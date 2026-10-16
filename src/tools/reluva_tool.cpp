@@ -113,13 +113,6 @@ std::string readName(const Bytes& d, size_t p) {
     return n;
 }
 
-float rdFloat(const Bytes& d, size_t o) {
-    uint32_t v = rd32(d, o);
-    float f;
-    std::memcpy(&f, &v, 4);
-    return f;
-}
-
 int cmdCatProbe(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool cat-probe <file.cat>\n");
@@ -136,21 +129,32 @@ int cmdCatProbe(int argc, char** argv) {
                 rd32(d, 2) + 6 == d.size() ? "matches" : "MISMATCH");
     std::printf("table chunk tag %u size %u, ends at 0x%zx; %u entries\n\n", rd16(d, 6), tocSize, tocEnd, count);
 
-    std::printf("%4s %6s %9s %4s %8s %-16s %s\n", "idx", "at", "chunk at", "tag", "size", "modified (UTC)",
-                "name (indented by folder)  [extra fields]");
+    std::printf("%4s %6s %9s %4s %8s  %-16s %s\n", "idx", "at", "chunk at", "tag", "size", "modified (UTC)",
+                "name (indented by folder)");
     std::vector<size_t> folderEnds; // chunk end positions of open folders
-    size_t pos = 0x10;
-    unsigned files = 0, folders = 0;
     std::vector<std::pair<uint16_t, unsigned>> tagCounts;
+    size_t pos = 0x10;
+    size_t expectedChunk = tocEnd; // each chunk must start where the previous one ended
+    unsigned files = 0, folders = 0, indexGaps = 0, chainBreaks = 0, sizeMismatches = 0;
+    int prevIndex = -1;
     for (unsigned i = 0; i < count; ++i) {
-        if (pos + 8 > d.size() || rd16(d, pos + 4) != i) {
-            std::printf("entry %u: expected at 0x%zx but the index there is %u\n", i, pos, rd16(d, pos + 4));
+        const int index = rd16(d, pos + 4);
+        if (pos + 8 > d.size() || index <= prevIndex || d[pos + 6] != 0 || d[pos + 7] != d[0x17]) {
+            std::printf("entry #%u at 0x%zx doesn't look like an entry (index %d after %d)\n", i, pos, index,
+                        prevIndex);
             hexdump(d, pos > 0x20 ? pos - 0x20 : 0, 0x80);
+            std::printf("RESULT: FAIL at entry #%u\n", i);
             return 1;
         }
+        if (prevIndex >= 0 && index != prevIndex + 1)
+            indexGaps += unsigned(index - prevIndex - 1);
+        prevIndex = index;
+
         const size_t chunk = size_t(rd32(d, pos)) + tocSize;
         const uint16_t tag = rd16(d, chunk);
         const uint32_t size = rd32(d, chunk + 2);
+        const bool chainOk = chunk == expectedChunk;
+        chainBreaks += !chainOk;
         while (!folderEnds.empty() && chunk >= folderEnds.back())
             folderEnds.pop_back();
         const std::string indent(folderEnds.size() * 2, ' ');
@@ -165,28 +169,39 @@ int cmdCatProbe(int argc, char** argv) {
             tagCounts.push_back({tag, 1});
 
         if (tag == kFolderTag) {
-            std::printf("%4u %6zx %9zx %4x %8u %-16s %s<folder>\n", i, pos, chunk, tag, size, "", indent.c_str());
+            std::printf("%4d %6zx %9zx%s %4x %8u  %-16s %s<folder>\n", index, pos, chunk, chainOk ? " " : "!", tag,
+                        size, "", indent.c_str());
             folderEnds.push_back(chunk + 6 + size);
+            expectedChunk = chunk + 6; // children follow the folder header
             pos += kFolderEntrySize;
             ++folders;
             continue;
         }
         const size_t p = pos + 8;
         const uint32_t metaSize = rd32(d, p + 0x116);
-        std::printf("%4u %6zx %9zx %4x %8u%s %-16s %s%s  [%u %g %g]\n", i, pos, chunk, tag, size,
+        sizeMismatches += metaSize != size;
+        std::printf("%4d %6zx %9zx%s %4x %8u%s %-16s %s%s\n", index, pos, chunk, chainOk ? " " : "!", tag, size,
                     metaSize == size ? " " : "!", formatTime(rd32(d, p + 0x11e)).c_str(), indent.c_str(),
-                    readName(d, p).c_str(), rd32(d, pos + 0x142), rdFloat(d, pos + 0x146), rdFloat(d, pos + 0x14a));
+                    readName(d, p).c_str());
+        expectedChunk = chunk + 6 + size;
         pos += kFileEntrySize;
         ++files;
     }
 
-    std::printf("\n%u files, %u folders; table walk ended at 0x%zx, table chunk ends at 0x%zx (%s)\n", files, folders,
-                pos, tocEnd, pos == tocEnd ? "matches" : "MISMATCH");
+    const bool tableOk = pos == tocEnd;
+    std::printf("\n%u files, %u folders, %u index gaps; table walk ended at 0x%zx, table chunk ends at 0x%zx\n", files,
+                folders, indexGaps, pos, tocEnd);
+    std::printf("last chunk ends at %zu, file size %zu (%lld bytes after)\n", expectedChunk, d.size(),
+                (long long)d.size() - (long long)expectedChunk);
     std::printf("chunk tags:");
     for (auto& tc : tagCounts)
         std::printf("  0x%x x%u", tc.first, tc.second);
     std::printf("\n");
-    return 0;
+    const bool ok = tableOk && chainBreaks == 0 && sizeMismatches == 0 && expectedChunk <= d.size();
+    std::printf("RESULT: %s (%u files, %u folders, table %s, %u chain breaks, %u size mismatches, %lld trailing bytes)\n",
+                ok ? "OK" : "FAIL", files, folders, tableOk ? "exact" : "MISMATCH", chainBreaks, sizeMismatches,
+                (long long)d.size() - (long long)expectedChunk);
+    return ok ? 0 : 1;
 }
 
 } // namespace

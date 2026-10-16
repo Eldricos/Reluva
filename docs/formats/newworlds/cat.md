@@ -48,7 +48,7 @@ exactly 244 files and 98 folders.
 | Entry offset | Type | Meaning |
 |---|---|---|
 | +0x000 | u32 | offset: the item's chunk is at file position offset + T. Equivalently, offsets are positions in the file as if the table's contents were removed: the first is 12, right after the two chunk headers |
-| +0x004 | u16 | entry index (0, 1, 2…) |
+| +0x004 | u16 | index. Increases by 1 per entry, except that each folder uses one extra index after its last child (as if an unstored "end of folder" entry existed): in `rommisc.cat`, folder 18 holds 19 and 20, and the next entry is 22 |
 | +0x006 | u8 | 0 |
 | +0x007 | u8 | same in every entry of an archive (`0x15` in `rommisc.cat`, `0x17` in `glblgame.cat`); possibly an archive ID |
 
@@ -66,7 +66,7 @@ File entries continue:
 | +0x12a | u32 | creation time (Unix time) |
 | +0x12e | u32 | modification time again |
 | +0x132 | u32 | Windows file attributes (`0x20` archive, `0x21` archive + read-only) |
-| +0x142 | u32, f32, f32 | unknown. Zero for `.stb`; `4, 64468.0, 62813.0` for `alert003.wav`; `1, 38187.0, 2949.0` for the entry before it |
+| +0x142 | 12 bytes | unknown; values look random across entries, so probably more uncleared memory |
 
 Example (`rommisc.cat` entry 0): offset 12 → chunk at 10230, tag `0x32`,
 size 3168, modified 2000-08-14 23:14 UTC, path
@@ -81,5 +81,5 @@ environment-map textures), `.geo` (geometry), `.wav`.
 
 ## Open questions
 
-- The meaning of the u8 at entry +0x007 and of the three fields at +0x142.
+- The meaning of the u8 at entry +0x007.
 - The formats of the stored files themselves.
