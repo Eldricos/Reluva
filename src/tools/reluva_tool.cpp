@@ -10,11 +10,15 @@
 //   reluva-tool cat-list <file>                    list a .cat file's contents
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
 //   reluva-tool stb-dump <file.stb>                print a string table
+//   reluva-tool tex-survey <file.cat>...           group every texture by header layout
 //   reluva-tool lbp-info <file> [out] [WxH]        show a texture's header; if it decodes,
 //                                                  write <out>_rgb.bmp and <out>_bgr.bmp
 
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
+#include "engines/newworlds/texture.h"
+
+#include <map>
 
 #include <cstdint>
 #include <cstdio>
@@ -575,6 +579,85 @@ int cmdLbpInfo(int argc, char** argv) {
     return 0;
 }
 
+
+// Decode every texture (tag 0x16) in the given archives and group them by
+// what their header holds, to find the layouts the decoder doesn't handle.
+int cmdTexSurvey(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool tex-survey <file.cat>...\n");
+        return 2;
+    }
+    struct Group {
+        unsigned count = 0;
+        std::map<std::string, unsigned> extensions;
+        std::vector<std::string> examples;
+        Bytes firstBytes;
+    };
+    std::map<std::string, Group> groups;
+    unsigned total = 0, decoded = 0;
+    std::vector<uint8_t> data;
+    for (int a = 2; a < argc; ++a) {
+        reluva::newworlds::CatArchive cat;
+        if (reluva::Error err = cat.open(argv[a])) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        for (const auto& e : cat.entries()) {
+            if (e.tag != reluva::newworlds::cattag::Texture)
+                continue;
+            if (cat.read(e, data))
+                continue;
+            ++total;
+            reluva::newworlds::Texture tex;
+            const bool ok = !reluva::newworlds::decodeTexture(data, tex);
+            decoded += ok;
+
+            // Describe the header: format, palette count, the three u32s
+            // after the palette, and data size relative to width x height.
+            char key[160];
+            const uint32_t format = data.size() >= 4 ? rd32(data, 0) : 0;
+            const uint32_t pal = data.size() >= 8 ? rd32(data, 4) : 0;
+            const size_t hdr = 8 + size_t(pal) * 4;
+            if (pal > 256 || hdr + 12 > data.size()) {
+                std::snprintf(key, sizeof key, "%s format %u, u32@4 %u: palette doesn't fit", ok ? "OK  " : "FAIL",
+                              format, pal);
+            } else {
+                const uint32_t f0 = rd32(data, hdr), w = rd32(data, hdr + 4), h = rd32(data, hdr + 8);
+                const size_t rest = data.size() - hdr - 12;
+                char ratio[48];
+                if (w && h && w <= 4096 && h <= 4096 && rest % (size_t(w) * h) == 0)
+                    std::snprintf(ratio, sizeof ratio, "data = %zu x w*h", rest / (size_t(w) * h));
+                else if (w && h && w <= 4096 && h <= 4096)
+                    std::snprintf(ratio, sizeof ratio, "data = %.3f x w*h", double(rest) / (double(w) * h));
+                else
+                    std::snprintf(ratio, sizeof ratio, "w/h not plausible");
+                std::snprintf(key, sizeof key, "%s format %u, palette %u, u32 after palette %u, %s", ok ? "OK  " : "FAIL",
+                              format, pal, f0, ratio);
+            }
+            Group& g = groups[key];
+            ++g.count;
+            ++g.extensions[extensionOf(e.name)];
+            if (g.examples.size() < 3)
+                g.examples.push_back(std::string(argv[a]) + ": " + e.name + " (" + std::to_string(data.size()) + " bytes)");
+            if (g.firstBytes.empty())
+                g.firstBytes.assign(data.begin(), data.begin() + std::min<size_t>(data.size(), 48));
+        }
+    }
+    std::printf("%u textures, %u decode with the current rules\n\n", total, decoded);
+    for (const auto& [key, g] : groups) {
+        std::printf("%5u  %s\n       extensions:", g.count, key.c_str());
+        for (const auto& [ext, n] : g.extensions)
+            std::printf(" %s x%u", ext.empty() ? "(none)" : ext.c_str(), n);
+        std::printf("\n");
+        for (const std::string& ex : g.examples)
+            std::printf("       e.g. %s\n", ex.c_str());
+        if (key.rfind("FAIL", 0) == 0)
+            hexdump(g.firstBytes, 0, g.firstBytes.size());
+        std::printf("\n");
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -590,6 +673,8 @@ int main(int argc, char** argv) {
         return cmdStbDump(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "lbp-info") == 0)
         return cmdLbpInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "tex-survey") == 0)
+        return cmdTexSurvey(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -597,6 +682,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool cat-list <file.cat>\n"
                  "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
                  "  reluva-tool stb-dump <file.stb>\n"
+                 "  reluva-tool tex-survey <file.cat>...\n"
                  "  reluva-tool lbp-info <file> [output prefix] [WxH]\n");
     return 2;
 }
