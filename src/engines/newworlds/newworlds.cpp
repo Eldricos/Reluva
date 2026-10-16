@@ -16,9 +16,13 @@ namespace {
 // Detection table. Fill it in from a real install: pick 2-3 files that are
 // unique to the game, then record their size and the MD5 of their first
 // kDetectionHashBytes bytes (the `reluva --hash <file>` tool prints these).
+//
+// Detection keys on glblgame.cat: patches tend to replace the executable but
+// not the large archives, so the executable is only required to exist.
 const std::vector<GameVariant> kVariants = {
-    // {"newworlds", "Star Trek: New Worlds", "en", "windows",
-    //  {{"<file1>", "<md5>", <size>}, {"<file2>", "<md5>", <size>}}},
+    {"newworlds", "Star Trek: New Worlds", "en", "windows",
+     {{"glblgame.cat", "9b5c322aef388f8e58e72b81bd9a91ad", 6883984},
+      {"STNW.exe", "", -1}}},
 };
 
 class NewWorldsEngine : public Engine {
