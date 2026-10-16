@@ -73,6 +73,10 @@ add_executable(reluva
     src/launcher/launcher.cpp)
 target_link_libraries(reluva PRIVATE reluva_engines imgui SDL3::SDL3 reluva_warnings)
 
+# --- developer tools -----------------------------------------------------------
+add_executable(reluva-tool src/tools/reluva_tool.cpp)
+target_link_libraries(reluva-tool PRIVATE reluva_warnings)
+
 # --- tests ----------------------------------------------------------------------
 if(RELUVA_BUILD_TESTS)
     enable_testing()

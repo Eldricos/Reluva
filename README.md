@@ -16,6 +16,7 @@ src/launcher/      Dear ImGui game list: add / remove / start games
 src/engines/       one directory per engine, plus registry.cpp listing them
   testbed/         built-in test "game" that exercises the backend
   newworlds/       Star Trek: New Worlds (stub; detection table empty)
+src/tools/         reluva-tool, utilities for studying game data
 tests/             unit tests for common/
 ```
 
@@ -41,6 +42,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 - `reluva <target>` starts a configured game directly. `reluva testbed`
   runs the test pattern.
 - `reluva --hash <files...>` prints detection signatures for an engine's table.
+- `reluva-tool hexdump <file> [offset] [length]` and `reluva-tool cat-probe <file>`
+  are developer tools for studying game data files.
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
