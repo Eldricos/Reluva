@@ -18,6 +18,7 @@
 #include "common/fs.h"
 
 #include <algorithm>
+#include <cstring>
 #include <memory>
 
 namespace reluva {
@@ -39,6 +40,11 @@ const std::vector<GameVariant> kVariants = {
 
 constexpr int kScreenW = 640;
 constexpr int kScreenH = 480;
+
+bool endsWith(const std::string& s, const char* suffix) {
+    const size_t n = std::strlen(suffix);
+    return s.size() >= n && s.compare(s.size() - n, n, suffix) == 0;
+}
 
 class NewWorldsEngine : public Engine {
 public:
@@ -99,7 +105,7 @@ private:
                 return err;
             const auto& entries = cat->entries();
             for (size_t i = 0; i < entries.size(); ++i)
-                if (entries[i].tag == newworlds::cattag::Texture)
+                if (entries[i].tag == newworlds::cattag::Texture && !endsWith(entries[i].name, ".stb"))
                     textures_.push_back({archives_.size(), i});
             archives_.push_back(std::move(cat));
         }
@@ -123,7 +129,8 @@ private:
             fill(0, 0, kScreenW, kScreenH, 80, 0, 0); // dark red: couldn't decode
         } else {
             drawTexture(tex);
-            status = std::to_string(tex.width) + "x" + std::to_string(tex.height);
+            status = "format " + std::to_string(tex.format) + ", " + std::to_string(tex.width) + "x" +
+                     std::to_string(tex.height) + (tex.sizeGuessed ? ", size not stored: guessed" : "");
         }
         sys_.setWindowTitle("New Worlds textures " + std::to_string(index + 1) + "/" +
                             std::to_string(textures_.size()) + ": " + cat.entries()[ref.entry].name + " (" +

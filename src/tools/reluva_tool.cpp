@@ -623,6 +623,19 @@ int cmdTexSurvey(int argc, char** argv) {
                               format, pal);
             } else {
                 const uint32_t f0 = rd32(data, hdr), w = rd32(data, hdr + 4), h = rd32(data, hdr + 8);
+                if (f0 == 1) {
+                    // No size stored: describe the pixel count per layer.
+                    const size_t layers = format == 6 ? 2 : 1, n = (data.size() - hdr - 4) / layers;
+                    size_t side = 1, half = 1;
+                    while (side * side < n)
+                        ++side;
+                    while (half * half * 2 < n)
+                        ++half;
+                    const char* shape = side * side == n ? "square" : half * half * 2 == n ? "2:1" : "neither square nor 2:1";
+                    std::snprintf(key, sizeof key, "%s format %u, palette %u, size not stored, pixels per layer %s",
+                                  ok ? "OK  " : "FAIL", format, pal, shape);
+                    goto grouped;
+                }
                 const size_t rest = data.size() - hdr - 12;
                 char ratio[48];
                 if (w && h && w <= 4096 && h <= 4096 && rest % (size_t(w) * h) == 0)
@@ -634,6 +647,7 @@ int cmdTexSurvey(int argc, char** argv) {
                 std::snprintf(key, sizeof key, "%s format %u, palette %u, u32 after palette %u, %s", ok ? "OK  " : "FAIL",
                               format, pal, f0, ratio);
             }
+        grouped:
             Group& g = groups[key];
             ++g.count;
             ++g.extensions[extensionOf(e.name)];
