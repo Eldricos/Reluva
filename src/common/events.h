@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include <cstdint>
 
-namespace kestrel {
+namespace reluva {
 
 // Key codes are backend-independent. Printable keys use their lowercase
 // ASCII value; everything else uses the values below.
@@ -64,4 +67,4 @@ struct Event {
     int wheelY = 0;
 };
 
-} // namespace kestrel
+} // namespace reluva

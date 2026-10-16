@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 // Star Trek: New Worlds engine (clean-room reimplementation).
 //
 // Everything in this engine must come from the game's data files, observed
@@ -6,13 +9,13 @@
 
 #include "engines/engine.h"
 
-namespace kestrel {
+namespace reluva {
 
 namespace {
 
 // Detection table. Fill it in from a real install: pick 2-3 files that are
 // unique to the game, then record their size and the MD5 of their first
-// kDetectionHashBytes bytes (the `kestrel --hash <file>` tool prints these).
+// kDetectionHashBytes bytes (the `reluva --hash <file>` tool prints these).
 const std::vector<GameVariant> kVariants = {
     // {"newworlds", "Star Trek: New Worlds", "en", "windows",
     //  {{"<file1>", "<md5>", <size>}, {"<file2>", "<md5>", <size>}}},
@@ -52,4 +55,4 @@ const MetaEngine& newWorldsMetaEngine() {
     return instance;
 }
 
-} // namespace kestrel
+} // namespace reluva

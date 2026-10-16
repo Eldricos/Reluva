@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include "common/events.h"
@@ -7,7 +10,7 @@
 #include <functional>
 #include <string>
 
-namespace kestrel {
+namespace reluva {
 
 // Everything an engine may ask of the platform. Engines must never include
 // SDL (or any other backend) headers; they go through this interface so the
@@ -41,4 +44,4 @@ public:
     virtual int audioRate() const = 0;
 };
 
-} // namespace kestrel
+} // namespace reluva

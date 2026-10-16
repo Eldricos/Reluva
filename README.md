@@ -1,10 +1,10 @@
-# Kestrel
+# Reluva
+
+**R**eimplemented **E**ngines for **L**egacy, **U**nsupported & **V**intage **A**dventures.
 
 A framework for running classic games natively on modern systems by
 reimplementing their engines, in the spirit of ScummVM. Games are not
-included: you point Kestrel at your own installed copy.
-
-The name is a placeholder.
+included: you point Reluva at your own installed copy.
 
 ## Layout
 
@@ -29,29 +29,37 @@ and built automatically.
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j
-./build/kestrel
+./build/reluva
 ```
 
 On Linux, install SDL's build dependencies first (X11/Wayland, audio
 headers): https://wiki.libsdl.org/SDL3/README-linux#build-dependencies.
-To use an installed SDL3 instead, add `-DKESTREL_USE_SYSTEM_SDL=ON`.
+To use an installed SDL3 instead, add `-DRELUVA_USE_SYSTEM_SDL=ON`.
 
 ## Usage
 
-- `kestrel` opens the launcher. *Add Game...* scans a folder for supported games.
-- `kestrel <target>` starts a configured game directly. `kestrel testbed`
+- `reluva` opens the launcher. *Add Game...* scans a folder for supported games.
+- `reluva <target>` starts a configured game directly. `reluva testbed`
   runs the test pattern.
-- `kestrel --hash <files...>` prints detection signatures for an engine's table.
+- `reluva --hash <files...>` prints detection signatures for an engine's table.
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
 
-The config is saved as `kestrel.ini` in SDL's preferences folder
-(`~/.local/share/kestrel/kestrel/` on Linux, `%APPDATA%\kestrel\kestrel\` on Windows).
+The config is saved as `reluva.ini` in SDL's preferences folder
+(`~/.local/share/reluva/reluva/` on Linux, `%APPDATA%\reluva\reluva\` on Windows).
 
 ## Adding an engine
 
 1. Create `src/engines/<name>/` with an `Engine` and a `MetaEngine` (copy `testbed`).
-2. Add a detection table built with `kestrel --hash`.
+2. Add a detection table built with `reluva --hash`.
 3. Register its accessor in `src/engines/registry.cpp` and add the source to
    `CMakeLists.txt`.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) first: only clean-room work is accepted.
+
+## License
+
+Reluva is free software, licensed under the GNU General Public License,
+version 3 or (at your option) any later version. See [LICENSE](LICENSE).
+
+Reluva doesn't include any game data. Games and their assets remain the
+property of their respective owners.

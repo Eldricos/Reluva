@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
 #include <string>
 
-namespace kestrel {
+namespace reluva {
 
 // Minimal MD5 (RFC 1321), used only for identifying game data files.
 class Md5 {
@@ -22,4 +25,4 @@ private:
     size_t bufferLen_ = 0;
 };
 
-} // namespace kestrel
+} // namespace reluva

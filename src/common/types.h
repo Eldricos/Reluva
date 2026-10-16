@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include <cstdint>
 #include <string>
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
 // Result of an operation that can fail with a human-readable reason.
 struct Error {
@@ -45,4 +48,4 @@ struct Surface {
     const uint8_t* row(int y) const { return pixels.data() + static_cast<size_t>(y) * pitch; }
 };
 
-} // namespace kestrel
+} // namespace reluva

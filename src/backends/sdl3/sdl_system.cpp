@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "backends/sdl3/sdl_system.h"
 
 #include <cstring>
 
-namespace kestrel {
+namespace reluva {
 
 namespace {
 
@@ -78,7 +81,7 @@ Error SdlSystem::init() {
     if (!SDL_InitSubSystem(SDL_INIT_AUDIO))
         SDL_Log("Audio unavailable: %s", SDL_GetError());
 
-    window_ = SDL_CreateWindow("Kestrel", 1280, 800,
+    window_ = SDL_CreateWindow("Reluva", 1280, 800,
                                SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
     if (!window_)
         return Error::fail(std::string("SDL_CreateWindow failed: ") + SDL_GetError());
@@ -101,7 +104,7 @@ void SdlSystem::resetForLauncher() {
     }
     gameW_ = gameH_ = 0;
     SDL_SetRenderLogicalPresentation(renderer_, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
-    SDL_SetWindowTitle(window_, "Kestrel");
+    SDL_SetWindowTitle(window_, "Reluva");
 }
 
 Error SdlSystem::initGraphics(int width, int height, PixelFormat format) {
@@ -239,4 +242,4 @@ void SdlSystem::stopAudio() {
     audioCallback_ = nullptr;
 }
 
-} // namespace kestrel
+} // namespace reluva

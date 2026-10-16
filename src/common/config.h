@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include "common/types.h"
@@ -7,13 +10,13 @@
 #include <string>
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
-// INI-style settings file. The [kestrel] section holds global settings; every
+// INI-style settings file. The [reluva] section holds global settings; every
 // other section is a game target (one installed game the user added).
 class Config {
 public:
-    static constexpr const char* kGlobalSection = "kestrel";
+    static constexpr const char* kGlobalSection = "reluva";
 
     Error load(const std::filesystem::path& path);
     Error save() const;
@@ -31,4 +34,4 @@ private:
     std::map<std::string, std::map<std::string, std::string>> sections_;
 };
 
-} // namespace kestrel
+} // namespace reluva

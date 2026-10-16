@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 // Small self-contained tests for common/. No framework, to keep deps at zero.
 
 #include "common/config.h"
@@ -9,7 +12,7 @@
 #include <fstream>
 #include <string>
 
-using namespace kestrel;
+using namespace reluva;
 
 static int failures = 0;
 
@@ -79,7 +82,7 @@ static void testConfig(const std::filesystem::path& tmp) {
 }
 
 int main() {
-    auto tmp = std::filesystem::temp_directory_path() / "kestrel_tests";
+    auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include <cstdint>
@@ -6,7 +9,7 @@
 #include <string>
 #include <string_view>
 
-namespace kestrel::fs {
+namespace reluva::fs {
 
 namespace stdfs = std::filesystem;
 
@@ -20,4 +23,4 @@ std::optional<stdfs::path> findFile(const stdfs::path& dir, std::string_view rel
 // when maxBytes is 0. Returns nullopt if the file can't be read.
 std::optional<std::string> md5File(const stdfs::path& file, uint64_t maxBytes);
 
-} // namespace kestrel::fs
+} // namespace reluva::fs

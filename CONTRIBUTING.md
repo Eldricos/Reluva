@@ -1,6 +1,6 @@
 # Contributing
 
-Kestrel reimplements classic game engines from scratch. Every line of code
+Reluva reimplements classic game engines from scratch. Every line of code
 has to be our own, written from information we are allowed to use.
 
 ## Allowed sources

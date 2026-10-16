@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "launcher/launcher.h"
 
 #include "backends/sdl3/sdl_system.h"
@@ -7,7 +10,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 
-namespace kestrel {
+namespace reluva {
 
 Launcher::Launcher(SdlSystem& system, Config& config) : sys_(system), config_(config) {
     IMGUI_CHECKVERSION();
@@ -81,11 +84,11 @@ void Launcher::drawUi(std::optional<GameTarget>& launch, bool& quit) {
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(vp->WorkPos);
     ImGui::SetNextWindowSize(vp->WorkSize);
-    ImGui::Begin("Kestrel", nullptr,
+    ImGui::Begin("Reluva", nullptr,
                  ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
 
-    ImGui::TextUnformatted("Kestrel");
+    ImGui::TextUnformatted("Reluva");
     ImGui::SameLine();
     ImGui::TextDisabled("v0.1 - classic game engine reimplementations");
     ImGui::Separator();
@@ -233,4 +236,4 @@ GameTarget Launcher::targetFromConfig(const std::string& name) const {
                       config_.get(name, "description", name), config_.get(name, "path")};
 }
 
-} // namespace kestrel
+} // namespace reluva

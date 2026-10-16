@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "backends/sdl3/sdl_system.h"
 #include "common/config.h"
 #include "common/detection.h"
@@ -13,18 +16,18 @@
 #include <optional>
 #include <string>
 
-using namespace kestrel;
+using namespace reluva;
 
 static std::filesystem::path configPath() {
     std::filesystem::path dir = ".";
-    if (char* pref = SDL_GetPrefPath("kestrel", "kestrel")) {
+    if (char* pref = SDL_GetPrefPath("reluva", "reluva")) {
         dir = pref;
         SDL_free(pref);
     }
-    return dir / "kestrel.ini";
+    return dir / "reluva.ini";
 }
 
-// `kestrel --hash <file>...` prints detection signatures for building tables.
+// `reluva --hash <file>...` prints detection signatures for building tables.
 static int printHashes(int argc, char** argv) {
     for (int i = 2; i < argc; ++i) {
         std::error_code ec;
@@ -46,7 +49,7 @@ int main(int argc, char** argv) {
 
     SdlSystem system;
     if (Error err = system.init()) {
-        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Kestrel", err.message.c_str(), nullptr);
+        SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Reluva", err.message.c_str(), nullptr);
         SDL_Log("%s", err.message.c_str());
         return 1;
     }
@@ -54,7 +57,7 @@ int main(int argc, char** argv) {
     Config config;
     config.load(configPath());
 
-    // `kestrel <target>` starts a configured game (or "testbed") directly and
+    // `reluva <target>` starts a configured game (or "testbed") directly and
     // exits when it ends; otherwise the launcher runs.
     std::optional<GameTarget> direct;
     if (argc >= 2) {

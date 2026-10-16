@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 // Testbed: a built-in "game" that exercises the System interface (palette
 // graphics, input, timing, audio) so the backend can be checked without any
 // game data. Esc returns to the launcher, Space toggles a test tone.
@@ -7,7 +10,7 @@
 #include <atomic>
 #include <cmath>
 
-namespace kestrel {
+namespace reluva {
 
 namespace {
 
@@ -22,7 +25,7 @@ public:
     Error run() override {
         if (Error err = sys_.initGraphics(kWidth, kHeight, PixelFormat::CLUT8))
             return err;
-        sys_.setWindowTitle("Kestrel - Testbed (Esc: back, Space: tone)");
+        sys_.setWindowTitle("Reluva - Testbed (Esc: back, Space: tone)");
         screen_.create(kWidth, kHeight, PixelFormat::CLUT8);
 
         const int rate = sys_.audioRate();
@@ -145,4 +148,4 @@ const MetaEngine& testbedMetaEngine() {
     return instance;
 }
 
-} // namespace kestrel
+} // namespace reluva

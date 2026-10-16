@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "common/md5.h"
 
 #include <cmath>
 #include <cstring>
 
-namespace kestrel {
+namespace reluva {
 
 namespace {
 
@@ -109,4 +112,4 @@ std::string Md5::hexDigest() {
     return out;
 }
 
-} // namespace kestrel
+} // namespace reluva

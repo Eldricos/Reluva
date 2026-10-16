@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include "common/detection.h"
@@ -9,7 +12,7 @@
 #include <string>
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
 // A game the user has added, as stored in the config file.
 struct GameTarget {
@@ -42,4 +45,4 @@ public:
     virtual std::unique_ptr<Engine> create(System& system, const GameTarget& target) const = 0;
 };
 
-} // namespace kestrel
+} // namespace reluva

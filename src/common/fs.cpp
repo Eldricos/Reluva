@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "common/fs.h"
 #include "common/md5.h"
 
@@ -6,7 +9,7 @@
 #include <fstream>
 #include <vector>
 
-namespace kestrel::fs {
+namespace reluva::fs {
 
 std::string toLower(std::string_view s) {
     std::string out(s);
@@ -68,4 +71,4 @@ std::optional<std::string> md5File(const stdfs::path& file, uint64_t maxBytes) {
     return md5.hexDigest();
 }
 
-} // namespace kestrel::fs
+} // namespace reluva::fs

@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include "common/system.h"
@@ -6,7 +9,7 @@
 
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
 class SdlSystem : public System {
 public:
@@ -55,4 +58,4 @@ private:
     std::vector<int16_t> audioBuffer_; // audio thread only
 };
 
-} // namespace kestrel
+} // namespace reluva

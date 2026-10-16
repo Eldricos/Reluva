@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include <cstdint>
@@ -5,7 +8,7 @@
 #include <string>
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
 // How many leading bytes of a file are hashed for detection. Hashing only the
 // start keeps detection fast even for large archives.
@@ -40,4 +43,4 @@ std::vector<DetectedGame> detectFromTable(const std::string& engineId,
                                           const std::vector<GameVariant>& table,
                                           const std::filesystem::path& dir);
 
-} // namespace kestrel
+} // namespace reluva

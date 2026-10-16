@@ -1,8 +1,11 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "common/config.h"
 
 #include <fstream>
 
-namespace kestrel {
+namespace reluva {
 
 static std::string trim(const std::string& s) {
     const char* ws = " \t\r\n";
@@ -77,4 +80,4 @@ std::vector<std::string> Config::targets() const {
     return out;
 }
 
-} // namespace kestrel
+} // namespace reluva

@@ -1,6 +1,9 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "engines/registry.h"
 
-namespace kestrel {
+namespace reluva {
 
 // Each engine exposes one accessor. Add new engines here.
 const MetaEngine& testbedMetaEngine();
@@ -30,4 +33,4 @@ std::vector<DetectedGame> detectGames(const std::filesystem::path& dir) {
     return all;
 }
 
-} // namespace kestrel
+} // namespace reluva

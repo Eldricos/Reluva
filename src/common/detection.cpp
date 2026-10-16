@@ -1,10 +1,13 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #include "common/detection.h"
 #include "common/fs.h"
 
 #include <map>
 #include <optional>
 
-namespace kestrel {
+namespace reluva {
 
 std::vector<DetectedGame> detectFromTable(const std::string& engineId,
                                           const std::vector<GameVariant>& table,
@@ -55,4 +58,4 @@ std::vector<DetectedGame> detectFromTable(const std::string& engineId,
     return results;
 }
 
-} // namespace kestrel
+} // namespace reluva

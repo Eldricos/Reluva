@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
 #pragma once
 
 #include "common/config.h"
@@ -10,7 +13,7 @@
 #include <string>
 #include <vector>
 
-namespace kestrel {
+namespace reluva {
 
 class SdlSystem;
 
@@ -52,4 +55,4 @@ private:
     std::vector<DetectedGame> pendingChoices_;
 };
 
-} // namespace kestrel
+} // namespace reluva
