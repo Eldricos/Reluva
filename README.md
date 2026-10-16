@@ -15,7 +15,8 @@ src/backends/sdl3/ the only code that touches SDL (window, rendering, input, aud
 src/launcher/      Dear ImGui game list: add / remove / start games
 src/engines/       one directory per engine, plus registry.cpp listing them
   testbed/         built-in test "game" that exercises the backend
-  newworlds/       Star Trek: New Worlds (stub; detection table empty)
+  newworlds/       Star Trek: New Worlds: archive, string table and texture
+                   readers; currently runs as a texture viewer
 src/tools/         reluva-tool, utilities for studying game data
 tests/             unit tests for common/
 ```

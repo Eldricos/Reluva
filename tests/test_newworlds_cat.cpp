@@ -6,6 +6,7 @@
 
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
+#include "engines/newworlds/texture.h"
 
 #include <cstdio>
 #include <cstring>
@@ -226,6 +227,39 @@ void testStringTable() {
     CHECK(t.parse(cut));                             // last string unterminated
 }
 
+// Format 6: u32 6, u32 palette count, palette (blue, green, red, 0),
+// u32 0, u32 width, u32 height, indices, alpha.
+std::vector<uint8_t> textureBytes(uint32_t w, uint32_t h, uint32_t format = 6) {
+    std::vector<uint8_t> b;
+    put32(b, format);
+    put32(b, 2);
+    b.insert(b.end(), {0x10, 0x20, 0xf0, 0}); // index 0: red 0xf0, green 0x20, blue 0x10
+    b.insert(b.end(), {0xff, 0x00, 0x00, 0}); // index 1: pure blue
+    put32(b, 0);
+    put32(b, w);
+    put32(b, h);
+    for (uint32_t i = 0; i < w * h; ++i)
+        b.push_back(uint8_t(i % 2));          // indices alternate 0, 1
+    for (uint32_t i = 0; i < w * h; ++i)
+        b.push_back(uint8_t(i * 10));         // alpha
+    return b;
+}
+
+void testTexture() {
+    Texture t;
+    CHECK(!decodeTexture(textureBytes(4, 2), t));
+    CHECK(t.width == 4 && t.height == 2 && t.rgba.size() == 32);
+    CHECK(t.rgba[0] == 0xf0 && t.rgba[1] == 0x20 && t.rgba[2] == 0x10 && t.rgba[3] == 0); // pixel 0
+    CHECK(t.rgba[4] == 0x00 && t.rgba[5] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 10); // pixel 1
+    CHECK(t.rgba[31] == 70);
+
+    CHECK(decodeTexture(textureBytes(4, 2, 7), t)); // unknown format
+    auto bad = textureBytes(4, 2);
+    bad.pop_back();
+    CHECK(decodeTexture(bad, t));                  // wrong size
+    CHECK(decodeTexture(textureBytes(0, 2), t));   // zero width
+}
+
 } // namespace
 
 int main() {
@@ -234,6 +268,7 @@ int main() {
     testRead(tmp);
     testRejectsCorruption(tmp);
     testStringTable();
+    testTexture();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

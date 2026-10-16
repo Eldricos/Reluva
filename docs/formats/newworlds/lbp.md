@@ -1,8 +1,9 @@
 # Star Trek: New Worlds: textures (`.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp`)
 
-Status: **layout understood for format 6**; what the second layer means and
-the palette's channel order are still open. Check any texture with
-`reluva-tool lbp-info <file> <prefix>`, which decodes it to BMP files.
+Status: **understood for format 6**, confirmed visually on real textures.
+Decoder: `src/engines/newworlds/texture.cpp`; the New Worlds engine currently
+shows every texture in an install. `reluva-tool lbp-info <file> <prefix>`
+decodes one to BMP files.
 Stored in `.cat` archives with chunk tag `0x16`.
 
 All values little-endian.
@@ -10,12 +11,12 @@ All values little-endian.
 ```
 u32 format           6 in every texture checked so far
 u32 palette count    256
-palette              count × 4 bytes, e.g. d2 ce ce 00 (4th byte 0 so far)
+palette              count × 4 bytes: blue, green, red, 0 (like a Windows RGBQUAD)
 u32 0                (unknown, 0 so far)
 u32 width
 u32 height
 layer 1              width × height bytes: palette indices
-layer 2              width × height bytes: probably alpha
+layer 2              width × height bytes: alpha (0 transparent, 255 opaque)
 ```
 
 Evidence (from `rommisc.cat`, decoded with `lbp-info`):
@@ -33,14 +34,21 @@ the larger textures looked stretched, as expected if their real widths are 128
 and 256. Every texture size seen in the archives fits 8 + 1024 + 12 + 2 × w × h
 for power-of-two sizes.
 
+Confirmed by viewing the decoded images:
+
+- Decoded at the header size, `rom_hs`, `rflare` and `rb_muzzl` look right.
+- `rimpact.lbp` (256 × 256) is a 4 × 4 grid of 64 × 64 frames, presumably an
+  animated impact effect stored as a sprite sheet.
+- Layer 2 looks like a transparency mask of the image.
+- With the palette read as blue, green, red, `explode.lbp` is orange and
+  yellow fire; read as red, green, blue it isn't.
+
 ## Open questions
 
-- Whether layer 2 is alpha. `lbp-info` writes it as `<prefix>_layer2.bmp`
-  and prints how many distinct values it uses.
-- Palette channel order (RGB or BGR). The Romulan textures checked are near
-  grey or green, where the order barely shows; a strongly coloured texture
-  (e.g. an explosion) will settle it.
-- Whether other format values exist.
+- What the u32 0 before the width means.
+- Whether other format values exist, e.g. in `.fbp` font textures or `.eb0`
+  environment maps.
+- How sprite sheets are divided into frames (fixed grid, or described elsewhere).
 
 ## Texture sets
 
