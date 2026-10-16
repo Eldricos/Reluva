@@ -23,8 +23,8 @@ Engines only use `common/` and `engines/engine.h`. They never include SDL.
 
 ## Building
 
-Needs CMake 3.24+ and a C++20 compiler. SDL3 and Dear ImGui are downloaded
-and built automatically.
+Needs CMake 3.24+, Git and a C++20 compiler. SDL3 and Dear ImGui are
+downloaded and built automatically.
 
 ```sh
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -32,9 +32,8 @@ cmake --build build -j
 ./build/reluva
 ```
 
-On Linux, install SDL's build dependencies first (X11/Wayland, audio
-headers): https://wiki.libsdl.org/SDL3/README-linux#build-dependencies.
-To use an installed SDL3 instead, add `-DRELUVA_USE_SYSTEM_SDL=ON`.
+See **[docs/BUILDING.md](docs/BUILDING.md)** for step-by-step instructions for
+Linux (with each distro's packages) and Windows with Visual Studio 2022.
 
 ## Usage
 
