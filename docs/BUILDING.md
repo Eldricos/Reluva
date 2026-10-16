@@ -131,6 +131,10 @@ With this generator, choose Debug or Release with `--config` when building
 - **The first configure fails while downloading:** CMake fetches SDL and ImGui
   from GitHub, so it needs internet access the first time. Later builds reuse
   the downloaded copies.
+- **"Error: generator : Ninja / Does not match the generator used previously"**
+  The `build` folder was first configured with a different generator (e.g.
+  without `-G Ninja`). A build folder keeps the generator it started with, so
+  delete it (`rm -rf build`) and configure again, or use a new folder name.
 - **Linux: CMake error "Couldn't find dependency package for ..."** A `-dev`
   package from step 1 is missing. The error names the feature, e.g. `XCURSOR`
   → `libxcursor-dev`.
