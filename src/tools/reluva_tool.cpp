@@ -10,7 +10,7 @@
 //   reluva-tool cat-list <file>                    list a .cat file's contents
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
 //   reluva-tool stb-dump <file.stb>                print a string table
-//   reluva-tool lbp-info <file> [out]              show a texture's header; if it decodes,
+//   reluva-tool lbp-info <file> [out] [WxH]        show a texture's header; if it decodes,
 //                                                  write <out>_rgb.bmp and <out>_bgr.bmp
 
 #include "engines/newworlds/cat_archive.h"
@@ -454,7 +454,7 @@ bool writeBmp(const std::string& path, int w, int h, const uint8_t* palette, int
 
 int cmdLbpInfo(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: reluva-tool lbp-info <file> [output prefix]\n");
+        std::fprintf(stderr, "usage: reluva-tool lbp-info <file> [output prefix] [WxH]\n");
         return 2;
     }
     Bytes d;
@@ -477,15 +477,62 @@ int cmdLbpInfo(int argc, char** argv) {
     std::printf("first palette entries:\n");
     hexdump(d, 8, 32);
 
-    int w = 0, h = 0;
-    if (size_t(a) * b == pixelBytes) {
-        w = int(a);
-        h = int(b);
-        std::printf("=> %d x %d at 8 bits per pixel fits exactly\n", w, h);
-    } else {
-        std::printf("=> width x height doesn't match the remaining bytes; not decoding\n");
+    // The size can be stored in several ways; try each and keep the ones
+    // that account for exactly the pixel bytes.
+    struct Candidate {
+        std::string how;
+        size_t w, h;
+    };
+    std::vector<Candidate> candidates;
+    auto consider = [&](const std::string& how, size_t cw, size_t ch) {
+        if (cw && ch && cw <= 4096 && ch <= 4096 && cw * ch == pixelBytes)
+            candidates.push_back({how, cw, ch});
+    };
+    const uint32_t fields[3] = {a, b, c};
+    const char* names[3] = {"a", "b", "c"};
+    for (int i = 0; i < 3; ++i)
+        for (int j = 0; j < 3; ++j)
+            if (i != j) {
+                consider(std::string(names[i]) + " x " + names[j], fields[i], fields[j]);
+                if (fields[i] < 16 && fields[j] < 16)
+                    consider(std::string("2^") + names[i] + " x 2^" + names[j], size_t(1) << fields[i],
+                             size_t(1) << fields[j]);
+            }
+    for (int i = 0; i < 3; ++i) // u16 halves of one field
+        consider(std::string(names[i]) + " as two u16", fields[i] & 0xffff, fields[i] >> 16);
+    if (format < 16 && pixelBytes % (size_t(1) << format) == 0)
+        consider("width 2^format, height from size", size_t(1) << format, pixelBytes >> format);
+    for (int i = 0; i < 3; ++i)
+        if (fields[i] && pixelBytes % fields[i] == 0)
+            consider(std::string("width ") + names[i] + ", height from size", fields[i], pixelBytes / fields[i]);
+    size_t side = 1;
+    while (side * side < pixelBytes)
+        side <<= 1;
+    if (side * side == pixelBytes)
+        consider("square (guess)", side, side);
+    else
+        consider("2:1 (guess)", side, side / 2);
+
+    std::printf("candidates (a=%u b=%u c=%u, %zu pixel bytes):\n", a, b, c, pixelBytes);
+    for (const Candidate& cand : candidates)
+        std::printf("  %-34s %zu x %zu\n", cand.how.c_str(), cand.w, cand.h);
+    if (candidates.empty()) {
+        std::printf("=> no size interpretation fits; not decoding\n");
         return 1;
     }
+    int w = int(candidates.front().w), h = int(candidates.front().h);
+    std::string how = candidates.front().how;
+    if (argc > 4) { // explicit size, e.g. 128x64
+        int fw = 0, fh = 0;
+        if (std::sscanf(argv[4], "%dx%d", &fw, &fh) != 2 || fw <= 0 || fh <= 0 || size_t(fw) * size_t(fh) != pixelBytes) {
+            std::fprintf(stderr, "size %s doesn't match %zu pixel bytes\n", argv[4], pixelBytes);
+            return 1;
+        }
+        w = fw;
+        h = fh;
+        how = "given on the command line";
+    }
+    std::printf("=> decoding as %d x %d (%s)\n", w, h, how.c_str());
     if (argc > 3) {
         const std::string prefix = argv[3];
         const uint8_t* pixels = d.data() + paletteEnd + 12;
@@ -520,6 +567,6 @@ int main(int argc, char** argv) {
                  "  reluva-tool cat-list <file.cat>\n"
                  "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
                  "  reluva-tool stb-dump <file.stb>\n"
-                 "  reluva-tool lbp-info <file> [output prefix]\n");
+                 "  reluva-tool lbp-info <file> [output prefix] [WxH]\n");
     return 2;
 }
