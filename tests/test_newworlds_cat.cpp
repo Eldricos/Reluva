@@ -5,6 +5,7 @@
 // docs/formats/newworlds/cat.md, so no game data is needed.
 
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/string_table.h"
 
 #include <cstdio>
 #include <cstring>
@@ -189,6 +190,42 @@ void testNormalizeName() {
     CHECK(CatArchive::normalizeName("") == "");
 }
 
+// Laid out like the start of rom01.stb: count, then (id, UTF-16 text, 0).
+std::vector<uint8_t> stringTableBytes(const std::vector<std::pair<uint32_t, std::u16string>>& strings,
+                                      uint32_t count) {
+    std::vector<uint8_t> b;
+    put32(b, count);
+    for (const auto& [id, str] : strings) {
+        put32(b, id);
+        for (char16_t c : str)
+            put16(b, uint16_t(c));
+        put16(b, 0);
+    }
+    return b;
+}
+
+void testStringTable() {
+    const std::vector<std::pair<uint32_t, std::u16string>> strings = {
+        {1, u" 'Et Tu?'"},
+        {23, u"Stardate 8988.4.  The type 6 world Sakuntula has significant deposits of dilithium."},
+        {22, u"~STELLAR CARTOGRAPHY~"},
+        {5, u""},
+    };
+    StringTable t;
+    CHECK(!t.parse(stringTableBytes(strings, 4)));
+    CHECK(t.strings().size() == 4);
+    CHECK(t.find(1) && *t.find(1) == " 'Et Tu?'");
+    CHECK(t.find(22) && *t.find(22) == "~STELLAR CARTOGRAPHY~");
+    CHECK(t.find(5) && t.find(5)->empty());
+    CHECK(t.find(99) == nullptr);
+
+    CHECK(t.parse(stringTableBytes(strings, 5)));    // count too high
+    CHECK(t.parse(stringTableBytes(strings, 3)));    // bytes left over
+    auto cut = stringTableBytes(strings, 4);
+    cut.resize(cut.size() - 1);
+    CHECK(t.parse(cut));                             // last string unterminated
+}
+
 } // namespace
 
 int main() {
@@ -196,6 +233,7 @@ int main() {
     testNormalizeName();
     testRead(tmp);
     testRejectsCorruption(tmp);
+    testStringTable();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

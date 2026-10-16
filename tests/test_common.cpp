@@ -7,6 +7,7 @@
 #include "common/detection.h"
 #include "common/fs.h"
 #include "common/md5.h"
+#include "common/text.h"
 
 #include <cstdio>
 #include <fstream>
@@ -81,9 +82,18 @@ static void testConfig(const std::filesystem::path& tmp) {
     std::filesystem::remove_all(tmp);
 }
 
+static void testUtf16() {
+    const uint16_t hello[] = {'H', 'i', ' ', 0x00e9, 0x20ac, 0xd83d, 0xde80}; // e-acute, euro, rocket
+    CHECK(text::utf16leToUtf8(hello, 7) == "Hi \xc3\xa9\xe2\x82\xac\xf0\x9f\x9a\x80");
+    const uint16_t lone[] = {0xd800, 'x'};
+    CHECK(text::utf16leToUtf8(lone, 2) == "\xef\xbf\xbdx");
+    CHECK(text::utf16leToUtf8(nullptr, 0).empty());
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
+    testUtf16();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)

@@ -9,8 +9,12 @@
 //                                                  layout and work out unknown entry kinds
 //   reluva-tool cat-list <file>                    list a .cat file's contents
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
+//   reluva-tool stb-dump <file.stb>                print a string table
+//   reluva-tool lbp-info <file> [out]              show a texture's header; if it decodes,
+//                                                  write <out>_rgb.bmp and <out>_bgr.bmp
 
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/string_table.h"
 
 #include <cstdint>
 #include <cstdio>
@@ -390,6 +394,110 @@ int cmdCatExtract(int argc, char** argv) {
     return 0;
 }
 
+
+int cmdStbDump(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool stb-dump <file.stb>\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    reluva::newworlds::StringTable table;
+    reluva::Error err = table.parse(d);
+    for (const auto& s : table.strings())
+        std::printf("%6u  %s\n", s.id, s.text.c_str());
+    if (err) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::printf("-- %zu strings, layout matches exactly\n", table.strings().size());
+    return 0;
+}
+
+// 8-bit paletted BMP, rows top-down. swapRB picks which palette byte is red.
+bool writeBmp(const std::string& path, int w, int h, const uint8_t* palette, int paletteCount, const uint8_t* pixels,
+              bool swapRB) {
+    const int stride = (w + 3) & ~3;
+    const uint32_t paletteBytes = 256 * 4, dataOffset = 14 + 40 + paletteBytes;
+    const uint32_t fileSize = dataOffset + uint32_t(stride * h);
+    Bytes out;
+    auto p16 = [&](uint32_t v) { out.push_back(uint8_t(v)); out.push_back(uint8_t(v >> 8)); };
+    auto p32 = [&](uint32_t v) { for (int i = 0; i < 4; ++i) out.push_back(uint8_t(v >> (8 * i))); };
+    out.push_back('B');
+    out.push_back('M');
+    p32(fileSize); p32(0); p32(dataOffset);
+    p32(40); p32(uint32_t(w)); p32(uint32_t(-h)); p16(1); p16(8); p32(0); p32(uint32_t(stride * h));
+    p32(2835); p32(2835); p32(256); p32(0);
+    for (int i = 0; i < 256; ++i) {
+        uint8_t c0 = 0, c1 = 0, c2 = 0;
+        if (i < paletteCount) {
+            c0 = palette[i * 4];
+            c1 = palette[i * 4 + 1];
+            c2 = palette[i * 4 + 2];
+        }
+        // BMP palettes are stored blue, green, red, 0.
+        uint8_t r = swapRB ? c2 : c0, b = swapRB ? c0 : c2;
+        out.push_back(b);
+        out.push_back(c1);
+        out.push_back(r);
+        out.push_back(0);
+    }
+    for (int y = 0; y < h; ++y) {
+        out.insert(out.end(), pixels + size_t(y) * size_t(w), pixels + size_t(y + 1) * size_t(w));
+        out.resize(out.size() + size_t(stride - w), 0);
+    }
+    std::ofstream f(path, std::ios::binary);
+    f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
+    return bool(f);
+}
+
+int cmdLbpInfo(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool lbp-info <file> [output prefix]\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    // Hypothesis (docs/formats/newworlds/lbp.md): u32 format, u32 palette
+    // count, palette (4 bytes each), 12-byte image header, 8-bit pixels.
+    const uint32_t format = rd32(d, 0), paletteCount = rd32(d, 4);
+    std::printf("size %zu, u32@0 (format?) %u, u32@4 (palette count?) %u\n", d.size(), format, paletteCount);
+    const size_t paletteEnd = 8 + size_t(paletteCount) * 4;
+    if (paletteCount > 256 || paletteEnd + 12 > d.size()) {
+        std::printf("palette hypothesis doesn't fit; first bytes:\n");
+        hexdump(d, 0, 64);
+        return 1;
+    }
+    const uint32_t a = rd32(d, paletteEnd), b = rd32(d, paletteEnd + 4), c = rd32(d, paletteEnd + 8);
+    const size_t pixelBytes = d.size() - paletteEnd - 12;
+    std::printf("after palette at 0x%zx: u32 %u, u32 %u, u32 %u; %zu bytes follow\n", paletteEnd, a, b, c, pixelBytes);
+    hexdump(d, paletteEnd, 32);
+    std::printf("first palette entries:\n");
+    hexdump(d, 8, 32);
+
+    int w = 0, h = 0;
+    if (size_t(a) * b == pixelBytes) {
+        w = int(a);
+        h = int(b);
+        std::printf("=> %d x %d at 8 bits per pixel fits exactly\n", w, h);
+    } else {
+        std::printf("=> width x height doesn't match the remaining bytes; not decoding\n");
+        return 1;
+    }
+    if (argc > 3) {
+        const std::string prefix = argv[3];
+        const uint8_t* pixels = d.data() + paletteEnd + 12;
+        bool ok = writeBmp(prefix + "_rgb.bmp", w, h, d.data() + 8, int(paletteCount), pixels, false) &&
+                  writeBmp(prefix + "_bgr.bmp", w, h, d.data() + 8, int(paletteCount), pixels, true);
+        std::printf(ok ? "wrote %s_rgb.bmp and %s_bgr.bmp\n" : "failed writing %s_*.bmp\n", prefix.c_str(),
+                    prefix.c_str());
+        return ok ? 0 : 1;
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -401,11 +509,17 @@ int main(int argc, char** argv) {
         return cmdCatList(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "cat-extract") == 0)
         return cmdCatExtract(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "stb-dump") == 0)
+        return cmdStbDump(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "lbp-info") == 0)
+        return cmdLbpInfo(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
                  "  reluva-tool cat-probe <file.cat> [-q]\n"
                  "  reluva-tool cat-list <file.cat>\n"
-                 "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n");
+                 "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
+                 "  reluva-tool stb-dump <file.stb>\n"
+                 "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }

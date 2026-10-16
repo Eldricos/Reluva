@@ -27,7 +27,7 @@ Tags seen in the 23 retail archives:
 | `0x01` | root | | the whole file; size = file size − 6 |
 | `0x05` | table of contents | | see below |
 | `0x11` | file | `.gmf` | only in the planet (`*wrld`) archives; source size always differs |
-| `0x16` | file | `.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp` | textures (and one `.stb` in `misc.cat`) |
+| `0x16` | file | `.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp` | textures, see [lbp.md](lbp.md) (and one `.stb` in `misc.cat`) |
 | `0x17` | file | `.geo` | geometry; source size always differs |
 | `0x25` | file | `.arf` | only in the `*actor` archives |
 | `0x26` | file | `.fif` | inside `0x27` in the `*gui` archives |
@@ -36,8 +36,8 @@ Tags seen in the 23 retail archives:
 | `0x29` | container | | texture set: an `.mmb` followed by texture levels |
 | `0x2a` | file | `.mmb` | 8 bytes in the cases seen; first item of a `0x29` set |
 | `0x2c` | file | `.mdl` | 522 in `misc.cat` |
-| `0x32` | file | `.stb` | string tables |
-| `0x33` | file | `.wav` | payload starts with `RIFF`; RIFF size + 8 = payload size |
+| `0x32` | file | `.stb` | string tables, see [stb.md](stb.md) |
+| `0x33` | file | `.wav` | complete WAV files; `alert003.wav` is IMA ADPCM (format `0x0011`) |
 
 "Source size differs" means the size in the entry's copied metadata is not the
 stored size, presumably because those files were converted when packed.
