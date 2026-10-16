@@ -1,6 +1,8 @@
 # Star Trek: New Worlds: `.cat` archives
 
-Status: **structure understood; stored file formats not yet studied.**
+Status: **archive structure fully understood** (verified on all 23 retail
+archives); the formats of the stored files are not studied yet. Reader:
+`src/engines/newworlds/cat_archive.cpp`.
 Worked out from hex dumps and `reluva-tool cat-probe` runs on the clean
 retail `rommisc.cat` and `glblgame.cat`, October 2026. Run
 `reluva-tool cat-probe <file>` to check this description against any archive.
@@ -17,17 +19,28 @@ The whole file is a tree of chunks. Every chunk is:
 | 2 | u32 | payload size (excluding these 6 bytes) |
 | 6 | … | payload |
 
-Tags seen so far:
+Tags seen in the 23 retail archives:
 
-| Tag | Meaning | Evidence |
-|---|---|---|
-| `0x01` | root: the whole file | size = file size − 6 in both archives |
-| `0x05` | table of contents | its size accounts exactly for the entries (below) |
-| `0x16` | `.lbp`, `.mp0`, `.eb0` data (textures) | from entry names |
-| `0x29` | folder: payload is the chunks of the following entries | `rommisc.cat` entry 18: size 9256 = (6 + 8) + (6 + 9236), its two children |
-| `0x2a` | `.mmb` data (8 bytes in both cases seen) | from entry names |
-| `0x32` | `.stb` data (string tables) | from entry names |
-| `0x33` | `.wav` data | payload starts with `RIFF`, and the RIFF size + 8 = the chunk size (54,844) |
+| Tag | Kind | Stored extensions | Notes |
+|---|---|---|---|
+| `0x00` | container | | purpose unknown; in `*actor`, `formisc`, `glblgame`, `misc` |
+| `0x01` | root | | the whole file; size = file size − 6 |
+| `0x05` | table of contents | | see below |
+| `0x11` | file | `.gmf` | only in the planet (`*wrld`) archives; source size always differs |
+| `0x16` | file | `.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp` | textures (and one `.stb` in `misc.cat`) |
+| `0x17` | file | `.geo` | geometry; source size always differs |
+| `0x25` | file | `.arf` | only in the `*actor` archives |
+| `0x26` | file | `.fif` | inside `0x27` in the `*gui` archives |
+| `0x27` | container | | inside `0x28` |
+| `0x28` | container | | in the `*gui` archives |
+| `0x29` | container | | texture set: an `.mmb` followed by texture levels |
+| `0x2a` | file | `.mmb` | 8 bytes in the cases seen; first item of a `0x29` set |
+| `0x2c` | file | `.mdl` | 522 in `misc.cat` |
+| `0x32` | file | `.stb` | string tables |
+| `0x33` | file | `.wav` | payload starts with `RIFF`; RIFF size + 8 = payload size |
+
+"Source size differs" means the size in the entry's copied metadata is not the
+stored size, presumably because those files were converted when packed.
 
 ## File layout
 
@@ -35,7 +48,7 @@ Tags seen so far:
 0x00  chunk tag 1 (root), size = file size - 6
 0x06    chunk tag 5 (table of contents), size T
 0x0c      u32 entry count
-0x10      entries, one after another (file 334 bytes, folder 264 bytes)
+0x10      entries, one after another (file 334 bytes, container 264 bytes)
 0x0c+T  item chunks, in entry order; folders contain their children's chunks
 ```
 
@@ -52,7 +65,8 @@ exactly 244 files and 98 folders.
 | +0x006 | u8 | 0 |
 | +0x007 | u8 | same in every entry of an archive (`0x15` in `rommisc.cat`, `0x17` in `glblgame.cat`); possibly an archive ID |
 
-Folder entries end there plus 256 bytes (264 total); their path is empty.
+Container entries end there plus 256 bytes (264 total). Which tags are
+containers isn't stored anywhere, so a reader needs the list above.
 File entries continue:
 
 | Entry offset | Type | Meaning |
@@ -79,14 +93,14 @@ the path buffers suggests UTF-16), `.lbp` (textures, under `lbp\txr`), `.mmb`
 + `.mp0` and `.mmb` + `.eb0` pairs grouped in folders (possibly mipmapped and
 environment-map textures), `.geo` (geometry), `.wav`.
 
-## Verified so far
+## Verified
 
-The chunk chain (every chunk starting where the previous one ended) and the
-exact table size hold for 16 of the 23 archives in the retail install. The
-other 7 contain entry kinds whose table entry size isn't known yet; the probe
-now works these out from the chain.
+`reluva-tool cat-probe` walks the table using only the rules above and checks
+that every chunk starts where the previous one ended, that the walk ends
+exactly at the end of the table chunk, and that the last chunk ends exactly
+at the end of the file. All 23 archives of the retail install pass.
 
 ## Open questions
 
-- The meaning of the u8 at entry +0x007.
+- The meaning of the u8 at entry +0x007, and of the `0x00` containers.
 - The formats of the stored files themselves.

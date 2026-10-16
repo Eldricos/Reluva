@@ -5,13 +5,18 @@
 //
 //   reluva-tool hexdump <file> [offset] [length]   offset may be hex (0x..) or
 //                                                  negative (from the end)
-//   reluva-tool cat-probe <file>                   test the current .cat layout
-//                                                  hypothesis and report where it breaks
+//   reluva-tool cat-probe <file> [-q]              check a .cat file against the documented
+//                                                  layout and work out unknown entry kinds
+//   reluva-tool cat-list <file>                    list a .cat file's contents
+//   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
+
+#include "engines/newworlds/cat_archive.h"
 
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -318,6 +323,73 @@ int cmdCatProbe(int argc, char** argv) {
     return ok ? 0 : 1;
 }
 
+
+int cmdCatList(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool cat-list <file.cat>\n");
+        return 2;
+    }
+    reluva::newworlds::CatArchive cat;
+    if (reluva::Error err = cat.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    const auto& entries = cat.entries();
+    for (const auto& e : entries) {
+        int depth = 0;
+        for (int p = e.parent; p >= 0; p = entries[size_t(p)].parent)
+            ++depth;
+        std::printf("%4x %9u  %-16s %*s%s\n", e.tag, e.size, e.container ? "" : formatTime(e.modified).c_str(),
+                    depth * 2, "", e.container ? "<container>" : e.name.c_str());
+    }
+    return 0;
+}
+
+int cmdCatExtract(int argc, char** argv) {
+    if (argc < 4) {
+        std::fprintf(stderr, "usage: reluva-tool cat-extract <file.cat> <output dir> [name filter]\n");
+        return 2;
+    }
+    reluva::newworlds::CatArchive cat;
+    if (reluva::Error err = cat.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    const std::filesystem::path outDir = argv[3];
+    const std::string filter = argc > 4 ? argv[4] : "";
+    std::vector<uint8_t> data;
+    unsigned written = 0;
+    for (const auto& e : cat.entries()) {
+        if (e.container || e.name.empty() || e.name.find(filter) == std::string::npos)
+            continue;
+        // Names come from the archive: refuse anything that could escape outDir.
+        const std::filesystem::path rel(e.name);
+        bool safe = !rel.is_absolute() && !rel.has_root_name();
+        for (const auto& part : rel)
+            safe &= part != "..";
+        if (!safe) {
+            std::fprintf(stderr, "skipping unsafe name %s\n", e.name.c_str());
+            continue;
+        }
+        if (reluva::Error err = cat.read(e, data)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        const std::filesystem::path out = outDir / rel;
+        std::error_code ec;
+        std::filesystem::create_directories(out.parent_path(), ec);
+        std::ofstream f(out, std::ios::binary);
+        f.write(reinterpret_cast<const char*>(data.data()), std::streamsize(data.size()));
+        if (!f) {
+            std::fprintf(stderr, "cannot write %s\n", out.string().c_str());
+            return 1;
+        }
+        ++written;
+    }
+    std::printf("extracted %u files to %s\n", written, outDir.string().c_str());
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -325,9 +397,15 @@ int main(int argc, char** argv) {
         return cmdHexdump(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "cat-probe") == 0)
         return cmdCatProbe(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "cat-list") == 0)
+        return cmdCatList(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "cat-extract") == 0)
+        return cmdCatExtract(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
-                 "  reluva-tool cat-probe <file.cat> [-q]\n");
+                 "  reluva-tool cat-probe <file.cat> [-q]\n"
+                 "  reluva-tool cat-list <file.cat>\n"
+                 "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n");
     return 2;
 }

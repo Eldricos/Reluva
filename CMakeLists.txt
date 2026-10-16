@@ -63,7 +63,8 @@ target_link_libraries(reluva_common PRIVATE reluva_warnings)
 add_library(reluva_engines STATIC
     src/engines/registry.cpp
     src/engines/testbed/testbed.cpp
-    src/engines/newworlds/newworlds.cpp)
+    src/engines/newworlds/newworlds.cpp
+    src/engines/newworlds/cat_archive.cpp)
 target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warnings)
 
 # --- executable: SDL3 backend + ImGui launcher --------------------------------
@@ -75,7 +76,7 @@ target_link_libraries(reluva PRIVATE reluva_engines imgui SDL3::SDL3 reluva_warn
 
 # --- developer tools -----------------------------------------------------------
 add_executable(reluva-tool src/tools/reluva_tool.cpp)
-target_link_libraries(reluva-tool PRIVATE reluva_warnings)
+target_link_libraries(reluva-tool PRIVATE reluva_engines reluva_warnings)
 
 # --- tests ----------------------------------------------------------------------
 if(RELUVA_BUILD_TESTS)
@@ -83,4 +84,8 @@ if(RELUVA_BUILD_TESTS)
     add_executable(reluva_tests tests/test_common.cpp)
     target_link_libraries(reluva_tests PRIVATE reluva_common reluva_warnings)
     add_test(NAME common COMMAND reluva_tests)
+
+    add_executable(reluva_newworlds_tests tests/test_newworlds_cat.cpp)
+    target_link_libraries(reluva_newworlds_tests PRIVATE reluva_engines reluva_warnings)
+    add_test(NAME newworlds_cat COMMAND reluva_newworlds_tests)
 endif()

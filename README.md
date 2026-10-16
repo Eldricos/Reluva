@@ -42,8 +42,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 - `reluva <target>` starts a configured game directly. `reluva testbed`
   runs the test pattern.
 - `reluva --hash <files...>` prints detection signatures for an engine's table.
-- `reluva-tool hexdump <file> [offset] [length]` and `reluva-tool cat-probe <file>`
-  are developer tools for studying game data files.
+- `reluva-tool` has developer tools for studying game data: `hexdump`,
+  `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
