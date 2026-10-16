@@ -113,94 +113,208 @@ std::string readName(const Bytes& d, size_t p) {
     return n;
 }
 
+std::string extensionOf(const std::string& name) {
+    size_t dot = name.rfind('.');
+    return dot == std::string::npos || name.find('\\', dot) != std::string::npos ? "" : name.substr(dot);
+}
+
+// Rules for walking the table. Start with what is known; learn the rest.
+struct TagRule {
+    uint16_t tag;
+    size_t entrySize;
+    bool container;
+    bool learned;
+};
+
+struct Walker {
+    const Bytes& d;
+    uint32_t tocSize;
+    uint8_t archiveByte;
+    std::vector<TagRule> rules;
+
+    TagRule rule(uint16_t tag) const {
+        for (const TagRule& r : rules)
+            if (r.tag == tag)
+                return r;
+        return tag == kFolderTag ? TagRule{tag, kFolderEntrySize, true, false} : TagRule{tag, kFileEntrySize, false, false};
+    }
+    void learn(const TagRule& r) {
+        for (TagRule& x : rules)
+            if (x.tag == r.tag) {
+                x = r;
+                return;
+            }
+        rules.push_back(r);
+    }
+    size_t chunkOf(size_t entryPos) const { return size_t(rd32(d, entryPos)) + tocSize; }
+    bool validEntry(size_t q, int prevIndex, size_t expectedChunk) const {
+        return q + 8 <= d.size() && int(rd16(d, q + 4)) > prevIndex && d[q + 6] == 0 && d[q + 7] == archiveByte &&
+               chunkOf(q) == expectedChunk;
+    }
+};
+
 int cmdCatProbe(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: reluva-tool cat-probe <file.cat>\n");
+        std::fprintf(stderr, "usage: reluva-tool cat-probe <file.cat> [-q]\n");
         return 2;
     }
     Bytes d;
     if (!readFile(argv[2], d))
         return 1;
+    const bool quiet = argc > 3 && std::strcmp(argv[3], "-q") == 0;
 
     const uint32_t tocSize = rd32(d, 8);
     const uint32_t count = rd32(d, 0x0c);
     const size_t tocEnd = 0x0c + size_t(tocSize);
-    std::printf("file size %zu; root chunk tag %u size %u (%s)\n", d.size(), rd16(d, 0), rd32(d, 2),
-                rd32(d, 2) + 6 == d.size() ? "matches" : "MISMATCH");
-    std::printf("table chunk tag %u size %u, ends at 0x%zx; %u entries\n\n", rd16(d, 6), tocSize, tocEnd, count);
+    if (!quiet) {
+        std::printf("file size %zu; root chunk tag %u size %u (%s)\n", d.size(), rd16(d, 0), rd32(d, 2),
+                    rd32(d, 2) + 6 == d.size() ? "matches" : "MISMATCH");
+        std::printf("table chunk tag %u size %u, ends at 0x%zx; %u entries\n\n", rd16(d, 6), tocSize, tocEnd, count);
+        std::printf("%4s %6s %9s %4s %8s  %-16s %s\n", "idx", "at", "chunk at", "tag", "size", "modified (UTC)",
+                    "name (indented by folder)");
+    }
 
-    std::printf("%4s %6s %9s %4s %8s  %-16s %s\n", "idx", "at", "chunk at", "tag", "size", "modified (UTC)",
-                "name (indented by folder)");
-    std::vector<size_t> folderEnds; // chunk end positions of open folders
-    std::vector<std::pair<uint16_t, unsigned>> tagCounts;
-    size_t pos = 0x10;
-    size_t expectedChunk = tocEnd; // each chunk must start where the previous one ended
-    unsigned files = 0, folders = 0, indexGaps = 0, chainBreaks = 0, sizeMismatches = 0;
+    Walker w{d, tocSize, d.size() > 0x17 ? d[0x17] : uint8_t(0), {}};
+    std::vector<size_t> folderEnds;
+    struct TagStat {
+        uint16_t tag;
+        unsigned count = 0, sizeMismatches = 0;
+        std::vector<std::string> extensions;
+    };
+    std::vector<TagStat> stats;
+    auto statFor = [&](uint16_t tag) -> TagStat& {
+        for (TagStat& s : stats)
+            if (s.tag == tag)
+                return s;
+        stats.push_back(TagStat{tag, 0, 0, {}});
+        return stats.back();
+    };
+
+    size_t pos = 0x10, expectedChunk = tocEnd;
+    size_t prevPos = 0, prevChunk = 0;
+    uint32_t prevSize = 0;
+    uint16_t prevTag = 0;
     int prevIndex = -1;
+    unsigned entries = 0, indexGaps = 0;
     for (unsigned i = 0; i < count; ++i) {
-        const int index = rd16(d, pos + 4);
-        if (pos + 8 > d.size() || index <= prevIndex || d[pos + 6] != 0 || d[pos + 7] != d[0x17]) {
-            std::printf("entry #%u at 0x%zx doesn't look like an entry (index %d after %d)\n", i, pos, index,
-                        prevIndex);
-            hexdump(d, pos > 0x20 ? pos - 0x20 : 0, 0x80);
-            std::printf("RESULT: FAIL at entry #%u\n", i);
-            return 1;
+        if (!w.validEntry(pos, prevIndex, expectedChunk)) {
+            // The previous entry's rule was wrong. Try the other kind (file /
+            // container) and any entry size, and keep the one that lets the
+            // chain continue.
+            // Take the nearest entry that fits either explanation: a farther
+            // match can be a later entry that skips a container's children.
+            bool recovered = false;
+            const TagRule old = w.rule(prevTag);
+            size_t bestQ = 0, bestWant = 0;
+            bool bestContainer = false;
+            for (int attempt = 0; attempt < 2 && i > 0; ++attempt) {
+                const bool container = attempt == 0 ? old.container : !old.container;
+                const size_t want = container ? prevChunk + 6 : prevChunk + 6 + prevSize;
+                for (size_t q = prevPos + 8; q < prevPos + 4096 && q + 8 <= d.size() && (!bestQ || q < bestQ); ++q) {
+                    if (w.validEntry(q, prevIndex, want)) {
+                        bestQ = q;
+                        bestWant = want;
+                        bestContainer = container;
+                        break;
+                    }
+                }
+            }
+            if (bestQ) {
+                TagRule r{prevTag, bestQ - prevPos, bestContainer, true};
+                w.learn(r);
+                if (!quiet)
+                    std::printf("  -> learned: tag 0x%x entries are %zu bytes, %s\n", prevTag, r.entrySize,
+                                bestContainer ? "container" : "file");
+                if (bestContainer && !old.container) // re-open what we treated as a file
+                    folderEnds.push_back(prevChunk + 6 + prevSize);
+                if (!bestContainer && old.container && !folderEnds.empty())
+                    folderEnds.pop_back();
+                pos = bestQ;
+                expectedChunk = bestWant;
+                recovered = true;
+            }
+            if (!recovered) {
+                std::printf("entry #%u: no valid entry follows the one at 0x%zx (tag 0x%x)\n", i, prevPos, prevTag);
+                hexdump(d, pos > 0x20 ? pos - 0x20 : 0, 0x80);
+                std::printf("RESULT: FAIL at entry #%u after a tag 0x%x entry\n", i, prevTag);
+                return 1;
+            }
         }
+
+        const int index = rd16(d, pos + 4);
         if (prevIndex >= 0 && index != prevIndex + 1)
             indexGaps += unsigned(index - prevIndex - 1);
-        prevIndex = index;
-
-        const size_t chunk = size_t(rd32(d, pos)) + tocSize;
+        const size_t chunk = w.chunkOf(pos);
         const uint16_t tag = rd16(d, chunk);
         const uint32_t size = rd32(d, chunk + 2);
-        const bool chainOk = chunk == expectedChunk;
-        chainBreaks += !chainOk;
+        const TagRule r = w.rule(tag);
         while (!folderEnds.empty() && chunk >= folderEnds.back())
             folderEnds.pop_back();
         const std::string indent(folderEnds.size() * 2, ' ');
+        TagStat& st = statFor(tag);
+        ++st.count;
 
-        bool counted = false;
-        for (auto& tc : tagCounts)
-            if (tc.first == tag) {
-                ++tc.second;
-                counted = true;
-            }
-        if (!counted)
-            tagCounts.push_back({tag, 1});
-
-        if (tag == kFolderTag) {
-            std::printf("%4d %6zx %9zx%s %4x %8u  %-16s %s<folder>\n", index, pos, chunk, chainOk ? " " : "!", tag,
-                        size, "", indent.c_str());
+        if (r.container) {
+            if (!quiet)
+                std::printf("%4d %6zx %9zx %4x %8u  %-16s %s<container>\n", index, pos, chunk, tag, size, "",
+                            indent.c_str());
             folderEnds.push_back(chunk + 6 + size);
-            expectedChunk = chunk + 6; // children follow the folder header
-            pos += kFolderEntrySize;
-            ++folders;
-            continue;
+            expectedChunk = chunk + 6;
+        } else {
+            const size_t p = pos + 8;
+            const std::string name = readName(d, p);
+            const uint32_t metaSize = rd32(d, p + 0x116);
+            const bool sizeOk = metaSize == size;
+            st.sizeMismatches += !sizeOk;
+            std::string ext = extensionOf(name);
+            bool seen = false;
+            for (const std::string& e : st.extensions)
+                seen |= e == ext;
+            if (!seen && !ext.empty())
+                st.extensions.push_back(ext);
+            if (!quiet)
+                std::printf("%4d %6zx %9zx %4x %8u%s %-16s %s%s\n", index, pos, chunk, tag, size, sizeOk ? " " : "*",
+                            formatTime(rd32(d, p + 0x11e)).c_str(), indent.c_str(), name.c_str());
+            expectedChunk = chunk + 6 + size;
         }
-        const size_t p = pos + 8;
-        const uint32_t metaSize = rd32(d, p + 0x116);
-        sizeMismatches += metaSize != size;
-        std::printf("%4d %6zx %9zx%s %4x %8u%s %-16s %s%s\n", index, pos, chunk, chainOk ? " " : "!", tag, size,
-                    metaSize == size ? " " : "!", formatTime(rd32(d, p + 0x11e)).c_str(), indent.c_str(),
-                    readName(d, p).c_str());
-        expectedChunk = chunk + 6 + size;
-        pos += kFileEntrySize;
-        ++files;
+        prevPos = pos;
+        prevChunk = chunk;
+        prevSize = size;
+        prevTag = tag;
+        prevIndex = index;
+        pos += r.entrySize;
+        ++entries;
     }
 
     const bool tableOk = pos == tocEnd;
-    std::printf("\n%u files, %u folders, %u index gaps; table walk ended at 0x%zx, table chunk ends at 0x%zx\n", files,
-                folders, indexGaps, pos, tocEnd);
-    std::printf("last chunk ends at %zu, file size %zu (%lld bytes after)\n", expectedChunk, d.size(),
-                (long long)d.size() - (long long)expectedChunk);
-    std::printf("chunk tags:");
-    for (auto& tc : tagCounts)
-        std::printf("  0x%x x%u", tc.first, tc.second);
+    const long long trailing = (long long)d.size() - (long long)expectedChunk;
+    if (!quiet) {
+        std::printf("\n%u entries, %u index gaps; table walk ended at 0x%zx, table chunk ends at 0x%zx\n", entries,
+                    indexGaps, pos, tocEnd);
+        std::printf("last chunk ends at %zu, file size %zu\n", expectedChunk, d.size());
+        std::printf("* = stored size differs from the size in the entry's copied metadata\n\n");
+    }
+    std::printf("tags:");
+    for (const TagStat& s : stats) {
+        const TagRule r = w.rule(s.tag);
+        std::printf(" 0x%x x%u", s.tag, s.count);
+        if (r.container)
+            std::printf("(container");
+        else
+            std::printf("(");
+        for (size_t k = 0; k < s.extensions.size(); ++k)
+            std::printf("%s%s", k || r.container ? " " : "", s.extensions[k].c_str());
+        if (s.sizeMismatches)
+            std::printf(" *%u", s.sizeMismatches);
+        std::printf(")");
+    }
     std::printf("\n");
-    const bool ok = tableOk && chainBreaks == 0 && sizeMismatches == 0 && expectedChunk <= d.size();
-    std::printf("RESULT: %s (%u files, %u folders, table %s, %u chain breaks, %u size mismatches, %lld trailing bytes)\n",
-                ok ? "OK" : "FAIL", files, folders, tableOk ? "exact" : "MISMATCH", chainBreaks, sizeMismatches,
-                (long long)d.size() - (long long)expectedChunk);
+    for (const TagRule& r : w.rules)
+        if (r.learned)
+            std::printf("learned: tag 0x%x entry %zu bytes, %s\n", r.tag, r.entrySize, r.container ? "container" : "file");
+    const bool ok = tableOk && trailing >= 0;
+    std::printf("RESULT: %s (%u entries, table %s, %lld trailing bytes)\n", ok ? "OK" : "FAIL", entries,
+                tableOk ? "exact" : "MISMATCH", trailing);
     return ok ? 0 : 1;
 }
 
@@ -214,6 +328,6 @@ int main(int argc, char** argv) {
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
-                 "  reluva-tool cat-probe <file.cat>\n");
+                 "  reluva-tool cat-probe <file.cat> [-q]\n");
     return 2;
 }

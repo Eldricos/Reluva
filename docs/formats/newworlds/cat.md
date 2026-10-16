@@ -60,7 +60,7 @@ File entries continue:
 | +0x008 | char[260] | original build-machine path, NUL-terminated (260 = Windows `MAX_PATH`). Bytes after the NUL are uncleared memory from the packing tool |
 | +0x110 | u16 | mode, e.g. `0x8124` = regular file, read-only (apparently a C `stat` copy) |
 | +0x112 | u16 | link count (1) |
-| +0x11e | u32 | file size (equals the chunk's payload size) |
+| +0x11e | u32 | size of the original source file. Usually equals the chunk's payload size, but differs for some files (in `rommisc.cat`, 6 of 29, matching its 6 `.geo` files), so presumably those were converted when packed. The chunk size is authoritative |
 | +0x122 | u32 | access time (Unix time, date only, as FAT stores it) |
 | +0x126 | u32 | modification time (Unix time) |
 | +0x12a | u32 | creation time (Unix time) |
@@ -78,6 +78,13 @@ From the stored paths: `.stb` (string tables; leftover UTF-16 English text in
 the path buffers suggests UTF-16), `.lbp` (textures, under `lbp\txr`), `.mmb`
 + `.mp0` and `.mmb` + `.eb0` pairs grouped in folders (possibly mipmapped and
 environment-map textures), `.geo` (geometry), `.wav`.
+
+## Verified so far
+
+The chunk chain (every chunk starting where the previous one ended) and the
+exact table size hold for 16 of the 23 archives in the retail install. The
+other 7 contain entry kinds whose table entry size isn't known yet; the probe
+now works these out from the chain.
 
 ## Open questions
 
