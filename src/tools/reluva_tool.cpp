@@ -90,19 +90,18 @@ int cmdHexdump(int argc, char** argv) {
     return 0;
 }
 
-// Current hypothesis (see docs/formats/newworlds/cat.md):
-//   0x00 u16 1, 0x02 u32 file size - 6, 0x06 u16 5, 0x08 u32 data base, 0x0c u32 count
-//   entries from 0x10: u32 offset, u16 index, u8 0, u8 archive byte, char path[260], metadata
-//   stored file i: at base + offset, u16 tag, u32 size, then the data
-struct Entry {
-    size_t start = 0, stride = 0;
-    uint32_t offset = 0, metaSize = 0, mtime = 0;
-    unsigned index = 0;
-    std::string name;
-};
-
+// Current understanding (see docs/formats/newworlds/cat.md): the file is a
+// tree of chunks, each a u16 tag + u32 size + payload.
+//   0x00 tag 1, size = rest of file
+//   0x06 tag 5, size = table of contents: u32 count, then one entry per item
+//        file entries are 334 bytes, folder entries 264
+//   then the items themselves, each a chunk; folders (tag 0x29) contain the
+//   chunks of the entries that follow them
+// An entry's offset + the table size gives the absolute position of its chunk.
 constexpr size_t kPathLen = 260;
-constexpr size_t kEntrySize = 334;
+constexpr size_t kFileEntrySize = 334;
+constexpr size_t kFolderEntrySize = 264;
+constexpr uint16_t kFolderTag = 0x29;
 
 std::string readName(const Bytes& d, size_t p) {
     std::string n;
@@ -111,7 +110,14 @@ std::string readName(const Bytes& d, size_t p) {
             return "<binary>";
         n += char(d[k]);
     }
-    return n.empty() ? "<empty>" : n;
+    return n;
+}
+
+float rdFloat(const Bytes& d, size_t o) {
+    uint32_t v = rd32(d, o);
+    float f;
+    std::memcpy(&f, &v, 4);
+    return f;
 }
 
 int cmdCatProbe(int argc, char** argv) {
@@ -123,106 +129,62 @@ int cmdCatProbe(int argc, char** argv) {
     if (!readFile(argv[2], d))
         return 1;
 
-    const uint32_t base = rd32(d, 8);
+    const uint32_t tocSize = rd32(d, 8);
     const uint32_t count = rd32(d, 0x0c);
-    const size_t declaredSize = size_t(rd32(d, 2)) + 6;
-    std::printf("file size        %zu\n", d.size());
-    std::printf("0x00 u16         %u\n", rd16(d, 0));
-    std::printf("0x02 u32         %u  (file size - 6 = %zu)\n", rd32(d, 2), d.size() - 6);
-    std::printf("0x06 u16         %u\n", rd16(d, 6));
-    std::printf("0x08 u32 base?   %u (0x%x)\n", base, base);
-    std::printf("0x0c u32 count?  %u\n", count);
-    const uint8_t archiveByte = d.size() > 0x17 ? d[0x17] : 0;
-    std::printf("archive byte     0x%02x\n\n", archiveByte);
+    const size_t tocEnd = 0x0c + size_t(tocSize);
+    std::printf("file size %zu; root chunk tag %u size %u (%s)\n", d.size(), rd16(d, 0), rd32(d, 2),
+                rd32(d, 2) + 6 == d.size() ? "matches" : "MISMATCH");
+    std::printf("table chunk tag %u size %u, ends at 0x%zx; %u entries\n\n", rd16(d, 6), tocSize, tocEnd, count);
 
-    // Locate entry i by its index and archive byte, and an offset that moves
-    // forward, without assuming a stride or a readable name.
-    std::vector<Entry> entries;
+    std::printf("%4s %6s %9s %4s %8s %-16s %s\n", "idx", "at", "chunk at", "tag", "size", "modified (UTC)",
+                "name (indented by folder)  [extra fields]");
+    std::vector<size_t> folderEnds; // chunk end positions of open folders
     size_t pos = 0x10;
-    for (unsigned i = 0; i < count && pos < d.size(); ++i) {
-        const uint32_t minOffset = entries.empty() ? 0 : entries.back().offset + 1;
-        size_t found = 0;
-        for (size_t j = pos; j + 8 < d.size() && j < pos + 8192; ++j) {
-            uint32_t off = rd32(d, j);
-            if (rd16(d, j + 4) == i && d[j + 6] == 0 && d[j + 7] == archiveByte && off >= minOffset && off < declaredSize) {
-                found = j;
-                break;
+    unsigned files = 0, folders = 0;
+    std::vector<std::pair<uint16_t, unsigned>> tagCounts;
+    for (unsigned i = 0; i < count; ++i) {
+        if (pos + 8 > d.size() || rd16(d, pos + 4) != i) {
+            std::printf("entry %u: expected at 0x%zx but the index there is %u\n", i, pos, rd16(d, pos + 4));
+            hexdump(d, pos > 0x20 ? pos - 0x20 : 0, 0x80);
+            return 1;
+        }
+        const size_t chunk = size_t(rd32(d, pos)) + tocSize;
+        const uint16_t tag = rd16(d, chunk);
+        const uint32_t size = rd32(d, chunk + 2);
+        while (!folderEnds.empty() && chunk >= folderEnds.back())
+            folderEnds.pop_back();
+        const std::string indent(folderEnds.size() * 2, ' ');
+
+        bool counted = false;
+        for (auto& tc : tagCounts)
+            if (tc.first == tag) {
+                ++tc.second;
+                counted = true;
             }
-        }
-        if (!found && i == 0)
-            found = 0x10;
-        if (!found) {
-            std::printf("entry %u: not found within 8 KB of 0x%zx\n", i, pos);
-            hexdump(d, pos, 128);
-            break;
-        }
-        Entry e;
-        e.start = found;
-        e.offset = rd32(d, found);
-        e.index = i;
-        e.name = readName(d, found + 8);
-        e.metaSize = rd32(d, found + 8 + 0x116);
-        e.mtime = rd32(d, found + 8 + 0x11e);
-        if (!entries.empty())
-            entries.back().stride = e.start - entries.back().start;
-        entries.push_back(e);
-        pos = e.start + 8;
-    }
+        if (!counted)
+            tagCounts.push_back({tag, 1});
 
-    std::printf("%4s %7s %6s %9s %8s %8s %4s %8s  %-16s %s\n", "idx", "at", "stride", "offset", "metasize",
-                "chainsz", "tag", "prefixsz", "modified (UTC)", "name");
-    int mismatches = 0;
-    for (size_t i = 0; i < entries.size(); ++i) {
-        const Entry& e = entries[i];
-        const size_t blob = size_t(base) + e.offset;
-        const uint16_t tag = rd16(d, blob);
-        const uint32_t prefixSize = rd32(d, blob + 2);
-        long long chain = i + 1 < entries.size() ? (long long)entries[i + 1].offset - e.offset - 6 : -1;
-        bool ok = chain < 0 || chain == prefixSize;
-        mismatches += !ok;
-        std::printf("%4u %7zx %6zu %9u %8u %8lld %4x %8u%s %-16s %s\n", e.index, e.start, e.stride, e.offset,
-                    e.metaSize, chain, tag, prefixSize, ok ? " " : "!", formatTime(e.mtime).c_str(), e.name.c_str());
-    }
-    std::printf("\nentries found: %zu of %u, prefix/chain size mismatches: %d\n", entries.size(), count, mismatches);
-    if (entries.empty())
-        return 1;
-
-    const Entry& last = entries.back();
-    const size_t lastEnd = size_t(base) + last.offset + 6 + rd32(d, size_t(base) + last.offset + 2);
-    std::printf("last stored file ends at %zu; file size %zu; %lld bytes after it\n", lastEnd, d.size(),
-                (long long)d.size() - (long long)lastEnd);
-    std::printf("entry table: 0x10 .. 0x%zx (last entry at 0x%zx); data base 0x%x\n",
-                last.start + kEntrySize, last.start, base);
-
-    std::printf("\nbytes before the first stored file:\n");
-    hexdump(d, base > 0x60 ? base - 0x60 : 0, 0x80);
-
-    std::printf("\nRIFF signatures (a stored WAV must start with one):\n");
-    for (size_t j = 0; j + 4 <= d.size(); ++j) {
-        if (std::memcmp(&d[j], "RIFF", 4) != 0)
+        if (tag == kFolderTag) {
+            std::printf("%4u %6zx %9zx %4x %8u %-16s %s<folder>\n", i, pos, chunk, tag, size, "", indent.c_str());
+            folderEnds.push_back(chunk + 6 + size);
+            pos += kFolderEntrySize;
+            ++folders;
             continue;
-        const Entry* owner = nullptr;
-        for (const Entry& e : entries)
-            if (size_t(base) + e.offset + 6 == j)
-                owner = &e;
-        if (owner)
-            std::printf("  0x%zx = data of entry %u (%s)\n", j, owner->index, owner->name.c_str());
-        else
-            std::printf("  0x%zx = not at the start of any entry's data\n", j);
+        }
+        const size_t p = pos + 8;
+        const uint32_t metaSize = rd32(d, p + 0x116);
+        std::printf("%4u %6zx %9zx %4x %8u%s %-16s %s%s  [%u %g %g]\n", i, pos, chunk, tag, size,
+                    metaSize == size ? " " : "!", formatTime(rd32(d, p + 0x11e)).c_str(), indent.c_str(),
+                    readName(d, p).c_str(), rd32(d, pos + 0x142), rdFloat(d, pos + 0x146), rdFloat(d, pos + 0x14a));
+        pos += kFileEntrySize;
+        ++files;
     }
 
-    std::printf("\ndistinct prefix tags:");
-    std::vector<uint16_t> tags;
-    for (const Entry& e : entries) {
-        uint16_t t = rd16(d, size_t(base) + e.offset);
-        bool seen = false;
-        for (uint16_t x : tags)
-            seen |= x == t;
-        if (!seen) {
-            tags.push_back(t);
-            std::printf(" 0x%x", t);
-        }
-    }
+    std::printf("\n%u files, %u folders; table walk ended at 0x%zx, table chunk ends at 0x%zx (%s)\n", files, folders,
+                pos, tocEnd, pos == tocEnd ? "matches" : "MISMATCH");
+    std::printf("chunk tags:");
+    for (auto& tc : tagCounts)
+        std::printf("  0x%x x%u", tc.first, tc.second);
     std::printf("\n");
     return 0;
 }
