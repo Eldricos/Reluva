@@ -477,6 +477,14 @@ int cmdLbpInfo(int argc, char** argv) {
     std::printf("first palette entries:\n");
     hexdump(d, 8, 32);
 
+    // Layout seen so far (docs/formats/newworlds/lbp.md): the 12 bytes are
+    // u32 0, u32 width, u32 height, and the data is two w*h 8-bit layers.
+    bool twoLayers = false;
+    if (b && c && size_t(b) * c * 2 == pixelBytes) {
+        twoLayers = true;
+        std::printf("=> header width %u x height %u; data is exactly 2 layers of %u x %u\n", b, c, b, c);
+    }
+
     // The size can be stored in several ways; try each and keep the ones
     // that account for exactly the pixel bytes.
     struct Candidate {
@@ -516,14 +524,22 @@ int cmdLbpInfo(int argc, char** argv) {
     std::printf("candidates (a=%u b=%u c=%u, %zu pixel bytes):\n", a, b, c, pixelBytes);
     for (const Candidate& cand : candidates)
         std::printf("  %-34s %zu x %zu\n", cand.how.c_str(), cand.w, cand.h);
-    if (candidates.empty()) {
+    if (candidates.empty() && !twoLayers) {
         std::printf("=> no size interpretation fits; not decoding\n");
         return 1;
     }
+    if (candidates.empty())
+        candidates.push_back({"", b, c});
     int w = int(candidates.front().w), h = int(candidates.front().h);
     std::string how = candidates.front().how;
+    if (twoLayers) {
+        w = int(b);
+        h = int(c);
+        how = "header width and height, 2 layers";
+    }
     if (argc > 4) { // explicit size, e.g. 128x64
         int fw = 0, fh = 0;
+        twoLayers = false;
         if (std::sscanf(argv[4], "%dx%d", &fw, &fh) != 2 || fw <= 0 || fh <= 0 || size_t(fw) * size_t(fh) != pixelBytes) {
             std::fprintf(stderr, "size %s doesn't match %zu pixel bytes\n", argv[4], pixelBytes);
             return 1;
@@ -538,8 +554,22 @@ int cmdLbpInfo(int argc, char** argv) {
         const uint8_t* pixels = d.data() + paletteEnd + 12;
         bool ok = writeBmp(prefix + "_rgb.bmp", w, h, d.data() + 8, int(paletteCount), pixels, false) &&
                   writeBmp(prefix + "_bgr.bmp", w, h, d.data() + 8, int(paletteCount), pixels, true);
-        std::printf(ok ? "wrote %s_rgb.bmp and %s_bgr.bmp\n" : "failed writing %s_*.bmp\n", prefix.c_str(),
-                    prefix.c_str());
+        if (twoLayers) {
+            uint8_t grey[256 * 4];
+            for (int i = 0; i < 256; ++i)
+                grey[i * 4] = grey[i * 4 + 1] = grey[i * 4 + 2] = uint8_t(i), grey[i * 4 + 3] = 0;
+            ok = ok && writeBmp(prefix + "_layer2.bmp", w, h, grey, 256, pixels + size_t(w) * size_t(h), false);
+            // How the second layer is used tells us whether it's alpha.
+            unsigned hist[256] = {};
+            for (size_t k = 0; k < size_t(w) * size_t(h); ++k)
+                ++hist[pixels[size_t(w) * size_t(h) + k]];
+            unsigned distinct = 0, zeros = hist[0], full = hist[255];
+            for (unsigned v : hist)
+                distinct += v != 0;
+            std::printf("layer 2: %u distinct values, %u pixels = 0, %u pixels = 255\n", distinct, zeros, full);
+        }
+        std::printf(ok ? "wrote %s_rgb.bmp, %s_bgr.bmp%s\n" : "failed writing %s_*.bmp\n", prefix.c_str(),
+                    prefix.c_str(), twoLayers ? (" and " + prefix + "_layer2.bmp").c_str() : "");
         return ok ? 0 : 1;
     }
     return 0;
