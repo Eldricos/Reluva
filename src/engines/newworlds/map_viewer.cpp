@@ -20,10 +20,15 @@ constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
 constexpr int kSlotY[4] = {0, 0, 1, 1};
-// How the ground is coloured: with the models' own textures, or with the
-// colour of each cell's terrain code (from the tile's layers).
-constexpr int kColourings = 2;
-constexpr const char* kColouringNames[kColourings] = {"models' own textures", "terrain codes"};
+// How the ground is coloured: with the models' own textures, with the colour
+// of each cell's terrain code (from the tile's layers), or textured and tinted
+// where the grid marks a resource deposit.
+constexpr int kColourings = 3;
+constexpr const char* kColouringNames[kColourings] = {"models' own textures", "terrain codes",
+                                                      "resource deposits"};
+// Tints for the six deposit kinds (which resource each is isn't known).
+constexpr uint8_t kDepositColours[6][3] = {{255, 60, 60}, {255, 230, 40}, {60, 230, 60},
+                                           {40, 230, 255}, {255, 60, 255}, {255, 255, 255}};
 
 } // namespace
 
@@ -459,7 +464,8 @@ void MapViewer::render() {
     };
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
-    auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground) {
+    auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
+                         const uint8_t* tint = nullptr) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
@@ -541,8 +547,10 @@ void MapViewer::render() {
                         return a >= 0.5f;
                     }
                 }
-                for (int i = 0; i < 3; ++i)
-                    out[i] = uint8_t(std::min(255.0f, float(col[i]) * intensity));
+                for (int i = 0; i < 3; ++i) {
+                    const float base = tint ? (float(col[i]) + float(tint[i])) / 2 : float(col[i]);
+                    out[i] = uint8_t(std::min(255.0f, base * intensity));
+                }
                 out[3] = 255;
                 return true;
             };
@@ -575,7 +583,10 @@ void MapViewer::render() {
                     continue;
                 ++drawnTiles_;
                 static constexpr float kCos[4] = {1, 0, -1, 0}, kSin[4] = {0, 1, 0, -1};
-                drawModel(m, origin, kCos[tile.rotation], kSin[tile.rotation], &tile);
+                const int deposit = map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].deposit();
+                const uint8_t* tint =
+                    textured_ && colouring_ == 2 && deposit >= 1 && deposit <= 6 ? kDepositColours[deposit - 1] : nullptr;
+                drawModel(m, origin, kCos[tile.rotation], kSin[tile.rotation], &tile, tint);
             }
         }
     // Placed objects big enough on the screen to see.

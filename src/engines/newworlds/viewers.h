@@ -122,7 +122,7 @@ private:
 //   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines   K: walls
 //   O: placed objects (trees, rocks) on/off   H: smooth or flat shading
 //   T: textures on/off   G: colouring (the models' own textures; the map's
-//   terrain codes in its colour table)
+//   terrain codes in its colour table; textures tinted by resource deposit)
 class MapViewer {
 public:
     MapViewer(System& sys, Surface& screen, const Archives& archives);

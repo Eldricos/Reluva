@@ -39,9 +39,9 @@ N × u32                       lists, each ended by ff ff ff ff; entries are
                               24-bit values with bit 23 set, e.g. 00a0b277
 grid w × h × 10 bytes         one entry per grid cell, row by row:
                                 u16 block number (0-5 in kurt64)
-                                u16 50 in kurt64 (all cells; 0 in coverd2's
-                                first ones), perhaps a height
-                                u16 0
+                                u16 bits 12-15: resource deposit kind (1-6,
+                                0 none); bits 0-11: 50-300 (see below)
+                                u16 bits 12-15 repeat the kind; rest 0
                                 u32 where the cell's list starts in the N u32s
 1024 bytes                    a colour table: u32 entries, bytes B, G, R, 0,
                               ending with a zero entry (see Terrain codes)
@@ -50,6 +50,21 @@ grid w × h × 10 bytes         one entry per grid cell, row by row:
 The lists are stored column by column (cell (0, 1) starts at 47, cell (1, 0)
 at 1380). `kurt64`'s grid is a field of block 1 with scattered variants
 (blocks 2-5) and a patch of block 0, as a test map would be.
+
+### Resource deposits
+
+Bits 12-15 of a grid cell's second value mark a resource deposit, kinds 1
+to 6, and the third value's bits 12-15 always repeat it (every `icewrld`
+map). The game has six raw resources (dilithium, talgonite, silicon,
+kelbonite, magnesite, dolamide), so these are probably they; which kind is
+which isn't known. The deposits are hand-painted patches: `j1` (a
+multiplayer arena) is covered in large ones of every kind, `f1` (the first
+Federation mission) has one cluster of all six plus two small patches, `r12`
+only kind 1, `k12` kinds 1-3, and `kurt64` none.
+
+The low 12 bits run 50-300 in steps of 12.5. Inside deposits they vary
+(perhaps the amount); elsewhere they are mostly one value per map (50 in
+`f1`, 250 in most others) with other values tracing the terrain. Unknown.
 
 ### Placed objects
 
@@ -159,7 +174,17 @@ textures.
 - What the five layers of terrain codes are for.
 - How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
-  entries' second value (50, 75, 100, ... in steps of 25, sometimes with
-  bits 12-15 set) and third (multiples of 4096); the placed objects' bits
-  8-15 and the missing quarter; where units and buildings are placed.
-- The data after the records (most of the file).
+  entries' second value's low 12 bits; the placed objects' bits
+  8-15 and the missing quarter.
+- Which deposit kind is which resource.
+
+## Not in the map
+
+Every part of the file is now accounted for: the tile, link and block
+records, the placed objects, the grid (blocks and deposits) and the colour
+table. The only parts not understood are per tile model (the type-21 links)
+or per cell (the low bits above), so units, buildings and starting colonies
+can't be stored here: they presumably come from the missions, which
+`level.dat` names by a "parser short name" (`F1`, …) but whose scripts
+aren't in any archive (probably inside `STNW.exe`). The concrete tiles in
+`f1` are a few scattered groups of 1-3 tiles, not a colony's pad.

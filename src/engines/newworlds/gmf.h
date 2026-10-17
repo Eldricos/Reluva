@@ -35,7 +35,12 @@ struct GmfMap {
     };
     struct Cell {
         uint16_t block = 0; // which block
-        uint16_t value = 0; // unknown (50 in every kurt64 cell)
+        // Bits 12-15: a resource deposit's kind (1-6; 0 none; the third u16's
+        // bits 12-15 always repeat it). Bits 0-11: 50-300 in steps of 12.5,
+        // spread inside deposits (an amount?) and following the terrain
+        // elsewhere (unknown).
+        uint16_t value = 0;
+        int deposit() const { return value >> 12; }
     };
 
     // An object placed on the map, from a grid cell's list: a u32 whose bits
