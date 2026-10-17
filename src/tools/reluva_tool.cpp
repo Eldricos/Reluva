@@ -880,6 +880,15 @@ int cmdGeoInfo(int argc, char** argv) {
                     double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
     }
     std::printf("centre %g, %g; radius %g\n", double(m.centreX), double(m.centreY), double(m.radius));
+    // How often each value of the faces' second header word occurs (face 0's
+    // header is the file header, so it's left out).
+    std::map<uint32_t, unsigned> seconds;
+    for (size_t i = 1; i < m.faces.size(); ++i)
+        ++seconds[m.faces[i].groupB];
+    std::printf("faces' second header value (value x count):");
+    for (const auto& [value, n] : seconds)
+        std::printf(" %u x%u", value, n);
+    std::printf("\n");
     if (argc > 3) {
         if (!writeObj(m, argv[3])) {
             std::fprintf(stderr, "cannot write %s\n", argv[3]);
