@@ -80,6 +80,7 @@ void MapViewer::show(int index) {
     if (!status_.empty())
         map_ = GmfMap{};
     placeScenery();
+    makeUnderlay();
     resetView();
     updateTitle();
 }
@@ -204,6 +205,35 @@ float MapViewer::groundHeight(float x, float y) {
         }
     }
     return best;
+}
+
+// The ground under tiles drawn over something (hole_02's texture is
+// transparent around the hole): the texture of the map's most common flat,
+// low tile whose faces all use one texture (icewrld: ice_07). Where such a
+// tile's own texture is transparent, this shows through at the same texture
+// coordinates. The game's choice isn't known.
+void MapViewer::makeUnderlay() {
+    underlay_ = Texture{};
+    std::map<uint32_t, size_t> uses; // tile model: grid squares using it
+    for (const auto& cell : map_.cells)
+        for (uint32_t t : map_.blocks[cell.block])
+            ++uses[map_.tiles[t].model];
+    size_t bestUses = 0;
+    for (const auto& [model, n] : uses) {
+        const TileModel& m = tileModel(model);
+        if (!m.error.empty() || m.textures.empty() || m.textures[0].rgba.empty() || n <= bestUses)
+            continue;
+        bool fits = true;
+        for (const auto& face : m.geo.faces)
+            fits = fits && face.corners.back().extra[4] == 0;
+        for (const auto& part : m.geo.parts)
+            for (const auto& v : part.vertices)
+                fits = fits && std::fabs(v.z) < 1000;
+        if (fits) {
+            underlay_ = m.textures[0];
+            bestUses = n;
+        }
+    }
 }
 
 // The map's placed objects, each at the centre of its square on the block's
@@ -477,13 +507,25 @@ void MapViewer::render() {
                     ty += ty < 0 ? tt->height : 0;
                     const size_t texel = size_t(ty) * size_t(tt->width) + size_t(tx);
                     col = &tt->rgba[texel * 4];
-                    if (col[3] == 0)
-                        return false;
                     // On the planets the alpha layer is transparency (the
-                    // trees' and bushes' outlines): blend, and only mostly
-                    // opaque texels hide what's drawn later.
-                    if (!tt->alpha.empty() && tt->alpha[texel] < 255) {
-                        const float a = float(tt->alpha[texel]) / 255;
+                    // trees' and bushes' outlines, the ground round a hole).
+                    const float a = col[3] == 0 ? 0.0f
+                                    : tt->alpha.empty() ? 1.0f
+                                                        : float(tt->alpha[texel]) / 255;
+                    if (a < 1 && ground && ground->underlay && !underlay_.rgba.empty()) {
+                        // Ground shows through, at the same texture coordinates.
+                        const Texture& g = underlay_;
+                        const int gx = std::clamp(int(u * float(g.width)), 0, g.width - 1);
+                        const int gy = std::clamp(int(v * float(g.height)), 0, g.height - 1);
+                        const uint8_t* gc = &g.rgba[(size_t(gy) * size_t(g.width) + size_t(gx)) * 4];
+                        for (int i = 0; i < 3; ++i)
+                            out[i] = uint8_t(std::min(255.0f, (float(col[i]) * a + float(gc[i]) * (1 - a)) * intensity));
+                        out[3] = 255;
+                        return true;
+                    }
+                    if (a == 0)
+                        return false;
+                    if (a < 1) { // blend; only mostly opaque texels hide what's drawn later
                         for (int i = 0; i < 3; ++i)
                             out[i] = uint8_t(std::min(255.0f, float(col[i]) * intensity * a + float(out[i]) * (1 - a)));
                         return a >= 0.5f;
@@ -500,7 +542,6 @@ void MapViewer::render() {
                 outlines.push_back(projected);
         }
     };
-
 
     for (int by = 0; by < map_.height; ++by)
         for (int bx = 0; bx < map_.width; ++bx) {

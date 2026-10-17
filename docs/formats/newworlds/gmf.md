@@ -108,6 +108,12 @@ Checked on the 7 maps of `icewrld.cat`:
   nothing tested (cell values, block bytes, tile fields, other rotations or
   mirroring) lifts them. The terrain codes (below) agree they are low ground:
   they are real pits in the plateau, so the game must draw walls there.
+- **Bit 24** of the fourth value is set only on `hole_02` tiles (in every
+  `icewrld` map). `hole_02` is a bowl whose texture (`hole02`) is transparent
+  round the hole, so ground must show through there: presumably the bit
+  says so. Drawn that way, with the lowland ice texture underneath, the
+  tiles look like the frozen-water pits in screenshots of `f1`: blue ice at
+  the bottom of smooth, steep sides.
 - In each type-21 record, the first four items count 0-3 starting at
   (rotation + 2) mod 4: the tile's sides, numbered in its own frame.
 

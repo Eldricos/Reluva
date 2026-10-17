@@ -22,6 +22,9 @@ struct GmfMap {
         uint32_t model = 0;    // index of its ground model among the archive's .geo files
         uint32_t flags = 0;    // bits 14-15: rotation; others unknown
         int rotation = 0;      // quarter turns anticlockwise (bits 14-15 of flags)
+        // Bit 24 of flags: set only on hole_02 in icewrld, whose texture is
+        // transparent around the hole, so presumably "draw ground under it".
+        bool underlay = false;
         // Layers of terrain codes: 8 x 8 cells each, row by row from the
         // south, columns from the west (after the tile's rotation); 0 for
         // none, otherwise an index into the map's colour table. The first row

@@ -67,6 +67,7 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
                 t.model = r.u32(body + 8);
                 t.flags = r.u32(body + 12);
                 t.rotation = int(t.flags >> 14 & 3);
+                t.underlay = (t.flags >> 24 & 1) != 0;
                 const size_t layerBytes = std::min<size_t>(t.layers.size(), length - kGridOffset) / 64 * 64;
                 std::memcpy(t.layers.data(), &data[body + kGridOffset], layerBytes);
                 out.tiles.push_back(t);

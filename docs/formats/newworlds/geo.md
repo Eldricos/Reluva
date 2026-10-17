@@ -49,7 +49,8 @@ part data      u32 size (reaches the end of the file in mn_s), u32 1,
                index (0, 4, 6); then u32 3, 2, 8, 9, 0, 0, 2 before the names
 ...            terrain tiles: u32 1, u32 64, then per cell of an 8 × 8 grid a
                count and that many face indices; then u32 8, 8, ?, bounds, and
-               the faces again with another set of texture coordinates
+               the faces again (in hole_02, with the same texture coordinates:
+               not a second texture layer)
 trailer        names ("main", "terminate", "muzzle_flash", "front_lock",
                "pickup"),
                layout not studied

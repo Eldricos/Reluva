@@ -163,6 +163,7 @@ private:
     const TileModel& tileModel(uint32_t index);
     float groundHeight(float x, float y);
     void placeScenery();
+    void makeUnderlay();
     const TileEdges& tileEdges(uint32_t tile);
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
@@ -184,6 +185,7 @@ private:
     Texture wallTexture_; // the map archive's last cliff texture, if any
     std::map<int, TileModel> sceneryModels_; // by object type
     std::vector<Placed> placed_;
+    Texture underlay_; // ground showing through tiles with GmfMap::Tile::underlay
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
     bool textured_ = true, outlines_ = false, walls_ = true, scenery_ = true;
