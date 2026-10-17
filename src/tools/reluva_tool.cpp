@@ -18,7 +18,7 @@
 //   reluva-tool geo-info <file.geo> [out.obj]      decode a model; optionally export it as OBJ
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
 //   reluva-tool geo-textures [-a] <file.cat>...    show which textures each model gets (by default
-//                                                  only models without any, with similar names)
+//                                                  only models with too few, with similar names)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
 //                                                  corner, and dump the bytes where the walk stops
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
@@ -1006,35 +1006,49 @@ int cmdGeoTextures(int argc, char** argv) {
         archives.push_back(std::move(cat));
     }
     const std::vector<nw::TextureFile> textures = nw::listTextureFiles(archives);
-    unsigned models = 0, without = 0;
+    unsigned models = 0, without = 0, short_ = 0;
+    std::vector<uint8_t> data;
     for (const auto& cat : archives)
         for (const auto& e : cat->entries()) {
             if (e.tag != nw::cattag::Geometry)
                 continue;
             ++models;
+            // How many textures the faces number: the highest number + 1.
+            uint32_t needed = 0;
+            nw::GeoModel m;
+            if (!cat->read(e, data) && !nw::parseGeo(data, m))
+                for (const auto& face : m.faces)
+                    needed = std::max(needed, face.corners.back().extra[4] + 1);
             const auto found = nw::findModelTextures(e.name, textures);
-            if (!found.empty()) {
-                if (all) {
-                    std::printf("%s:", e.name.c_str());
-                    for (const auto* t : found)
-                        std::printf(" %s", t->stem.c_str());
-                    std::printf("\n");
-                }
+            const bool tooFew = found.size() < needed;
+            if (found.empty())
+                ++without;
+            else if (tooFew)
+                ++short_;
+            if (!all && !tooFew)
                 continue;
+            std::printf("%s: needs %u, found", e.name.c_str(), needed);
+            for (const auto* t : found)
+                std::printf(" %s", t->stem.c_str());
+            if (found.empty())
+                std::printf(" none");
+            if (tooFew) {
+                // Textures in the same folder whose names start like the model's.
+                std::string folder, stem, ext;
+                nw::splitName(e.name, folder, stem, ext);
+                const size_t prefix = std::min<size_t>(3, stem.size());
+                std::printf("; similar:");
+                unsigned shown = 0;
+                for (const auto& t : textures)
+                    if (t.folder == folder && t.stem.compare(0, prefix, stem, 0, prefix) == 0 && shown++ < 10)
+                        std::printf(" %s", t.stem.c_str());
+                if (!shown)
+                    std::printf(" -");
             }
-            ++without;
-            // Textures in the same folder whose names start like the model's.
-            std::string folder, stem, ext;
-            nw::splitName(e.name, folder, stem, ext);
-            const size_t prefix = std::min<size_t>(3, stem.size());
-            std::printf("%s: none; similar:", e.name.c_str());
-            unsigned shown = 0;
-            for (const auto& t : textures)
-                if (t.folder == folder && t.stem.compare(0, prefix, stem, 0, prefix) == 0 && shown++ < 10)
-                    std::printf(" %s", t.stem.c_str());
-            std::printf(shown ? "\n" : " -\n");
+            std::printf("\n");
         }
-    std::printf("%u models, %u without textures\n", models, without);
+    std::printf("%u models: %u without textures, %u with fewer than their faces number\n", models, without,
+                short_);
     return 0;
 }
 
