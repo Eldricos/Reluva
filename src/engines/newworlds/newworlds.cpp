@@ -8,8 +8,8 @@
 // owned copy. Never from leaked source code. See CONTRIBUTING.md.
 //
 // For now the engine is a data viewer: it opens every .cat archive in the
-// game folder and shows the models or the textures (see viewers.h for the
-// keys). Tab switches between them; Esc goes back to the launcher.
+// game folder and shows the models, the textures or the maps (see viewers.h
+// for the keys). Tab switches between them; Esc goes back to the launcher.
 
 #include "engines/engine.h"
 #include "engines/newworlds/viewers.h"
@@ -23,6 +23,7 @@ namespace reluva {
 namespace {
 
 using newworlds::CatArchive;
+using newworlds::MapViewer;
 using newworlds::ModelViewer;
 using newworlds::TextureViewer;
 
@@ -52,13 +53,25 @@ public:
         screen_.create(kScreenW, kScreenH, PixelFormat::RGBA32);
         ModelViewer models(sys_, screen_, archives_);
         TextureViewer textures(sys_, screen_, archives_);
-        if (models.count() == 0 && textures.count() == 0)
-            return Error::fail("No models or textures found in " + target_.path.string());
-        bool showModels = models.count() > 0;
-        if (showModels)
-            models.activate(); // the viewers draw into the screen, so it must exist
-        else
-            textures.activate();
+        MapViewer maps(sys_, screen_, archives_);
+        const size_t counts[3] = {models.count(), textures.count(), maps.count()};
+        if (counts[0] + counts[1] + counts[2] == 0)
+            return Error::fail("No models, textures or maps found in " + target_.path.string());
+        // Viewer 0 shows models, 1 textures, 2 maps; Tab moves to the next
+        // one that has something to show. They draw into the screen, so it
+        // must exist before the first activate().
+        int viewer = 0;
+        while (counts[viewer] == 0)
+            viewer = (viewer + 1) % 3;
+        auto activate = [&] {
+            if (viewer == 0)
+                models.activate();
+            else if (viewer == 1)
+                textures.activate();
+            else
+                maps.activate();
+        };
+        activate();
 
         while (true) {
             Event ev;
@@ -68,22 +81,23 @@ public:
                 if (ev.type == EventType::KeyDown && ev.key == key::Escape)
                     return Error::success();
                 if (ev.type == EventType::KeyDown && ev.key == key::Tab) {
-                    if ((showModels ? textures.count() : models.count()) > 0) {
-                        showModels = !showModels;
-                        if (showModels)
-                            models.activate();
-                        else
-                            textures.activate();
-                    }
+                    do
+                        viewer = (viewer + 1) % 3;
+                    while (counts[viewer] == 0);
+                    activate();
                     continue;
                 }
-                if (showModels)
+                if (viewer == 0)
                     models.handleEvent(ev);
-                else if (ev.type == EventType::KeyDown)
+                else if (viewer == 1 && ev.type == EventType::KeyDown)
                     textures.handleKey(ev.key);
+                else if (viewer == 2)
+                    maps.handleEvent(ev);
             }
-            if (showModels)
+            if (viewer == 0)
                 models.update(sys_.getMillis());
+            else if (viewer == 2)
+                maps.update(sys_.getMillis());
             sys_.updateScreen(screen_);
             sys_.delayMillis(10);
         }

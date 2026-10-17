@@ -8,10 +8,12 @@
 #include "common/types.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/gmf.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/texture.h"
 
+#include <map>
 #include <memory>
 #include <string>
 #include <vector>
@@ -111,6 +113,58 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     uint64_t lastMs_ = 0;
+};
+
+// Shows the planet maps (.gmf), built from their ground tiles: a map is a
+// grid of blocks, a block 2 x 2 tiles, and a tile one of the planet's ground
+// models. See docs/formats/newworlds/gmf.md.
+//   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
+//   W/A/S/D: move   R: reset the view   T: textures on/off   L: outlines
+class MapViewer {
+public:
+    MapViewer(System& sys, Surface& screen, const Archives& archives);
+    size_t count() const { return maps_.size(); }
+    void activate();
+    void handleEvent(const Event& ev);
+    void update(uint64_t nowMs); // redraws when something changed
+
+private:
+    using Vec3 = GeoModel::Vec3;
+    struct TileModel {
+        std::string name;              // e.g. "geo/map/ice/ice_07.geo"
+        std::string error;             // when it doesn't decode
+        GeoModel geo;
+        std::vector<Vec3> faceNormals; // per face, unit length
+        std::vector<Texture> textures; // in the order the faces number them
+        std::vector<std::string> textureNames;
+    };
+
+    void show(int index);
+    void resetView();
+    void render();
+    void updateTitle();
+    const TileModel& tileModel(uint32_t index);
+
+    System& sys_;
+    Surface& screen_;
+    const Archives& archives_;
+    Rasterizer raster_;
+    std::vector<EntryRef> maps_;
+    std::vector<TextureFile> textureFiles_;
+    bool shown_ = false;
+    int current_ = 0;
+
+    GmfMap map_;
+    std::string status_;                 // decode error, if any
+    std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, in order
+    std::map<uint32_t, TileModel> tileModels_;
+
+    float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
+    bool textured_ = true, outlines_ = false;
+    bool dragging_ = false;
+    int dragX_ = 0, dragY_ = 0;
+    bool dirty_ = true;
+    unsigned drawnTiles_ = 0, drawnFaces_ = 0;
 };
 
 } // namespace reluva::newworlds

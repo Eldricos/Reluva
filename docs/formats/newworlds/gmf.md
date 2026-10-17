@@ -56,13 +56,39 @@ their values, and their low byte has a strongly patterned distribution, so
 they are packed fields of some kind; what they describe isn't known yet
 (placed scenery, pathfinding or visibility data?).
 
-Each tile's type-20 header has a third value that takes one value per kind
-of tile (`kurt64`: 32 for tiles 0-3, 6 for 4-7, 30 for 8-11): perhaps the
-ground model it uses.
+## Tiles and ground models
+
+A tile's type-20 header's third value is the number of its ground model
+among the `.geo` files of the map's archive, in archive order (counting from
+0, `lod/` models included). In `kurt64` (`icewrld.cat`): 6 = `ice_07` for the
+field (tiles 4-7, block 1), 30 = `crack_08` for the crack tiles (8-11, which
+blocks 2-5 each swap in once), and 32 = `hole_02` for the patch of block 0
+(tiles 0-3). The fourth value differs per kind too (`0x18000`, `0x8000`,
+`0x1018000`).
+
+Ground models span -4096..4096 in x and y, so a tile is 8192 units and a
+block 16384. Their edges are at height 0 where they meet (`ice_07` on all
+sides; `crack_08` except where its crack reaches two of them). Their faces
+pick textures the usual way (the last value of the last corner); `ice_07`
+uses one, `crack_08` four. The planet archives hold textures named like the
+models without the underscore (`ice07`, `hole02`, `brid01`), presumably each
+model's first; the others aren't known.
+
+A ground model's own 8 x 8 grid (after its faces) lists, per cell, the faces
+over it; cells overlap, so it's a lookup for heights or collisions, not a
+texture map. The type-20 grids are the same (2 on the edge, `0b` inside) for
+all of `kurt64`'s tiles, whatever their model, so they aren't textures
+either; perhaps whether ground is passable.
+
+The viewer places a block's four tiles round the square in record order
+(x, y offsets (0, 0), (1, 0), (1, 1), (0, 1)), which matches block 0's
+numbering (0, 1, 3, 2) but isn't confirmed; on `kurt64`, where the edges are
+flat, any order looks the same.
 
 ## Open questions
 
 - What the type-21 records, the type-20 grids and the list entries hold;
-  which ground-tile model each tile uses; where units and buildings are
-  placed.
+  how a block's tiles are arranged (and whether tiles can be rotated); the
+  grid entries' second value (50 everywhere in `kurt64`: a height?); where
+  units and buildings are placed.
 - The data after the records (most of the file).

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
 #include <algorithm>
@@ -30,41 +31,6 @@ constexpr uint8_t kPartColours[8][3] = {
     {170, 180, 195}, {225, 140, 70}, {90, 170, 230}, {120, 200, 110},
     {215, 95, 120},  {200, 190, 90}, {160, 120, 220}, {90, 200, 190},
 };
-
-struct Vec {
-    float x, y, z;
-};
-Vec operator-(Vec a, Vec b) { return {a.x - b.x, a.y - b.y, a.z - b.z}; }
-Vec operator*(Vec a, float s) { return {a.x * s, a.y * s, a.z * s}; }
-float dot(Vec a, Vec b) { return a.x * b.x + a.y * b.y + a.z * b.z; }
-Vec cross(Vec a, Vec b) { return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x}; }
-Vec normalize(Vec a) {
-    const float len = std::sqrt(dot(a, a));
-    return len > 0 ? a * (1.0f / len) : Vec{0, 0, 0};
-}
-
-// A polygon corner in view space (x right, y up, z away from the camera).
-struct ViewVertex {
-    float x, y, z, u, v;
-};
-
-// Keep the part of the polygon with z >= nearZ (Sutherland-Hodgman).
-std::vector<ViewVertex> clipNear(const std::vector<ViewVertex>& in, float nearZ) {
-    std::vector<ViewVertex> out;
-    for (size_t i = 0; i < in.size(); ++i) {
-        const ViewVertex& a = in[i];
-        const ViewVertex& b = in[(i + 1) % in.size()];
-        const bool aIn = a.z >= nearZ, bIn = b.z >= nearZ;
-        if (aIn)
-            out.push_back(a);
-        if (aIn != bIn) {
-            const float t = (nearZ - a.z) / (b.z - a.z);
-            out.push_back({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, nearZ, a.u + (b.u - a.u) * t,
-                           a.v + (b.v - a.v) * t});
-        }
-    }
-    return out;
-}
 
 } // namespace
 
@@ -334,16 +300,7 @@ void ModelViewer::render() {
     }
 
     // Orbit camera around the model's centre, z up.
-    const float distance = size_ * 2.6f * zoom_;
-    const Vec centre{centre_[0], centre_[1], centre_[2]};
-    const Vec toCamera{std::cos(pitch_) * std::sin(yaw_), -std::cos(pitch_) * std::cos(yaw_), std::sin(pitch_)};
-    const Vec eye = Vec{centre.x + toCamera.x * distance, centre.y + toCamera.y * distance,
-                        centre.z + toCamera.z * distance};
-    const Vec forward = toCamera * -1.0f;
-    const Vec right = normalize(cross(forward, Vec{0, 0, 1}));
-    const Vec up = cross(right, forward);
-    const float focal = float(h) * 1.2f;
-    const float nearZ = distance * 0.01f;
+    const OrbitCamera cam(Vec{centre_[0], centre_[1], centre_[2]}, yaw_, pitch_, size_ * 2.6f * zoom_, w, h);
     const Vec light = normalize(Vec{-0.4f, 0.5f, -0.75f}); // towards the light, in view space
 
     raster_.begin(screen_);
@@ -377,19 +334,17 @@ void ModelViewer::render() {
             normal.x += (a.y - b.y) * (a.z + b.z);
             normal.y += (a.z - b.z) * (a.x + b.x);
             normal.z += (a.x - b.x) * (a.y + b.y);
-            const Vec d = Vec{a.x, a.y, a.z} - eye;
-            poly.push_back({dot(d, right), dot(d, up), dot(d, forward), face.corners[i].u, face.corners[i].v});
+            poly.push_back(cam.toView(Vec{a.x, a.y, a.z}, face.corners[i].u, face.corners[i].v));
         }
         normal = normalize(normal);
-        const Vec viewNormal{dot(normal, right), dot(normal, up), dot(normal, forward)};
+        const Vec viewNormal = cam.directionToView(normal);
 
-        poly = clipNear(poly, nearZ);
+        poly = clipNear(poly, cam.nearZ);
         if (poly.size() < 3)
             continue;
         projected.clear();
         for (const auto& p : poly)
-            projected.push_back({float(w) / 2 + focal * p.x / p.z, float(h) / 2 - focal * p.y / p.z, 1.0f / p.z,
-                                 p.u, p.v});
+            projected.push_back(cam.project(p));
 
         // Twice the projected area; positive when clockwise on the screen (y down).
         float area = 0;

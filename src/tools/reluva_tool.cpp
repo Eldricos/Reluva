@@ -30,6 +30,7 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/gmf.h"
 #include "engines/newworlds/model_textures.h"
 
 #include <map>
@@ -1072,6 +1073,11 @@ int cmdGmfInfo(int argc, char** argv) {
     const uint16_t types[3] = {21, 20, 19};
     std::printf("%zu bytes; %u type-21, %u type-20 and %u type-19 records; grid %u x %u\n", d.size(), counts[0],
                 counts[1], counts[2], rd16(d, 6), rd16(d, 8));
+    {
+        reluva::newworlds::GmfMap map;
+        const reluva::Error err = reluva::newworlds::parseGmf(d, map);
+        std::printf("engine's reader: %s\n", err ? err.message.c_str() : "reads it");
+    }
 
     struct Record {
         size_t offset;

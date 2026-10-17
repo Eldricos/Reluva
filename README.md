@@ -46,14 +46,16 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 - `reluva-tool` has developer tools for studying game data: `hexdump`,
   `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
-- New Worlds currently opens as a data viewer. **Tab** switches between models
-  and textures, **Left/Right** step through them and **F** cycles filters. For
+- New Worlds currently opens as a data viewer. **Tab** switches between models,
+  textures and maps, **Left/Right** step through them and **F** cycles filters. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used
   (glow, ignored, transparency), **C** to
   colour faces by texture number, **B** to show back faces
-  and **R** to reset the view.
+  and **R** to reset the view. Maps are built from their ground tiles: drag to
+  rotate, use the wheel to zoom, **W/A/S/D** to move, **Q/E** to turn,
+  **Left/Right** for the next map, **T** for textures and **L** for outlines.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
 (`~/.local/share/reluva/reluva/` on Linux, `%APPDATA%\reluva\reluva\` on Windows).

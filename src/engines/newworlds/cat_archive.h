@@ -52,6 +52,7 @@ public:
     Error open(const std::filesystem::path& path);
 
     const std::vector<CatEntry>& entries() const { return entries_; }
+    const std::filesystem::path& path() const { return path_; }
     // Look up a file by normalized name, ignoring case and slash direction.
     const CatEntry* find(std::string_view name) const;
     Error read(const CatEntry& entry, std::vector<uint8_t>& out);

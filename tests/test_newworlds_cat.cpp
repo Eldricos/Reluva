@@ -8,6 +8,7 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/gmf.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 
@@ -368,6 +369,49 @@ void testGeo() {
     CHECK(parseGeo(bad, m));
 }
 
+// A 2 x 1 map: 2 tiles, 1 block, both cells using it.
+std::vector<uint8_t> tinyGmf() {
+    std::vector<uint8_t> b;
+    auto put16 = [&](uint16_t v) { b.push_back(uint8_t(v)); b.push_back(uint8_t(v >> 8)); };
+    put16(2); put16(2); put16(1); put16(2); put16(1);
+    for (int i = 0; i < 2; ++i) { // type 21, contents unknown
+        put16(21); put16(4); put16(0); put32(b, 0);
+    }
+    for (uint32_t i = 0; i < 2; ++i) { // type 20: number, 0, model, flags, u16, 8 x 8 grid
+        put16(20); put16(18 + 64); put16(0);
+        put32(b, i); put32(b, 0); put32(b, 6 + i); put32(b, 0x18000); put16(0);
+        for (int c = 0; c < 64; ++c)
+            b.push_back(uint8_t(c == 0 ? 2 : 11));
+    }
+    put16(19); put16(22); put16(0); // block: 6 bytes, then four tile numbers
+    for (int i = 0; i < 6; ++i)
+        b.push_back(0);
+    for (uint32_t t : {0u, 1u, 1u, 0u})
+        put32(b, t);
+    put32(b, 2); put32(b, 0x00a0b277); put32(b, 0xffffffffu); // lists
+    for (int cell = 0; cell < 2; ++cell) {                    // grid
+        put16(0); put16(50); put16(0); put32(b, 0);
+    }
+    b.insert(b.end(), 1024, 0);
+    return b;
+}
+
+void testGmf() {
+    GmfMap m;
+    Error err = parseGmf(tinyGmf(), m);
+    CHECK(!err);
+    if (err) {
+        std::fprintf(stderr, "  %s\n", err.message.c_str());
+        return;
+    }
+    CHECK(m.width == 2 && m.height == 1 && m.tiles.size() == 2 && m.blocks.size() == 1 && m.cells.size() == 2);
+    CHECK(m.tiles[1].model == 7 && m.tiles[0].cells[0] == 2 && m.tiles[0].cells[1] == 11);
+    CHECK(m.blocks[0][2] == 1 && m.cells[1].block == 0 && m.cells[1].value == 50);
+    auto bad = tinyGmf();
+    bad[bad.size() - 1024 - 10] = 5; // the last cell uses block 5 of 1
+    CHECK(parseGmf(bad, m));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -454,6 +498,7 @@ int main() {
     testStringTable();
     testTexture();
     testGeo();
+    testGmf();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);
