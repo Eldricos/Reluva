@@ -20,6 +20,10 @@ constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
 constexpr int kSlotY[4] = {0, 0, 1, 1};
+// Where ground textures come from. The map's layers are read two ways: each
+// layer is one texture (the value in its first row and column) and its other
+// cells say where it covers; or each cell names its own texture.
+constexpr const char* kSourceNames[3] = {"map layers", "map layers per cell", "models' own textures"};
 
 } // namespace
 
@@ -48,6 +52,7 @@ void MapViewer::show(int index) {
     current_ = index;
     status_.clear();
     tileModels_.clear();
+    tileEdges_.clear();
     archiveModels_.clear();
     const EntryRef& ref = maps_[size_t(index)];
     CatArchive& cat = *archives_[ref.archive];
@@ -160,6 +165,68 @@ const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     return m;
 }
 
+int MapViewer::tileAt(int tx, int ty) const {
+    if (tx < 0 || ty < 0 || tx >= 2 * map_.width || ty >= 2 * map_.height)
+        return -1;
+    static constexpr int kSlotAt[2][2] = {{0, 3}, {1, 2}}; // [x][y] within the block
+    const auto& block = map_.blocks[map_.cells[size_t(ty / 2) * size_t(map_.width) + size_t(tx / 2)].block];
+    return int(block[size_t(kSlotAt[tx % 2][ty % 2])]);
+}
+
+// Edge heights at 5 points along each side, from the model's vertices that
+// lie on the side (linear in between), after the tile's rotation.
+const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
+    auto found = tileEdges_.find(tileIndex);
+    if (found != tileEdges_.end())
+        return found->second;
+    TileEdges& e = tileEdges_[tileIndex];
+    const GmfMap::Tile& tile = map_.tiles[tileIndex];
+    const TileModel& m = tileModel(tile.model);
+    if (!m.error.empty())
+        return e;
+    std::vector<std::pair<float, float>> side[4]; // (position along the side, height)
+    for (const auto& part : m.geo.parts)
+        for (const auto& v : part.vertices) {
+            float x = v.x, y = v.y;
+            for (int k = 0; k < tile.rotation; ++k) {
+                const float t = x;
+                x = -y;
+                y = t;
+            }
+            const float h = kTileSize / 2;
+            if (std::fabs(x - h) < 2)
+                side[0].push_back({y, v.z});
+            if (std::fabs(y - h) < 2)
+                side[1].push_back({x, v.z});
+            if (std::fabs(x + h) < 2)
+                side[2].push_back({y, v.z});
+            if (std::fabs(y + h) < 2)
+                side[3].push_back({x, v.z});
+        }
+    for (int s = 0; s < 4; ++s) {
+        auto& pts = side[s];
+        if (pts.empty())
+            continue;
+        std::sort(pts.begin(), pts.end());
+        e.present[s] = true;
+        for (int k = 0; k < 5; ++k) {
+            const float t = -kTileSize / 2 + float(k) * kTileSize / 4;
+            float z = pts.front().second;
+            for (size_t i = 0; i + 1 < pts.size(); ++i)
+                if (t >= pts[i].first && t <= pts[i + 1].first) {
+                    const float span = pts[i + 1].first - pts[i].first;
+                    z = span > 0 ? pts[i].second + (pts[i + 1].second - pts[i].second) * (t - pts[i].first) / span
+                                 : pts[i].second;
+                    break;
+                }
+            if (t > pts.back().first)
+                z = pts.back().second;
+            e.z[s][k] = z;
+        }
+    }
+    return e;
+}
+
 void MapViewer::handleEvent(const Event& ev) {
     switch (ev.type) {
     case EventType::MouseDown:
@@ -206,8 +273,9 @@ void MapViewer::handleEvent(const Event& ev) {
     case '-': distance_ = std::min(distance_ * 1.25f, 1e8f); break;
     case 'r': resetView(); break;
     case 't': textured_ = !textured_; break;
-    case 'g': layered_ = !layered_; break;
+    case 'g': textureSource_ = (textureSource_ + 1) % 3; break;
     case 'l': outlines_ = !outlines_; break;
+    case 'k': walls_ = !walls_; break;
     case key::Right: show((current_ + 1) % n); return;
     case key::Left: show((current_ + n - 1) % n); return;
     default: return;
@@ -237,10 +305,12 @@ void MapViewer::updateTitle() {
     title += "; " + std::to_string(map_.width) + " x " + std::to_string(map_.height) + " blocks, " +
              std::to_string(map_.tiles.size()) + " tiles, " + std::to_string(map_.blocks.size()) + " blocks; drew " +
              std::to_string(drawnTiles_) + " tiles, " + std::to_string(drawnFaces_) + " faces)";
+    if (!walls_)
+        title += " [no walls]";
     if (!textured_)
         title += " [untextured]";
-    else if (!layered_)
-        title += " [models' own textures]";
+    else
+        title += std::string(" [") + kSourceNames[textureSource_] + "]";
     sys_.setWindowTitle(title);
 }
 
@@ -331,20 +401,23 @@ void MapViewer::render() {
                                                  !m.textures[textureIndex].rgba.empty()
                                              ? &m.textures[textureIndex]
                                              : nullptr;
-                    const bool layers = textured_ && layered_ && !planetTextures_.empty();
+                    const bool layers = textured_ && textureSource_ < 2 && !planetTextures_.empty();
+                    const bool layerTexture = textureSource_ == 0;
                     auto shade = [&](float u, float v, uint8_t* out) {
                         static const uint8_t plain[3] = {170, 180, 195};
                         const uint8_t* col = plain;
-                        // The map's layers: the topmost texture in the cell
+                        // The map's layers: the topmost layer covering the cell
                         // under (u, v), the tile's own texture coordinates.
-                        // The first row and column hold other values, so they
-                        // take the next cell's.
+                        // Its texture is the layer's first-row value, or the
+                        // cell's own. The first row and column take the next
+                        // cell's coverage.
                         const Texture* cellTex = nullptr;
                         if (layers) {
                             const int cx = std::clamp(int(u * 8), 1, 7), cy = std::clamp(int(v * 8), 1, 7);
                             for (int layer = GmfMap::kLayers - 1; layer >= 0 && !cellTex; --layer) {
-                                const unsigned n = tile.layers[size_t(layer * 64 + cy * 8 + cx)];
-                                if (n && n < planetTextures_.size() && !planetTextures_[n].rgba.empty())
+                                const unsigned cover = tile.layers[size_t(layer * 64 + cy * 8 + cx)];
+                                const unsigned n = layerTexture ? tile.layers[size_t(layer * 64)] : cover;
+                                if (cover && n && n < planetTextures_.size() && !planetTextures_[n].rgba.empty())
                                     cellTex = &planetTextures_[n];
                             }
                         }
@@ -369,6 +442,63 @@ void MapViewer::render() {
                 }
             }
         }
+    // Walls: where a tile's east or north edge and its neighbour's don't meet,
+    // close the gap with flat, unlit quads. The game draws something there
+    // (cliff walls in screenshots); how isn't known, so this is the viewer's
+    // own approximation.
+    if (walls_)
+        for (int ty = 0; ty < 2 * map_.height; ++ty)
+            for (int tx = 0; tx < 2 * map_.width; ++tx) {
+                const int here = tileAt(tx, ty);
+                for (int s = 0; s < 2; ++s) {
+                    const int there = tileAt(tx + (s == 0), ty + (s == 1));
+                    if (there < 0)
+                        continue;
+                    const TileEdges& a = tileEdges(uint32_t(here));
+                    const TileEdges& b = tileEdges(uint32_t(there));
+                    const int other = s == 0 ? 2 : 3; // the neighbour's west or south side
+                    if (!a.present[s] || !b.present[other])
+                        continue;
+                    // The shared edge, in world coordinates.
+                    const float ex = float(tx + 1) * kTileSize, ey = float(ty + 1) * kTileSize;
+                    const float cx = (float(tx) + 0.5f) * kTileSize, cy = (float(ty) + 0.5f) * kTileSize;
+                    const ViewVertex mid = cam.toView(Vec{s == 0 ? ex : cx, s == 0 ? cy : ey, 0});
+                    if (mid.z < -tileRadius)
+                        continue;
+                    for (int k = 0; k < 4; ++k) {
+                        const float z0a = a.z[s][k], z1a = a.z[s][k + 1];
+                        const float z0b = b.z[other][k], z1b = b.z[other][k + 1];
+                        if (std::fabs(z0a - z0b) < 80 && std::fabs(z1a - z1b) < 80)
+                            continue;
+                        const float t0 = -kTileSize / 2 + float(k) * kTileSize / 4, t1 = t0 + kTileSize / 4;
+                        auto at = [&](float t, float z) {
+                            return s == 0 ? Vec{ex, cy + t, z} : Vec{cx + t, ey, z};
+                        };
+                        poly.clear();
+                        poly.push_back(cam.toView(at(t0, z0a), 0, 0));
+                        poly.push_back(cam.toView(at(t1, z1a), 1, 0));
+                        poly.push_back(cam.toView(at(t1, z1b), 1, 1));
+                        poly.push_back(cam.toView(at(t0, z0b), 0, 1));
+                        poly = clipNear(poly, cam.nearZ);
+                        if (poly.size() < 3)
+                            continue;
+                        projected.clear();
+                        for (const auto& p : poly)
+                            projected.push_back(cam.project(p));
+                        const uint8_t shadeLevel = s == 0 ? 120 : 140; // east- and north-facing walls differ
+                        auto wall = [&](float, float, uint8_t* out) {
+                            out[0] = uint8_t(shadeLevel * 0.85f);
+                            out[1] = uint8_t(shadeLevel * 0.92f);
+                            out[2] = shadeLevel;
+                            out[3] = 255;
+                            return true;
+                        };
+                        for (size_t i = 1; i + 1 < projected.size(); ++i)
+                            raster_.drawTriangle(projected[0], projected[i], projected[i + 1], wall);
+                    }
+                }
+            }
+
     for (const auto& o : outlines)
         for (size_t i = 0; i < o.size(); ++i) {
             const auto& a = o[i];

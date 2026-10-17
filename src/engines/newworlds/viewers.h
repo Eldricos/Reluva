@@ -119,8 +119,9 @@ private:
 // grid of blocks, a block 2 x 2 tiles, and a tile one of the planet's ground
 // models. See docs/formats/newworlds/gmf.md.
 //   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
-//   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines
-//   T: textures on/off   G: the map's texture layers or the models' own textures
+//   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines   K: walls
+//   T: textures on/off   G: texture source (map layers, as one texture each; map
+//   layers, per cell; the models' own textures)
 class MapViewer {
 public:
     MapViewer(System& sys, Surface& screen, const Archives& archives);
@@ -140,11 +141,20 @@ private:
         std::vector<std::string> textureNames;
     };
 
+    // A tile's edge heights after its rotation, at 5 points along each side
+    // (east, north, west, south); a side without vertices on it is missing.
+    struct TileEdges {
+        bool present[4] = {};
+        float z[4][5] = {};
+    };
+
     void show(int index);
     void resetView();
     void render();
     void updateTitle();
     const TileModel& tileModel(uint32_t index);
+    const TileEdges& tileEdges(uint32_t tile);
+    int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
 
     System& sys_;
     Surface& screen_;
@@ -159,10 +169,12 @@ private:
     std::string status_;                 // decode error, if any
     std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, in order
     std::map<uint32_t, TileModel> tileModels_;
+    std::map<uint32_t, TileEdges> tileEdges_;
     std::vector<Texture> planetTextures_; // the map archive's textures, in order
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
-    bool textured_ = true, outlines_ = false, layered_ = true;
+    bool textured_ = true, outlines_ = false, walls_ = true;
+    int textureSource_ = 0; // see kSourceNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;

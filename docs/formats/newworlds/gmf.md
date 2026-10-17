@@ -85,20 +85,25 @@ Checked on the 7 maps of `icewrld.cat`:
 
 ## Texture layers
 
-A type-20 record's five 8 x 8 grids are texture layers: each cell holds a
-texture number, the planet archive's full-size textures (`.mp0` and `.lbp`)
-in archive order (`icewrld`: 0 `blue01` ... 15 `ice01` ... 30 `hole02`, 31
-`tree.lbp` ...), or 0 for none. Higher layers cover parts of a tile in
-staircase shapes; the 8 bytes after the grids are bit masks of rows
-(`ff ff fc f0 f0 e0 c0 c0`), presumably for the top layer. The first row and
-column of a layer hold a different value (`0f` around `09`, `02` around
-`0e`): unknown. Painted from above with each texture's average colour, the
-cells' values follow the landscape's shapes, the first-row values don't.
+A type-20 record's five 8 x 8 grids are texture layers. Each layer is one
+texture, the value in its first row and column: a number among the planet
+archive's full-size textures (`.mp0` and `.lbp`) in archive order
+(`icewrld`: 0 `blue01` ... 15 `ice01` ... 18 `ice04` ... 30 `hole02`, 31
+`tree.lbp` ...). Its other cells are 0 where the layer doesn't cover;
+elsewhere they hold another small value (`09`, `0e`, `08`, `0c`, …; unknown).
+Higher layers cover parts of a tile in staircase shapes; the 8 bytes after the
+grids are bit masks of rows (`ff ff fc f0 f0 e0 c0 c0`), presumably for the
+top layer.
 
-The viewer paints each pixel with the topmost layer's texture in its cell
-(cell from the tile's texture coordinates); that comes out banded, so the
-layers are probably blended (by the masks?) or the cells are oriented
-differently. G switches to the models' own textures.
+So `ice_09`'s plateau is `ice01` (15), and the lowland tiles' layers are
+`blue03`, `ice04` and the like. Drawn that way (topmost covering layer per
+cell, the texture once across the tile) the map looks like screenshots of
+the game: broad, even ice with darker lowland. Reading each cell's own value
+as its texture gives a banded patchwork instead. How the game blends the
+layers' edges isn't known.
+
+Where neighbouring tiles' edges don't meet (a plateau beside a pit), the game
+draws cliff walls; the viewer closes those gaps with plain quads of its own.
 
 A ground model's own 8 x 8 grid (after its faces) lists, per cell, the faces
 over it; cells overlap, so it's a lookup for heights or collisions, not
@@ -106,8 +111,8 @@ textures.
 
 ## Open questions
 
-- How the texture layers combine; what the first row and column hold.
-- What closes the gaps between plateaus and flat tiles beside them.
+- How the texture layers blend; what the non-zero cell values mean.
+- How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
   entries' second value (50, 75, 100, ... in steps of 25, sometimes with
   bits 12-15 set) and third (multiples of 4096); the list entries (probably
