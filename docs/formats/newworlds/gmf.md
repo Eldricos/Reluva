@@ -22,15 +22,21 @@ All values little-endian.
 
 | Type | Length | Notes |
 |---|---|---|
-| 21 | 148–155 | bodies of small items: `00 00 00 k 00 80 00`, and many `02 ff ff ff ff ff` (empty?) |
-| 20 | 338–362 | |
-| 19 | 22 | |
+| 21 | 148–155 | one per tile (see below): small items `00 00 00 k 00 80 00`, many `02 ff ff ff ff ff` |
+| 20 | 338–362 | one per tile: u32 its own number (0, 1, …), u32 0, u32 ?, u32 `0x18000`, u16 ?, then 8 × 8 byte grids (5, plus 0–3 8-byte items); values such as 2, 8, `0b`, `0d`, `0e`, perhaps terrain textures per cell |
+| 19 | 22 | a 2 × 2 **block** of tiles: 6 bytes (0), then four u32 tile numbers, e.g. (0, 1, 3, 2), (4, 5, 6, 7), (8, 5, 6, 7) |
 
-The counts of types 21 and 20 are equal, so they probably describe the same
-things in two ways.
+So the type-21 and type-20 counts are the number of distinct **tiles** (each
+with two records), type 19 builds 2 × 2 **blocks** from them, and the header's
+grid is in blocks: `kurt64` is 32 × 32 blocks = 64 × 64 tiles, as its name
+says. Ground-tile models (`geo/map/...`) also have an 8 × 8 face grid.
+
+After the records: a u32 (37092 in `kurt64`, 39607 in `coverd2`), then 4-byte
+entries such as `67 5b d8 00` (the third byte always has its top bit set),
+separated by `ff ff ff ff`.
 
 ## Open questions
 
-- What the records describe, how cells refer to ground tiles and textures,
-  and where units and buildings are placed.
+- What the type-21 records and the type-20 grids hold, which ground-tile
+  model each tile uses, and where units and buildings are placed.
 - The data after the records (most of the file).

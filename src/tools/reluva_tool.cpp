@@ -1112,6 +1112,42 @@ int cmdGmfInfo(int argc, char** argv) {
         hexdump(d, r.offset, 6 + size_t(r.length));
         return 0;
     }
+    // Type 19: four u32 indices after 6 bytes, presumably into the tiles
+    // (the type-21/20 records). Check they're in range.
+    {
+        const size_t first = counts[0] + counts[1];
+        uint32_t maxIndex = 0;
+        for (size_t i = first; i < records.size(); ++i)
+            for (int k = 0; k < 4; ++k)
+                maxIndex = std::max(maxIndex, rd32(d, records[i].offset + 6 + 6 + 4 * size_t(k)));
+        std::printf("type-19 indices: highest %u (%u tiles)\n", maxIndex, counts[0]);
+        // Type 20: u32 own number, u32, u32, u32, u16, then 8 x 8 byte grids.
+        unsigned numbered = 0;
+        for (size_t i = counts[0]; i < first; ++i)
+            numbered += rd32(d, records[i].offset + 6) == i - counts[0];
+        std::printf("type-20 records whose first value is their own number: %u of %u\n", numbered, counts[1]);
+    }
+
+    // After the records: a u32 count, then (perhaps) that many u32 entries,
+    // with ffffffff separators.
+    {
+        const uint32_t n = rd32(d, p);
+        size_t separators = 0;
+        const size_t end = p + 4 + size_t(n) * 4;
+        if (end <= d.size()) {
+            for (size_t o = p + 4; o < end; o += 4)
+                separators += rd32(d, o) == 0xffffffffu;
+            std::printf("after the records: u32 %u; %u u32s from there hold %zu ffffffff separators and end at 0x%zx, "
+                        "leaving %zu bytes (%.2f per grid cell)\n",
+                        n, n, separators, end, d.size() - end,
+                        double(d.size() - end) / std::max(1, rd16(d, 6) * rd16(d, 8)));
+            std::printf("start of what's left:\n");
+            hexdump(d, end, 0x80);
+        } else {
+            std::printf("after the records: u32 %u (too many for the file to be that many u32s)\n", n);
+        }
+    }
+
     // A sample of each kind, and the start of what follows.
     for (int k = 0; k < 3; ++k) {
         size_t first = 0;
@@ -1122,6 +1158,26 @@ int cmdGmfInfo(int argc, char** argv) {
         const size_t pick = first + counts[k] / 2;
         const Record& r = records[pick];
         std::printf("record %zu (a type-%u one from the middle) at 0x%zx:\n", pick, r.type, r.offset);
+        if (r.type == 20) { // header values, then the 8 x 8 grids
+            std::printf("  values %u %u %u %u %u; grids:\n", rd32(d, r.offset + 6), rd32(d, r.offset + 10),
+                        rd32(d, r.offset + 14), rd32(d, r.offset + 18), rd16(d, r.offset + 22));
+            const size_t grids = r.offset + 6 + 18;
+            for (unsigned row = 0; row < 8; ++row) {
+                std::printf("   ");
+                for (size_t g = 0; g * 64 + 64 <= size_t(r.length) - 18; ++g) {
+                    for (unsigned c = 0; c < 8; ++c)
+                        std::printf(" %02x", d[grids + g * 64 + row * 8 + c]);
+                    std::printf("  ");
+                }
+                std::printf("\n");
+            }
+            const size_t rest = grids + ((size_t(r.length) - 18) / 64) * 64;
+            if (rest < r.offset + 6 + r.length) {
+                std::printf("  after the grids:\n");
+                hexdump(d, rest, r.offset + 6 + r.length - rest);
+            }
+            continue;
+        }
         hexdump(d, r.offset, std::min<size_t>(6 + size_t(r.length), 0x80));
     }
     if (counts[2] > 1) {
@@ -1131,7 +1187,7 @@ int cmdGmfInfo(int argc, char** argv) {
             hexdump(d, records[i].offset, 6 + size_t(records[i].length));
     }
     std::printf("after the records:\n");
-    hexdump(d, p, 0x100);
+    hexdump(d, p, 0x80);
     return 0;
 }
 
