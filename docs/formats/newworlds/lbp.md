@@ -51,9 +51,33 @@ width) for every group, e.g.
 | `res/kurtscou/kscout1l.lbp` | 12.012 | 5 | 64 | 60 |
 | `lbp/txr/solsys/tabras01.mp0` (format 6) | 2.016 | 254 | 256 | 256 |
 
-Palettes of these textures typically hold magenta (`fe 02 fe`) or green
-(`02 aa 02`), the usual key colours. For format 6 with a key, the decoder makes
-keyed pixels transparent and uses the alpha layer for the rest.
+For format 6 with a key, the decoder makes keyed pixels transparent and uses
+the alpha layer for the rest.
+
+**The key index is the transparent colour.** `reluva-tool tex-keys` over all 69
+colour-keyed textures in the retail archives:
+
+- Interface images (`lbp/gui/...`): key 255 (191 in `pbbutt.lbp`), always pure
+  magenta `#ff00ff`. In cursors (`attack.lbp`, `move.lbp`, …) three corners are
+  the key and the top-left is the pointer tip.
+- Sprites in `res/kurtscou/` (`kscout*`, `ktank*`): the key is a black index, and
+  all four corners use it in every one.
+- Star fields and planets (`lbp/txr/solsys/stars*`, `tabras*`): key 254, black,
+  so space is transparent.
+- Images that fill their whole area (sliders, effects, padded buttons) don't have
+  key-coloured corners, so only 32 of 69 have the key in all four corners.
+
+One exception: `res/kurtscou/ksmile_m.lbp` has key 255 = black (51 pixels) but
+a background of index 2 = `#fe02fe`, nearly but not exactly the `#ff00ff` used
+everywhere else. It sits in a developer folder with other test sprites, so it's
+probably an unused asset; the decoder doesn't special-case it.
+
+### Padding
+
+Some interface images (`basebut1.lbp`, `smlogos.lbp`, `kln/ops2crnr.lbp`) have
+solid bars along the right and bottom edges, presumably padding to a
+power-of-two size, as the 3D hardware of the time required. Which part the game
+actually draws is presumably defined elsewhere (e.g. the interface layout).
 
 ### Other
 
@@ -85,7 +109,7 @@ Confirmed by viewing the decoded images:
 
 ## Open questions
 
-- Confirm visually that keyed pixels should be transparent (expected from the key colours).
+- Where the used area of padded interface images is defined.
 - Whether other format values exist, e.g. in `.fbp` font textures or `.eb0`
   environment maps.
 - How sprite sheets are divided into frames (fixed grid, or described elsewhere).
