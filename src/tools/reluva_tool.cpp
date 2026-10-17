@@ -12,6 +12,8 @@
 //   reluva-tool stb-dump <file.stb>                print a string table
 //   reluva-tool tex-survey <file.cat>...           group every texture by header layout
 //   reluva-tool tex-keys <file.cat>...             compare each colour key with the image corners
+//   reluva-tool chunks <file>                      try to read any file as a (u16 tag, u32 size) chunk tree
+//   reluva-tool words <file> [offset] [count]      show 4-byte values as hex, integer and float
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
@@ -675,6 +677,105 @@ int cmdTexKeys(int argc, char** argv) {
     return 0;
 }
 
+
+// A payload counts as a container if it splits exactly into chunks whose
+// tags look plausible. Small tag limit keeps random data from qualifying.
+bool tilesIntoChunks(const Bytes& d, size_t begin, size_t end) {
+    if (end - begin < 6)
+        return false;
+    size_t p = begin;
+    while (p < end) {
+        if (p + 6 > end)
+            return false;
+        const uint16_t tag = rd16(d, p);
+        const uint32_t size = rd32(d, p + 2);
+        if (tag > 0x400 || size > end - p - 6)
+            return false;
+        p += 6 + size;
+    }
+    return p == end;
+}
+
+std::string describeWords(const Bytes& d, size_t p, size_t end, int count) {
+    std::string out;
+    char buf[64];
+    for (int i = 0; i < count && p + 4 <= end; ++i, p += 4) {
+        const uint32_t v = rd32(d, p);
+        float f;
+        std::memcpy(&f, &v, 4);
+        const bool plausibleFloat = (v & 0x7f800000) != 0 && (v & 0x7f800000) != 0x7f800000 && f > -1e6f &&
+                                    f < 1e6f && (f > 1e-4f || f < -1e-4f);
+        if (plausibleFloat)
+            std::snprintf(buf, sizeof buf, " %gf", double(f));
+        else
+            std::snprintf(buf, sizeof buf, " %u", v);
+        out += buf;
+    }
+    return out;
+}
+
+void printChunks(const Bytes& d, size_t begin, size_t end, int depth) {
+    size_t p = begin;
+    while (p < end) {
+        const uint16_t tag = rd16(d, p);
+        const uint32_t size = rd32(d, p + 2);
+        const size_t payload = p + 6, payloadEnd = payload + size;
+        const bool container = tilesIntoChunks(d, payload, payloadEnd);
+        std::printf("%*s%06zx tag 0x%04x size %u%s", depth * 2, "", p, tag, size, container ? "  {" : "");
+        if (!container)
+            std::printf("  :%s%s", describeWords(d, payload, payloadEnd, 6).c_str(), size > 24 ? " ..." : "");
+        std::printf("\n");
+        if (container)
+            printChunks(d, payload, payloadEnd, depth + 1);
+        p = payloadEnd;
+    }
+}
+
+int cmdChunks(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool chunks <file>\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    std::printf("%s: %zu bytes\n", argv[2], d.size());
+    if (!tilesIntoChunks(d, 0, d.size())) {
+        std::printf("doesn't divide into chunks from the start; first words:%s\n",
+                    describeWords(d, 0, d.size(), 12).c_str());
+        // Maybe there's a header: report the first offset from which it does.
+        for (size_t start = 1; start < std::min<size_t>(d.size(), 64); ++start)
+            if (tilesIntoChunks(d, start, d.size())) {
+                std::printf("but it does from offset %zu:\n", start);
+                printChunks(d, start, d.size(), 1);
+                return 0;
+            }
+        return 1;
+    }
+    printChunks(d, 0, d.size(), 0);
+    return 0;
+}
+
+int cmdWords(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool words <file> [offset] [count]\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    size_t off = argc > 3 ? size_t(parseNumber(argv[3])) : 0;
+    const size_t count = argc > 4 ? size_t(parseNumber(argv[4])) : 64;
+    std::printf("%8s  %8s  %11s  %14s  %s\n", "offset", "hex", "u32", "float", "u16 pair");
+    for (size_t i = 0; i < count && off + 4 <= d.size(); ++i, off += 4) {
+        const uint32_t v = rd32(d, off);
+        float f;
+        std::memcpy(&f, &v, 4);
+        std::printf("%8zx  %08x  %11u  %14g  %u, %u\n", off, v, v, double(f), v & 0xffff, v >> 16);
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -694,6 +795,10 @@ int main(int argc, char** argv) {
         return cmdTexSurvey(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "tex-keys") == 0)
         return cmdTexKeys(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "chunks") == 0)
+        return cmdChunks(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "words") == 0)
+        return cmdWords(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -703,6 +808,8 @@ int main(int argc, char** argv) {
                  "  reluva-tool stb-dump <file.stb>\n"
                  "  reluva-tool tex-survey <file.cat>...\n"
                  "  reluva-tool tex-keys <file.cat>...\n"
+                 "  reluva-tool chunks <file>\n"
+                 "  reluva-tool words <file> [offset] [count]\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }
