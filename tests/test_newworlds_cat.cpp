@@ -229,20 +229,21 @@ void testStringTable() {
 
 // Format 6: u32 6, u32 palette count, palette (blue, green, red, 0),
 // u32 0, u32 width, u32 height, indices, alpha.
-// sizeStored false: the u32 after the palette is 1 and width/height are omitted.
-std::vector<uint8_t> textureBytes(uint32_t w, uint32_t h, uint32_t format = 6, bool sizeStored = true) {
+// keyIndex >= 0: colour-keyed layout (u32 1, u32 key, width, height).
+std::vector<uint8_t> textureBytes(uint32_t w, uint32_t h, uint32_t format = 6, int keyIndex = -1) {
     std::vector<uint8_t> b;
     put32(b, format);
     put32(b, 2);
     b.insert(b.end(), {0x10, 0x20, 0xf0, 0}); // index 0: red 0xf0, green 0x20, blue 0x10
     b.insert(b.end(), {0xff, 0x00, 0x00, 0}); // index 1: pure blue
-    if (sizeStored) {
-        put32(b, 0);
-        put32(b, w);
-        put32(b, h);
-    } else {
+    if (keyIndex >= 0) {
         put32(b, 1);
+        put32(b, uint32_t(keyIndex));
+    } else {
+        put32(b, 0);
     }
+    put32(b, w);
+    put32(b, h);
     for (uint32_t i = 0; i < w * h; ++i)
         b.push_back(uint8_t(i % 2));          // indices alternate 0, 1
     if (format == 6)
@@ -261,15 +262,15 @@ void testTexture() {
 
     // Format 1: one layer, opaque.
     CHECK(!decodeTexture(textureBytes(4, 2, 1), t));
-    CHECK(t.format == 1 && t.width == 4 && t.height == 2 && !t.sizeGuessed);
+    CHECK(t.format == 1 && t.width == 4 && t.height == 2 && !t.colourKeyed);
     CHECK(t.rgba[4] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 255);
 
-    // Size not stored: inferred as square, or 2:1 when not square.
-    CHECK(!decodeTexture(textureBytes(4, 4, 1, false), t));
-    CHECK(t.width == 4 && t.height == 4 && t.sizeGuessed);
-    CHECK(!decodeTexture(textureBytes(8, 4, 6, false), t));
-    CHECK(t.width == 8 && t.height == 4 && t.sizeGuessed && t.rgba[7] == 10);
-    CHECK(decodeTexture(textureBytes(5, 3, 1, false), t)); // 15 pixels: no shape to infer
+    // Colour key: pixels using the key index become transparent.
+    CHECK(!decodeTexture(textureBytes(5, 3, 1, 1), t));
+    CHECK(t.colourKeyed && t.keyIndex == 1 && t.width == 5 && t.height == 3);
+    CHECK(t.rgba[3] == 255 && t.rgba[7] == 0);            // index 0 opaque, index 1 keyed out
+    CHECK(!decodeTexture(textureBytes(4, 2, 6, 0), t));
+    CHECK(t.rgba[3] == 0 && t.rgba[7] == 10);             // key overrides alpha; others keep it
 
     CHECK(decodeTexture(textureBytes(4, 2, 7), t)); // unknown format
     auto bad = textureBytes(4, 2);

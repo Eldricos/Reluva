@@ -38,42 +38,23 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
     const size_t palette = 8, header = palette + size_t(paletteCount) * 4;
     if (header + 4 > data.size())
         return Error::fail("texture ends inside its header");
-    out.sizeFlag = rd32(data, header);
-
-    uint32_t w = 0, h = 0;
-    size_t indices = 0;
-    if (out.sizeFlag == 0) {
-        if (header + 12 > data.size())
+    // After the palette: u32 0, width, height; or u32 1, key index, width,
+    // height for textures with a transparent palette index.
+    const uint32_t flag = rd32(data, header);
+    size_t sizeAt = header + 4;
+    if (flag == 1) {
+        out.colourKeyed = true;
+        if (header + 8 > data.size())
             return Error::fail("texture ends inside its header");
-        w = rd32(data, header + 4);
-        h = rd32(data, header + 8);
-        indices = header + 12;
-    } else if (out.sizeFlag == 1) {
-        // The size isn't stored (it may be given elsewhere). Infer it: square
-        // if possible, otherwise twice as wide as high.
-        indices = header + 4;
-        const size_t rest = data.size() - indices;
-        const size_t n = rest / size_t(layers);
-        if (rest % size_t(layers) != 0 || n == 0)
-            return Error::fail("size not stored and data length doesn't divide into layers");
-        uint32_t side = 1;
-        while (size_t(side) * side < n)
-            ++side;
-        if (size_t(side) * side == n) {
-            w = h = side;
-        } else {
-            uint32_t half = 1;
-            while (size_t(half) * half * 2 < n)
-                ++half;
-            if (size_t(half) * half * 2 != n)
-                return Error::fail("size not stored; " + std::to_string(n) + " pixels isn't a square or 2:1");
-            w = half * 2;
-            h = half;
-        }
-        out.sizeGuessed = true;
-    } else {
-        return Error::fail("unknown value " + std::to_string(out.sizeFlag) + " after the palette");
+        out.keyIndex = rd32(data, header + 4);
+        sizeAt = header + 8;
+    } else if (flag != 0) {
+        return Error::fail("unknown value " + std::to_string(flag) + " after the palette");
     }
+    if (sizeAt + 8 > data.size())
+        return Error::fail("texture ends inside its header");
+    const uint32_t w = rd32(data, sizeAt), h = rd32(data, sizeAt + 4);
+    const size_t indices = sizeAt + 8;
 
     if (w == 0 || h == 0 || w > kMaxSide || h > kMaxSide)
         return Error::fail("texture size " + std::to_string(w) + "x" + std::to_string(h) + " out of range");
@@ -98,6 +79,8 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
             px[0] = px[1] = px[2] = 0;
         }
         px[3] = layers == 2 ? data[alpha + i] : 255;
+        if (out.colourKeyed && index == out.keyIndex)
+            px[3] = 0;
     }
     return Error::success();
 }

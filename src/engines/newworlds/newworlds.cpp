@@ -10,7 +10,8 @@
 // For now the engine is a data viewer: it opens every .cat archive in the
 // game folder and lets you browse the textures.
 //   Left/Right: previous/next texture   PageUp/PageDown: jump 10
-//   Home/End: first/last                Esc: back to the launcher
+//   Home/End: first/last                F: filter (all, failed, colour-keyed, with alpha)
+//   Esc: back to the launcher
 
 #include "engines/engine.h"
 #include "engines/newworlds/cat_archive.h"
@@ -58,7 +59,9 @@ public:
         if (Error err = sys_.initGraphics(kScreenW, kScreenH, PixelFormat::RGBA32))
             return err;
         screen_.create(kScreenW, kScreenH, PixelFormat::RGBA32);
-        show(0);
+        classify();
+        applyFilter(0); // draws the first texture, so the screen must exist
+
 
         while (true) {
             Event ev;
@@ -67,7 +70,13 @@ public:
                     return Error::success();
                 if (ev.type != EventType::KeyDown)
                     continue;
-                const int n = int(textures_.size());
+                const int n = int(visible_.size());
+                if (ev.key == 'f') {
+                    applyFilter((filter_ + 1) % kFilterCount);
+                    continue;
+                }
+                if (n == 0)
+                    continue;
                 switch (ev.key) {
                 case key::Escape: return Error::success();
                 case key::Right: show((current_ + 1) % n); break;
@@ -87,7 +96,42 @@ public:
 private:
     struct TextureRef {
         size_t archive, entry;
+        bool ok = false, colourKeyed = false, alpha = false;
     };
+
+    static constexpr int kFilterCount = 4;
+    static constexpr const char* kFilterNames[kFilterCount] = {"all", "failed", "colour-keyed", "with alpha"};
+
+    // Decode every texture once so the filters know which is which.
+    void classify() {
+        std::vector<uint8_t> data;
+        newworlds::Texture tex;
+        for (TextureRef& ref : textures_) {
+            CatArchive& cat = *archives_[ref.archive];
+            ref.ok = !cat.read(cat.entries()[ref.entry], data) && !newworlds::decodeTexture(data, tex);
+            ref.colourKeyed = ref.ok && tex.colourKeyed;
+            ref.alpha = ref.ok && tex.format == 6;
+        }
+    }
+
+    void applyFilter(int filter) {
+        filter_ = filter;
+        visible_.clear();
+        for (size_t i = 0; i < textures_.size(); ++i) {
+            const TextureRef& r = textures_[i];
+            const bool keep = filter == 0 || (filter == 1 && !r.ok) || (filter == 2 && r.colourKeyed) ||
+                              (filter == 3 && r.alpha);
+            if (keep)
+                visible_.push_back(i);
+        }
+        if (visible_.empty()) {
+            drawCheckerboard();
+            sys_.setWindowTitle(std::string("New Worlds textures [") + kFilterNames[filter_] +
+                                "]: none (press F for the next filter)");
+            return;
+        }
+        show(0);
+    }
 
     Error openArchives() {
         std::vector<std::filesystem::path> paths;
@@ -114,7 +158,7 @@ private:
 
     void show(int index) {
         current_ = index;
-        const TextureRef& ref = textures_[size_t(index)];
+        const TextureRef& ref = textures_[visible_[size_t(index)]];
         CatArchive& cat = *archives_[ref.archive];
         const auto& entry = cat.entries()[ref.entry];
 
@@ -130,11 +174,12 @@ private:
         } else {
             drawTexture(tex);
             status = "format " + std::to_string(tex.format) + ", " + std::to_string(tex.width) + "x" +
-                     std::to_string(tex.height) + (tex.sizeGuessed ? ", size not stored: guessed" : "");
+                     std::to_string(tex.height) +
+                     (tex.colourKeyed ? ", colour key " + std::to_string(tex.keyIndex) : std::string());
         }
-        sys_.setWindowTitle("New Worlds textures " + std::to_string(index + 1) + "/" +
-                            std::to_string(textures_.size()) + ": " + cat.entries()[ref.entry].name + " (" +
-                            status + ")");
+        sys_.setWindowTitle(std::string("New Worlds textures [") + kFilterNames[filter_] + "] " +
+                            std::to_string(index + 1) + "/" + std::to_string(visible_.size()) + ": " +
+                            cat.entries()[ref.entry].name + " (" + status + ")");
     }
 
     void fill(int x0, int y0, int w, int h, uint8_t r, uint8_t g, uint8_t b) {
@@ -187,6 +232,8 @@ private:
     Surface screen_;
     std::vector<std::unique_ptr<CatArchive>> archives_;
     std::vector<TextureRef> textures_;
+    std::vector<size_t> visible_; // indices into textures_ that pass the filter
+    int filter_ = 0;
     int current_ = 0;
 };
 
