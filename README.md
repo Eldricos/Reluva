@@ -50,8 +50,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   and textures, **Left/Right** step through them and **F** cycles filters. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
-  for outlines, **U** for texture-coordinate checks, **C** to colour faces by a possible
-  texture number, **B** to show back faces
+  for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **C** to
+  colour faces by texture number, **B** to show back faces
   and **R** to reset the view.
 
 The config is saved as `reluva.ini` in SDL's preferences folder

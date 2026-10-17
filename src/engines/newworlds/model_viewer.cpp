@@ -63,6 +63,21 @@ std::vector<ViewVertex> clipNear(const std::vector<ViewVertex>& in, float nearZ)
     return out;
 }
 
+// "lbp/txr/kln/k_bop_a.mp0" -> stem "k_bop_a", folder "kln", extension "mp0".
+void splitName(const std::string& name, std::string& folder, std::string& stem, std::string& ext) {
+    const size_t slash = name.rfind('/');
+    const size_t dot = name.rfind('.');
+    const size_t start = slash == std::string::npos ? 0 : slash + 1;
+    stem = name.substr(start, (dot == std::string::npos || dot < start ? name.size() : dot) - start);
+    ext = dot == std::string::npos || dot < start ? std::string() : name.substr(dot + 1);
+    folder.clear();
+    if (slash != std::string::npos) {
+        const size_t prev = name.rfind('/', slash - 1);
+        folder = name.substr(prev == std::string::npos ? 0 : prev + 1,
+                             slash - (prev == std::string::npos ? 0 : prev + 1));
+    }
+}
+
 } // namespace
 
 ModelViewer::ModelViewer(System& sys, Surface& screen, const Archives& archives)
@@ -70,9 +85,21 @@ ModelViewer::ModelViewer(System& sys, Surface& screen, const Archives& archives)
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
-            if (entries[i].tag == cattag::Geometry)
+            if (entries[i].tag == cattag::Geometry) {
                 models_.push_back({a, i});
+            } else if (entries[i].tag == cattag::Texture) {
+                // Full-size textures only: .lbp, or level 0 of a mipmap set.
+                TextureFile t;
+                std::string ext;
+                splitName(entries[i].name, t.folder, t.stem, ext);
+                if (ext == "lbp" || ext == "mp0") {
+                    t.ref = {a, i};
+                    textureFiles_.push_back(std::move(t));
+                }
+            }
     }
+    std::sort(textureFiles_.begin(), textureFiles_.end(),
+              [](const TextureFile& x, const TextureFile& y) { return x.stem < y.stem; });
 }
 
 void ModelViewer::activate() {
@@ -130,6 +157,7 @@ void ModelViewer::show(int index) {
         status_ = err2.message;
     if (!status_.empty())
         model_ = GeoModel{};
+    loadTextures(cat.entries()[ref.entry].name);
 
     // Frame the model: centre of its bounding box, distance to the farthest vertex.
     float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
@@ -155,6 +183,45 @@ void ModelViewer::show(int index) {
     }
     dirty_ = true;
     updateTitle();
+}
+
+// A model's textures are named after it: k_bop uses k_bop_a, k_bop_b and
+// k_bop_g, in name order. A variant such as k_bop_l with no textures of its own
+// uses those of the name without the suffix. Textures in the model's own
+// folder (kln for geo/kln/k_bop.geo) are preferred.
+void ModelViewer::loadTextures(const std::string& modelName) {
+    modelTextures_.clear();
+    modelTextureNames_.clear();
+    std::string folder, base, ext;
+    splitName(modelName, folder, base, ext);
+
+    std::vector<const TextureFile*> found;
+    while (true) {
+        auto matches = [&](const TextureFile& t) {
+            return t.stem == base || (t.stem.size() > base.size() + 1 && t.stem.compare(0, base.size(), base) == 0 &&
+                                      t.stem[base.size()] == '_' &&
+                                      t.stem.find('_', base.size() + 1) == std::string::npos);
+        };
+        for (int sameFolder = 1; sameFolder >= 0 && found.empty(); --sameFolder)
+            for (const TextureFile& t : textureFiles_)
+                if ((!sameFolder || t.folder == folder) && matches(t))
+                    found.push_back(&t);
+        // Otherwise drop a short suffix (_l, _d, _ad, ...) and try again.
+        const size_t us = base.rfind('_');
+        if (!found.empty() || us == std::string::npos || base.size() - us > 3)
+            break;
+        base.resize(us);
+    }
+
+    std::vector<uint8_t> data;
+    for (const TextureFile* t : found) {
+        CatArchive& cat = *archives_[t->ref.archive];
+        Texture tex;
+        if (cat.read(cat.entries()[t->ref.entry], data) || decodeTexture(data, tex))
+            tex = Texture{}; // keeps the face numbering; drawn untextured
+        modelTextures_.push_back(std::move(tex));
+        modelTextureNames_.push_back(t->stem);
+    }
 }
 
 void ModelViewer::resetView() {
@@ -208,6 +275,7 @@ void ModelViewer::handleEvent(const Event& ev) {
     case key::Space: spin_ = !spin_; break;
     case 'u': uvCheck_ = !uvCheck_; break;
     case 'c': colourByTail_ = !colourByTail_; break;
+    case 't': textured_ = !textured_; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'p':
@@ -260,13 +328,22 @@ void ModelViewer::updateTitle() {
              (model_.parts.size() == 1 ? " part" : " parts");
     if (soloPart_ >= 0)
         title += "; showing part " + std::to_string(soloPart_);
+    if (modelTextureNames_.empty()) {
+        title += "; no textures found";
+    } else {
+        title += "; textures";
+        for (size_t i = 0; i < modelTextureNames_.size(); ++i)
+            title += (i ? ", " : " ") + modelTextureNames_[i];
+        if (!textured_)
+            title += " (off)";
+    }
     title += ")";
     if (outlines_)
         title += std::string(" [") + kOutlineNames[outlines_] + "]";
     if (faces_)
         title += std::string(" [") + kFaceNames[faces_] + "]";
     if (colourByTail_)
-        title += " [colour: last corner value]";
+        title += " [colour: texture number]";
     if (uvCheck_)
         title += " [UV check]";
     sys_.setWindowTitle(title);
@@ -350,19 +427,36 @@ void ModelViewer::render() {
             continue;
 
         if (outlines_ != 2) {
-            const float intensity = 0.3f + 0.7f * std::fabs(dot(viewNormal, light));
-            // Colour by part, or by the last value of the face's last corner
-            // (a possible texture number).
-            const uint8_t* base = kPartColours[(colourByTail_ ? face.corners.back().extra[4] : face.part) % 8];
+            // The last value of the face's last corner picks its texture.
+            const uint32_t textureIndex = face.corners.back().extra[4];
+            const Texture* tex = nullptr;
+            if (textured_ && !colourByTail_ && textureIndex < modelTextures_.size() &&
+                !modelTextures_[textureIndex].rgba.empty())
+                tex = &modelTextures_[textureIndex];
+            const float intensity = tex ? 0.45f + 0.55f * std::fabs(dot(viewNormal, light))
+                                        : 0.3f + 0.7f * std::fabs(dot(viewNormal, light));
+            // Untextured: colour by part, or by the texture number.
+            const uint8_t* base = kPartColours[(colourByTail_ ? textureIndex : face.part) % 8];
             const bool check = uvCheck_;
             auto shade = [&](float u, float v, uint8_t* out) {
                 float k = intensity;
                 if (check && ((int(std::floor(u * 8)) + int(std::floor(v * 8))) & 1))
                     k *= 0.55f;
-                out[0] = uint8_t(std::min(255.0f, base[0] * k));
-                out[1] = uint8_t(std::min(255.0f, base[1] * k));
-                out[2] = uint8_t(std::min(255.0f, base[2] * k));
+                const uint8_t* c = base;
+                if (tex) { // nearest texel, wrapping; transparent texels aren't drawn
+                    int tx = int(std::floor(u * float(tex->width))) % tex->width;
+                    int ty = int(std::floor(v * float(tex->height))) % tex->height;
+                    tx += tx < 0 ? tex->width : 0;
+                    ty += ty < 0 ? tex->height : 0;
+                    c = &tex->rgba[(size_t(ty) * size_t(tex->width) + size_t(tx)) * 4];
+                    if (c[3] < 128)
+                        return false;
+                }
+                out[0] = uint8_t(std::min(255.0f, c[0] * k));
+                out[1] = uint8_t(std::min(255.0f, c[1] * k));
+                out[2] = uint8_t(std::min(255.0f, c[2] * k));
                 out[3] = 255;
+                return true;
             };
             for (size_t i = 1; i + 1 < projected.size(); ++i)
                 raster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);

@@ -28,7 +28,9 @@ public:
         depth_.assign(size_t(target.w) * size_t(target.h), 0.0f);
     }
 
-    // shade(u, v, rgba) writes the pixel's colour (4 bytes, R G B A).
+    // shade(u, v, rgba) writes the pixel's colour (4 bytes, R G B A) and
+    // returns true, or returns false to leave the pixel (and its depth) alone,
+    // as for a transparent texel.
     template <typename Shade>
     void drawTriangle(const ScreenVertex& a, const ScreenVertex& b, const ScreenVertex& c, Shade&& shade) {
         const ScreenVertex* v0 = &a;
@@ -63,10 +65,10 @@ public:
                 const float invZ = b0 * v0->invZ + b1 * v1->invZ + b2 * v2->invZ;
                 if (invZ <= depthRow[x])
                     continue;
-                depthRow[x] = invZ;
                 const float u = (b0 * v0->u * v0->invZ + b1 * v1->u * v1->invZ + b2 * v2->u * v2->invZ) / invZ;
                 const float v = (b0 * v0->v * v0->invZ + b1 * v1->v * v1->invZ + b2 * v2->v * v2->invZ) / invZ;
-                shade(u, v, row + x * 4);
+                if (shade(u, v, row + x * 4))
+                    depthRow[x] = invZ;
             }
         }
     }

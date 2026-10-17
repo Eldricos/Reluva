@@ -374,7 +374,10 @@ void testRasterizer() {
     r.begin(surf);
     // Two triangles making the square 2..12; every pixel inside is drawn once.
     std::vector<int> hits(16 * 16, 0);
-    auto count = [&](float, float, uint8_t* px) { ++hits[size_t(px - surf.pixels.data()) / 4]; };
+    auto count = [&](float, float, uint8_t* px) {
+        ++hits[size_t(px - surf.pixels.data()) / 4];
+        return true;
+    };
     const ScreenVertex a{2, 2, 1, 0, 0}, b{12, 2, 1, 1, 0}, c{12, 12, 1, 1, 1}, d{2, 12, 1, 0, 1};
     r.drawTriangle(a, b, c, count);
     r.begin(surf); // fresh depth so the second triangle isn't hidden by equal depth
@@ -390,7 +393,12 @@ void testRasterizer() {
         r.begin(surf);
         const ScreenVertex n0{0, 0, 1.0f, 0, 0}, n1{16, 0, 1.0f, 1, 0}, n2{0, 16, 1.0f, 0, 1};
         const ScreenVertex f0{0, 0, 0.5f, 0, 0}, f1{16, 0, 0.5f, 0, 0}, f2{0, 16, 0.5f, 0, 0};
-        auto paint = [](uint8_t value) { return [value](float, float, uint8_t* px) { px[0] = value; }; };
+        auto paint = [](uint8_t value) {
+            return [value](float, float, uint8_t* px) {
+                px[0] = value;
+                return true;
+            };
+        };
         if (order == 0) {
             r.drawTriangle(n0, n1, n2, paint(1));
             r.drawTriangle(f0, f1, f2, paint(2));
@@ -403,7 +411,11 @@ void testRasterizer() {
     float seenU = -1;
     r.begin(surf);
     r.drawTriangle({0, 0, 1, 0, 0}, {16, 0, 1, 1, 0}, {0, 16, 1, 0, 0},
-                   [&](float u, float, uint8_t* px) { if (px == surf.row(0) + 8 * 4) seenU = u; });
+                   [&](float u, float, uint8_t* px) {
+                       if (px == surf.row(0) + 8 * 4)
+                           seenU = u;
+                       return true;
+                   });
     CHECK(std::fabs(seenU - 8.5f / 16) < 1e-4f);
 }
 

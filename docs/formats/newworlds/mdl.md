@@ -48,7 +48,6 @@ Floats follow, likely positions for the points above.
 
 ## Open questions
 
-- Which texture a model uses: no texture name appears in `k_bop.mdl`.
-  `kliactor.cat` has `k_bop_a`, `k_bop_b` and `k_bop_g` (256 × 256), named
-  after the model.
+- No texture name appears in `k_bop.mdl`; textures are found by the
+  model's name (see [geo.md](geo.md#textures)).
 - The layout after the first table.

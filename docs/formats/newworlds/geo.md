@@ -28,7 +28,8 @@ faces          face count × face; face 0's header is the file header:
                               49 seen (perhaps a material index)
                  u32 corners
                  u32 part     which part the face belongs to (see Parts)
-                 corners × 32 bytes: u32 vertex, f32 u, f32 v (both × 65536), 20 bytes
+                 corners × 32 bytes: u32 vertex, f32 u, f32 v (both × 65536),
+                 5 × u32 extra; in the last corner, extra[4] picks the texture
 bounds         u32 last face's part, u32 ?, u32 part count,
                u32 attachment count (2 in rb_mid, 4 in fcarb, 6 in rms_d)
                f32 centre x, f32 centre y, f32 radius
@@ -67,6 +68,24 @@ after another; each edge record starts with its part's number, and its faces
 (numbered across the whole model) belong to that part. Part vertices are in
 model coordinates: the two parts of `mn_s` (a flat outline: body and wings,
 then the tail) meet without any offset.
+
+## Textures
+
+No file names a model's textures; they are found by name. `k_bop`
+(`kliactor.cat`) goes with `lbp/txr/kln/k_bop_a`, `k_bop_b` and `k_bop_g`.
+Each face picks one with the **last value of its last corner**
+(`extra[4]` in the reader): in `k_bop`, 0 is the central body (`k_bop_a`),
+1 both wings (`k_bop_b`), and 2 three spots on the body (`k_bop_g`, the
+small 128 × 128 one). So the textures are numbered in name order.
+
+The viewer's rule, still to be checked on more models: a model uses the
+textures named exactly after it or after it plus `_` and a suffix, in name
+order, preferring its own folder (`kln`). A model without any, such as a `_l`
+version, uses those of its name without the suffix. A model without a match
+at all, such as the `_s` outlines, is drawn untextured.
+
+In the other corners of a face, the same value holds the part number (0 in
+part 0), so it isn't a per-corner texture choice.
 
 ## Winding and file names
 
@@ -119,5 +138,4 @@ would flip both the picture and the winding) isn't confirmed yet.
 - Attachment data; the terrain grid's exact layout; the second texture set in
   terrain tiles; the trailer.
 - What the two normal lists are (vertex and face normals?).
-- Which texture a model uses (not stored in the model as far as seen).
 - Larger 3D unit models haven't been checked yet.
