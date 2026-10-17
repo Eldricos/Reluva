@@ -1128,8 +1128,18 @@ int cmdGmfInfo(int argc, char** argv) {
         std::printf("type-20 records whose first value is their own number: %u of %u\n", numbered, counts[1]);
     }
 
-    // After the records: a u32 count, then (perhaps) that many u32 entries,
-    // with ffffffff separators.
+    // Each tile's type-20 header values: own number, 0, model?, flags?, u16.
+    std::printf("tiles (number: type-20 values 2-5):");
+    for (size_t i = counts[0]; i < size_t(counts[0]) + counts[1]; ++i) {
+        const size_t o = records[i].offset + 6;
+        std::printf("%s %zu: %u %u 0x%x %u", (i - counts[0]) % 6 ? ";" : "\n ", i - counts[0], rd32(d, o + 4),
+                    rd32(d, o + 8), rd32(d, o + 12), rd16(d, o + 16));
+    }
+    std::printf("\n");
+
+    // After the records: a u32 count, then that many u32 entries (lists ending
+    // ffffffff), then one 10-byte entry per grid cell (u16 block, u16 ?, u16 ?,
+    // u32 where its list starts), then 1024 more bytes.
     {
         const uint32_t n = rd32(d, p);
         size_t separators = 0;
@@ -1141,8 +1151,29 @@ int cmdGmfInfo(int argc, char** argv) {
                         "leaving %zu bytes (%.2f per grid cell)\n",
                         n, n, separators, end, d.size() - end,
                         double(d.size() - end) / std::max(1, rd16(d, 6) * rd16(d, 8)));
-            std::printf("start of what's left:\n");
-            hexdump(d, end, 0x80);
+            const unsigned w = rd16(d, 6), h = rd16(d, 8);
+            if (d.size() - end >= size_t(w) * h * 10) {
+                std::map<uint16_t, unsigned> seconds;
+                std::printf("blocks on the grid (rows of %u; 0-9 then a-z, '+' for higher):\n", w);
+                for (unsigned y = 0; y < h; ++y) {
+                    std::printf("  ");
+                    for (unsigned x = 0; x < w; ++x) {
+                        const size_t e = end + (size_t(y) * w + x) * 10;
+                        const unsigned b = rd16(d, e);
+                        ++seconds[rd16(d, e + 2)];
+                        std::printf("%c", b < 10 ? char('0' + b) : b < 36 ? char('a' + b - 10) : '+');
+                    }
+                    std::printf("\n");
+                }
+                std::printf("second values of the grid entries:");
+                for (const auto& [v, n] : seconds)
+                    std::printf(" %u x%u", v, n);
+                std::printf("\nlast 1024 bytes start:\n");
+                hexdump(d, end + size_t(w) * h * 10, 0x40);
+            } else {
+                std::printf("start of what's left:\n");
+                hexdump(d, end, 0x80);
+            }
         } else {
             std::printf("after the records: u32 %u (too many for the file to be that many u32s)\n", n);
         }
