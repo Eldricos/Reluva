@@ -58,37 +58,59 @@ they are packed fields of some kind; what they describe isn't known yet
 
 ## Tiles and ground models
 
-A tile's type-20 header's third value is the number of its ground model
-among the `.geo` files of the map's archive, in archive order (counting from
-0, `lod/` models included). In `kurt64` (`icewrld.cat`): 6 = `ice_07` for the
-field (tiles 4-7, block 1), 30 = `crack_08` for the crack tiles (8-11, which
-blocks 2-5 each swap in once), and 32 = `hole_02` for the patch of block 0
-(tiles 0-3). The fourth value differs per kind too (`0x18000`, `0x8000`,
-`0x1018000`).
+Checked on the 7 maps of `icewrld.cat`:
 
-Ground models span -4096..4096 in x and y, so a tile is 8192 units and a
-block 16384. Their edges are at height 0 where they meet (`ice_07` on all
-sides; `crack_08` except where its crack reaches two of them). Their faces
-pick textures the usual way (the last value of the last corner); `ice_07`
-uses one, `crack_08` four. The planet archives hold textures named like the
-models without the underscore (`ice07`, `hole02`, `brid01`), presumably each
-model's first; the others aren't known.
+- A tile's type-20 header's third value is the number of its ground model
+  among the `.geo` files of the map's archive, in archive order (counting from
+  0, `lod/` models included). Shifting the numbering by one in either
+  direction halves how many edges meet, so this is right.
+- **Rotation:** bits 14-15 of the fourth value turn the model anticlockwise
+  by that many quarter turns about the tile's centre. Bits 16-17 take three
+  values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't
+  a mirror or a height offset (tested). Each model appears in groups of 4
+  records per rotation (`f1`: most models 16 times), which differ in their
+  texture layers.
+- **Layout:** a block's four tiles go round the square in record order, at
+  (0, 0), (1, 0), (1, 1), (0, 1) tiles from its corner. With rotation, 88.5 %
+  of neighbouring tile edges in `f1` meet exactly (heights at 5 points within
+  80 units); the next best layout scores 72 % and no rotation 46 %.
+- Ground models span -4096..4096 in x and y (a tile is 8192 units, a block
+  16384). Heights come in levels built into the models: 0, 3264 and 7360
+  (`ice_08` is a plateau at 3264, `ice_09` at 7360; cliffs and ramps join
+  them). Most remaining mismatches are flat tiles at 0 beside `ice_09`
+  plateaus, even inside one block, and nothing tested (cell values, block
+  bytes, tile fields) lifts them: perhaps the game draws walls between levels.
+- In each type-21 record, the first four items count 0-3 starting at
+  (rotation + 2) mod 4: the tile's sides, numbered in its own frame.
+
+## Texture layers
+
+A type-20 record's five 8 x 8 grids are texture layers: each cell holds a
+texture number, the planet archive's full-size textures (`.mp0` and `.lbp`)
+in archive order (`icewrld`: 0 `blue01` ... 15 `ice01` ... 30 `hole02`, 31
+`tree.lbp` ...), or 0 for none. Higher layers cover parts of a tile in
+staircase shapes; the 8 bytes after the grids are bit masks of rows
+(`ff ff fc f0 f0 e0 c0 c0`), presumably for the top layer. The first row and
+column of a layer hold a different value (`0f` around `09`, `02` around
+`0e`): unknown. Painted from above with each texture's average colour, the
+cells' values follow the landscape's shapes, the first-row values don't.
+
+The viewer paints each pixel with the topmost layer's texture in its cell
+(cell from the tile's texture coordinates); that comes out banded, so the
+layers are probably blended (by the masks?) or the cells are oriented
+differently. G switches to the models' own textures.
 
 A ground model's own 8 x 8 grid (after its faces) lists, per cell, the faces
-over it; cells overlap, so it's a lookup for heights or collisions, not a
-texture map. The type-20 grids are the same (2 on the edge, `0b` inside) for
-all of `kurt64`'s tiles, whatever their model, so they aren't textures
-either; perhaps whether ground is passable.
-
-The viewer places a block's four tiles round the square in record order
-(x, y offsets (0, 0), (1, 0), (1, 1), (0, 1)), which matches block 0's
-numbering (0, 1, 3, 2) but isn't confirmed; on `kurt64`, where the edges are
-flat, any order looks the same.
+over it; cells overlap, so it's a lookup for heights or collisions, not
+textures.
 
 ## Open questions
 
-- What the type-21 records, the type-20 grids and the list entries hold;
-  how a block's tiles are arranged (and whether tiles can be rotated); the
-  grid entries' second value (50 everywhere in `kurt64`: a height?); where
-  units and buildings are placed.
+- How the texture layers combine; what the first row and column hold.
+- What closes the gaps between plateaus and flat tiles beside them.
+- Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
+  entries' second value (50, 75, 100, ... in steps of 25, sometimes with
+  bits 12-15 set) and third (multiples of 4096); the list entries (probably
+  placed scenery: the planet archives hold `tree`, `rock`, `bush` and
+  `frn_spec` models); where units and buildings are placed.
 - The data after the records (most of the file).

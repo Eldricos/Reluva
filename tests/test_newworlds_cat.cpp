@@ -379,7 +379,7 @@ std::vector<uint8_t> tinyGmf() {
     }
     for (uint32_t i = 0; i < 2; ++i) { // type 20: number, 0, model, flags, u16, 8 x 8 grid
         put16(20); put16(18 + 64); put16(0);
-        put32(b, i); put32(b, 0); put32(b, 6 + i); put32(b, 0x18000); put16(0);
+        put32(b, i); put32(b, 0); put32(b, 6 + i); put32(b, 0x18000 + 0x4000 * i); put16(0);
         for (int c = 0; c < 64; ++c)
             b.push_back(uint8_t(c == 0 ? 2 : 11));
     }
@@ -405,7 +405,8 @@ void testGmf() {
         return;
     }
     CHECK(m.width == 2 && m.height == 1 && m.tiles.size() == 2 && m.blocks.size() == 1 && m.cells.size() == 2);
-    CHECK(m.tiles[1].model == 7 && m.tiles[0].cells[0] == 2 && m.tiles[0].cells[1] == 11);
+    CHECK(m.tiles[1].model == 7 && m.tiles[0].layers[0] == 2 && m.tiles[0].layers[1] == 11);
+    CHECK(m.tiles[0].rotation == 2 && m.tiles[1].rotation == 3);
     CHECK(m.blocks[0][2] == 1 && m.cells[1].block == 0 && m.cells[1].value == 50);
     auto bad = tinyGmf();
     bad[bad.size() - 1024 - 10] = 5; // the last cell uses block 5 of 1

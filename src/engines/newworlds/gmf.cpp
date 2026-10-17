@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/gmf.h"
 
+#include <algorithm>
 #include <cstring>
 #include <string>
 
@@ -62,7 +63,9 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
                 GmfMap::Tile t;
                 t.model = r.u32(body + 8);
                 t.flags = r.u32(body + 12);
-                std::memcpy(t.cells.data(), &data[body + kGridOffset], 64);
+                t.rotation = int(t.flags >> 14 & 3);
+                const size_t layerBytes = std::min<size_t>(t.layers.size(), length - kGridOffset) / 64 * 64;
+                std::memcpy(t.layers.data(), &data[body + kGridOffset], layerBytes);
                 out.tiles.push_back(t);
             } else if (types[k] == kBlock) {
                 if (length < 22)

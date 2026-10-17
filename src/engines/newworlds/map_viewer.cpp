@@ -56,6 +56,21 @@ void MapViewer::show(int index) {
         if (cat.entries()[i].tag == cattag::Geometry)
             archiveModels_.push_back(i);
     std::vector<uint8_t> data;
+    // The tiles' texture layers number the archive's full-size textures in
+    // order (.mp0 and .lbp: icewrld's 15 is ice01).
+    planetTextures_.clear();
+    for (const auto& e : cat.entries()) {
+        if (e.tag != cattag::Texture)
+            continue;
+        std::string folder, stem, ext;
+        splitName(e.name, folder, stem, ext);
+        if (ext != "mp0" && ext != "lbp")
+            continue;
+        Texture tex;
+        if (cat.read(e, data) || decodeTexture(data, tex))
+            tex = Texture{};
+        planetTextures_.push_back(std::move(tex));
+    }
     if (Error err = cat.read(cat.entries()[ref.entry], data))
         status_ = err.message;
     else if (Error err2 = parseGmf(data, map_))
@@ -75,9 +90,10 @@ void MapViewer::resetView() {
     dirty_ = true;
 }
 
-// A tile's ground model, decoded once per map, with its textures: the one
-// named like the model without its underscore (ice_07: ice07) first, then
-// those the usual rule finds. Faces numbering other textures are untextured.
+// A tile's ground model, decoded once per map, with its own textures (used
+// where the map's layers give none, or with G): the one named like the model
+// without its underscore (ice_07: ice07) first, then those the usual rule
+// finds. Faces numbering other textures are untextured.
 const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     auto found = tileModels_.find(index);
     if (found != tileModels_.end())
@@ -190,6 +206,7 @@ void MapViewer::handleEvent(const Event& ev) {
     case '-': distance_ = std::min(distance_ * 1.25f, 1e8f); break;
     case 'r': resetView(); break;
     case 't': textured_ = !textured_; break;
+    case 'g': layered_ = !layered_; break;
     case 'l': outlines_ = !outlines_; break;
     case key::Right: show((current_ + 1) % n); return;
     case key::Left: show((current_ + n - 1) % n); return;
@@ -222,6 +239,8 @@ void MapViewer::updateTitle() {
              std::to_string(drawnTiles_) + " tiles, " + std::to_string(drawnFaces_) + " faces)";
     if (!textured_)
         title += " [untextured]";
+    else if (!layered_)
+        title += " [models' own textures]";
     sys_.setWindowTitle(title);
 }
 
@@ -254,6 +273,15 @@ void MapViewer::render() {
             const auto& block = map_.blocks[map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].block];
             for (int slot = 0; slot < 4; ++slot) {
                 const GmfMap::Tile& tile = map_.tiles[block[size_t(slot)]];
+                // Quarter turns anticlockwise about the tile's centre.
+                auto turn = [&](float x, float y) {
+                    for (int k = 0; k < tile.rotation; ++k) {
+                        const float t = x;
+                        x = -y;
+                        y = t;
+                    }
+                    return std::pair<float, float>(x, y);
+                };
                 const Vec origin{(float(bx * 2 + kSlotX[slot]) + 0.5f) * kTileSize,
                                  (float(by * 2 + kSlotY[slot]) + 0.5f) * kTileSize, 0};
                 // Skip tiles behind the camera or well off the screen.
@@ -276,8 +304,8 @@ void MapViewer::render() {
                     poly.clear();
                     for (const auto& corner : face.corners) {
                         const auto& v = verts[corner.vertex];
-                        poly.push_back(cam.toView(Vec{origin.x + v.x, origin.y + v.y, origin.z + v.z}, corner.u,
-                                                  corner.v));
+                        const auto [x, y] = turn(v.x, v.y);
+                        poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z}, corner.u, corner.v));
                     }
                     poly = clipNear(poly, cam.nearZ);
                     if (poly.size() < 3)
@@ -295,22 +323,37 @@ void MapViewer::render() {
                         continue;
                     ++drawnFaces_;
                     const auto& fn = m.faceNormals[fi];
+                    const auto [nx, ny] = turn(fn.x, fn.y);
                     const float intensity =
-                        0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{fn.x, fn.y, fn.z}), light));
+                        0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{nx, ny, fn.z}), light));
                     const uint32_t textureIndex = face.corners.back().extra[4];
                     const Texture* tex = textured_ && textureIndex < m.textures.size() &&
                                                  !m.textures[textureIndex].rgba.empty()
                                              ? &m.textures[textureIndex]
                                              : nullptr;
+                    const bool layers = textured_ && layered_ && !planetTextures_.empty();
                     auto shade = [&](float u, float v, uint8_t* out) {
                         static const uint8_t plain[3] = {170, 180, 195};
                         const uint8_t* col = plain;
-                        if (tex) {
-                            int tx = int(std::floor(u * float(tex->width))) % tex->width;
-                            int ty = int(std::floor(v * float(tex->height))) % tex->height;
-                            tx += tx < 0 ? tex->width : 0;
-                            ty += ty < 0 ? tex->height : 0;
-                            col = &tex->rgba[(size_t(ty) * size_t(tex->width) + size_t(tx)) * 4];
+                        // The map's layers: the topmost texture in the cell
+                        // under (u, v), the tile's own texture coordinates.
+                        // The first row and column hold other values, so they
+                        // take the next cell's.
+                        const Texture* cellTex = nullptr;
+                        if (layers) {
+                            const int cx = std::clamp(int(u * 8), 1, 7), cy = std::clamp(int(v * 8), 1, 7);
+                            for (int layer = GmfMap::kLayers - 1; layer >= 0 && !cellTex; --layer) {
+                                const unsigned n = tile.layers[size_t(layer * 64 + cy * 8 + cx)];
+                                if (n && n < planetTextures_.size() && !planetTextures_[n].rgba.empty())
+                                    cellTex = &planetTextures_[n];
+                            }
+                        }
+                        if (const Texture* tt = cellTex ? cellTex : tex) {
+                            int tx = int(std::floor(u * float(tt->width))) % tt->width;
+                            int ty = int(std::floor(v * float(tt->height))) % tt->height;
+                            tx += tx < 0 ? tt->width : 0;
+                            ty += ty < 0 ? tt->height : 0;
+                            col = &tt->rgba[(size_t(ty) * size_t(tt->width) + size_t(tx)) * 4];
                             if (col[3] == 0)
                                 return false;
                         }

@@ -119,7 +119,8 @@ private:
 // grid of blocks, a block 2 x 2 tiles, and a tile one of the planet's ground
 // models. See docs/formats/newworlds/gmf.md.
 //   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
-//   W/A/S/D: move   R: reset the view   T: textures on/off   L: outlines
+//   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines
+//   T: textures on/off   G: the map's texture layers or the models' own textures
 class MapViewer {
 public:
     MapViewer(System& sys, Surface& screen, const Archives& archives);
@@ -158,9 +159,10 @@ private:
     std::string status_;                 // decode error, if any
     std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, in order
     std::map<uint32_t, TileModel> tileModels_;
+    std::vector<Texture> planetTextures_; // the map archive's textures, in order
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
-    bool textured_ = true, outlines_ = false;
+    bool textured_ = true, outlines_ = false, layered_ = true;
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
