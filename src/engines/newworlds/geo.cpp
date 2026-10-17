@@ -16,6 +16,7 @@ constexpr size_t kCornerSize = 32;
 constexpr float kUvScale = 1.0f / 65536.0f;
 constexpr uint32_t kMaxCount = 1u << 20;
 constexpr uint32_t kMaxParts = 256;
+constexpr uint32_t kMaxPartValue = 255; // sanity limit for a part's unknown first value
 
 struct Reader {
     const std::vector<uint8_t>& d;
@@ -108,8 +109,9 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         return Error::fail("vertex block not found after " + hex(p));
     p = partData + 12;
 
-    // Each part: u32 0, u32 vertex count, the vertices, its normal lists and
-    // its edges; parts other than the last end with a u32 0.
+    // Each part: u32 ? (0, or 1 in ptank_l's part 1), u32 vertex count, the
+    // vertices, its normal lists and its edges; parts other than the last end
+    // with a u32 0.
     for (uint32_t partIndex = 0; partIndex < partCount; ++partIndex) {
         const std::string where = "part " + std::to_string(partIndex) + " at " + hex(p);
         if (partIndex > 0) {
@@ -117,13 +119,14 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
                 return Error::fail("no end marker before " + where);
             p += 4;
         }
-        if (!r.has(p, 8) || r.u32(p) != 0)
-            return Error::fail(where + " doesn't start with 0");
+        if (!r.has(p, 8) || r.u32(p) > kMaxPartValue)
+            return Error::fail(where + " starts with " + std::to_string(r.has(p, 4) ? r.u32(p) : 0));
+        GeoModel::Part part;
+        part.unknown = r.u32(p);
         const uint32_t vertexCount = r.u32(p + 4);
         p += 8;
         if (vertexCount > kMaxCount || !r.has(p, size_t(vertexCount) * 12))
             return Error::fail(where + " has a bad vertex count");
-        GeoModel::Part part;
         for (uint32_t i = 0; i < vertexCount; ++i, p += 12)
             part.vertices.push_back(r.vec3(p));
 

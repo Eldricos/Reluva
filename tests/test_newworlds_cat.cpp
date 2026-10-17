@@ -316,7 +316,7 @@ std::vector<uint8_t> triangleGeo(bool withEdges = true, bool oddAttachment = fal
     for (uint32_t part = 0; part < parts; ++part) {
         if (part > 0)
             put32(b, 0);                                // end of the previous part
-        put32(b, 0); put32(b, 3);
+        put32(b, part); put32(b, 3);                    // part 1 starts with 1, as in ptank_l
         for (auto& p : pos) {
             putF(b, p[0]); putF(b, p[1]); putF(b, 0);
         }
@@ -357,7 +357,8 @@ void testGeo() {
     CHECK(!err && m.parts[0].vertices.size() == 3 && m.parts[0].vertices[1].x == 100.0f);
 
     err = parseGeo(triangleGeo(false, false, true), m);
-    CHECK(!err && m.parts.size() == 2 && m.faces[1].part == 1 && m.parts[1].vertices.size() == 3);
+    CHECK(!err && m.parts.size() == 2 && m.faces[1].part == 1 && m.parts[1].vertices.size() == 3 &&
+          m.parts[1].unknown == 1);
 
     auto bad = triangleGeo();
     bad[bad.size() - 16] = 7; // last edge now starts at vertex 7

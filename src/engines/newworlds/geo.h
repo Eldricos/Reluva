@@ -32,6 +32,7 @@ struct GeoModel {
     };
     // A separately numbered piece of the model (most models have one).
     struct Part {
+        uint32_t unknown = 0; // first value: 0, or 1 in ptank_l's part 1
         std::vector<Vec3> vertices;
         std::vector<std::vector<Vec3>> normalLists;
         std::vector<Edge> edges;

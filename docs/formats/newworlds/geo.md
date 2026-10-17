@@ -38,7 +38,8 @@ bounds         u32 last face's part, u32 ?, u32 part count,
 part data      u32 size (reaches the end of the file in mn_s), u32 1,
                u32 part count, then per part, in part order:
   (parts > 0)    u32 0        end of the previous part
-  vertices       u32 0, u32 count, count × (f32 x, y, z)
+  vertices       u32 ? (0; 1 in ptank_l's part 1), u32 count,
+                 count × (f32 x, y, z)
   normal lists   repeated while present: u32 1, u32 count, count × unit vector
   edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
                  per group: u32 count, count × (u32 part, v0, v1, faceA, faceB)

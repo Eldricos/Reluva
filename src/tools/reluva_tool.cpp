@@ -874,8 +874,9 @@ int cmdGeoInfo(int argc, char** argv) {
         size_t faces = 0;
         for (const auto& face : m.faces)
             faces += face.part == pi;
-        std::printf("  part %zu: %zu faces, %zu vertices, %zu edges, %zu normal lists; x %g..%g, y %g..%g, z %g..%g\n",
-                    pi, faces, part.vertices.size(), part.edges.size(), part.normalLists.size(), double(lo[0]),
+        std::printf("  part %zu (%u): %zu faces, %zu vertices, %zu edges, %zu normal lists; x %g..%g, y %g..%g, "
+                    "z %g..%g\n",
+                    pi, part.unknown, faces, part.vertices.size(), part.edges.size(), part.normalLists.size(), double(lo[0]),
                     double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
     }
     std::printf("centre %g, %g; radius %g\n", double(m.centreX), double(m.centreY), double(m.radius));
