@@ -43,8 +43,8 @@ grid w × h × 10 bytes         one entry per grid cell, row by row:
                                 first ones), perhaps a height
                                 u16 0
                                 u32 where the cell's list starts in the N u32s
-1024 bytes                    mostly 0; starts with a few 24-bit values
-                              (00ff00ff, 0042c6f9, 004175a5, …)
+1024 bytes                    a colour table: u32 entries, bytes B, G, R, 0,
+                              ending with a zero entry (see Terrain codes)
 ```
 
 The lists are stored column by column (cell (0, 1) starts at 47, cell (1, 0)
@@ -53,8 +53,10 @@ at 1380). `kurt64`'s grid is a field of block 1 with scattered variants
 
 The list entries' middle byte and bits 19-22 are evenly spread over all
 their values, and their low byte has a strongly patterned distribution, so
-they are packed fields of some kind; what they describe isn't known yet
-(placed scenery, pathfinding or visibility data?).
+they are packed fields of some kind; what they describe isn't known yet.
+They look like placed objects: in `f1`, bits 16-17 take 3 values (0, 1, 2:
+perhaps the planet's tree, rock and bush models), bits 19-23 are spread over
+16 values (perhaps a turn) and the low 16 bits look like a position.
 
 ## Tiles and ground models
 
@@ -69,7 +71,8 @@ Checked on the 7 maps of `icewrld.cat`:
   values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't
   a mirror or a height offset (tested). Each model appears in groups of 4
   records per rotation (`f1`: most models 16 times), which differ in their
-  texture layers.
+  terrain codes. A few `ramp` tiles with bits 16-17 = 1 would fit better
+  turned a further half turn; not enough to be sure.
 - **Layout:** a block's four tiles go round the square in record order, at
   (0, 0), (1, 0), (1, 1), (0, 1) tiles from its corner. With rotation, 88.5 %
   of neighbouring tile edges in `f1` meet exactly (heights at 5 points within
@@ -77,33 +80,45 @@ Checked on the 7 maps of `icewrld.cat`:
 - Ground models span -4096..4096 in x and y (a tile is 8192 units, a block
   16384). Heights come in levels built into the models: 0, 3264 and 7360
   (`ice_08` is a plateau at 3264, `ice_09` at 7360; cliffs and ramps join
-  them). Most remaining mismatches are flat tiles at 0 beside `ice_09`
-  plateaus, even inside one block, and nothing tested (cell values, block
-  bytes, tile fields) lifts them: perhaps the game draws walls between levels.
+  them). Most remaining mismatches are flat `ice_19` tiles at 0 beside
+  `ice_09` plateaus (1687 of 2900 in `f1`), even inside one block, and
+  nothing tested (cell values, block bytes, tile fields, other rotations or
+  mirroring) lifts them. The terrain codes (below) agree they are low ground:
+  they are real pits in the plateau, so the game must draw walls there.
 - In each type-21 record, the first four items count 0-3 starting at
   (rotation + 2) mod 4: the tile's sides, numbered in its own frame.
 
-## Texture layers
+## Terrain codes
 
-A type-20 record's five 8 x 8 grids are texture layers. Each layer is one
-texture, the value in its first row and column: a number among the planet
-archive's full-size textures (`.mp0` and `.lbp`) in archive order
-(`icewrld`: 0 `blue01` ... 15 `ice01` ... 18 `ice04` ... 30 `hole02`, 31
-`tree.lbp` ...). Its other cells are 0 where the layer doesn't cover;
-elsewhere they hold another small value (`09`, `0e`, `08`, `0c`, …; unknown).
-Higher layers cover parts of a tile in staircase shapes; the 8 bytes after the
-grids are bit masks of rows (`ff ff fc f0 f0 e0 c0 c0`), presumably for the
-top layer.
+A type-20 record's five 8 x 8 grids are **not** textures, as first thought:
+`hole_03`, `ramp` and `concrete` tiles, which look nothing alike, carry the
+same grids, and `ice_09`'s plateau has the same codes in all five layers.
+Each cell holds a code from 1 to 18, or 0 for none. Codes 1, 2, 4, 7, 10,
+13, 15 and 18 appear only in a grid's first row and column, the others only
+inside it, and they come in pairs (border 15 with inner 9, 2 with 11, 13
+with 8, 4 with 12, 18 with 6, 1 with 17, 10 with 5).
 
-So `ice_09`'s plateau is `ice01` (15), and the lowland tiles' layers are
-`blue03`, `ice04` and the like. Drawn that way (topmost covering layer per
-cell, the texture once across the tile) the map looks like screenshots of
-the game: broad, even ice with darker lowland. Reading each cell's own value
-as its texture gives a banded patchwork instead. How the game blends the
-layers' edges isn't known.
+The codes index the colour table at the end of the file (the same 18 colours
+in every `icewrld` map; entry 0 is magenta). Coloured that way, plateaus are
+light blue and lowland dark blue, and the first row and column draw a grid:
+a minimap or terrain-type map. Cells are in map orientation (row 0 at the
+south, column 0 at the west, after the tile's rotation). Higher layers cover
+parts of a tile in staircase shapes; the 8 bytes after the grids are bit
+masks of rows (`ff ff fc f0 f0 e0 c0 c0`) matching those shapes. What the
+five layers are for (unit types? heights?) isn't known.
 
-Where neighbouring tiles' edges don't meet (a plateau beside a pit), the game
-draws cliff walls; the viewer closes those gaps with plain quads of its own.
+### Textures
+
+Neither the map nor the ground models name their textures. Each face numbers
+a texture among its model's own (0-6, as for other models; see
+[geo.md](geo.md#textures)), with UVs across the whole tile (`hole_01`'s
+crater spans 0-1). The planet's textures fit the models' names only in part:
+`hole01`-`hole03`, `crack01`, `ramp01`, `concrete`, and `ice01`-`ice08` for
+the 26 `ice_` models, several of which number more than one texture. Matching
+textures to faces by colour across seams gave no consistent answer. The
+assignment is probably held elsewhere (another archive or the game itself).
+`cliff07`, which no model's name matches, may be the texture for the walls
+between levels.
 
 A ground model's own 8 x 8 grid (after its faces) lists, per cell, the faces
 over it; cells overlap, so it's a lookup for heights or collisions, not
@@ -111,7 +126,8 @@ textures.
 
 ## Open questions
 
-- How the texture layers blend; what the non-zero cell values mean.
+- Which textures the ground models' faces use.
+- What the five layers of terrain codes are for.
 - How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
   entries' second value (50, 75, 100, ... in steps of 25, sometimes with

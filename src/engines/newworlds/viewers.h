@@ -120,8 +120,8 @@ private:
 // models. See docs/formats/newworlds/gmf.md.
 //   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
 //   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines   K: walls
-//   T: textures on/off   G: texture source (map layers, as one texture each; map
-//   layers, per cell; the models' own textures)
+//   T: textures on/off   G: colouring (the models' own textures; the map's
+//   terrain codes in its colour table)
 class MapViewer {
 public:
     MapViewer(System& sys, Surface& screen, const Archives& archives);
@@ -155,6 +155,7 @@ private:
     const TileModel& tileModel(uint32_t index);
     const TileEdges& tileEdges(uint32_t tile);
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
+    static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
 
     System& sys_;
     Surface& screen_;
@@ -170,11 +171,11 @@ private:
     std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, in order
     std::map<uint32_t, TileModel> tileModels_;
     std::map<uint32_t, TileEdges> tileEdges_;
-    std::vector<Texture> planetTextures_; // the map archive's textures, in order
+    Texture wallTexture_; // the map archive's last cliff texture, if any
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
     bool textured_ = true, outlines_ = false, walls_ = true;
-    int textureSource_ = 0; // see kSourceNames
+    int colouring_ = 0; // see kColouringNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;

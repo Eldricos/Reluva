@@ -20,10 +20,10 @@ constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
 constexpr int kSlotY[4] = {0, 0, 1, 1};
-// Where ground textures come from. The map's layers are read two ways: each
-// layer is one texture (the value in its first row and column) and its other
-// cells say where it covers; or each cell names its own texture.
-constexpr const char* kSourceNames[3] = {"map layers", "map layers per cell", "models' own textures"};
+// How the ground is coloured: with the models' own textures, or with the
+// colour of each cell's terrain code (from the tile's layers).
+constexpr int kColourings = 2;
+constexpr const char* kColouringNames[kColourings] = {"models' own textures", "terrain codes"};
 
 } // namespace
 
@@ -61,20 +61,17 @@ void MapViewer::show(int index) {
         if (cat.entries()[i].tag == cattag::Geometry)
             archiveModels_.push_back(i);
     std::vector<uint8_t> data;
-    // The tiles' texture layers number the archive's full-size textures in
-    // order (.mp0 and .lbp: icewrld's 15 is ice01).
-    planetTextures_.clear();
-    for (const auto& e : cat.entries()) {
-        if (e.tag != cattag::Texture)
-            continue;
+    // Walls get the archive's last full-size cliff texture (icewrld's
+    // cliff07, which no ground model's name matches). A guess.
+    wallTexture_ = Texture{};
+    for (auto e = cat.entries().rbegin(); e != cat.entries().rend(); ++e) {
         std::string folder, stem, ext;
-        splitName(e.name, folder, stem, ext);
-        if (ext != "mp0" && ext != "lbp")
+        splitName(e->name, folder, stem, ext);
+        if (e->tag != cattag::Texture || ext != "mp0" || stem.rfind("cliff", 0) != 0)
             continue;
-        Texture tex;
-        if (cat.read(e, data) || decodeTexture(data, tex))
-            tex = Texture{};
-        planetTextures_.push_back(std::move(tex));
+        if (cat.read(*e, data) || decodeTexture(data, wallTexture_))
+            wallTexture_ = Texture{};
+        break;
     }
     if (Error err = cat.read(cat.entries()[ref.entry], data))
         status_ = err.message;
@@ -95,10 +92,10 @@ void MapViewer::resetView() {
     dirty_ = true;
 }
 
-// A tile's ground model, decoded once per map, with its own textures (used
-// where the map's layers give none, or with G): the one named like the model
-// without its underscore (ice_07: ice07) first, then those the usual rule
-// finds. Faces numbering other textures are untextured.
+// A tile's ground model, decoded once per map, with its own textures: the one
+// named like the model without its underscore (ice_07: ice07) first, then
+// those the usual rule finds. Which textures the game really uses isn't known
+// (see docs/formats/newworlds/gmf.md); faces numbering others are untextured.
 const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     auto found = tileModels_.find(index);
     if (found != tileModels_.end())
@@ -273,7 +270,7 @@ void MapViewer::handleEvent(const Event& ev) {
     case '-': distance_ = std::min(distance_ * 1.25f, 1e8f); break;
     case 'r': resetView(); break;
     case 't': textured_ = !textured_; break;
-    case 'g': textureSource_ = (textureSource_ + 1) % 3; break;
+    case 'g': colouring_ = (colouring_ + 1) % kColourings; break;
     case 'l': outlines_ = !outlines_; break;
     case 'k': walls_ = !walls_; break;
     case key::Right: show((current_ + 1) % n); return;
@@ -310,8 +307,17 @@ void MapViewer::updateTitle() {
     if (!textured_)
         title += " [untextured]";
     else
-        title += std::string(" [") + kSourceNames[textureSource_] + "]";
+        title += std::string(" [") + kColouringNames[colouring_] + "]";
     sys_.setWindowTitle(title);
+}
+
+// The terrain code of a tile's cell (column cx from the west, row cy from the
+// south, in map orientation): the topmost layer's that isn't 0, or 0.
+unsigned MapViewer::terrainCode(const GmfMap::Tile& tile, int cx, int cy) {
+    for (int layer = GmfMap::kLayers - 1; layer >= 0; --layer)
+        if (const unsigned code = tile.layers[size_t(layer * 64 + cy * 8 + cx)])
+            return code;
+    return 0;
 }
 
 void MapViewer::render() {
@@ -375,7 +381,12 @@ void MapViewer::render() {
                     for (const auto& corner : face.corners) {
                         const auto& v = verts[corner.vertex];
                         const auto [x, y] = turn(v.x, v.y);
-                        poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z}, corner.u, corner.v));
+                        // For terrain codes, (u, v) is the position across the
+                        // tile, in map orientation.
+                        const bool planar = colouring_ == 1;
+                        poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z},
+                                                  planar ? (x + kTileSize / 2) / kTileSize : corner.u,
+                                                  planar ? (y + kTileSize / 2) / kTileSize : corner.v));
                     }
                     poly = clipNear(poly, cam.nearZ);
                     if (poly.size() < 3)
@@ -401,27 +412,16 @@ void MapViewer::render() {
                                                  !m.textures[textureIndex].rgba.empty()
                                              ? &m.textures[textureIndex]
                                              : nullptr;
-                    const bool layers = textured_ && textureSource_ < 2 && !planetTextures_.empty();
-                    const bool layerTexture = textureSource_ == 0;
+                    const bool codes = textured_ && colouring_ == 1;
                     auto shade = [&](float u, float v, uint8_t* out) {
                         static const uint8_t plain[3] = {170, 180, 195};
                         const uint8_t* col = plain;
-                        // The map's layers: the topmost layer covering the cell
-                        // under (u, v), the tile's own texture coordinates.
-                        // Its texture is the layer's first-row value, or the
-                        // cell's own. The first row and column take the next
-                        // cell's coverage.
-                        const Texture* cellTex = nullptr;
-                        if (layers) {
-                            const int cx = std::clamp(int(u * 8), 1, 7), cy = std::clamp(int(v * 8), 1, 7);
-                            for (int layer = GmfMap::kLayers - 1; layer >= 0 && !cellTex; --layer) {
-                                const unsigned cover = tile.layers[size_t(layer * 64 + cy * 8 + cx)];
-                                const unsigned n = layerTexture ? tile.layers[size_t(layer * 64)] : cover;
-                                if (cover && n && n < planetTextures_.size() && !planetTextures_[n].rgba.empty())
-                                    cellTex = &planetTextures_[n];
-                            }
-                        }
-                        if (const Texture* tt = cellTex ? cellTex : tex) {
+                        if (codes) {
+                            const unsigned code =
+                                terrainCode(tile, std::clamp(int(u * 8), 0, 7), std::clamp(int(v * 8), 0, 7));
+                            if (code && code < map_.palette.size())
+                                col = map_.palette[code].data();
+                        } else if (const Texture* tt = tex) {
                             int tx = int(std::floor(u * float(tt->width))) % tt->width;
                             int ty = int(std::floor(v * float(tt->height))) % tt->height;
                             tx += tx < 0 ? tt->width : 0;
@@ -475,21 +475,50 @@ void MapViewer::render() {
                             return s == 0 ? Vec{ex, cy + t, z} : Vec{cx + t, ey, z};
                         };
                         poly.clear();
-                        poly.push_back(cam.toView(at(t0, z0a), 0, 0));
-                        poly.push_back(cam.toView(at(t1, z1a), 1, 0));
-                        poly.push_back(cam.toView(at(t1, z1b), 1, 1));
-                        poly.push_back(cam.toView(at(t0, z0b), 0, 1));
+                        // (u, v): across the quarter edge, and height above the
+                        // wall's lowest point.
+                        const float zl = std::min({z0a, z1a, z0b, z1b});
+                        poly.push_back(cam.toView(at(t0, z0a), 0, z0a - zl));
+                        poly.push_back(cam.toView(at(t1, z1a), 1, z1a - zl));
+                        poly.push_back(cam.toView(at(t1, z1b), 1, z1b - zl));
+                        poly.push_back(cam.toView(at(t0, z0b), 0, z0b - zl));
                         poly = clipNear(poly, cam.nearZ);
                         if (poly.size() < 3)
                             continue;
                         projected.clear();
                         for (const auto& p : poly)
                             projected.push_back(cam.project(p));
-                        const uint8_t shadeLevel = s == 0 ? 120 : 140; // east- and north-facing walls differ
-                        auto wall = [&](float, float, uint8_t* out) {
-                            out[0] = uint8_t(shadeLevel * 0.85f);
-                            out[1] = uint8_t(shadeLevel * 0.92f);
-                            out[2] = shadeLevel;
+                        // Textured with the cliff texture, projected sideways
+                        // (or coloured like the higher tile's edge cells);
+                        // east- and north-facing walls are shaded differently.
+                        const bool aHigher = z0a + z1a > z0b + z1b;
+                        const GmfMap::Tile& high = map_.tiles[size_t(aHigher ? here : there)];
+                        const int edgeCell = aHigher ? 7 : 0;
+                        const float shadeLevel = s == 0 ? 0.6f : 0.75f;
+                        const float zLow = std::min({z0a, z1a, z0b, z1b});
+                        auto wall = [&](float u, float v, uint8_t* out) {
+                            static const uint8_t plain[3] = {150, 160, 175};
+                            const uint8_t* col = plain;
+                            const int along = std::clamp(k * 2 + int(u * 2), 0, 7);
+                            const Texture* tt = textured_ && colouring_ == 0 && !wallTexture_.rgba.empty()
+                                                    ? &wallTexture_
+                                                    : nullptr;
+                            if (textured_ && colouring_ == 1) {
+                                const unsigned code =
+                                    terrainCode(high, s == 0 ? edgeCell : along, s == 0 ? along : edgeCell);
+                                if (code && code < map_.palette.size())
+                                    col = map_.palette[code].data();
+                            } else if (tt) {
+                                // The image upright: its top row at the top of the wall.
+                                const float tu = (float(k) + u) / 4, tv = -(zLow + v) / kTileSize;
+                                int tx = int(std::floor(tu * float(tt->width))) % tt->width;
+                                int ty = int(std::floor(tv * float(tt->height))) % tt->height;
+                                tx += tx < 0 ? tt->width : 0;
+                                ty += ty < 0 ? tt->height : 0;
+                                col = &tt->rgba[(size_t(ty) * size_t(tt->width) + size_t(tx)) * 4];
+                            }
+                            for (int i = 0; i < 3; ++i)
+                                out[i] = uint8_t(float(col[i]) * shadeLevel);
                             out[3] = 255;
                             return true;
                         };

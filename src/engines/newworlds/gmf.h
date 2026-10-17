@@ -22,9 +22,12 @@ struct GmfMap {
         uint32_t model = 0;    // index of its ground model among the archive's .geo files
         uint32_t flags = 0;    // bits 14-15: rotation; others unknown
         int rotation = 0;      // quarter turns anticlockwise (bits 14-15 of flags)
-        // Texture layers: 8 x 8 cells each, row by row; a cell holds a texture
-        // number (the planet archive's textures in order) or 0 for none. The
-        // first row and column hold another value (unknown).
+        // Layers of terrain codes: 8 x 8 cells each, row by row from the
+        // south, columns from the west (after the tile's rotation); 0 for
+        // none, otherwise an index into the map's colour table. The first row
+        // and column use other codes than the rest. What the layers are for
+        // (not textures: hole, ramp and concrete tiles share the same ones)
+        // isn't known.
         std::array<uint8_t, kLayers * 64> layers{};
     };
     struct Cell {
@@ -36,6 +39,9 @@ struct GmfMap {
     std::vector<Tile> tiles;
     std::vector<std::array<uint32_t, 4>> blocks; // four tile numbers each
     std::vector<Cell> cells;                   // width x height, row by row
+    // The colour table at the end of the file (the same in every icewrld
+    // map), one RGB colour per terrain code; code 0 is magenta.
+    std::vector<std::array<uint8_t, 3>> palette;
 };
 
 Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out);

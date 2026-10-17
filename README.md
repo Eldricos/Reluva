@@ -55,7 +55,7 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   colour faces by texture number, **B** to show back faces
   and **R** to reset the view. Maps are built from their ground tiles: drag to
   rotate, use the wheel to zoom, **W/A/S/D** to move, **Q/E** to turn,
-  **Left/Right** for the next map, **T** for textures, **G** to switch where ground textures come from, **K** for
+  **Left/Right** for the next map, **T** for textures, **G** to colour the ground by its terrain codes, **K** for
   the walls between levels and **L** for outlines.
 
 The config is saved as `reluva.ini` in SDL's preferences folder

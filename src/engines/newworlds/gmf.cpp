@@ -16,6 +16,7 @@ constexpr uint16_t kTile = 20;
 constexpr uint16_t kBlock = 19;
 constexpr size_t kGridOffset = 18;  // in a type-20 body, after its header values
 constexpr size_t kCellEntrySize = 10;
+constexpr size_t kPaletteSize = 1024;
 
 struct Reader {
     const std::vector<uint8_t>& d;
@@ -37,7 +38,8 @@ std::string hex(size_t v) {
 // Layout: u16 counts of type-21, type-20 and type-19 records, u16 width and
 // height in blocks; the records (u16 type, u16 length, u16 0, body), all
 // type 21, then 20, then 19; u32 N and N u32 list entries (unknown meaning);
-// one 10-byte entry per grid cell; 1024 more bytes.
+// one 10-byte entry per grid cell; a 1024-byte colour table (u32 B, G, R, 0
+// per terrain code, ending with a zero entry).
 Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
     out = GmfMap{};
     const Reader r{data};
@@ -100,6 +102,11 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
             return Error::fail("grid cell " + std::to_string(i) + " uses block " + std::to_string(c.block) + " of " +
                                std::to_string(out.blocks.size()));
         out.cells.push_back(c);
+    }
+    for (size_t i = 0; i < kPaletteSize / 4 && r.has(p, 4); ++i, p += 4) {
+        if (i > 0 && r.u32(p) == 0)
+            break;
+        out.palette.push_back({data[p + 2], data[p + 1], data[p]});
     }
     return Error::success();
 }
