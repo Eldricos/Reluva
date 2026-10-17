@@ -63,7 +63,9 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         face.groupB = i ? r.u32(p + 4) : 0;
         const uint32_t n = r.u32(p + 8);
         if (n < 3 || n > 256 || r.u32(p + 12) != 0 || !r.has(p + 16, size_t(n) * kCornerSize))
-            return Error::fail("face " + std::to_string(i) + " at " + hex(p) + " has a bad header");
+            return Error::fail("face " + std::to_string(i) + " at " + hex(p) + " has a bad header (" +
+                               std::to_string(r.u32(p)) + ", " + std::to_string(r.u32(p + 4)) + ", " +
+                               std::to_string(n) + ", " + std::to_string(r.u32(p + 12)) + ")");
         p += 16;
         for (uint32_t k = 0; k < n; ++k, p += kCornerSize)
             face.corners.push_back({r.u32(p), r.f32(p + 4) * kUvScale, r.f32(p + 8) * kUvScale});
