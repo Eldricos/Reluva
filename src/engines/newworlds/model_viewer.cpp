@@ -207,6 +207,7 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'r': resetView(); break;
     case key::Space: spin_ = !spin_; break;
     case 'u': uvCheck_ = !uvCheck_; break;
+    case 'c': colourByTail_ = !colourByTail_; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'p':
@@ -264,6 +265,8 @@ void ModelViewer::updateTitle() {
         title += std::string(" [") + kOutlineNames[outlines_] + "]";
     if (faces_)
         title += std::string(" [") + kFaceNames[faces_] + "]";
+    if (colourByTail_)
+        title += " [colour: last corner value]";
     if (uvCheck_)
         title += " [UV check]";
     sys_.setWindowTitle(title);
@@ -348,7 +351,9 @@ void ModelViewer::render() {
 
         if (outlines_ != 2) {
             const float intensity = 0.3f + 0.7f * std::fabs(dot(viewNormal, light));
-            const uint8_t* base = kPartColours[face.part % 8];
+            // Colour by part, or by the last value of the face's last corner
+            // (a possible texture number).
+            const uint8_t* base = kPartColours[(colourByTail_ ? face.corners.back().extra[4] : face.part) % 8];
             const bool check = uvCheck_;
             auto shade = [&](float u, float v, uint8_t* out) {
                 float k = intensity;

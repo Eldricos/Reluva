@@ -74,7 +74,8 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
                                std::to_string(n) + ", " + std::to_string(r.u32(p + 12)) + ")");
         p += 16;
         for (uint32_t k = 0; k < n; ++k, p += kCornerSize)
-            face.corners.push_back({r.u32(p), r.f32(p + 4) * kUvScale, r.f32(p + 8) * kUvScale});
+            face.corners.push_back({r.u32(p), r.f32(p + 4) * kUvScale, r.f32(p + 8) * kUvScale,
+                                    {r.u32(p + 12), r.u32(p + 16), r.u32(p + 20), r.u32(p + 24), r.u32(p + 28)}});
         partCount = std::max(partCount, face.part + 1);
         out.faces.push_back(std::move(face));
     }

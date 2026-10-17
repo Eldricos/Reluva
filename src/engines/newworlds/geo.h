@@ -18,8 +18,10 @@ struct GeoModel {
         float x, y, z;
     };
     struct Corner {
-        uint32_t vertex; // index into the face's part's vertices
-        float u, v;      // texture coordinates, 0..1
+        uint32_t vertex;    // index into the face's part's vertices
+        float u, v;         // texture coordinates, 0..1
+        uint32_t extra[5];  // unknown; in parts above 0, extra[4] is the part
+                            // number except in a face's last corner
     };
     struct Face {
         uint32_t groupA = 0, groupB = 0; // header values: the previous face's part, and unknown

@@ -894,6 +894,14 @@ int cmdGeoInfo(int argc, char** argv) {
     for (const auto& [value, n] : seconds)
         std::printf(" %u x%u", value, n);
     std::printf("\n");
+    // The last value of each face's last corner: a texture number?
+    std::map<uint32_t, unsigned> tails;
+    for (const auto& face : m.faces)
+        ++tails[face.corners.back().extra[4]];
+    std::printf("last value of each face's last corner (value x count):");
+    for (const auto& [value, n] : tails)
+        std::printf(" %u x%u", value, n);
+    std::printf("\n");
 
     // Test: is the second value an index into the face's part's first normal
     // list, giving the face's normal? Compare with the normal worked out from
