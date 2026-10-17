@@ -19,6 +19,8 @@
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
 //   reluva-tool geo-textures [-a] <file.cat>...    show which textures each model gets (by default
 //                                                  only models with too few, with similar names)
+//   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
+//                                                  one record (or where the walk stops)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
 //                                                  corner, and dump the bytes where the walk stops
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
@@ -1053,6 +1055,83 @@ int cmdGeoTextures(int argc, char** argv) {
     return 0;
 }
 
+// Map (.gmf) layout as far as known: five u16 header values, then records of
+// u16 type, u16 length, u16 ?, and `length` bytes. See docs/formats/newworlds/gmf.md.
+int cmdGmfInfo(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool gmf-info <file.gmf> [record number]\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    const long want = argc > 3 ? std::strtol(argv[3], nullptr, 0) : -1;
+    std::printf("%zu bytes; header u16:", d.size());
+    for (size_t o = 0; o < 10; o += 2)
+        std::printf(" %u", rd16(d, o));
+    std::printf("\n");
+
+    struct Record {
+        size_t offset;
+        uint16_t type, length, third;
+    };
+    std::vector<Record> records;
+    size_t p = 10;
+    while (p + 6 <= d.size()) {
+        const Record r{p, rd16(d, p), rd16(d, p + 2), rd16(d, p + 4)};
+        if (p + 6 + r.length > d.size())
+            break;
+        records.push_back(r);
+        p += 6 + r.length;
+    }
+    std::printf("%zu records; the walk %s at 0x%zx\n", records.size(),
+                p == d.size() ? "ends exactly at the end of the file" : "stops", p);
+
+    std::map<uint16_t, unsigned> types, thirds;
+    std::map<uint16_t, unsigned> lengths;
+    for (const auto& r : records) {
+        ++types[r.type];
+        ++thirds[r.third];
+        ++lengths[r.length];
+    }
+    auto show = [](const char* what, const std::map<uint16_t, unsigned>& m) {
+        std::printf("%s (value x count):", what);
+        unsigned shown = 0;
+        for (const auto& [v, n] : m)
+            if (shown++ < 40)
+                std::printf(" %u x%u", v, n);
+        if (m.size() > 40)
+            std::printf(" ... (%zu values)", m.size());
+        std::printf("\n");
+    };
+    show("types", types);
+    show("third values", thirds);
+    show("lengths", lengths);
+
+    // Runs of equal types, to show how the records are grouped.
+    std::printf("type runs:");
+    unsigned shownRuns = 0;
+    for (size_t i = 0; i < records.size();) {
+        size_t j = i;
+        while (j < records.size() && records[j].type == records[i].type)
+            ++j;
+        if (shownRuns++ < 30)
+            std::printf(" %u x%zu", records[i].type, j - i);
+        i = j;
+    }
+    std::printf("\n");
+
+    if (want >= 0 && size_t(want) < records.size()) {
+        const Record& r = records[size_t(want)];
+        std::printf("record %ld at 0x%zx: type %u, length %u, third %u\n", want, r.offset, r.type, r.length, r.third);
+        hexdump(d, r.offset, 6 + size_t(r.length));
+    } else if (p != d.size()) {
+        std::printf("bytes where the walk stops:\n");
+        hexdump(d, p, 0x80);
+    }
+    return 0;
+}
+
 int cmdGeoSurvey(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool geo-survey <file.cat>...\n");
@@ -1133,6 +1212,8 @@ int main(int argc, char** argv) {
         return cmdGeoInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-survey") == 0)
         return cmdGeoSurvey(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "gmf-info") == 0)
+        return cmdGmfInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-textures") == 0)
         return cmdGeoTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1152,6 +1233,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-info <file.geo> [out.obj]\n"
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
+                 "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
