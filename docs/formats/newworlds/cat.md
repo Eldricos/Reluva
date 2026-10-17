@@ -28,7 +28,7 @@ Tags seen in the 23 retail archives:
 | `0x05` | table of contents | | see below |
 | `0x11` | file | `.gmf` | only in the planet (`*wrld`) archives; source size always differs |
 | `0x16` | file | `.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp` | textures, see [lbp.md](lbp.md) (and one `.stb` in `misc.cat`) |
-| `0x17` | file | `.geo` | geometry; source size always differs |
+| `0x17` | file | `.geo` | models, see [geo.md](geo.md); source size always differs |
 | `0x25` | file | `.arf` | only in the `*actor` archives |
 | `0x26` | file | `.fif` | inside `0x27` in the `*gui` archives |
 | `0x27` | container | | inside `0x28` |

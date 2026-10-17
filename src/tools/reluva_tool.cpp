@@ -15,12 +15,15 @@
 //   reluva-tool chunks <file>                      try to read any file as a (u16 tag, u32 size) chunk tree
 //   reluva-tool words <file> [offset] [count]      show 4-byte values as hex, integer and float
 //   reluva-tool table <file> [per row] [offset]    show 4-byte values compactly, N per row
+//   reluva-tool geo-info <file.geo> [out.obj]      decode a model; optionally export it as OBJ
+//   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
+#include "engines/newworlds/geo.h"
 
 #include <map>
 
@@ -808,6 +811,106 @@ int cmdTable(int argc, char** argv) {
     return 0;
 }
 
+
+bool writeObj(const reluva::newworlds::GeoModel& m, const std::string& path) {
+    std::ofstream f(path);
+    f << "# exported by reluva-tool geo-info\n";
+    for (const auto& v : m.vertices)
+        f << "v " << v.x << ' ' << v.y << ' ' << v.z << '\n';
+    size_t vt = 1;
+    for (const auto& face : m.faces) {
+        for (const auto& c : face.corners)
+            f << "vt " << c.u << ' ' << 1.0f - c.v << '\n';
+        f << 'f';
+        for (const auto& c : face.corners)
+            f << ' ' << c.vertex + 1 << '/' << vt++;
+        f << '\n';
+    }
+    return bool(f);
+}
+
+int cmdGeoInfo(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool geo-info <file.geo> [out.obj]\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    reluva::newworlds::GeoModel m;
+    if (reluva::Error err = reluva::newworlds::parseGeo(d, m)) {
+        std::printf("doesn't decode: %s\n", err.message.c_str());
+        return 1;
+    }
+    float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
+    for (const auto& v : m.vertices) {
+        const float c[3] = {v.x, v.y, v.z};
+        for (int i = 0; i < 3; ++i) {
+            lo[i] = std::min(lo[i], c[i]);
+            hi[i] = std::max(hi[i], c[i]);
+        }
+    }
+    size_t corners = 0;
+    for (const auto& face : m.faces)
+        corners += face.corners.size();
+    std::printf("%zu vertices, %zu faces (%zu corners), %zu edges, %zu normal lists\n", m.vertices.size(),
+                m.faces.size(), corners, m.edges.size(), m.normalLists.size());
+    std::printf("bounds x %g..%g, y %g..%g, z %g..%g; radius %g\n", double(lo[0]), double(hi[0]), double(lo[1]),
+                double(hi[1]), double(lo[2]), double(hi[2]), double(m.radius));
+    if (argc > 3) {
+        if (!writeObj(m, argv[3])) {
+            std::fprintf(stderr, "cannot write %s\n", argv[3]);
+            return 1;
+        }
+        std::printf("wrote %s\n", argv[3]);
+    }
+    return 0;
+}
+
+int cmdGeoSurvey(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool geo-survey <file.cat>...\n");
+        return 2;
+    }
+    std::map<std::string, std::vector<std::string>> failures;
+    unsigned total = 0, ok = 0;
+    std::vector<uint8_t> d;
+    for (int a = 2; a < argc; ++a) {
+        reluva::newworlds::CatArchive cat;
+        if (reluva::Error err = cat.open(argv[a])) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        for (const auto& e : cat.entries()) {
+            if (e.tag != reluva::newworlds::cattag::Geometry || cat.read(e, d))
+                continue;
+            ++total;
+            reluva::newworlds::GeoModel m;
+            reluva::Error err = reluva::newworlds::parseGeo(d, m);
+            if (!err) {
+                ++ok;
+                continue;
+            }
+            // Group by message with numbers removed.
+            std::string key;
+            for (char c : err.message)
+                if (!(c >= '0' && c <= '9') && c != 'x')
+                    key += c;
+                else if (key.empty() || key.back() != '#')
+                    key += '#';
+            failures[key].push_back(std::string(argv[a]) + ": " + e.name + " (" + std::to_string(d.size()) +
+                                    " bytes): " + err.message);
+        }
+    }
+    std::printf("%u models, %u decode\n\n", total, ok);
+    for (const auto& [key, list] : failures) {
+        std::printf("%5zu  %s\n", list.size(), key.c_str());
+        for (size_t i = 0; i < list.size() && i < 3; ++i)
+            std::printf("       e.g. %s\n", list[i].c_str());
+    }
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -833,6 +936,10 @@ int main(int argc, char** argv) {
         return cmdWords(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "table") == 0)
         return cmdTable(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-info") == 0)
+        return cmdGeoInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-survey") == 0)
+        return cmdGeoSurvey(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -845,6 +952,8 @@ int main(int argc, char** argv) {
                  "  reluva-tool chunks <file>\n"
                  "  reluva-tool words <file> [offset] [count]\n"
                  "  reluva-tool table <file> [values per row] [offset]\n"
+                 "  reluva-tool geo-info <file.geo> [out.obj]\n"
+                 "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }

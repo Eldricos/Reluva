@@ -7,6 +7,7 @@
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
+#include "engines/newworlds/geo.h"
 
 #include <cstdio>
 #include <cstring>
@@ -279,6 +280,68 @@ void testTexture() {
     CHECK(decodeTexture(textureBytes(0, 2), t));   // zero width
 }
 
+void putF(std::vector<uint8_t>& b, float f) {
+    uint32_t v;
+    std::memcpy(&v, &f, 4);
+    put32(b, v);
+}
+
+// A one-triangle model laid out as in docs/formats/newworlds/geo.md.
+std::vector<uint8_t> triangleGeo() {
+    const float pos[3][2] = {{0, 0}, {100, 0}, {0, 200}};
+    const float uv[3][2] = {{0, 0}, {65536, 0}, {0, 65536}};
+    std::vector<uint8_t> b;
+    put32(b, 0); // purpose unknown
+    put32(b, 2); // faces + 1
+    put32(b, 3); // texture vertices
+    put32(b, 0);
+    auto corner = [&](uint32_t v) {
+        put32(b, v);
+        putF(b, uv[v][0]);
+        putF(b, uv[v][1]);
+        for (int i = 0; i < 5; ++i)
+            put32(b, 0);
+    };
+    for (uint32_t v = 0; v < 3; ++v)
+        corner(v);
+    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, 0); // face header
+    corner(0); corner(1); corner(2);
+    put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // bounds header, no attachments
+    putF(b, 0); putF(b, 0); putF(b, 224);
+    put32(b, 1); put32(b, 0); put32(b, 0);             // unknown, as in fs_s.geo
+    put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // vertex block
+    put32(b, 3);
+    for (auto& p : pos) {
+        putF(b, p[0]); putF(b, p[1]); putF(b, 0);
+    }
+    put32(b, 1); put32(b, 1); putF(b, 0); putF(b, 0); putF(b, 1); // one normal
+    put32(b, 1); put32(b, 1); put32(b, 3); put32(b, 0);            // three edges
+    const uint32_t edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
+    for (auto& e : edges) {
+        put32(b, e[0]); put32(b, e[1]); put32(b, 0); put32(b, 1); put32(b, 0);
+    }
+    return b;
+}
+
+void testGeo() {
+    GeoModel m;
+    Error err = parseGeo(triangleGeo(), m);
+    CHECK(!err);
+    if (err) {
+        std::fprintf(stderr, "  %s\n", err.message.c_str());
+        return;
+    }
+    CHECK(m.vertices.size() == 3 && m.vertices[2].y == 200.0f);
+    CHECK(m.faces.size() == 1 && m.faces[0].corners.size() == 3);
+    CHECK(m.faces[0].corners[1].vertex == 1 && m.faces[0].corners[1].u == 1.0f);
+    CHECK(m.edges.size() == 3 && m.edges[1].v1 == 2 && m.edges[1].faceB == 1);
+    CHECK(m.normalLists.size() == 1 && m.radius == 224.0f);
+
+    auto bad = triangleGeo();
+    bad[bad.size() - 20] = 7; // last edge now starts at vertex 7
+    CHECK(parseGeo(bad, m));
+}
+
 } // namespace
 
 int main() {
@@ -288,6 +351,7 @@ int main() {
     testRejectsCorruption(tmp);
     testStringTable();
     testTexture();
+    testGeo();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);
