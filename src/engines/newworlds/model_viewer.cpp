@@ -187,7 +187,7 @@ void ModelViewer::show(int index) {
 
 // A model's textures are named after it: k_bop uses k_bop_a, k_bop_b and
 // k_bop_g, in name order. A variant such as k_bop_l with no textures of its own
-// uses those of the name without the suffix. Textures in the model's own
+// uses those of the name without the suffix (except the flat _s outlines). Textures in the model's own
 // folder (kln for geo/kln/k_bop.geo) are preferred.
 void ModelViewer::loadTextures(const std::string& modelName) {
     modelTextures_.clear();
@@ -206,9 +206,10 @@ void ModelViewer::loadTextures(const std::string& modelName) {
             for (const TextureFile& t : textureFiles_)
                 if ((!sameFolder || t.folder == folder) && matches(t))
                     found.push_back(&t);
-        // Otherwise drop a short suffix (_l, _d, _ad, ...) and try again.
+        // Otherwise drop a short suffix (_l, _d, _ad, ...) and try again; but
+        // not _s, the flat outlines, which don't use the full model's textures.
         const size_t us = base.rfind('_');
-        if (!found.empty() || us == std::string::npos || base.size() - us > 3)
+        if (!found.empty() || us == std::string::npos || base.size() - us > 3 || base.compare(us, 3, "_s") == 0)
             break;
         base.resize(us);
     }
@@ -387,8 +388,20 @@ void ModelViewer::render() {
     std::vector<std::vector<ScreenVertex>> outlines;
     std::vector<ViewVertex> poly;
     std::vector<ScreenVertex> projected;
+    // Faces whose texture has an alpha layer are blended over the rest, so
+    // they're drawn in a second pass.
+    for (int pass = 0; pass < 2; ++pass)
     for (const auto& face : model_.faces) {
         if (soloPart_ >= 0 && int(face.part) != soloPart_)
+            continue;
+        // The last value of the face's last corner picks its texture.
+        const uint32_t textureIndex = face.corners.back().extra[4];
+        const Texture* tex = nullptr;
+        if (textured_ && !colourByTail_ && textureIndex < modelTextures_.size() &&
+            !modelTextures_[textureIndex].rgba.empty())
+            tex = &modelTextures_[textureIndex];
+        const bool blended = tex && tex->format == 6;
+        if (blended != (pass == 1))
             continue;
         const auto& verts = model_.parts[face.part].vertices;
 
@@ -427,12 +440,6 @@ void ModelViewer::render() {
             continue;
 
         if (outlines_ != 2) {
-            // The last value of the face's last corner picks its texture.
-            const uint32_t textureIndex = face.corners.back().extra[4];
-            const Texture* tex = nullptr;
-            if (textured_ && !colourByTail_ && textureIndex < modelTextures_.size() &&
-                !modelTextures_[textureIndex].rgba.empty())
-                tex = &modelTextures_[textureIndex];
             const float intensity = tex ? 0.45f + 0.55f * std::fabs(dot(viewNormal, light))
                                         : 0.3f + 0.7f * std::fabs(dot(viewNormal, light));
             // Untextured: colour by part, or by the texture number.
@@ -443,20 +450,21 @@ void ModelViewer::render() {
                 if (check && ((int(std::floor(u * 8)) + int(std::floor(v * 8))) & 1))
                     k *= 0.55f;
                 const uint8_t* c = base;
-                if (tex) { // nearest texel, wrapping; transparent texels aren't drawn
+                float a = 1;
+                if (tex) { // nearest texel, wrapping
                     int tx = int(std::floor(u * float(tex->width))) % tex->width;
                     int ty = int(std::floor(v * float(tex->height))) % tex->height;
                     tx += tx < 0 ? tex->width : 0;
                     ty += ty < 0 ? tex->height : 0;
                     c = &tex->rgba[(size_t(ty) * size_t(tex->width) + size_t(tx)) * 4];
-                    if (c[3] < 128)
-                        return false;
+                    if (c[3] == 0)
+                        return false; // colour key or fully transparent: nothing drawn
+                    a = blended ? float(c[3]) / 255.0f : 1.0f;
                 }
-                out[0] = uint8_t(std::min(255.0f, c[0] * k));
-                out[1] = uint8_t(std::min(255.0f, c[1] * k));
-                out[2] = uint8_t(std::min(255.0f, c[2] * k));
+                for (int i = 0; i < 3; ++i)
+                    out[i] = uint8_t(std::min(255.0f, c[i] * k * a + float(out[i]) * (1 - a)));
                 out[3] = 255;
-                return true;
+                return a > 0.98f; // only (nearly) opaque pixels hide what's behind
             };
             for (size_t i = 1; i + 1 < projected.size(); ++i)
                 raster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);
