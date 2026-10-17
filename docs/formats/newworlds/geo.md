@@ -78,6 +78,12 @@ Each face picks one with the **last value of its last corner**
 1 both wings (`k_bop_b`), and 2 three spots on the body (`k_bop_g`, the
 small 128 × 128 one). So the textures are numbered in name order.
 
+`reluva-tool geo-textures <file.cat>...` applies the rule below to every model
+and lists the ones it finds no textures for (`-a` lists every model's).
+Known misses: `landpd_d`, which looks like `landpad` but doesn't share its
+name; textures also look misplaced on some models, such as `fpdt` and
+`fhf_p`.
+
 The viewer's rule, still to be checked on more models: a model uses the
 textures named exactly after it or after it plus `_` and a suffix, in name
 order, preferring its own folder (`kln`). A model without any, such as a `_l`
@@ -117,6 +123,7 @@ would flip both the picture and the winding) isn't confirmed yet.
 |---|---|
 | `_l` | lower-detail version (e.g. `phtart_l`, `ptank_l`, `mb_l`) |
 | `_s` | flat outline at z ≈ 0, presumably the shadow (`fs_s`, `kwb_s`, `mn_s`) |
+| `_p` | a separate piece of the main model: `fhf_p` looks like the inside of the `fhf` hangar's bay, seen when its doors open |
 | `_d`, `_a`, `_b`, `_ad`, `_r` | variants with small changes; meaning unknown (`_d` may be damaged) |
 
 ## Evidence

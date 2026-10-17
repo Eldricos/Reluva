@@ -69,6 +69,7 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/string_table.cpp
     src/engines/newworlds/texture.cpp
     src/engines/newworlds/geo.cpp
+    src/engines/newworlds/model_textures.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp)
 target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warnings)

@@ -8,6 +8,7 @@
 #include "common/types.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/texture.h"
 
@@ -20,13 +21,6 @@
 // the window title.
 
 namespace reluva::newworlds {
-
-using Archives = std::vector<std::unique_ptr<CatArchive>>;
-
-// Where an item lives: archive index and entry index.
-struct EntryRef {
-    size_t archive, entry;
-};
 
 // Browses every texture.
 //   Left/Right: previous/next   PageUp/PageDown: jump 10   Home/End: first/last
@@ -88,11 +82,6 @@ private:
     void updateTitle();
     void drawLine(float x0, float y0, float x1, float y1);
     void loadTextures(const std::string& modelName);
-
-    struct TextureFile {
-        std::string stem, folder; // "k_bop_a", "kln" for lbp/txr/kln/k_bop_a.mp0
-        EntryRef ref;
-    };
 
     System& sys_;
     Surface& screen_;

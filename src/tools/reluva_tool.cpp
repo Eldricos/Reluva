@@ -17,6 +17,8 @@
 //   reluva-tool table <file> [per row] [offset]    show 4-byte values compactly, N per row
 //   reluva-tool geo-info <file.geo> [out.obj]      decode a model; optionally export it as OBJ
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
+//   reluva-tool geo-textures [-a] <file.cat>...    show which textures each model gets (by default
+//                                                  only models without any, with similar names)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
 //                                                  corner, and dump the bytes where the walk stops
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
@@ -26,8 +28,10 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/model_textures.h"
 
 #include <map>
+#include <memory>
 
 #include <algorithm>
 #include <cctype>
@@ -982,6 +986,58 @@ int cmdGeoFaces(int argc, char** argv) {
     return 0;
 }
 
+int cmdGeoTextures(int argc, char** argv) {
+    int first = 2;
+    const bool all = argc > 2 && std::strcmp(argv[2], "-a") == 0;
+    if (all)
+        ++first;
+    if (argc <= first) {
+        std::fprintf(stderr, "usage: reluva-tool geo-textures [-a] <file.cat>...\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    nw::Archives archives;
+    for (int a = first; a < argc; ++a) {
+        auto cat = std::make_unique<nw::CatArchive>();
+        if (reluva::Error err = cat->open(argv[a])) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        archives.push_back(std::move(cat));
+    }
+    const std::vector<nw::TextureFile> textures = nw::listTextureFiles(archives);
+    unsigned models = 0, without = 0;
+    for (const auto& cat : archives)
+        for (const auto& e : cat->entries()) {
+            if (e.tag != nw::cattag::Geometry)
+                continue;
+            ++models;
+            const auto found = nw::findModelTextures(e.name, textures);
+            if (!found.empty()) {
+                if (all) {
+                    std::printf("%s:", e.name.c_str());
+                    for (const auto* t : found)
+                        std::printf(" %s", t->stem.c_str());
+                    std::printf("\n");
+                }
+                continue;
+            }
+            ++without;
+            // Textures in the same folder whose names start like the model's.
+            std::string folder, stem, ext;
+            nw::splitName(e.name, folder, stem, ext);
+            const size_t prefix = std::min<size_t>(3, stem.size());
+            std::printf("%s: none; similar:", e.name.c_str());
+            unsigned shown = 0;
+            for (const auto& t : textures)
+                if (t.folder == folder && t.stem.compare(0, prefix, stem, 0, prefix) == 0 && shown++ < 10)
+                    std::printf(" %s", t.stem.c_str());
+            std::printf(shown ? "\n" : " -\n");
+        }
+    std::printf("%u models, %u without textures\n", models, without);
+    return 0;
+}
+
 int cmdGeoSurvey(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool geo-survey <file.cat>...\n");
@@ -1062,6 +1118,8 @@ int main(int argc, char** argv) {
         return cmdGeoInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-survey") == 0)
         return cmdGeoSurvey(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-textures") == 0)
+        return cmdGeoTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
         return cmdGeoFaces(argc, argv);
     std::fprintf(stderr,
@@ -1078,6 +1136,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool table <file> [values per row] [offset]\n"
                  "  reluva-tool geo-info <file.geo> [out.obj]\n"
                  "  reluva-tool geo-survey <file.cat>...\n"
+                 "  reluva-tool geo-textures [-a] <file.cat>...\n"
                  "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;

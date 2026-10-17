@@ -8,6 +8,7 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 
 #include <cmath>
@@ -367,6 +368,24 @@ void testGeo() {
     CHECK(parseGeo(bad, m));
 }
 
+void testModelTextures() {
+    std::vector<TextureFile> tex;
+    for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
+        tex.push_back({name, "kln", {0, 0}});
+    tex.push_back({"kwb", "fed", {0, 0}}); // same name elsewhere: the model's own folder wins
+    auto names = [&](const char* model) {
+        std::string out;
+        for (const TextureFile* t : findModelTextures(model, tex))
+            out += (out.empty() ? "" : " ") + t->stem + (t->folder == "kln" ? "" : "@" + t->folder);
+        return out;
+    };
+    CHECK(names("geo/kln/k_bop.geo") == "k_bop_a k_bop_b k_bop_g"); // not k_bop2_a
+    CHECK(names("geo/kln/k_bop_l.geo") == "k_bop_a k_bop_b k_bop_g"); // falls back without _l
+    CHECK(names("geo/kln/kcs_l.geo") == "kcs_l");                     // its own texture first
+    CHECK(names("geo/kln/kcs_s.geo").empty());                         // outlines don't fall back
+    CHECK(names("geo/fed/kwb.geo") == "kwb@fed");
+}
+
 void testRasterizer() {
     Surface surf;
     surf.create(16, 16, PixelFormat::RGBA32);
@@ -429,6 +448,7 @@ int main() {
     testStringTable();
     testTexture();
     testGeo();
+    testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);
     if (failures)
