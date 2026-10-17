@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -874,9 +875,13 @@ int cmdGeoInfo(int argc, char** argv) {
         size_t faces = 0;
         for (const auto& face : m.faces)
             faces += face.part == pi;
-        std::printf("  part %zu (%u): %zu faces, %zu vertices, %zu edges, %zu normal lists; x %g..%g, y %g..%g, "
+        std::string lists;
+        for (const auto& list : part.normalLists)
+            lists += (lists.empty() ? "" : "+") + std::to_string(list.size());
+        std::printf("  part %zu (%u): %zu faces, %zu vertices, %zu edges, normal lists of %s; x %g..%g, y %g..%g, "
                     "z %g..%g\n",
-                    pi, part.unknown, faces, part.vertices.size(), part.edges.size(), part.normalLists.size(), double(lo[0]),
+                    pi, part.unknown, faces, part.vertices.size(), part.edges.size(),
+                    lists.empty() ? "none" : lists.c_str(), double(lo[0]),
                     double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
     }
     std::printf("centre %g, %g; radius %g\n", double(m.centreX), double(m.centreY), double(m.radius));
@@ -889,6 +894,39 @@ int cmdGeoInfo(int argc, char** argv) {
     for (const auto& [value, n] : seconds)
         std::printf(" %u x%u", value, n);
     std::printf("\n");
+
+    // Test: is the second value an index into the face's part's first normal
+    // list, giving the face's normal? Compare with the normal worked out from
+    // the corners (Newell's method), either way round.
+    unsigned same = 0, opposite = 0, other = 0, outOfRange = 0;
+    for (size_t i = 1; i < m.faces.size(); ++i) {
+        const auto& face = m.faces[i];
+        const auto& part = m.parts[face.part];
+        if (part.normalLists.empty() || face.groupB >= part.normalLists[0].size()) {
+            ++outOfRange;
+            continue;
+        }
+        double n[3] = {0, 0, 0};
+        for (size_t k = 0; k < face.corners.size(); ++k) {
+            const auto& a = part.vertices[face.corners[k].vertex];
+            const auto& b = part.vertices[face.corners[(k + 1) % face.corners.size()].vertex];
+            n[0] += double(a.y - b.y) * double(a.z + b.z);
+            n[1] += double(a.z - b.z) * double(a.x + b.x);
+            n[2] += double(a.x - b.x) * double(a.y + b.y);
+        }
+        const double len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
+        const auto& s = part.normalLists[0][face.groupB];
+        const double d = len > 0 ? (n[0] * s.x + n[1] * s.y + n[2] * s.z) / len : 0;
+        if (d > 0.99)
+            ++same;
+        else if (d < -0.99)
+            ++opposite;
+        else
+            ++other;
+    }
+    std::printf("second value as an index into the part's first normal list: %u match the face's normal, "
+                "%u the opposite, %u neither, %u out of range\n",
+                same, opposite, other, outOfRange);
     if (argc > 3) {
         if (!writeObj(m, argv[3])) {
             std::fprintf(stderr, "cannot write %s\n", argv[3]);
