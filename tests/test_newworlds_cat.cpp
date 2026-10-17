@@ -388,9 +388,9 @@ std::vector<uint8_t> tinyGmf() {
         b.push_back(0);
     for (uint32_t t : {0u, 1u, 1u, 0u})
         put32(b, t);
-    put32(b, 2); put32(b, 0x00a0b277); put32(b, 0xffffffffu); // lists
-    for (int cell = 0; cell < 2; ++cell) {                    // grid
-        put16(0); put16(50); put16(0); put32(b, 0);
+    put32(b, 3); put32(b, 0x00a1b277); put32(b, 0xffffffffu); put32(b, 0xffffffffu); // lists
+    for (uint32_t cell = 0; cell < 2; ++cell) {                                     // grid
+        put16(0); put16(50); put16(0); put32(b, cell * 2); // one object, then none
     }
     // The colour table: magenta, then one colour (B, G, R), then the end.
     const uint8_t palette[8] = {0xff, 0x00, 0xff, 0x00, 0xf9, 0xc6, 0x42, 0x00};
@@ -411,6 +411,8 @@ void testGmf() {
     CHECK(m.tiles[1].model == 7 && m.tiles[0].layers[0] == 2 && m.tiles[0].layers[1] == 11);
     CHECK(m.tiles[0].rotation == 2 && m.tiles[1].rotation == 3);
     CHECK(m.blocks[0][2] == 1 && m.cells[1].block == 0 && m.cells[1].value == 50);
+    CHECK(m.scenery.size() == 1 && m.scenery[0].bx == 0 && m.scenery[0].x == 7 && m.scenery[0].y == 7);
+    CHECK(m.scenery[0].type == 1 && m.scenery[0].turn == 4 && m.scenery[0].variant == 2 && m.scenery[0].extra == 50);
     CHECK(m.palette.size() == 2 && m.palette[1][0] == 0x42 && m.palette[1][1] == 0xc6 && m.palette[1][2] == 0xf9);
     auto bad = tinyGmf();
     bad[bad.size() - 1024 - 10] = 5; // the last cell uses block 5 of 1

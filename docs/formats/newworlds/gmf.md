@@ -51,12 +51,35 @@ The lists are stored column by column (cell (0, 1) starts at 47, cell (1, 0)
 at 1380). `kurt64`'s grid is a field of block 1 with scattered variants
 (blocks 2-5) and a patch of block 0, as a test map would be.
 
-The list entries' middle byte and bits 19-22 are evenly spread over all
-their values, and their low byte has a strongly patterned distribution, so
-they are packed fields of some kind; what they describe isn't known yet.
-They look like placed objects: in `f1`, bits 16-17 take 3 values (0, 1, 2:
-perhaps the planet's tree, rock and bush models), bits 19-23 are spread over
-16 values (perhaps a turn) and the low 16 bits look like a position.
+### Placed objects
+
+The lists are the objects placed on the map (trees, rocks and the like):
+each grid cell's list holds the objects in that block. Each entry is a u32:
+
+| Bits | Meaning |
+|---|---|
+| 0-3 | x within the block, on a 16 x 16 grid (1024 units a square), from the west |
+| 4-7 | y, from the south |
+| 8-13 | unknown; evenly spread over 0-63 (a finer position?) |
+| 14-15 | unknown variant: 1-3 for types 0 and 2, 0 or 3 for type 1 |
+| 16-18 | type |
+| 19-22 | evenly spread over 0-15: presumably a turn in sixteenths |
+| 23 | always set |
+
+The position was checked by continuity: trees grow in groves, and only this
+reading (x low, y high, in map orientation) carries the groves across block
+edges (correlation of neighbouring squares 0.21 across an edge, against
+0.01-0.03 for the other readings, 0.32 inside a block). Trees are planted on
+alternate squares, so they don't overlap (a tree is 2200 units across).
+Oddly, no object in any `icewrld` map has x < 8 and y >= 8: one quarter of
+every block is always empty, even in `kurt64`'s plain field, so those bits
+may mean something else.
+
+Types in `icewrld` (`f1`): 1 x25472 (trees, by their planting and size), 0
+x9411 (scattered evenly: probably `rock`), 2 x1083 (probably `bush`), 4 x3
+(probably `frn_spec`). Only the trees are sure. `tree_s` is a flat soft
+shadow, probably drawn under trees. The scenery textures' alpha layers are
+their outlines (transparency), not light maps.
 
 ## Tiles and ground models
 
@@ -131,7 +154,6 @@ textures.
 - How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
   entries' second value (50, 75, 100, ... in steps of 25, sometimes with
-  bits 12-15 set) and third (multiples of 4096); the list entries (probably
-  placed scenery: the planet archives hold `tree`, `rock`, `bush` and
-  `frn_spec` models); where units and buildings are placed.
+  bits 12-15 set) and third (multiples of 4096); the placed objects' bits
+  8-15 and the missing quarter; where units and buildings are placed.
 - The data after the records (most of the file).

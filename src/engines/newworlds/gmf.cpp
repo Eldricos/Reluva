@@ -37,8 +37,9 @@ std::string hex(size_t v) {
 
 // Layout: u16 counts of type-21, type-20 and type-19 records, u16 width and
 // height in blocks; the records (u16 type, u16 length, u16 0, body), all
-// type 21, then 20, then 19; u32 N and N u32 list entries (unknown meaning);
-// one 10-byte entry per grid cell; a 1024-byte colour table (u32 B, G, R, 0
+// type 21, then 20, then 19; u32 N and N u32 list entries (placed objects,
+// each cell's list ended by ffffffff); one 10-byte entry per grid cell (u16
+// block, u16 ?, u16 ?, u32 where its list starts); a 1024-byte colour table (u32 B, G, R, 0
 // per terrain code, ending with a zero entry).
 Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
     out = GmfMap{};
@@ -85,13 +86,14 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
         }
     }
 
-    // The lists (skipped), then the grid.
+    // The lists of placed objects, then the grid.
     if (!r.has(p, 4))
         return Error::fail("map ends before its lists");
     const size_t lists = r.u32(p);
     p += 4;
     if (lists > data.size() / 4 || !r.has(p, lists * 4))
         return Error::fail("map's lists run past its end");
+    const size_t listStart = p;
     p += lists * 4;
     const size_t cellCount = size_t(out.width) * size_t(out.height);
     if (!r.has(p, cellCount * kCellEntrySize))
@@ -102,6 +104,23 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
             return Error::fail("grid cell " + std::to_string(i) + " uses block " + std::to_string(c.block) + " of " +
                                std::to_string(out.blocks.size()));
         out.cells.push_back(c);
+        // The cell's list of objects, ended by ffffffff.
+        size_t at = r.u32(p + 6);
+        if (at >= lists)
+            return Error::fail("grid cell " + std::to_string(i) + "'s list starts at " + std::to_string(at) + " of " +
+                               std::to_string(lists));
+        for (uint32_t e; at < lists && (e = r.u32(listStart + 4 * at)) != 0xffffffff; ++at) {
+            GmfMap::Scenery o;
+            o.bx = uint16_t(i % size_t(out.width));
+            o.by = uint16_t(i / size_t(out.width));
+            o.x = uint8_t(e & 15);
+            o.y = uint8_t(e >> 4 & 15);
+            o.extra = uint8_t(e >> 8 & 63);
+            o.variant = uint8_t(e >> 14 & 3);
+            o.type = uint8_t(e >> 16 & 7);
+            o.turn = uint8_t(e >> 19 & 15);
+            out.scenery.push_back(o);
+        }
     }
     for (size_t i = 0; i < kPaletteSize / 4 && r.has(p, 4); ++i, p += 4) {
         if (i > 0 && r.u32(p) == 0)

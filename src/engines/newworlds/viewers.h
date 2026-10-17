@@ -120,7 +120,7 @@ private:
 // models. See docs/formats/newworlds/gmf.md.
 //   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
 //   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines   K: walls
-//   T: textures on/off   G: colouring (the models' own textures; the map's
+//   O: placed objects (trees, rocks) on/off   T: textures on/off   G: colouring (the models' own textures; the map's
 //   terrain codes in its colour table)
 class MapViewer {
 public:
@@ -148,11 +148,21 @@ private:
         float z[4][5] = {};
     };
 
+    // A placed object, ready to draw.
+    struct Placed {
+        Vec3 position;
+        float angle; // anticlockwise, in radians
+        const TileModel* model;
+    };
+
     void show(int index);
     void resetView();
     void render();
     void updateTitle();
+    void loadModel(size_t entry, TileModel& m); // an entry of the map's archive
     const TileModel& tileModel(uint32_t index);
+    float groundHeight(float x, float y);
+    void placeScenery();
     const TileEdges& tileEdges(uint32_t tile);
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
@@ -172,14 +182,16 @@ private:
     std::map<uint32_t, TileModel> tileModels_;
     std::map<uint32_t, TileEdges> tileEdges_;
     Texture wallTexture_; // the map archive's last cliff texture, if any
+    std::map<int, TileModel> sceneryModels_; // by object type
+    std::vector<Placed> placed_;
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
-    bool textured_ = true, outlines_ = false, walls_ = true;
+    bool textured_ = true, outlines_ = false, walls_ = true, scenery_ = true;
     int colouring_ = 0; // see kColouringNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
-    unsigned drawnTiles_ = 0, drawnFaces_ = 0;
+    unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
 };
 
 } // namespace reluva::newworlds

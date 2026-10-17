@@ -1077,6 +1077,15 @@ int cmdGmfInfo(int argc, char** argv) {
         reluva::newworlds::GmfMap map;
         const reluva::Error err = reluva::newworlds::parseGmf(d, map);
         std::printf("engine's reader: %s\n", err ? err.message.c_str() : "reads it");
+        if (!err) {
+            std::map<int, size_t> types;
+            for (const auto& o : map.scenery)
+                ++types[o.type];
+            std::printf("placed objects: %zu;", map.scenery.size());
+            for (const auto& [type, n] : types)
+                std::printf(" type %d x%zu", type, n);
+            std::printf("\n");
+        }
     }
 
     struct Record {

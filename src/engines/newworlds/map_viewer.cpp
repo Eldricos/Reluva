@@ -79,6 +79,7 @@ void MapViewer::show(int index) {
         status_ = err2.message;
     if (!status_.empty())
         map_ = GmfMap{};
+    placeScenery();
     resetView();
     updateTitle();
 }
@@ -101,21 +102,25 @@ const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     if (found != tileModels_.end())
         return found->second;
     TileModel& m = tileModels_[index];
-    if (index >= archiveModels_.size()) {
+    if (index >= archiveModels_.size())
         m.error = "model " + std::to_string(index) + " of " + std::to_string(archiveModels_.size());
-        return m;
-    }
+    else
+        loadModel(archiveModels_[index], m);
+    return m;
+}
+
+void MapViewer::loadModel(size_t entryIndex, TileModel& m) {
     CatArchive& cat = *archives_[maps_[size_t(current_)].archive];
-    const auto& entry = cat.entries()[archiveModels_[index]];
+    const auto& entry = cat.entries()[entryIndex];
     m.name = entry.name;
     std::vector<uint8_t> data;
     if (Error err = cat.read(entry, data)) {
         m.error = err.message;
-        return m;
+        return;
     }
     if (Error err = parseGeo(data, m.geo)) {
         m.error = err.message;
-        return m;
+        return;
     }
     for (const auto& face : m.geo.faces) {
         const auto& verts = m.geo.parts[face.part].vertices;
@@ -159,7 +164,75 @@ const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
         m.textures.push_back(std::move(tex));
         m.textureNames.push_back(t ? t->stem : "?");
     }
-    return m;
+}
+
+// The ground's height at a point: the highest face of the tile there.
+float MapViewer::groundHeight(float x, float y) {
+    const int tx = int(std::floor(x / kTileSize)), ty = int(std::floor(y / kTileSize));
+    const int t = tileAt(tx, ty);
+    if (t < 0)
+        return 0;
+    const GmfMap::Tile& tile = map_.tiles[size_t(t)];
+    const TileModel& m = tileModel(tile.model);
+    if (!m.error.empty())
+        return 0;
+    // Into the model's own frame: undo the tile's turn.
+    float lx = x - (float(tx) + 0.5f) * kTileSize, ly = y - (float(ty) + 0.5f) * kTileSize;
+    for (int k = 0; k < tile.rotation; ++k) {
+        const float t0 = lx;
+        lx = ly;
+        ly = -t0;
+    }
+    bool found = false;
+    float best = 0;
+    for (const auto& face : m.geo.faces) {
+        const auto& verts = m.geo.parts[face.part].vertices;
+        const auto& a = verts[face.corners[0].vertex];
+        for (size_t i = 1; i + 1 < face.corners.size(); ++i) {
+            const auto& b = verts[face.corners[i].vertex];
+            const auto& c = verts[face.corners[i + 1].vertex];
+            const float d = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
+            if (std::fabs(d) < 1e-3f)
+                continue;
+            const float u = ((lx - a.x) * (c.y - a.y) - (c.x - a.x) * (ly - a.y)) / d;
+            const float v = ((b.x - a.x) * (ly - a.y) - (lx - a.x) * (b.y - a.y)) / d;
+            if (u < -1e-4f || v < -1e-4f || u + v > 1 + 1e-4f)
+                continue;
+            const float z = a.z + u * (b.z - a.z) + v * (c.z - a.z);
+            if (!found || z > best)
+                best = z, found = true;
+        }
+    }
+    return best;
+}
+
+// The map's placed objects, each at the centre of its square on the block's
+// 16 x 16 grid (bits 8-13 of its entry, perhaps a finer position, aren't
+// used), on the ground. Which model a type is comes from icewrld, where the
+// sizes fit: trees are planted two squares apart, and the rest are small.
+void MapViewer::placeScenery() {
+    placed_.clear();
+    sceneryModels_.clear();
+    static constexpr std::pair<int, const char*> kModels[] = {{0, "rock"}, {1, "tree"}, {2, "bush"}, {4, "frn_spec"}};
+    CatArchive& cat = *archives_[maps_[size_t(current_)].archive];
+    for (const auto& [type, name] : kModels)
+        for (size_t entry : archiveModels_) {
+            const std::string& full = cat.entries()[entry].name;
+            std::string folder, stem, ext;
+            splitName(full, folder, stem, ext);
+            if (stem != name || full.find("/lod/") != std::string::npos)
+                continue;
+            loadModel(entry, sceneryModels_[type]);
+            break;
+        }
+    const float square = kBlockSize / 16;
+    for (const auto& o : map_.scenery) {
+        const auto found = sceneryModels_.find(o.type);
+        if (found == sceneryModels_.end() || !found->second.error.empty())
+            continue;
+        const float x = (float(o.bx * 16 + o.x) + 0.5f) * square, y = (float(o.by * 16 + o.y) + 0.5f) * square;
+        placed_.push_back({{x, y, groundHeight(x, y)}, float(o.turn) * kPi / 8, &found->second});
+    }
 }
 
 int MapViewer::tileAt(int tx, int ty) const {
@@ -273,6 +346,7 @@ void MapViewer::handleEvent(const Event& ev) {
     case 'g': colouring_ = (colouring_ + 1) % kColourings; break;
     case 'l': outlines_ = !outlines_; break;
     case 'k': walls_ = !walls_; break;
+    case 'o': scenery_ = !scenery_; break;
     case key::Right: show((current_ + 1) % n); return;
     case key::Left: show((current_ + n - 1) % n); return;
     default: return;
@@ -301,9 +375,12 @@ void MapViewer::updateTitle() {
     }
     title += "; " + std::to_string(map_.width) + " x " + std::to_string(map_.height) + " blocks, " +
              std::to_string(map_.tiles.size()) + " tiles, " + std::to_string(map_.blocks.size()) + " blocks; drew " +
-             std::to_string(drawnTiles_) + " tiles, " + std::to_string(drawnFaces_) + " faces)";
+             std::to_string(drawnTiles_) + " tiles, " + std::to_string(drawnObjects_) + " objects, " +
+             std::to_string(drawnFaces_) + " faces)";
     if (!walls_)
         title += " [no walls]";
+    if (!scenery_)
+        title += " [no objects]";
     if (!textured_)
         title += " [untextured]";
     else
@@ -332,7 +409,7 @@ void MapViewer::render() {
             row[3] = 255;
         }
     }
-    drawnTiles_ = drawnFaces_ = 0;
+    drawnTiles_ = drawnFaces_ = drawnObjects_ = 0;
     if (!status_.empty())
         return;
 
@@ -343,21 +420,93 @@ void MapViewer::render() {
     std::vector<ViewVertex> poly;
     std::vector<ScreenVertex> projected;
     std::vector<std::vector<ScreenVertex>> outlines;
+    // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
+    // about origin; ground is the tile it is, for terrain codes, or null.
+    auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground) {
+        for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
+            const auto& face = m.geo.faces[fi];
+            const auto& verts = m.geo.parts[face.part].vertices;
+            poly.clear();
+            for (const auto& corner : face.corners) {
+                const auto& v = verts[corner.vertex];
+                const float x = c * v.x - s * v.y, y = s * v.x + c * v.y;
+                // For terrain codes, (u, v) is the position across the
+                // tile, in map orientation.
+                const bool planar = ground && colouring_ == 1;
+                poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z},
+                                          planar ? (x + kTileSize / 2) / kTileSize : corner.u,
+                                          planar ? (y + kTileSize / 2) / kTileSize : corner.v));
+            }
+            poly = clipNear(poly, cam.nearZ);
+            if (poly.size() < 3)
+                continue;
+            projected.clear();
+            for (const auto& p : poly)
+                projected.push_back(cam.project(p));
+            float area = 0; // positive when clockwise on the screen: a front face
+            for (size_t i = 0; i < projected.size(); ++i) {
+                const auto& a = projected[i];
+                const auto& b = projected[(i + 1) % projected.size()];
+                area += a.x * b.y - b.x * a.y;
+            }
+            if (area <= 0)
+                continue;
+            ++drawnFaces_;
+            const auto& fn = m.faceNormals[fi];
+            const float nx = c * fn.x - s * fn.y, ny = s * fn.x + c * fn.y;
+            const float intensity =
+                0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{nx, ny, fn.z}), light));
+            const uint32_t textureIndex = face.corners.back().extra[4];
+            const Texture* tex = textured_ && textureIndex < m.textures.size() &&
+                                         !m.textures[textureIndex].rgba.empty()
+                                     ? &m.textures[textureIndex]
+                                     : nullptr;
+            const bool codes = textured_ && ground && colouring_ == 1;
+            auto shade = [&](float u, float v, uint8_t* out) {
+                static const uint8_t plain[3] = {170, 180, 195};
+                const uint8_t* col = plain;
+                if (codes) {
+                    const unsigned code =
+                        terrainCode(*ground, std::clamp(int(u * 8), 0, 7), std::clamp(int(v * 8), 0, 7));
+                    if (code && code < map_.palette.size())
+                        col = map_.palette[code].data();
+                } else if (const Texture* tt = tex) {
+                    int tx = int(std::floor(u * float(tt->width))) % tt->width;
+                    int ty = int(std::floor(v * float(tt->height))) % tt->height;
+                    tx += tx < 0 ? tt->width : 0;
+                    ty += ty < 0 ? tt->height : 0;
+                    const size_t texel = size_t(ty) * size_t(tt->width) + size_t(tx);
+                    col = &tt->rgba[texel * 4];
+                    if (col[3] == 0)
+                        return false;
+                    // On the planets the alpha layer is transparency (the
+                    // trees' and bushes' outlines): blend, and only mostly
+                    // opaque texels hide what's drawn later.
+                    if (!tt->alpha.empty() && tt->alpha[texel] < 255) {
+                        const float a = float(tt->alpha[texel]) / 255;
+                        for (int i = 0; i < 3; ++i)
+                            out[i] = uint8_t(std::min(255.0f, float(col[i]) * intensity * a + float(out[i]) * (1 - a)));
+                        return a >= 0.5f;
+                    }
+                }
+                for (int i = 0; i < 3; ++i)
+                    out[i] = uint8_t(std::min(255.0f, float(col[i]) * intensity));
+                out[3] = 255;
+                return true;
+            };
+            for (size_t i = 1; i + 1 < projected.size(); ++i)
+                raster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);
+            if (outlines_)
+                outlines.push_back(projected);
+        }
+    };
+
 
     for (int by = 0; by < map_.height; ++by)
         for (int bx = 0; bx < map_.width; ++bx) {
             const auto& block = map_.blocks[map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].block];
             for (int slot = 0; slot < 4; ++slot) {
                 const GmfMap::Tile& tile = map_.tiles[block[size_t(slot)]];
-                // Quarter turns anticlockwise about the tile's centre.
-                auto turn = [&](float x, float y) {
-                    for (int k = 0; k < tile.rotation; ++k) {
-                        const float t = x;
-                        x = -y;
-                        y = t;
-                    }
-                    return std::pair<float, float>(x, y);
-                };
                 const Vec origin{(float(bx * 2 + kSlotX[slot]) + 0.5f) * kTileSize,
                                  (float(by * 2 + kSlotY[slot]) + 0.5f) * kTileSize, 0};
                 // Skip tiles behind the camera or well off the screen.
@@ -374,73 +523,23 @@ void MapViewer::render() {
                 if (!m.error.empty())
                     continue;
                 ++drawnTiles_;
-                for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
-                    const auto& face = m.geo.faces[fi];
-                    const auto& verts = m.geo.parts[face.part].vertices;
-                    poly.clear();
-                    for (const auto& corner : face.corners) {
-                        const auto& v = verts[corner.vertex];
-                        const auto [x, y] = turn(v.x, v.y);
-                        // For terrain codes, (u, v) is the position across the
-                        // tile, in map orientation.
-                        const bool planar = colouring_ == 1;
-                        poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z},
-                                                  planar ? (x + kTileSize / 2) / kTileSize : corner.u,
-                                                  planar ? (y + kTileSize / 2) / kTileSize : corner.v));
-                    }
-                    poly = clipNear(poly, cam.nearZ);
-                    if (poly.size() < 3)
-                        continue;
-                    projected.clear();
-                    for (const auto& p : poly)
-                        projected.push_back(cam.project(p));
-                    float area = 0; // positive when clockwise on the screen: a front face
-                    for (size_t i = 0; i < projected.size(); ++i) {
-                        const auto& a = projected[i];
-                        const auto& b = projected[(i + 1) % projected.size()];
-                        area += a.x * b.y - b.x * a.y;
-                    }
-                    if (area <= 0)
-                        continue;
-                    ++drawnFaces_;
-                    const auto& fn = m.faceNormals[fi];
-                    const auto [nx, ny] = turn(fn.x, fn.y);
-                    const float intensity =
-                        0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{nx, ny, fn.z}), light));
-                    const uint32_t textureIndex = face.corners.back().extra[4];
-                    const Texture* tex = textured_ && textureIndex < m.textures.size() &&
-                                                 !m.textures[textureIndex].rgba.empty()
-                                             ? &m.textures[textureIndex]
-                                             : nullptr;
-                    const bool codes = textured_ && colouring_ == 1;
-                    auto shade = [&](float u, float v, uint8_t* out) {
-                        static const uint8_t plain[3] = {170, 180, 195};
-                        const uint8_t* col = plain;
-                        if (codes) {
-                            const unsigned code =
-                                terrainCode(tile, std::clamp(int(u * 8), 0, 7), std::clamp(int(v * 8), 0, 7));
-                            if (code && code < map_.palette.size())
-                                col = map_.palette[code].data();
-                        } else if (const Texture* tt = tex) {
-                            int tx = int(std::floor(u * float(tt->width))) % tt->width;
-                            int ty = int(std::floor(v * float(tt->height))) % tt->height;
-                            tx += tx < 0 ? tt->width : 0;
-                            ty += ty < 0 ? tt->height : 0;
-                            col = &tt->rgba[(size_t(ty) * size_t(tt->width) + size_t(tx)) * 4];
-                            if (col[3] == 0)
-                                return false;
-                        }
-                        for (int i = 0; i < 3; ++i)
-                            out[i] = uint8_t(std::min(255.0f, float(col[i]) * intensity));
-                        out[3] = 255;
-                        return true;
-                    };
-                    for (size_t i = 1; i + 1 < projected.size(); ++i)
-                        raster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);
-                    if (outlines_)
-                        outlines.push_back(projected);
-                }
+                static constexpr float kCos[4] = {1, 0, -1, 0}, kSin[4] = {0, 1, 0, -1};
+                drawModel(m, origin, kCos[tile.rotation], kSin[tile.rotation], &tile);
             }
+        }
+    // Placed objects big enough on the screen to see.
+    if (scenery_)
+        for (const Placed& o : placed_) {
+            const Vec at{o.position.x, o.position.y, o.position.z};
+            const ViewVertex c = cam.toView(at);
+            if (c.z < cam.nearZ)
+                continue;
+            const float r = std::max(o.model->geo.radius, 256.0f) * cam.focal / c.z;
+            const ScreenVertex sv = cam.project(c);
+            if (r < 1.5f || sv.x < -r || sv.x > float(w) + r || sv.y < -r || sv.y > float(h) + r)
+                continue;
+            ++drawnObjects_;
+            drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
         }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there
