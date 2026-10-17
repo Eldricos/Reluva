@@ -14,6 +14,7 @@
 //   reluva-tool tex-keys <file.cat>...             compare each colour key with the image corners
 //   reluva-tool chunks <file>                      try to read any file as a (u16 tag, u32 size) chunk tree
 //   reluva-tool words <file> [offset] [count]      show 4-byte values as hex, integer and float
+//   reluva-tool table <file> [per row] [offset]    show 4-byte values compactly, N per row
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
@@ -776,6 +777,37 @@ int cmdWords(int argc, char** argv) {
     return 0;
 }
 
+
+int cmdTable(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool table <file> [values per row] [offset]\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    const size_t perRow = argc > 3 ? std::max<size_t>(1, size_t(parseNumber(argv[3]))) : 8;
+    size_t off = argc > 4 ? size_t(parseNumber(argv[4])) : 0;
+    for (; off + 4 <= d.size(); off += perRow * 4) {
+        std::printf("%6zx:", off);
+        for (size_t i = 0; i < perRow && off + i * 4 + 4 <= d.size(); ++i) {
+            const uint32_t v = rd32(d, off + i * 4);
+            float f;
+            std::memcpy(&f, &v, 4);
+            const bool isFloat = (v & 0x7f800000) != 0 && (v & 0x7f800000) != 0x7f800000 && f > -1e7f && f < 1e7f &&
+                                 (f > 1e-6f || f < -1e-6f);
+            if (isFloat)
+                std::printf(" %10.4gf", double(f));
+            else
+                std::printf(" %11u", v);
+        }
+        std::printf("\n");
+    }
+    if (d.size() % 4)
+        std::printf("(%zu trailing bytes)\n", d.size() % 4);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -799,6 +831,8 @@ int main(int argc, char** argv) {
         return cmdChunks(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "words") == 0)
         return cmdWords(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "table") == 0)
+        return cmdTable(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -810,6 +844,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool tex-keys <file.cat>...\n"
                  "  reluva-tool chunks <file>\n"
                  "  reluva-tool words <file> [offset] [count]\n"
+                 "  reluva-tool table <file> [values per row] [offset]\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }
