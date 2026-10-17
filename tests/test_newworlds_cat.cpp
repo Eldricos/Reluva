@@ -286,15 +286,13 @@ void putF(std::vector<uint8_t>& b, float f) {
     put32(b, v);
 }
 
-// A one-triangle model laid out as in docs/formats/newworlds/geo.md.
-std::vector<uint8_t> triangleGeo() {
+// A two-sided triangle laid out as in docs/formats/newworlds/geo.md: face 0
+// in the file header, face 1 its back, one edge group (or none, as in
+// terrain tiles).
+std::vector<uint8_t> triangleGeo(bool withEdges = true) {
     const float pos[3][2] = {{0, 0}, {100, 0}, {0, 200}};
     const float uv[3][2] = {{0, 0}, {65536, 0}, {0, 65536}};
     std::vector<uint8_t> b;
-    put32(b, 0); // purpose unknown
-    put32(b, 2); // faces + 1
-    put32(b, 3); // texture vertices
-    put32(b, 0);
     auto corner = [&](uint32_t v) {
         put32(b, v);
         putF(b, uv[v][0]);
@@ -302,23 +300,29 @@ std::vector<uint8_t> triangleGeo() {
         for (int i = 0; i < 5; ++i)
             put32(b, 0);
     };
-    for (uint32_t v = 0; v < 3; ++v)
-        corner(v);
-    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, 0); // face header
+    put32(b, 0); put32(b, 2); put32(b, 3); put32(b, 0); // header = face 0: 2 faces, 3 corners
     corner(0); corner(1); corner(2);
-    put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // bounds header, no attachments
+    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, 0); // face 1, the back
+    corner(2); corner(1); corner(0);
+    put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // bounds, no attachments
     putF(b, 0); putF(b, 0); putF(b, 224);
-    put32(b, 1); put32(b, 0); put32(b, 0);             // unknown, as in fs_s.geo
+    put32(b, 1); put32(b, 0); put32(b, 0);
     put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // vertex block
     put32(b, 3);
     for (auto& p : pos) {
         putF(b, p[0]); putF(b, p[1]); putF(b, 0);
     }
-    put32(b, 1); put32(b, 1); putF(b, 0); putF(b, 0); putF(b, 1); // one normal
-    put32(b, 1); put32(b, 1); put32(b, 3); put32(b, 0);            // three edges
-    const uint32_t edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
-    for (auto& e : edges) {
-        put32(b, e[0]); put32(b, e[1]); put32(b, 0); put32(b, 1); put32(b, 0);
+    put32(b, 1); put32(b, 2);                           // two normals
+    putF(b, 0); putF(b, 0); putF(b, 1);
+    putF(b, 0); putF(b, 0); putF(b, -1);
+    if (withEdges) {
+        put32(b, 1); put32(b, 1); put32(b, 3);          // one group of three edges
+        const uint32_t edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
+        for (auto& e : edges) {
+            put32(b, 0); put32(b, e[0]); put32(b, e[1]); put32(b, 0); put32(b, 1);
+        }
+    } else {
+        put32(b, 0);
     }
     return b;
 }
@@ -332,13 +336,15 @@ void testGeo() {
         return;
     }
     CHECK(m.vertices.size() == 3 && m.vertices[2].y == 200.0f);
-    CHECK(m.faces.size() == 1 && m.faces[0].corners.size() == 3);
+    CHECK(m.faces.size() == 2 && m.faces[0].corners.size() == 3 && m.faces[1].corners[0].vertex == 2);
     CHECK(m.faces[0].corners[1].vertex == 1 && m.faces[0].corners[1].u == 1.0f);
     CHECK(m.edges.size() == 3 && m.edges[1].v1 == 2 && m.edges[1].faceB == 1);
-    CHECK(m.normalLists.size() == 1 && m.radius == 224.0f);
+    CHECK(m.normalLists.size() == 1 && m.normalLists[0].size() == 2 && m.radius == 224.0f);
+
+    CHECK(!parseGeo(triangleGeo(false), m) && m.edges.empty()); // terrain-style: no edges
 
     auto bad = triangleGeo();
-    bad[bad.size() - 20] = 7; // last edge now starts at vertex 7
+    bad[bad.size() - 16] = 7; // last edge now starts at vertex 7
     CHECK(parseGeo(bad, m));
 }
 

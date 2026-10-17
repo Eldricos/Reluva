@@ -22,12 +22,12 @@ struct GeoModel {
         float u, v;      // texture coordinates, 0..1
     };
     struct Face {
-        uint32_t groupA = 0, groupB = 0; // unknown header values
+        uint32_t groupA = 0, groupB = 0; // unknown header values (0 for face 0)
         std::vector<Corner> corners;
     };
     struct Edge {
         uint32_t v0, v1;
-        uint32_t faceA, faceB; // 1-based into faces; 0 = no face (outline)
+        uint32_t faceA, faceB; // the faces on either side (0-based)
     };
 
     float centreX = 0, centreY = 0, radius = 0;

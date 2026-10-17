@@ -11,7 +11,6 @@ namespace reluva::newworlds {
 
 namespace {
 
-constexpr size_t kTexVertexSize = 32;
 constexpr size_t kCornerSize = 32;
 constexpr float kUvScale = 1.0f / 65536.0f;
 constexpr uint32_t kMaxCount = 1u << 20;
@@ -49,27 +48,21 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
     const Reader r{data};
     if (!r.has(0, 16))
         return Error::fail("model too small");
-    const uint32_t faceCount = r.u32(4) ? r.u32(4) - 1 : 0; // the header counts one more than there are
-    const uint32_t texVertexCount = r.u32(8);
-    if (faceCount > kMaxCount || texVertexCount > kMaxCount)
-        return Error::fail("model header counts out of range");
-
-    // Texture vertices: u32 vertex, f32 u, f32 v, then 20 bytes not yet understood.
-    size_t p = 16;
-    if (!r.has(p, size_t(texVertexCount) * kTexVertexSize))
-        return Error::fail("model ends inside its texture vertices");
-    p += size_t(texVertexCount) * kTexVertexSize;
-
-    // Faces: u32, u32, u32 corner count, u32 0, then 32-byte corners laid out
-    // like texture vertices.
+    // The file starts with face 0: its header is the file header, whose
+    // second value is the face count. Every face is u32 ?, u32 ?, u32 corner
+    // count, u32 0, then 32-byte corners: u32 vertex, f32 u, f32 v, 20 bytes.
+    const uint32_t faceCount = r.u32(4);
+    if (faceCount == 0 || faceCount > kMaxCount)
+        return Error::fail("model header face count out of range");
+    size_t p = 0;
     for (uint32_t i = 0; i < faceCount; ++i) {
         if (!r.has(p, 16))
             return Error::fail("model ends inside face " + std::to_string(i));
         GeoModel::Face face;
-        face.groupA = r.u32(p);
-        face.groupB = r.u32(p + 4);
+        face.groupA = i ? r.u32(p) : 0;
+        face.groupB = i ? r.u32(p + 4) : 0;
         const uint32_t n = r.u32(p + 8);
-        if (n < 3 || n > 64 || r.u32(p + 12) != 0 || !r.has(p + 16, size_t(n) * kCornerSize))
+        if (n < 3 || n > 256 || r.u32(p + 12) != 0 || !r.has(p + 16, size_t(n) * kCornerSize))
             return Error::fail("face " + std::to_string(i) + " at " + hex(p) + " has a bad header");
         p += 16;
         for (uint32_t k = 0; k < n; ++k, p += kCornerSize)
@@ -77,8 +70,9 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         out.faces.push_back(std::move(face));
     }
 
-    // Bounds: u32 0, 1, 1, attachment count, then centre x, y and radius.
-    if (!r.has(p, 28) || r.u32(p) != 0 || r.u32(p + 4) != 1 || r.u32(p + 8) != 1)
+    // Bounds: u32 ?, u32 ?, u32 1, u32 attachment count, then centre x, y
+    // and radius.
+    if (!r.has(p, 28) || r.u32(p + 8) != 1)
         return Error::fail("no bounds block after the faces at " + hex(p));
     out.centreX = r.f32(p + 16);
     out.centreY = r.f32(p + 20);
@@ -118,15 +112,26 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         p += 8 + size_t(n) * 12;
     }
 
-    // Edges: u32 1, 1, count, 0, then count x (v0, v1, faceA, faceB, 0).
-    if (!r.has(p, 16) || r.u32(p) != 1 || r.u32(p + 4) != 1 || r.u32(p + 12) != 0)
-        return Error::fail("edge list not found at " + hex(p));
-    const uint32_t edgeCount = r.u32(p + 8);
-    p += 16;
-    if (edgeCount > kMaxCount || !r.has(p, size_t(edgeCount) * 20))
-        return Error::fail("model ends inside its edge list");
-    for (uint32_t i = 0; i < edgeCount; ++i, p += 20)
-        out.edges.push_back({r.u32(p), r.u32(p + 4), r.u32(p + 8), r.u32(p + 12)});
+    // Edges: u32 0 (none, as in terrain tiles) or u32 1, u32 group count,
+    // then per group u32 count and count x (u32 ?, v0, v1, faceA, faceB).
+    if (!r.has(p, 4) || r.u32(p) > 1)
+        return Error::fail("edge list flag not found at " + hex(p));
+    if (r.u32(p) == 1) {
+        if (!r.has(p, 8))
+            return Error::fail("model ends at its edge list");
+        const uint32_t groups = r.u32(p + 4);
+        p += 8;
+        for (uint32_t g = 0; g < groups; ++g) {
+            if (!r.has(p, 4))
+                return Error::fail("model ends at an edge group");
+            const uint32_t n = r.u32(p);
+            p += 4;
+            if (n > kMaxCount || !r.has(p, size_t(n) * 20))
+                return Error::fail("model ends inside an edge group");
+            for (uint32_t i = 0; i < n; ++i, p += 20)
+                out.edges.push_back({r.u32(p + 4), r.u32(p + 8), r.u32(p + 12), r.u32(p + 16)});
+        }
+    }
 
     // Consistency: every index in range, every edge's vertices on its faces.
     for (const auto& face : out.faces)
@@ -135,17 +140,15 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
                 return Error::fail("face corner uses vertex " + std::to_string(c.vertex) + " of " +
                                    std::to_string(out.vertices.size()));
     auto onFace = [&](uint32_t vertex, uint32_t face) {
-        if (face == 0)
-            return true;
-        for (const auto& c : out.faces[face - 1].corners)
+        for (const auto& c : out.faces[face].corners)
             if (c.vertex == vertex)
                 return true;
         return false;
     };
     for (size_t i = 0; i < out.edges.size(); ++i) {
         const auto& e = out.edges[i];
-        if (e.v0 >= out.vertices.size() || e.v1 >= out.vertices.size() || e.faceA > out.faces.size() ||
-            e.faceB > out.faces.size())
+        if (e.v0 >= out.vertices.size() || e.v1 >= out.vertices.size() || e.faceA >= out.faces.size() ||
+            e.faceB >= out.faces.size())
             return Error::fail("edge " + std::to_string(i) + " is out of range");
         if (!onFace(e.v0, e.faceA) || !onFace(e.v1, e.faceA) || !onFace(e.v0, e.faceB) || !onFace(e.v1, e.faceB))
             return Error::fail("edge " + std::to_string(i) + " doesn't lie on its faces");
