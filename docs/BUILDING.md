@@ -57,6 +57,17 @@ cmake --build build
 
 For debugging, use a separate folder: `cmake -S . -B build-debug -G Ninja -DCMAKE_BUILD_TYPE=Debug`.
 
+Run everything from the top `Reluva` folder; there's no need to `cd build`.
+Linux only runs programs from the current folder when the path is given, hence
+the `./build/` prefix. The same goes for the developer tool, for example with
+the game installed in `games/newworlds`:
+
+```sh
+git pull && cmake --build build                         # update and rebuild
+./build/reluva-tool cat-list games/newworlds/rommisc.cat
+./build/reluva-tool geo-survey games/newworlds/*.cat
+```
+
 At the end of the configure step, CMake prints a summary of SDL's features.
 `SDL_X11`, `SDL_WAYLAND` and at least one of `SDL_PIPEWIRE`, `SDL_PULSEAUDIO` or
 `SDL_ALSA` should say `ON`. If one says `OFF`, its `-dev` package is missing.
