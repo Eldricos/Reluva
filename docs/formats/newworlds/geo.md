@@ -24,14 +24,17 @@ All values little-endian; floats are IEEE 32-bit.
 faces          face count × face; face 0's header is the file header:
                  u32 ?        file header: 952 / 416 / 1072 / 328 (fs_s, rb_mid, kwb_s, terrain)
                               other faces: 0 so far
-                 u32 ?        file header: the face count; other faces: 0 or 1
+                 u32 ?        file header: the face count; other faces: up to
+                              49 seen (perhaps a material index)
                  u32 corners
-                 u32 0
+                 u32 0 or 1   flag, meaning unknown (1 on some faces of units
+                              such as phtart_l; the corners after it are normal)
                  corners × 32 bytes: u32 vertex, f32 u, f32 v (both × 65536), 20 bytes
 bounds         u32 ?, u32 ?, u32 1, u32 attachment count (2 in rb_mid, else 0)
                f32 centre x, f32 centre y, f32 radius
                u32 1, 0, u32 ? (1 in rb_mid, else 0)
-...            attachment data, layout unknown (116 bytes in rb_mid)
+...            attachment data, layout unknown (116 bytes in rb_mid). Its
+               length can be odd (fsb_b), so what follows is not 4-byte aligned
 vertices       u32 ?, 1, 1, 0, u32 count, count × (f32 x, y, z)
 normal lists   repeated while present: u32 1, u32 count, count × unit vector
 edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
@@ -39,7 +42,8 @@ edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
 ...            terrain tiles: u32 1, u32 64, then per cell of an 8 × 8 grid a
                count and that many face indices; then u32 8, 8, ?, bounds, and
                the faces again with another set of texture coordinates
-trailer        names ("main", "terminate", "muzzle_flash", "front_lock"),
+trailer        names ("main", "terminate", "muzzle_flash", "front_lock",
+               "pickup"),
                layout not studied
 ```
 
@@ -61,6 +65,10 @@ trailer        names ("main", "terminate", "muzzle_flash", "front_lock"),
 - **Edge groups**: `kwb_s` has two groups of 5 edges, one per piece
   (vertices 0–3 with faces 0–2, and 4–7 with faces 3–5). Only with two groups
   does it show that each record starts with the 0 rather than ending with it.
+- **Unaligned blocks**: in `fsb_b` (7 faces) the attachment data contains
+  the bytes `1c 00 0c 00` and ends at an odd offset; the vertex block's
+  `1, 1, 0` sits at 0x416 and its count of 8 at 0x422. The reader therefore
+  searches for the vertex block byte by byte.
 - **Radius** is the farthest vertex from the centre: 488.2 in `fs_s` is the
   distance to (−88.6, −480.1).
 

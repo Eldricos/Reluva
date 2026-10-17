@@ -23,6 +23,7 @@ struct GeoModel {
     };
     struct Face {
         uint32_t groupA = 0, groupB = 0; // unknown header values (0 for face 0)
+        uint32_t flag = 0;               // unknown, 0 or 1
         std::vector<Corner> corners;
     };
     struct Edge {

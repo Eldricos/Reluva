@@ -50,7 +50,8 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         return Error::fail("model too small");
     // The file starts with face 0: its header is the file header, whose
     // second value is the face count. Every face is u32 ?, u32 ?, u32 corner
-    // count, u32 0, then 32-byte corners: u32 vertex, f32 u, f32 v, 20 bytes.
+    // count, u32 flag (0 or 1), then 32-byte corners: u32 vertex, f32 u,
+    // f32 v, 20 bytes.
     const uint32_t faceCount = r.u32(4);
     if (faceCount == 0 || faceCount > kMaxCount)
         return Error::fail("model header face count out of range");
@@ -62,7 +63,8 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         face.groupA = i ? r.u32(p) : 0;
         face.groupB = i ? r.u32(p + 4) : 0;
         const uint32_t n = r.u32(p + 8);
-        if (n < 3 || n > 256 || r.u32(p + 12) != 0 || !r.has(p + 16, size_t(n) * kCornerSize))
+        face.flag = r.u32(p + 12);
+        if (n < 3 || n > 256 || face.flag > 1 || !r.has(p + 16, size_t(n) * kCornerSize))
             return Error::fail("face " + std::to_string(i) + " at " + hex(p) + " has a bad header (" +
                                std::to_string(r.u32(p)) + ", " + std::to_string(r.u32(p + 4)) + ", " +
                                std::to_string(n) + ", " + std::to_string(r.u32(p + 12)) + ")");
@@ -83,8 +85,9 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
 
     // Attachment data of unknown layout follows; find the vertex block, which
     // starts u32 size, 1, 1, 0, count and is followed by a list of unit normals.
+    // The attachment data can have an odd length, so search byte by byte.
     size_t vertexBlock = 0;
-    for (size_t q = p; r.has(q, 20); q += 4) {
+    for (size_t q = p; r.has(q, 20); ++q) {
         const uint32_t n = r.u32(q + 16);
         if (r.u32(q + 4) != 1 || r.u32(q + 8) != 1 || r.u32(q + 12) != 0 || n == 0 || n > kMaxCount)
             continue;

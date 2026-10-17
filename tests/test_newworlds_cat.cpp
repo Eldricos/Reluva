@@ -289,7 +289,7 @@ void putF(std::vector<uint8_t>& b, float f) {
 // A two-sided triangle laid out as in docs/formats/newworlds/geo.md: face 0
 // in the file header, face 1 its back, one edge group (or none, as in
 // terrain tiles).
-std::vector<uint8_t> triangleGeo(bool withEdges = true) {
+std::vector<uint8_t> triangleGeo(bool withEdges = true, bool oddAttachment = false) {
     const float pos[3][2] = {{0, 0}, {100, 0}, {0, 200}};
     const float uv[3][2] = {{0, 0}, {65536, 0}, {0, 65536}};
     std::vector<uint8_t> b;
@@ -302,11 +302,13 @@ std::vector<uint8_t> triangleGeo(bool withEdges = true) {
     };
     put32(b, 0); put32(b, 2); put32(b, 3); put32(b, 0); // header = face 0: 2 faces, 3 corners
     corner(0); corner(1); corner(2);
-    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, 0); // face 1, the back
+    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, oddAttachment ? 1 : 0); // face 1, the back
     corner(2); corner(1); corner(0);
     put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // bounds, no attachments
     putF(b, 0); putF(b, 0); putF(b, 224);
     put32(b, 1); put32(b, 0); put32(b, 0);
+    if (oddAttachment) // odd-length data puts the vertex block off 4-byte alignment
+        b.insert(b.end(), {0x1c, 0x00, 0x0c});
     put32(b, 0); put32(b, 1); put32(b, 1); put32(b, 0); // vertex block
     put32(b, 3);
     for (auto& p : pos) {
@@ -342,6 +344,9 @@ void testGeo() {
     CHECK(m.normalLists.size() == 1 && m.normalLists[0].size() == 2 && m.radius == 224.0f);
 
     CHECK(!parseGeo(triangleGeo(false), m) && m.edges.empty()); // terrain-style: no edges
+
+    err = parseGeo(triangleGeo(true, true), m);
+    CHECK(!err && m.faces[1].flag == 1 && m.vertices.size() == 3 && m.vertices[1].x == 100.0f);
 
     auto bad = triangleGeo();
     bad[bad.size() - 16] = 7; // last edge now starts at vertex 7
