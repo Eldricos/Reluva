@@ -13,7 +13,9 @@ namespace {
 constexpr int kFilterCount = 3;
 constexpr const char* kFilterNames[kFilterCount] = {"all", "multi-part", "failed"};
 constexpr const char* kOutlineNames[3] = {"solid", "solid + outlines", "outlines"};
-constexpr const char* kCullNames[3] = {"", "hiding clockwise faces", "hiding anticlockwise faces"};
+// Front faces are clockwise on screen (models store them clockwise), so by
+// default anticlockwise faces are the back faces and are hidden.
+constexpr const char* kFaceNames[3] = {"", "showing back faces", "showing back faces only"};
 
 constexpr float kPi = 3.14159265f;
 constexpr float kMaxPitch = 89.0f * kPi / 180.0f;
@@ -206,7 +208,7 @@ void ModelViewer::handleEvent(const Event& ev) {
     case key::Space: spin_ = !spin_; break;
     case 'u': uvCheck_ = !uvCheck_; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
-    case 'b': cull_ = (cull_ + 1) % 3; break;
+    case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'p':
         if (!model_.parts.empty())
             soloPart_ = soloPart_ + 1 >= int(model_.parts.size()) ? -1 : soloPart_ + 1;
@@ -260,8 +262,8 @@ void ModelViewer::updateTitle() {
     title += ")";
     if (outlines_)
         title += std::string(" [") + kOutlineNames[outlines_] + "]";
-    if (cull_)
-        title += std::string(" [") + kCullNames[cull_] + "]";
+    if (faces_)
+        title += std::string(" [") + kFaceNames[faces_] + "]";
     if (uvCheck_)
         title += " [UV check]";
     sys_.setWindowTitle(title);
@@ -340,7 +342,8 @@ void ModelViewer::render() {
             const auto& b = projected[(i + 1) % projected.size()];
             area += a.x * b.y - b.x * a.y;
         }
-        if ((cull_ == 1 && area > 0) || (cull_ == 2 && area < 0))
+        const bool front = area > 0;
+        if ((faces_ == 0 && !front) || (faces_ == 2 && front))
             continue;
 
         if (outlines_ != 2) {

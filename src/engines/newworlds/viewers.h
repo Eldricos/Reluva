@@ -67,7 +67,7 @@ private:
 //   Mouse drag or W/A/S/D: rotate   wheel or +/-: zoom   R: reset the view
 //   Space: spin   P: show one part at a time   U: texture-coordinate checks
 //   L: outlines (solid, solid + outlines, outlines only)
-//   B: hide back faces (off, clockwise, anticlockwise)   F: filter (all, multi-part)
+//   B: back faces (hidden, shown, only back faces)   F: filter (all, multi-part, failed)
 class ModelViewer {
 public:
     ModelViewer(System& sys, Surface& screen, const Archives& archives);
@@ -104,7 +104,7 @@ private:
     float yaw_ = 0, pitch_ = 0, zoom_ = 1;
     int soloPart_ = -1; // -1: all parts
     bool spin_ = false, uvCheck_ = false;
-    int outlines_ = 0, cull_ = 0;
+    int outlines_ = 0, faces_ = 0; // faces_: 0 front only, 1 both sides, 2 back only
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;

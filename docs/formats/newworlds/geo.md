@@ -68,6 +68,23 @@ after another; each edge record starts with its part's number, and its faces
 model coordinates: the two parts of `mn_s` (a flat outline: body and wings,
 then the tail) meet without any offset.
 
+## Winding and file names
+
+**Front faces are clockwise.** Drawn with x, y, z as a right-handed, z-up
+space, a face's corners run clockwise when seen from outside the model.
+Hiding faces that appear anticlockwise on screen leaves solid models such as
+`k_bop` whole, while hiding the clockwise ones empties them. That's the Direct3D
+convention. Whether the game's space is mirrored relative to this one (which
+would flip both the picture and the winding) isn't confirmed yet.
+
+**Name suffixes** (from looking at the models in the viewer):
+
+| Suffix | Meaning |
+|---|---|
+| `_l` | lower-detail version (e.g. `phtart_l`, `ptank_l`, `mb_l`) |
+| `_s` | flat outline at z ≈ 0, presumably the shadow (`fs_s`, `kwb_s`, `mn_s`) |
+| `_d`, `_a`, `_b`, `_ad`, `_r` | variants with small changes; meaning unknown (`_d` may be damaged) |
+
 ## Evidence
 
 - **Face 0 is in the file header.** In `concrete` the header's `2, 3` are 2
