@@ -55,7 +55,7 @@ Some models are built from separate pieces, each with its own part number
 Faces are grouped by part, though not in part order: `rms_d` goes 0, 6, 7, 5,
 8, 4, 3, 2, 1. Each part numbers its vertices from 0: part 1 of `mn_s` uses
 vertices 0–5, and part 0 uses vertices 0–10. In the corners of a part above 0,
-the last of the 20 trailing bytes holds the part number, except in the
+the last u32 of the 20 trailing bytes holds the part number, except in the
 face's last corner. The vertex block that follows the bounds holds part 0's
 vertices. Where the other parts' vertices are stored isn't known yet, so
 the reader keeps only part 0's vertices.
