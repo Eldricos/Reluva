@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/geo.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <string>
@@ -14,6 +15,7 @@ namespace {
 constexpr size_t kCornerSize = 32;
 constexpr float kUvScale = 1.0f / 65536.0f;
 constexpr uint32_t kMaxCount = 1u << 20;
+constexpr uint32_t kMaxParts = 256;
 
 struct Reader {
     const std::vector<uint8_t>& d;
@@ -50,8 +52,8 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         return Error::fail("model too small");
     // The file starts with face 0: its header is the file header, whose
     // second value is the face count. Every face is u32 ?, u32 ?, u32 corner
-    // count, u32 flag (0 or 1), then 32-byte corners: u32 vertex, f32 u,
-    // f32 v, 20 bytes.
+    // count, u32 part, then 32-byte corners: u32 vertex, f32 u, f32 v,
+    // 20 bytes. A face's first value is the previous face's part.
     const uint32_t faceCount = r.u32(4);
     if (faceCount == 0 || faceCount > kMaxCount)
         return Error::fail("model header face count out of range");
@@ -63,33 +65,37 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         face.groupA = i ? r.u32(p) : 0;
         face.groupB = i ? r.u32(p + 4) : 0;
         const uint32_t n = r.u32(p + 8);
-        face.flag = r.u32(p + 12);
-        if (n < 3 || n > 256 || face.flag > 1 || !r.has(p + 16, size_t(n) * kCornerSize))
+        face.part = r.u32(p + 12);
+        if (n < 3 || n > 256 || face.part >= kMaxParts || !r.has(p + 16, size_t(n) * kCornerSize))
             return Error::fail("face " + std::to_string(i) + " at " + hex(p) + " has a bad header (" +
                                std::to_string(r.u32(p)) + ", " + std::to_string(r.u32(p + 4)) + ", " +
                                std::to_string(n) + ", " + std::to_string(r.u32(p + 12)) + ")");
         p += 16;
         for (uint32_t k = 0; k < n; ++k, p += kCornerSize)
             face.corners.push_back({r.u32(p), r.f32(p + 4) * kUvScale, r.f32(p + 8) * kUvScale});
+        out.partCount = std::max(out.partCount, face.part + 1);
         out.faces.push_back(std::move(face));
     }
 
-    // Bounds: u32 ?, u32 ?, u32 1, u32 attachment count, then centre x, y
-    // and radius.
-    if (!r.has(p, 28) || r.u32(p + 8) != 1)
-        return Error::fail("no bounds block after the faces at " + hex(p));
+    // Bounds: u32 last face's part, u32 ?, u32 part count, u32 attachment
+    // count, then centre x, y and radius.
+    if (!r.has(p, 28) || r.u32(p) != out.faces.back().part || r.u32(p + 8) != out.partCount)
+        return Error::fail("no bounds block after the faces at " + hex(p) + " (" + std::to_string(r.u32(p)) +
+                           ", " + std::to_string(r.u32(p + 4)) + ", " + std::to_string(r.u32(p + 8)) + ", " +
+                           std::to_string(r.u32(p + 12)) + "; " + std::to_string(out.partCount) + " parts)");
     out.centreX = r.f32(p + 16);
     out.centreY = r.f32(p + 20);
     out.radius = r.f32(p + 24);
     p += 28;
 
     // Attachment data of unknown layout follows; find the vertex block, which
-    // starts u32 size, 1, 1, 0, count and is followed by a list of unit normals.
+    // starts u32 size, 1, part count, 0, count and is followed by a list of
+    // unit normals.
     // The attachment data can have an odd length, so search byte by byte.
     size_t vertexBlock = 0;
     for (size_t q = p; r.has(q, 20); ++q) {
         const uint32_t n = r.u32(q + 16);
-        if (r.u32(q + 4) != 1 || r.u32(q + 8) != 1 || r.u32(q + 12) != 0 || n == 0 || n > kMaxCount)
+        if (r.u32(q + 4) != 1 || r.u32(q + 8) != out.partCount || r.u32(q + 12) != 0 || n == 0 || n > kMaxCount)
             continue;
         const size_t after = q + 20 + size_t(n) * 12;
         if (r.has(after, 20) && r.u32(after) == 1 && r.u32(after + 4) > 0 && isUnit(r.vec3(after + 8))) {
@@ -139,9 +145,10 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
     }
 
     // Consistency: every index in range, every edge's vertices on its faces.
+    // Only part 0's faces use the vertices read above.
     for (const auto& face : out.faces)
         for (const auto& c : face.corners)
-            if (c.vertex >= out.vertices.size())
+            if (face.part == 0 && c.vertex >= out.vertices.size())
                 return Error::fail("face corner uses vertex " + std::to_string(c.vertex) + " of " +
                                    std::to_string(out.vertices.size()));
     auto onFace = [&](uint32_t vertex, uint32_t face) {

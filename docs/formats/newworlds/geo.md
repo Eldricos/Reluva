@@ -23,19 +23,20 @@ All values little-endian; floats are IEEE 32-bit.
 ```
 faces          face count × face; face 0's header is the file header:
                  u32 ?        file header: 952 / 416 / 1072 / 328 (fs_s, rb_mid, kwb_s, terrain)
-                              other faces: 0 so far
+                              other faces: the previous face's part
                  u32 ?        file header: the face count; other faces: up to
                               49 seen (perhaps a material index)
                  u32 corners
-                 u32 0 or 1   flag, meaning unknown (1 on some faces of units
-                              such as phtart_l; the corners after it are normal)
+                 u32 part     which part the face belongs to (see Parts)
                  corners × 32 bytes: u32 vertex, f32 u, f32 v (both × 65536), 20 bytes
-bounds         u32 ?, u32 ?, u32 1, u32 attachment count (2 in rb_mid, else 0)
+bounds         u32 last face's part, u32 ?, u32 part count,
+               u32 attachment count (2 in rb_mid, 4 in fcarb, 6 in rms_d)
                f32 centre x, f32 centre y, f32 radius
                u32 1, 0, u32 ? (1 in rb_mid, else 0)
 ...            attachment data, layout unknown (116 bytes in rb_mid). Its
                length can be odd (fsb_b), so what follows is not 4-byte aligned
-vertices       u32 ?, 1, 1, 0, u32 count, count × (f32 x, y, z)
+vertices       u32 size, 1, u32 part count, 0, u32 count, count × (f32 x, y, z)
+               (part 0's vertices; size reaches the end of the file in mn_s)
 normal lists   repeated while present: u32 1, u32 count, count × unit vector
 edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
                per group: u32 count, count × (u32 0, v0, v1, faceA, faceB)
@@ -46,6 +47,18 @@ trailer        names ("main", "terminate", "muzzle_flash", "front_lock",
                "pickup"),
                layout not studied
 ```
+
+## Parts
+
+Some models are built from separate pieces, each with its own part number
+(0, 1, …) in its faces' headers. `mn_s` has 2 parts, `fcarb` 3, `rms_d` 9.
+Faces are grouped by part, though not in part order: `rms_d` goes 0, 6, 7, 5,
+8, 4, 3, 2, 1. Each part numbers its vertices from 0: part 1 of `mn_s` uses
+vertices 0–5, and part 0 uses vertices 0–10. In the corners of a part above 0,
+the last of the 20 trailing bytes holds the part number, except in the
+face's last corner. The vertex block that follows the bounds holds part 0's
+vertices. Where the other parts' vertices are stored isn't known yet, so
+the reader keeps only part 0's vertices.
 
 ## Evidence
 
@@ -74,6 +87,8 @@ trailer        names ("main", "terminate", "muzzle_flash", "front_lock",
 
 ## Open questions
 
+- Where parts other than 0 keep their vertices, normals and edges; how
+  parts are positioned relative to each other (attachments?).
 - The file header's first value, face header values, and the 20 bytes after
   each corner's texture coordinates (sometimes a 1 in the last word).
 - Attachment data; the terrain grid's exact layout; the second texture set in

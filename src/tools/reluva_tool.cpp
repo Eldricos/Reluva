@@ -822,6 +822,8 @@ bool writeObj(const reluva::newworlds::GeoModel& m, const std::string& path) {
         f << "v " << v.x << ' ' << v.y << ' ' << v.z << '\n';
     size_t vt = 1;
     for (const auto& face : m.faces) {
+        if (face.part != 0) // other parts' vertices aren't decoded yet
+            continue;
         for (const auto& c : face.corners)
             f << "vt " << c.u << ' ' << 1.0f - c.v << '\n';
         f << 'f';
@@ -856,8 +858,8 @@ int cmdGeoInfo(int argc, char** argv) {
     size_t corners = 0;
     for (const auto& face : m.faces)
         corners += face.corners.size();
-    std::printf("%zu vertices, %zu faces (%zu corners), %zu edges, %zu normal lists\n", m.vertices.size(),
-                m.faces.size(), corners, m.edges.size(), m.normalLists.size());
+    std::printf("%u part(s); part 0: %zu vertices; %zu faces (%zu corners), %zu edges, %zu normal lists\n",
+                m.partCount, m.vertices.size(), m.faces.size(), corners, m.edges.size(), m.normalLists.size());
     std::printf("bounds x %g..%g, y %g..%g, z %g..%g; radius %g\n", double(lo[0]), double(hi[0]), double(lo[1]),
                 double(hi[1]), double(lo[2]), double(hi[2]), double(m.radius));
     if (argc > 3) {
