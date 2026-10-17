@@ -11,8 +11,8 @@
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
 //   reluva-tool stb-dump <file.stb>                print a string table
 //   reluva-tool tex-survey <file.cat>...           group every texture by header layout
-//   reluva-tool lbp-info <file> [out] [WxH]        show a texture's header; if it decodes,
-//                                                  write <out>_rgb.bmp and <out>_bgr.bmp
+//   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
+//                                                  write <out>.bmp and <out>_alpha.bmp
 
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
@@ -20,6 +20,7 @@
 
 #include <map>
 
+#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -458,127 +459,74 @@ bool writeBmp(const std::string& path, int w, int h, const uint8_t* palette, int
 
 int cmdLbpInfo(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: reluva-tool lbp-info <file> [output prefix] [WxH]\n");
+        std::fprintf(stderr, "usage: reluva-tool lbp-info <file> [output prefix]\n");
         return 2;
     }
     Bytes d;
     if (!readFile(argv[2], d))
         return 1;
-    // Hypothesis (docs/formats/newworlds/lbp.md): u32 format, u32 palette
-    // count, palette (4 bytes each), 12-byte image header, 8-bit pixels.
-    const uint32_t format = rd32(d, 0), paletteCount = rd32(d, 4);
-    std::printf("size %zu, u32@0 (format?) %u, u32@4 (palette count?) %u\n", d.size(), format, paletteCount);
-    const size_t paletteEnd = 8 + size_t(paletteCount) * 4;
-    if (paletteCount > 256 || paletteEnd + 12 > d.size()) {
-        std::printf("palette hypothesis doesn't fit; first bytes:\n");
+    reluva::newworlds::Texture tex;
+    if (reluva::Error err = reluva::newworlds::decodeTexture(d, tex)) {
+        std::printf("doesn't decode: %s\nfirst bytes:\n", err.message.c_str());
         hexdump(d, 0, 64);
         return 1;
     }
-    const uint32_t a = rd32(d, paletteEnd), b = rd32(d, paletteEnd + 4), c = rd32(d, paletteEnd + 8);
-    const size_t pixelBytes = d.size() - paletteEnd - 12;
-    std::printf("after palette at 0x%zx: u32 %u, u32 %u, u32 %u; %zu bytes follow\n", paletteEnd, a, b, c, pixelBytes);
-    hexdump(d, paletteEnd, 32);
-    std::printf("first palette entries:\n");
-    hexdump(d, 8, 32);
-
-    // Layout seen so far (docs/formats/newworlds/lbp.md): the 12 bytes are
-    // u32 0, u32 width, u32 height, and the data is two w*h 8-bit layers.
-    bool twoLayers = false;
-    if (b && c && size_t(b) * c * 2 == pixelBytes) {
-        twoLayers = true;
-        std::printf("=> header width %u x height %u; data is exactly 2 layers of %u x %u\n", b, c, b, c);
-    }
-
-    // The size can be stored in several ways; try each and keep the ones
-    // that account for exactly the pixel bytes.
-    struct Candidate {
-        std::string how;
-        size_t w, h;
+    const uint32_t paletteCount = rd32(d, 4);
+    const size_t header = 8 + size_t(paletteCount) * 4;
+    const size_t pixels = size_t(tex.width) * size_t(tex.height);
+    const size_t indices = header + (tex.colourKeyed ? 16 : 12);
+    auto colour = [&](unsigned i) { // palette entries are blue, green, red, 0
+        char buf[32];
+        const uint8_t* e = &d[8 + size_t(i) * 4];
+        std::snprintf(buf, sizeof buf, "#%02x%02x%02x", e[2], e[1], e[0]);
+        return std::string(buf);
     };
-    std::vector<Candidate> candidates;
-    auto consider = [&](const std::string& how, size_t cw, size_t ch) {
-        if (cw && ch && cw <= 4096 && ch <= 4096 && cw * ch == pixelBytes)
-            candidates.push_back({how, cw, ch});
-    };
-    const uint32_t fields[3] = {a, b, c};
-    const char* names[3] = {"a", "b", "c"};
-    for (int i = 0; i < 3; ++i)
-        for (int j = 0; j < 3; ++j)
-            if (i != j) {
-                consider(std::string(names[i]) + " x " + names[j], fields[i], fields[j]);
-                if (fields[i] < 16 && fields[j] < 16)
-                    consider(std::string("2^") + names[i] + " x 2^" + names[j], size_t(1) << fields[i],
-                             size_t(1) << fields[j]);
-            }
-    for (int i = 0; i < 3; ++i) // u16 halves of one field
-        consider(std::string(names[i]) + " as two u16", fields[i] & 0xffff, fields[i] >> 16);
-    if (format < 16 && pixelBytes % (size_t(1) << format) == 0)
-        consider("width 2^format, height from size", size_t(1) << format, pixelBytes >> format);
-    for (int i = 0; i < 3; ++i)
-        if (fields[i] && pixelBytes % fields[i] == 0)
-            consider(std::string("width ") + names[i] + ", height from size", fields[i], pixelBytes / fields[i]);
-    size_t side = 1;
-    while (side * side < pixelBytes)
-        side <<= 1;
-    if (side * side == pixelBytes)
-        consider("square (guess)", side, side);
-    else
-        consider("2:1 (guess)", side, side / 2);
 
-    std::printf("candidates (a=%u b=%u c=%u, %zu pixel bytes):\n", a, b, c, pixelBytes);
-    for (const Candidate& cand : candidates)
-        std::printf("  %-34s %zu x %zu\n", cand.how.c_str(), cand.w, cand.h);
-    if (candidates.empty() && !twoLayers) {
-        std::printf("=> no size interpretation fits; not decoding\n");
-        return 1;
+    std::printf("format %u, %d x %d, palette %u entries\n", tex.format, tex.width, tex.height, paletteCount);
+    if (tex.colourKeyed)
+        std::printf("colour key: index %u = %s\n", tex.keyIndex,
+                    tex.keyIndex < paletteCount ? colour(tex.keyIndex).c_str() : "(outside the palette)");
+    std::printf("header after the palette:\n");
+    hexdump(d, header, tex.colourKeyed ? 16 : 12);
+
+    unsigned hist[256] = {};
+    for (size_t i = 0; i < pixels; ++i)
+        ++hist[d[indices + i]];
+    std::vector<unsigned> order;
+    for (unsigned i = 0; i < 256; ++i)
+        if (hist[i])
+            order.push_back(i);
+    std::sort(order.begin(), order.end(), [&](unsigned x, unsigned y) { return hist[x] > hist[y]; });
+    std::printf("most used indices:\n");
+    for (size_t k = 0; k < order.size() && k < 6; ++k)
+        std::printf("  index %3u %s  %6u pixels%s\n", order[k], order[k] < paletteCount ? colour(order[k]).c_str() : "?",
+                    hist[order[k]], tex.colourKeyed && order[k] == tex.keyIndex ? "  <- key" : "");
+
+    std::printf("palette entries that look like key colours (magenta or bright green):\n ");
+    for (unsigned i = 0; i < paletteCount; ++i) {
+        const uint8_t* e = &d[8 + size_t(i) * 4];
+        const uint8_t r = e[2], g = e[1], b = e[0];
+        if ((r > 200 && b > 200 && g < 60) || (g > 150 && r < 40 && b < 40))
+            std::printf(" %u=%s(%u px)", i, colour(i).c_str(), hist[i]);
     }
-    if (candidates.empty())
-        candidates.push_back({"", b, c});
-    int w = int(candidates.front().w), h = int(candidates.front().h);
-    std::string how = candidates.front().how;
-    if (twoLayers) {
-        w = int(b);
-        h = int(c);
-        how = "header width and height, 2 layers";
-    }
-    if (argc > 4) { // explicit size, e.g. 128x64
-        int fw = 0, fh = 0;
-        twoLayers = false;
-        if (std::sscanf(argv[4], "%dx%d", &fw, &fh) != 2 || fw <= 0 || fh <= 0 || size_t(fw) * size_t(fh) != pixelBytes) {
-            std::fprintf(stderr, "size %s doesn't match %zu pixel bytes\n", argv[4], pixelBytes);
-            return 1;
-        }
-        w = fw;
-        h = fh;
-        how = "given on the command line";
-    }
-    std::printf("=> decoding as %d x %d (%s)\n", w, h, how.c_str());
+    std::printf("\n");
+
     if (argc > 3) {
         const std::string prefix = argv[3];
-        const uint8_t* pixels = d.data() + paletteEnd + 12;
-        bool ok = writeBmp(prefix + "_rgb.bmp", w, h, d.data() + 8, int(paletteCount), pixels, false) &&
-                  writeBmp(prefix + "_bgr.bmp", w, h, d.data() + 8, int(paletteCount), pixels, true);
-        if (twoLayers) {
-            uint8_t grey[256 * 4];
-            for (int i = 0; i < 256; ++i)
-                grey[i * 4] = grey[i * 4 + 1] = grey[i * 4 + 2] = uint8_t(i), grey[i * 4 + 3] = 0;
-            ok = ok && writeBmp(prefix + "_layer2.bmp", w, h, grey, 256, pixels + size_t(w) * size_t(h), false);
-            // How the second layer is used tells us whether it's alpha.
-            unsigned hist[256] = {};
-            for (size_t k = 0; k < size_t(w) * size_t(h); ++k)
-                ++hist[pixels[size_t(w) * size_t(h) + k]];
-            unsigned distinct = 0, zeros = hist[0], full = hist[255];
-            for (unsigned v : hist)
-                distinct += v != 0;
-            std::printf("layer 2: %u distinct values, %u pixels = 0, %u pixels = 255\n", distinct, zeros, full);
-        }
-        std::printf(ok ? "wrote %s_rgb.bmp, %s_bgr.bmp%s\n" : "failed writing %s_*.bmp\n", prefix.c_str(),
-                    prefix.c_str(), twoLayers ? (" and " + prefix + "_layer2.bmp").c_str() : "");
+        Bytes alpha(pixels);
+        for (size_t i = 0; i < pixels; ++i)
+            alpha[i] = tex.rgba[i * 4 + 3];
+        uint8_t grey[256 * 4];
+        for (int i = 0; i < 256; ++i)
+            grey[i * 4] = grey[i * 4 + 1] = grey[i * 4 + 2] = uint8_t(i), grey[i * 4 + 3] = 0;
+        const bool ok = writeBmp(prefix + ".bmp", tex.width, tex.height, d.data() + 8, int(paletteCount),
+                                 d.data() + indices, true) &&
+                        writeBmp(prefix + "_alpha.bmp", tex.width, tex.height, grey, 256, alpha.data(), false);
+        std::printf(ok ? "wrote %s.bmp and %s_alpha.bmp\n" : "failed writing %s.bmp\n", prefix.c_str(), prefix.c_str());
         return ok ? 0 : 1;
     }
     return 0;
 }
-
 
 // Decode every texture (tag 0x16) in the given archives and group them by
 // what their header holds, to find the layouts the decoder doesn't handle.
@@ -693,6 +641,6 @@ int main(int argc, char** argv) {
                  "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
                  "  reluva-tool stb-dump <file.stb>\n"
                  "  reluva-tool tex-survey <file.cat>...\n"
-                 "  reluva-tool lbp-info <file> [output prefix] [WxH]\n");
+                 "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }
