@@ -1055,8 +1055,10 @@ int cmdGeoTextures(int argc, char** argv) {
     return 0;
 }
 
-// Map (.gmf) layout as far as known: five u16 header values, then records of
-// u16 type, u16 length, u16 ?, and `length` bytes. See docs/formats/newworlds/gmf.md.
+// Map (.gmf) layout as far as known: u16 counts of type-21, type-20 and
+// type-19 records, u16 grid width and height; those records (u16 type, u16
+// length, u16 ?, then `length` bytes) in that order; then data of unknown
+// layout. See docs/formats/newworlds/gmf.md.
 int cmdGmfInfo(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool gmf-info <file.gmf> [record number]\n");
@@ -1066,10 +1068,10 @@ int cmdGmfInfo(int argc, char** argv) {
     if (!readFile(argv[2], d))
         return 1;
     const long want = argc > 3 ? std::strtol(argv[3], nullptr, 0) : -1;
-    std::printf("%zu bytes; header u16:", d.size());
-    for (size_t o = 0; o < 10; o += 2)
-        std::printf(" %u", rd16(d, o));
-    std::printf("\n");
+    const unsigned counts[3] = {rd16(d, 0), rd16(d, 2), rd16(d, 4)};
+    const uint16_t types[3] = {21, 20, 19};
+    std::printf("%zu bytes; %u type-21, %u type-20 and %u type-19 records; grid %u x %u\n", d.size(), counts[0],
+                counts[1], counts[2], rd16(d, 6), rd16(d, 8));
 
     struct Record {
         size_t offset;
@@ -1077,58 +1079,59 @@ int cmdGmfInfo(int argc, char** argv) {
     };
     std::vector<Record> records;
     size_t p = 10;
-    while (p + 6 <= d.size()) {
-        const Record r{p, rd16(d, p), rd16(d, p + 2), rd16(d, p + 4)};
-        if (p + 6 + r.length > d.size())
-            break;
-        records.push_back(r);
-        p += 6 + r.length;
-    }
-    std::printf("%zu records; the walk %s at 0x%zx\n", records.size(),
-                p == d.size() ? "ends exactly at the end of the file" : "stops", p);
-
-    std::map<uint16_t, unsigned> types, thirds;
-    std::map<uint16_t, unsigned> lengths;
-    for (const auto& r : records) {
-        ++types[r.type];
-        ++thirds[r.third];
-        ++lengths[r.length];
-    }
-    auto show = [](const char* what, const std::map<uint16_t, unsigned>& m) {
-        std::printf("%s (value x count):", what);
-        unsigned shown = 0;
-        for (const auto& [v, n] : m)
-            if (shown++ < 40)
-                std::printf(" %u x%u", v, n);
-        if (m.size() > 40)
-            std::printf(" ... (%zu values)", m.size());
+    for (int k = 0; k < 3; ++k) {
+        std::map<uint16_t, unsigned> lengths, thirds;
+        const size_t start = p;
+        for (unsigned i = 0; i < counts[k]; ++i) {
+            const Record r{p, rd16(d, p), rd16(d, p + 2), rd16(d, p + 4)};
+            if (p + 6 > d.size() || r.type != types[k] || p + 6 + r.length > d.size()) {
+                std::printf("type-%u record %u at 0x%zx doesn't fit (type %u, length %u):\n", types[k], i, p, r.type,
+                            r.length);
+                hexdump(d, p, 0x40);
+                return 1;
+            }
+            records.push_back(r);
+            ++lengths[r.length];
+            ++thirds[r.third];
+            p += 6 + r.length;
+        }
+        std::printf("type %u: 0x%zx..0x%zx; lengths", types[k], start, p);
+        for (const auto& [v, n] : lengths)
+            std::printf(" %u x%u", v, n);
+        std::printf("; third values");
+        for (const auto& [v, n] : thirds)
+            std::printf(" %u x%u", v, n);
         std::printf("\n");
-    };
-    show("types", types);
-    show("third values", thirds);
-    show("lengths", lengths);
-
-    // Runs of equal types, to show how the records are grouped.
-    std::printf("type runs:");
-    unsigned shownRuns = 0;
-    for (size_t i = 0; i < records.size();) {
-        size_t j = i;
-        while (j < records.size() && records[j].type == records[i].type)
-            ++j;
-        if (shownRuns++ < 30)
-            std::printf(" %u x%zu", records[i].type, j - i);
-        i = j;
     }
-    std::printf("\n");
+    std::printf("after the records: 0x%zx, %zu bytes (%.2f per grid cell)\n", p, d.size() - p,
+                double(d.size() - p) / std::max(1, rd16(d, 6) * rd16(d, 8)));
 
     if (want >= 0 && size_t(want) < records.size()) {
         const Record& r = records[size_t(want)];
         std::printf("record %ld at 0x%zx: type %u, length %u, third %u\n", want, r.offset, r.type, r.length, r.third);
         hexdump(d, r.offset, 6 + size_t(r.length));
-    } else if (p != d.size()) {
-        std::printf("bytes where the walk stops:\n");
-        hexdump(d, p, 0x80);
+        return 0;
     }
+    // A sample of each kind, and the start of what follows.
+    for (int k = 0; k < 3; ++k) {
+        size_t first = 0;
+        for (int j = 0; j < k; ++j)
+            first += counts[j];
+        if (counts[k] == 0)
+            continue;
+        const size_t pick = first + counts[k] / 2;
+        const Record& r = records[pick];
+        std::printf("record %zu (a type-%u one from the middle) at 0x%zx:\n", pick, r.type, r.offset);
+        hexdump(d, r.offset, std::min<size_t>(6 + size_t(r.length), 0x80));
+    }
+    if (counts[2] > 1) {
+        std::printf("first type-19 records, one per line:\n");
+        const size_t first = counts[0] + counts[1];
+        for (size_t i = first; i < first + std::min<size_t>(counts[2], 12); ++i)
+            hexdump(d, records[i].offset, 6 + size_t(records[i].length));
+    }
+    std::printf("after the records:\n");
+    hexdump(d, p, 0x100);
     return 0;
 }
 

@@ -11,16 +11,26 @@ archive also holds that planet's ground tiles (`geo/map/alp/alpin_01.geo`
 All values little-endian.
 
 ```
-0x00   u16 × 5    376, 376, 749, 64, 64 in coverd2 (a 64 × 64 grid?)
-0x0a   records:   u16 type, u16 length, u16 ? (0 so far), length bytes
+0x00   u16 count of type-21 records   376 in coverd2, 12 in kurt64
+0x02   u16 count of type-20 records   376, 12
+0x04   u16 count of type-19 records   749, 6
+0x06   u16 grid width, u16 height     64 x 64, 32 x 32
+0x0a   the records, in that order: u16 type, u16 length, u16 ? (0 so far),
+       then length bytes
+...    data of unknown layout up to the end of the file
 ```
 
-The first records of `coverd2` are all type `0x15`, length 152 (later 154,
-153). Their bodies start with four 7-byte items `00 00 00 k 00 80 00`
-(k = 0..3), then repeat the 6-byte item `02 ff ff ff ff ff`, probably empty
-cells along the map's edge; the first eight records are identical.
+| Type | Length | Notes |
+|---|---|---|
+| 21 | 148–155 | bodies of small items: `00 00 00 k 00 80 00`, and many `02 ff ff ff ff ff` (empty?) |
+| 20 | 338–362 | |
+| 19 | 22 | |
+
+The counts of types 21 and 20 are equal, so they probably describe the same
+things in two ways.
 
 ## Open questions
 
-- Everything: what the header values and records mean, how cells refer to
-  ground tiles and textures, and where units and buildings are placed.
+- What the records describe, how cells refer to ground tiles and textures,
+  and where units and buildings are placed.
+- The data after the records (most of the file).
