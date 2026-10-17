@@ -84,10 +84,22 @@ Known misses: `landpd_d`, which looks like `landpad` but doesn't share its
 name; textures also look misplaced on some models, such as `fpdt` and
 `fhf_p`.
 
+Buildings also use **shared textures** with names of their own:
+`fedbuild.cat` has `pad`, `door2`, `door3`, `pdoor`, `f_in2`..`f_in4`,
+`deckanim` and `webspark`, and `fss_a` numbers 6 textures while only `fss`
+and `fss_g` are named after it. No file lists which shared textures a model
+uses: their names appear in no other file (the `.mdl` files list docking
+points and states, `constructed` and `deconstructed`, but no textures), and
+the archive's order doesn't follow the models. So those numbers stay unknown
+for now and are drawn untextured.
+
 The viewer's rule, still to be checked on more models: a model uses the
 textures named exactly after it or after it plus `_` and a suffix, in name
 order, preferring its own folder (`kln`). A model without any, such as a `_l`
-version, uses those of its name without the suffix. A model without a match
+version, uses those of its name without the suffix, and a shortened name such
+as `landpd_d` those of the texture it abbreviates (`landpad`). The plain
+textures take the numbers from 0, and the `_g` light map the last one (as in
+`k_bop`); `_s` textures belong to the `_s` models. A model without a match
 at all, such as the `_s` outlines, is drawn untextured.
 
 In the other corners of a face, the same value holds the part number (0 in
@@ -124,7 +136,8 @@ would flip both the picture and the winding) isn't confirmed yet.
 | `_l` | lower-detail version (e.g. `phtart_l`, `ptank_l`, `mb_l`) |
 | `_s` | flat outline at z ≈ 0, presumably the shadow (`fs_s`, `kwb_s`, `mn_s`) |
 | `_p` | a separate piece of the main model: `fhf_p` looks like the inside of the `fhf` hangar's bay, seen when its doors open |
-| `_d`, `_a`, `_b`, `_ad`, `_r` | variants with small changes; meaning unknown (`_d` may be damaged) |
+| `_d` | probably *deconstructed*: buildings' `.mdl` files list the states `constructed` and `deconstructed` |
+| `_a`, `_b`, `_c`, `_r` | variants with small changes; `_ad`, `_bd` are their `_d` versions |
 
 ## Evidence
 

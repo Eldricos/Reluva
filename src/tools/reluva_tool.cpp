@@ -1019,18 +1019,19 @@ int cmdGeoTextures(int argc, char** argv) {
             if (!cat->read(e, data) && !nw::parseGeo(data, m))
                 for (const auto& face : m.faces)
                     needed = std::max(needed, face.corners.back().extra[4] + 1);
-            const auto found = nw::findModelTextures(e.name, textures);
-            const bool tooFew = found.size() < needed;
-            if (found.empty())
+            const auto slots = nw::findModelTextures(e.name, textures, needed);
+            const size_t found = size_t(std::count_if(slots.begin(), slots.end(), [](auto* t) { return t; }));
+            const bool tooFew = found < needed;
+            if (found == 0)
                 ++without;
             else if (tooFew)
                 ++short_;
             if (!all && !tooFew)
                 continue;
             std::printf("%s: needs %u, found", e.name.c_str(), needed);
-            for (const auto* t : found)
-                std::printf(" %s", t->stem.c_str());
-            if (found.empty())
+            for (const auto* t : slots)
+                std::printf(" %s", t ? t->stem.c_str() : "?");
+            if (slots.empty())
                 std::printf(" none");
             if (tooFew) {
                 // Textures in the same folder whose names start like the model's.

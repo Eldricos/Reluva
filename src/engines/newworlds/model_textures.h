@@ -30,9 +30,11 @@ void splitName(const std::string& name, std::string& folder, std::string& stem, 
 // Every full-size texture in the archives, sorted by stem.
 std::vector<TextureFile> listTextureFiles(const Archives& archives);
 
-// A model's textures, in the order its faces number them. See
+// A model's textures, in the order its faces number them; `needed` is how
+// many the faces number (the highest number + 1). Slots the rule can't fill
+// (shared textures with other names) are null. See
 // docs/formats/newworlds/geo.md#textures for the rule.
 std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
-                                                  const std::vector<TextureFile>& textures);
+                                                  const std::vector<TextureFile>& textures, size_t needed);
 
 } // namespace reluva::newworlds

@@ -165,15 +165,21 @@ void ModelViewer::show(int index) {
 void ModelViewer::loadTextures(const std::string& modelName) {
     modelTextures_.clear();
     modelTextureNames_.clear();
-    const std::vector<const TextureFile*> found = findModelTextures(modelName, textureFiles_);
+    size_t needed = 0; // the highest texture number + 1
+    for (const auto& face : model_.faces)
+        needed = std::max<size_t>(needed, face.corners.back().extra[4] + 1);
     std::vector<uint8_t> data;
-    for (const TextureFile* t : found) {
-        CatArchive& cat = *archives_[t->ref.archive];
+    for (const TextureFile* t : findModelTextures(modelName, textureFiles_, needed)) {
+        // Unknown or unreadable textures stay empty, keeping the numbering;
+        // their faces are drawn untextured.
         Texture tex;
-        if (cat.read(cat.entries()[t->ref.entry], data) || decodeTexture(data, tex))
-            tex = Texture{}; // keeps the face numbering; drawn untextured
+        if (t) {
+            CatArchive& cat = *archives_[t->ref.archive];
+            if (cat.read(cat.entries()[t->ref.entry], data) || decodeTexture(data, tex))
+                tex = Texture{};
+        }
         modelTextures_.push_back(std::move(tex));
-        modelTextureNames_.push_back(t->stem);
+        modelTextureNames_.push_back(t ? t->stem : "?");
     }
 }
 
@@ -282,7 +288,8 @@ void ModelViewer::updateTitle() {
              (model_.parts.size() == 1 ? " part" : " parts");
     if (soloPart_ >= 0)
         title += "; showing part " + std::to_string(soloPart_);
-    if (modelTextureNames_.empty()) {
+    if (std::all_of(modelTextureNames_.begin(), modelTextureNames_.end(),
+                    [](const std::string& n) { return n == "?"; })) {
         title += "; no textures found";
     } else {
         title += "; textures";

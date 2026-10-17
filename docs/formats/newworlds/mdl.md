@@ -46,6 +46,15 @@ Further name lists, each ending with `terminate`:
 
 Floats follow, likely positions for the points above.
 
+## Buildings
+
+`fss_a.mdl` (title "fedsciencestatmetamodel") has the same layout with other
+names: docking points `BAY_0`..`BAY_5`, each with a `BAY_n_LOCK`;
+`VEHICLE_DOCK` with `_CAPTURE`, `_LOCK`, `_ARRIVAL`, `_RELEASE` and
+`_DEPARTURE` points; a `PORTAL`; and the states `constructed` and
+`deconstructed` (so a `_d` model is probably the deconstructed version). The
+same point names appear in the trailer of `fss_a.geo`.
+
 ## Open questions
 
 - No texture name appears in `k_bop.mdl`; textures are found by the

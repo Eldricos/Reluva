@@ -373,17 +373,23 @@ void testModelTextures() {
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
         tex.push_back({name, "kln", {0, 0}});
     tex.push_back({"kwb", "fed", {0, 0}}); // same name elsewhere: the model's own folder wins
-    auto names = [&](const char* model) {
+    for (const char* name : {"fhf_g", "fpdt", "fpdt_s", "fvpy", "fvpy", "landpad"})
+        tex.push_back({name, "fed", {0, 0}});
+    auto names = [&](const char* model, size_t needed) {
         std::string out;
-        for (const TextureFile* t : findModelTextures(model, tex))
-            out += (out.empty() ? "" : " ") + t->stem + (t->folder == "kln" ? "" : "@" + t->folder);
+        for (const TextureFile* t : findModelTextures(model, tex, needed))
+            out += (out.empty() ? "" : " ") + (t ? t->stem + (t->folder == "kln" ? "" : "@" + t->folder) : "?");
         return out;
     };
-    CHECK(names("geo/kln/k_bop.geo") == "k_bop_a k_bop_b k_bop_g"); // not k_bop2_a
-    CHECK(names("geo/kln/k_bop_l.geo") == "k_bop_a k_bop_b k_bop_g"); // falls back without _l
-    CHECK(names("geo/kln/kcs_l.geo") == "kcs_l");                     // its own texture first
-    CHECK(names("geo/kln/kcs_s.geo").empty());                         // outlines don't fall back
-    CHECK(names("geo/fed/kwb.geo") == "kwb@fed");
+    CHECK(names("geo/kln/k_bop.geo", 3) == "k_bop_a k_bop_b k_bop_g"); // not k_bop2_a
+    CHECK(names("geo/kln/k_bop_l.geo", 3) == "k_bop_a k_bop_b k_bop_g"); // falls back without _l
+    CHECK(names("geo/kln/kcs_l.geo", 1) == "kcs_l");                     // its own texture first
+    CHECK(names("geo/kln/kcs_s.geo", 1) == "?");                          // outlines don't fall back
+    CHECK(names("geo/fed/kwb.geo", 1) == "kwb@fed");
+    CHECK(names("geo/fed/fhf.geo", 3) == "? ? fhf_g@fed");       // the light map is the last number
+    CHECK(names("geo/fed/fpdt.geo", 2) == "fpdt@fed ?");          // fpdt_s is the outline's
+    CHECK(names("geo/fed/fvpy_a.geo", 1) == "fvpy@fed");          // duplicates count once
+    CHECK(names("geo/fed/landpd_d.geo", 2) == "landpad@fed ?");   // a shortened name
 }
 
 void testRasterizer() {
