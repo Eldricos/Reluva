@@ -35,11 +35,16 @@ bounds         u32 last face's part, u32 ?, u32 part count,
                u32 1, 0, u32 ? (1 in rb_mid, else 0)
 ...            attachment data, layout unknown (116 bytes in rb_mid). Its
                length can be odd (fsb_b), so what follows is not 4-byte aligned
-vertices       u32 size, 1, u32 part count, 0, u32 count, count × (f32 x, y, z)
-               (part 0's vertices; size reaches the end of the file in mn_s)
-normal lists   repeated while present: u32 1, u32 count, count × unit vector
-edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
-               per group: u32 count, count × (u32 0, v0, v1, faceA, faceB)
+part data      u32 size (reaches the end of the file in mn_s), u32 1,
+               u32 part count, then per part, in part order:
+  (parts > 0)    u32 0        end of the previous part
+  vertices       u32 0, u32 count, count × (f32 x, y, z)
+  normal lists   repeated while present: u32 1, u32 count, count × unit vector
+  edges          u32 0 = none (terrain tiles), or u32 1, u32 group count, then
+                 per group: u32 count, count × (u32 part, v0, v1, faceA, faceB)
+...            after the last part (mn_s): u32 2, then records of a position
+               (a part 0 vertex), a vector (0, 0, −4096), u32 0, 3, 1, and an
+               index (0, 4, 6); then u32 3, 2, 8, 9, 0, 0, 2 before the names
 ...            terrain tiles: u32 1, u32 64, then per cell of an 8 × 8 grid a
                count and that many face indices; then u32 8, 8, ?, bounds, and
                the faces again with another set of texture coordinates
@@ -56,9 +61,11 @@ Faces are grouped by part, though not in part order: `rms_d` goes 0, 6, 7, 5,
 8, 4, 3, 2, 1. Each part numbers its vertices from 0: part 1 of `mn_s` uses
 vertices 0–5, and part 0 uses vertices 0–10. In the corners of a part above 0,
 the last u32 of the 20 trailing bytes holds the part number, except in the
-face's last corner. The vertex block that follows the bounds holds part 0's
-vertices. Where the other parts' vertices are stored isn't known yet, so
-the reader keeps only part 0's vertices.
+face's last corner. Each part has its own vertices, normal lists and edges, stored one part
+after another; each edge record starts with its part's number, and its faces
+(numbered across the whole model) belong to that part. Part vertices are in
+model coordinates: the two parts of `mn_s` (a flat outline: body and wings,
+then the tail) meet without any offset.
 
 ## Evidence
 
@@ -87,8 +94,8 @@ the reader keeps only part 0's vertices.
 
 ## Open questions
 
-- Where parts other than 0 keep their vertices, normals and edges; how
-  parts are positioned relative to each other (attachments?).
+- What parts are for (moving pieces? damage states?), and the data after
+  the last part.
 - The file header's first value, face header values, and the 20 bytes after
   each corner's texture coordinates (sometimes a 1 in the last word).
 - Attachment data; the terrain grid's exact layout; the second texture set in

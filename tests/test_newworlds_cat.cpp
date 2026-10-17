@@ -289,11 +289,12 @@ void putF(std::vector<uint8_t>& b, float f) {
 // A two-sided triangle laid out as in docs/formats/newworlds/geo.md: face 0
 // in the file header, face 1 its back, one edge group (or none, as in
 // terrain tiles).
-// Two triangles back to back. With twoParts the back is part 1, whose
-// vertices aren't stored where part 0's are (so it needs withEdges false).
+// Two triangles back to back. With twoParts the back is part 1, with its
+// own copy of the vertices.
 std::vector<uint8_t> triangleGeo(bool withEdges = true, bool oddAttachment = false, bool twoParts = false) {
     const float pos[3][2] = {{0, 0}, {100, 0}, {0, 200}};
     const float uv[3][2] = {{0, 0}, {65536, 0}, {0, 65536}};
+    const uint32_t parts = twoParts ? 2 : 1;
     std::vector<uint8_t> b;
     auto corner = [&](uint32_t v) {
         put32(b, v);
@@ -304,29 +305,33 @@ std::vector<uint8_t> triangleGeo(bool withEdges = true, bool oddAttachment = fal
     };
     put32(b, 0); put32(b, 2); put32(b, 3); put32(b, 0); // header = face 0: 2 faces, 3 corners
     corner(0); corner(1); corner(2);
-    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, twoParts ? 1 : 0); // face 1, the back
+    put32(b, 0); put32(b, 0); put32(b, 3); put32(b, parts - 1); // face 1, the back
     corner(2); corner(1); corner(0);
-    put32(b, twoParts ? 1 : 0); put32(b, 1); put32(b, twoParts ? 2 : 1); put32(b, 0); // bounds, no attachments
+    put32(b, parts - 1); put32(b, 1); put32(b, parts); put32(b, 0); // bounds, no attachments
     putF(b, 0); putF(b, 0); putF(b, 224);
     put32(b, 1); put32(b, 0); put32(b, 0);
-    if (oddAttachment) // odd-length data puts the vertex block off 4-byte alignment
+    if (oddAttachment) // odd-length data puts the part data off 4-byte alignment
         b.insert(b.end(), {0x1c, 0x00, 0x0c});
-    put32(b, 0); put32(b, 1); put32(b, twoParts ? 2 : 1); put32(b, 0); // vertex block
-    put32(b, 3);
-    for (auto& p : pos) {
-        putF(b, p[0]); putF(b, p[1]); putF(b, 0);
-    }
-    put32(b, 1); put32(b, 2);                           // two normals
-    putF(b, 0); putF(b, 0); putF(b, 1);
-    putF(b, 0); putF(b, 0); putF(b, -1);
-    if (withEdges) {
-        put32(b, 1); put32(b, 1); put32(b, 3);          // one group of three edges
-        const uint32_t edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
-        for (auto& e : edges) {
-            put32(b, 0); put32(b, e[0]); put32(b, e[1]); put32(b, 0); put32(b, 1);
+    put32(b, 0); put32(b, 1); put32(b, parts);          // part data
+    for (uint32_t part = 0; part < parts; ++part) {
+        if (part > 0)
+            put32(b, 0);                                // end of the previous part
+        put32(b, 0); put32(b, 3);
+        for (auto& p : pos) {
+            putF(b, p[0]); putF(b, p[1]); putF(b, 0);
         }
-    } else {
-        put32(b, 0);
+        put32(b, 1); put32(b, 2);                       // two normals
+        putF(b, 0); putF(b, 0); putF(b, 1);
+        putF(b, 0); putF(b, 0); putF(b, -1);
+        if (withEdges && !twoParts) {
+            put32(b, 1); put32(b, 1); put32(b, 3);      // one group of three edges
+            const uint32_t edges[3][2] = {{0, 1}, {1, 2}, {2, 0}};
+            for (auto& e : edges) {
+                put32(b, 0); put32(b, e[0]); put32(b, e[1]); put32(b, 0); put32(b, 1);
+            }
+        } else {
+            put32(b, 0);
+        }
     }
     return b;
 }
@@ -339,19 +344,20 @@ void testGeo() {
         std::fprintf(stderr, "  %s\n", err.message.c_str());
         return;
     }
-    CHECK(m.vertices.size() == 3 && m.vertices[2].y == 200.0f);
+    CHECK(m.parts.size() == 1 && m.parts[0].vertices.size() == 3 && m.parts[0].vertices[2].y == 200.0f);
     CHECK(m.faces.size() == 2 && m.faces[0].corners.size() == 3 && m.faces[1].corners[0].vertex == 2);
     CHECK(m.faces[0].corners[1].vertex == 1 && m.faces[0].corners[1].u == 1.0f);
-    CHECK(m.edges.size() == 3 && m.edges[1].v1 == 2 && m.edges[1].faceB == 1);
-    CHECK(m.normalLists.size() == 1 && m.normalLists[0].size() == 2 && m.radius == 224.0f);
+    const auto& part = m.parts[0];
+    CHECK(part.edges.size() == 3 && part.edges[1].v1 == 2 && part.edges[1].faceB == 1);
+    CHECK(part.normalLists.size() == 1 && part.normalLists[0].size() == 2 && m.radius == 224.0f);
 
-    CHECK(!parseGeo(triangleGeo(false), m) && m.edges.empty()); // terrain-style: no edges
+    CHECK(!parseGeo(triangleGeo(false), m) && m.parts[0].edges.empty()); // terrain-style: no edges
 
     err = parseGeo(triangleGeo(true, true), m);
-    CHECK(!err && m.vertices.size() == 3 && m.vertices[1].x == 100.0f);
+    CHECK(!err && m.parts[0].vertices.size() == 3 && m.parts[0].vertices[1].x == 100.0f);
 
     err = parseGeo(triangleGeo(false, false, true), m);
-    CHECK(!err && m.partCount == 2 && m.faces[1].part == 1 && m.vertices.size() == 3);
+    CHECK(!err && m.parts.size() == 2 && m.faces[1].part == 1 && m.parts[1].vertices.size() == 3);
 
     auto bad = triangleGeo();
     bad[bad.size() - 16] = 7; // last edge now starts at vertex 7

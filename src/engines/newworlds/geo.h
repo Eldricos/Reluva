@@ -18,27 +18,28 @@ struct GeoModel {
         float x, y, z;
     };
     struct Corner {
-        uint32_t vertex; // index into vertices
+        uint32_t vertex; // index into the face's part's vertices
         float u, v;      // texture coordinates, 0..1
     };
     struct Face {
         uint32_t groupA = 0, groupB = 0; // header values: the previous face's part, and unknown
-        uint32_t part = 0;               // which part (separately numbered piece) the face belongs to
+        uint32_t part = 0;               // which part the face belongs to
         std::vector<Corner> corners;
     };
     struct Edge {
-        uint32_t v0, v1;
-        uint32_t faceA, faceB; // the faces on either side (0-based)
+        uint32_t v0, v1;       // the part's vertices
+        uint32_t faceA, faceB; // the faces on either side (0-based, model-wide)
+    };
+    // A separately numbered piece of the model (most models have one).
+    struct Part {
+        std::vector<Vec3> vertices;
+        std::vector<std::vector<Vec3>> normalLists;
+        std::vector<Edge> edges;
     };
 
-    uint32_t partCount = 1;
     float centreX = 0, centreY = 0, radius = 0;
-    // Part 0's vertices, normals and edges. Each part numbers its vertices from
-    // 0; where the other parts' vertices are stored isn't known yet.
-    std::vector<Vec3> vertices;
-    std::vector<std::vector<Vec3>> normalLists;
     std::vector<Face> faces;
-    std::vector<Edge> edges;
+    std::vector<Part> parts;
 };
 
 Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out);

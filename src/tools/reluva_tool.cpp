@@ -818,18 +818,28 @@ int cmdTable(int argc, char** argv) {
 bool writeObj(const reluva::newworlds::GeoModel& m, const std::string& path) {
     std::ofstream f(path);
     f << "# exported by reluva-tool geo-info\n";
-    for (const auto& v : m.vertices)
-        f << "v " << v.x << ' ' << v.y << ' ' << v.z << '\n';
+    // OBJ numbers vertices across the whole file, so offset each part's.
+    std::vector<size_t> base;
+    size_t next = 1;
+    for (const auto& part : m.parts) {
+        base.push_back(next);
+        next += part.vertices.size();
+        for (const auto& v : part.vertices)
+            f << "v " << v.x << ' ' << v.y << ' ' << v.z << '\n';
+    }
     size_t vt = 1;
-    for (const auto& face : m.faces) {
-        if (face.part != 0) // other parts' vertices aren't decoded yet
-            continue;
-        for (const auto& c : face.corners)
-            f << "vt " << c.u << ' ' << 1.0f - c.v << '\n';
-        f << 'f';
-        for (const auto& c : face.corners)
-            f << ' ' << c.vertex + 1 << '/' << vt++;
-        f << '\n';
+    for (size_t pi = 0; pi < m.parts.size(); ++pi) {
+        f << "g part" << pi << '\n';
+        for (const auto& face : m.faces) {
+            if (face.part != pi)
+                continue;
+            for (const auto& c : face.corners)
+                f << "vt " << c.u << ' ' << 1.0f - c.v << '\n';
+            f << 'f';
+            for (const auto& c : face.corners)
+                f << ' ' << base[pi] + c.vertex << '/' << vt++;
+            f << '\n';
+        }
     }
     return bool(f);
 }
@@ -847,21 +857,28 @@ int cmdGeoInfo(int argc, char** argv) {
         std::printf("doesn't decode: %s\n", err.message.c_str());
         return 1;
     }
-    float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
-    for (const auto& v : m.vertices) {
-        const float c[3] = {v.x, v.y, v.z};
-        for (int i = 0; i < 3; ++i) {
-            lo[i] = std::min(lo[i], c[i]);
-            hi[i] = std::max(hi[i], c[i]);
-        }
-    }
     size_t corners = 0;
     for (const auto& face : m.faces)
         corners += face.corners.size();
-    std::printf("%u part(s); part 0: %zu vertices; %zu faces (%zu corners), %zu edges, %zu normal lists\n",
-                m.partCount, m.vertices.size(), m.faces.size(), corners, m.edges.size(), m.normalLists.size());
-    std::printf("bounds x %g..%g, y %g..%g, z %g..%g; radius %g\n", double(lo[0]), double(hi[0]), double(lo[1]),
-                double(hi[1]), double(lo[2]), double(hi[2]), double(m.radius));
+    std::printf("%zu faces (%zu corners), %zu part(s)\n", m.faces.size(), corners, m.parts.size());
+    for (size_t pi = 0; pi < m.parts.size(); ++pi) {
+        const auto& part = m.parts[pi];
+        float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
+        for (const auto& v : part.vertices) {
+            const float c[3] = {v.x, v.y, v.z};
+            for (int i = 0; i < 3; ++i) {
+                lo[i] = std::min(lo[i], c[i]);
+                hi[i] = std::max(hi[i], c[i]);
+            }
+        }
+        size_t faces = 0;
+        for (const auto& face : m.faces)
+            faces += face.part == pi;
+        std::printf("  part %zu: %zu faces, %zu vertices, %zu edges, %zu normal lists; x %g..%g, y %g..%g, z %g..%g\n",
+                    pi, faces, part.vertices.size(), part.edges.size(), part.normalLists.size(), double(lo[0]),
+                    double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
+    }
+    std::printf("centre %g, %g; radius %g\n", double(m.centreX), double(m.centreY), double(m.radius));
     if (argc > 3) {
         if (!writeObj(m, argv[3])) {
             std::fprintf(stderr, "cannot write %s\n", argv[3]);
