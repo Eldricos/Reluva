@@ -15,8 +15,8 @@ src/backends/sdl3/ the only code that touches SDL (window, rendering, input, aud
 src/launcher/      Dear ImGui game list: add / remove / start games
 src/engines/       one directory per engine, plus registry.cpp listing them
   testbed/         built-in test "game" that exercises the backend
-  newworlds/       Star Trek: New Worlds: archive, string table and texture
-                   readers; currently runs as a texture viewer
+  newworlds/       Star Trek: New Worlds: archive, string table, texture and
+                   model readers; currently runs as a model and texture viewer
 src/tools/         reluva-tool, utilities for studying game data
 tests/             unit tests for common/
 ```
@@ -46,6 +46,12 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 - `reluva-tool` has developer tools for studying game data: `hexdump`,
   `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
+- New Worlds currently opens as a data viewer. **Tab** switches between models
+  and textures, **Left/Right** step through them and **F** cycles filters. For
+  models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
+  **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
+  for outlines, **U** for texture-coordinate checks, **B** to hide back faces
+  and **R** to reset the view.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
 (`~/.local/share/reluva/reluva/` on Linux, `%APPDATA%\reluva\reluva\` on Windows).

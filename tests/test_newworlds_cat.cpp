@@ -8,7 +8,9 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/rasterizer.h"
 
+#include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <filesystem>
@@ -365,6 +367,46 @@ void testGeo() {
     CHECK(parseGeo(bad, m));
 }
 
+void testRasterizer() {
+    Surface surf;
+    surf.create(16, 16, PixelFormat::RGBA32);
+    Rasterizer r;
+    r.begin(surf);
+    // Two triangles making the square 2..12; every pixel inside is drawn once.
+    std::vector<int> hits(16 * 16, 0);
+    auto count = [&](float, float, uint8_t* px) { ++hits[size_t(px - surf.pixels.data()) / 4]; };
+    const ScreenVertex a{2, 2, 1, 0, 0}, b{12, 2, 1, 1, 0}, c{12, 12, 1, 1, 1}, d{2, 12, 1, 0, 1};
+    r.drawTriangle(a, b, c, count);
+    r.begin(surf); // fresh depth so the second triangle isn't hidden by equal depth
+    r.drawTriangle(a, c, d, count);
+    bool exact = true;
+    for (int y = 0; y < 16; ++y)
+        for (int x = 0; x < 16; ++x)
+            exact &= hits[size_t(y * 16 + x)] == ((x >= 2 && x < 12 && y >= 2 && y < 12) ? 1 : 0);
+    CHECK(exact);
+
+    // The nearer triangle wins whichever is drawn first; u/v interpolate.
+    for (int order = 0; order < 2; ++order) {
+        r.begin(surf);
+        const ScreenVertex n0{0, 0, 1.0f, 0, 0}, n1{16, 0, 1.0f, 1, 0}, n2{0, 16, 1.0f, 0, 1};
+        const ScreenVertex f0{0, 0, 0.5f, 0, 0}, f1{16, 0, 0.5f, 0, 0}, f2{0, 16, 0.5f, 0, 0};
+        auto paint = [](uint8_t value) { return [value](float, float, uint8_t* px) { px[0] = value; }; };
+        if (order == 0) {
+            r.drawTriangle(n0, n1, n2, paint(1));
+            r.drawTriangle(f0, f1, f2, paint(2));
+        } else {
+            r.drawTriangle(f0, f1, f2, paint(2));
+            r.drawTriangle(n0, n1, n2, paint(1));
+        }
+        CHECK(surf.row(2)[2 * 4] == 1);
+    }
+    float seenU = -1;
+    r.begin(surf);
+    r.drawTriangle({0, 0, 1, 0, 0}, {16, 0, 1, 1, 0}, {0, 16, 1, 0, 0},
+                   [&](float u, float, uint8_t* px) { if (px == surf.row(0) + 8 * 4) seenU = u; });
+    CHECK(std::fabs(seenU - 8.5f / 16) < 1e-4f);
+}
+
 } // namespace
 
 int main() {
@@ -375,6 +417,7 @@ int main() {
     testStringTable();
     testTexture();
     testGeo();
+    testRasterizer();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);
