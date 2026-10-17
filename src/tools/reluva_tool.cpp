@@ -11,6 +11,7 @@
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
 //   reluva-tool stb-dump <file.stb>                print a string table
 //   reluva-tool tex-survey <file.cat>...           group every texture by header layout
+//   reluva-tool tex-keys <file.cat>...             compare each colour key with the image corners
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
@@ -616,6 +617,64 @@ int cmdTexSurvey(int argc, char** argv) {
     return 0;
 }
 
+
+// For every colour-keyed texture, compare the key index with the corner
+// pixels, which in sprites and interface images are nearly always background.
+int cmdTexKeys(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool tex-keys <file.cat>...\n");
+        return 2;
+    }
+    unsigned total = 0, keyIsCorner = 0, cornerLooksKey = 0;
+    std::vector<uint8_t> d;
+    std::printf("%-44s %3s %4s %-8s %6s  %-14s %s\n", "texture", "fmt", "key", "colour", "px", "corners", "corner colour");
+    for (int a = 2; a < argc; ++a) {
+        reluva::newworlds::CatArchive cat;
+        if (reluva::Error err = cat.open(argv[a])) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        for (const auto& e : cat.entries()) {
+            if (e.tag != reluva::newworlds::cattag::Texture || cat.read(e, d))
+                continue;
+            reluva::newworlds::Texture tex;
+            if (reluva::newworlds::decodeTexture(d, tex) || !tex.colourKeyed)
+                continue;
+            ++total;
+            const uint32_t pal = rd32(d, 4);
+            const size_t idx = 8 + size_t(pal) * 4 + 16;
+            const size_t w = size_t(tex.width), h = size_t(tex.height);
+            const uint8_t corners[4] = {d[idx], d[idx + w - 1], d[idx + (h - 1) * w], d[idx + h * w - 1]};
+            auto colour = [&](unsigned i) {
+                char buf[16];
+                if (i >= pal)
+                    return std::string("?");
+                const uint8_t* c = &d[8 + size_t(i) * 4];
+                std::snprintf(buf, sizeof buf, "#%02x%02x%02x", c[2], c[1], c[0]);
+                return std::string(buf);
+            };
+            unsigned keyPixels = 0;
+            for (size_t i = 0; i < w * h; ++i)
+                keyPixels += d[idx + i] == tex.keyIndex;
+            const bool allSame = corners[0] == corners[1] && corners[0] == corners[2] && corners[0] == corners[3];
+            const bool match = allSame && corners[0] == tex.keyIndex;
+            keyIsCorner += match;
+            const uint8_t* cc = corners[0] < pal ? &d[8 + size_t(corners[0]) * 4] : nullptr;
+            const bool looksKey = cc && ((cc[2] > 200 && cc[0] > 200 && cc[1] < 60) || (cc[1] > 150 && cc[2] < 40 && cc[0] < 40));
+            cornerLooksKey += looksKey;
+            char cornerText[24];
+            std::snprintf(cornerText, sizeof cornerText, "%u %u %u %u", corners[0], corners[1], corners[2], corners[3]);
+            std::string name = e.name.size() > 44 ? "..." + e.name.substr(e.name.size() - 41) : e.name;
+            std::printf("%-44s %3u %4u %-8s %6u  %-14s %s%s%s\n", name.c_str(), tex.format, tex.keyIndex,
+                        colour(tex.keyIndex).c_str(), keyPixels, cornerText, colour(corners[0]).c_str(),
+                        match ? "  key = corners" : "", looksKey ? "  (key-like colour)" : "");
+        }
+    }
+    std::printf("\n%u colour-keyed textures: key index = all four corners in %u; corner colour is magenta/green in %u\n",
+                total, keyIsCorner, cornerLooksKey);
+    return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -633,6 +692,8 @@ int main(int argc, char** argv) {
         return cmdLbpInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "tex-survey") == 0)
         return cmdTexSurvey(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "tex-keys") == 0)
+        return cmdTexKeys(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -641,6 +702,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
                  "  reluva-tool stb-dump <file.stb>\n"
                  "  reluva-tool tex-survey <file.cat>...\n"
+                 "  reluva-tool tex-keys <file.cat>...\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }
