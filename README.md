@@ -50,7 +50,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   and textures, **Left/Right** step through them and **F** cycles filters. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
-  for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **C** to
+  for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used
+  (ignored, glow, transparency), **C** to
   colour faces by texture number, **B** to show back faces
   and **R** to reset the view.
 

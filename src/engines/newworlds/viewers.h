@@ -64,7 +64,7 @@ private:
 // Shows every model with its textures. A model's textures are the ones named
 // after it (k_bop: k_bop_a, k_bop_b, k_bop_g), in name order; each face picks
 // one with the last value of its last corner. See docs/formats/newworlds/geo.md.
-//   T: textures on/off
+//   T: textures on/off   G: alpha layers (ignored, as glow, as transparency)
 //   Left/Right: previous/next   PageUp/PageDown: jump 10   Home/End: first/last
 //   Mouse drag or W/A/S/D: rotate   wheel or +/-: zoom   R: reset the view
 //   Space: spin   P: show one part at a time   U: texture-coordinate checks
@@ -117,6 +117,7 @@ private:
     int soloPart_ = -1; // -1: all parts
     bool spin_ = false, uvCheck_ = false, colourByTail_ = false, textured_ = true;
     int outlines_ = 0, faces_ = 0; // faces_: 0 front only, 1 both sides, 2 back only
+    int alphaMode_ = 0;            // see kAlphaNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;

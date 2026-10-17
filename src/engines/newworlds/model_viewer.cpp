@@ -12,6 +12,9 @@ namespace {
 
 constexpr int kFilterCount = 3;
 constexpr const char* kFilterNames[kFilterCount] = {"all", "multi-part", "failed"};
+// How a texture's alpha layer (format 6, e.g. k_bop_g) is used. It isn't
+// known yet; hulls shouldn't be see-through, so the default ignores it.
+constexpr const char* kAlphaNames[3] = {"alpha ignored", "alpha as glow", "alpha as transparency"};
 constexpr const char* kOutlineNames[3] = {"solid", "solid + outlines", "outlines"};
 // Front faces are clockwise on screen (models store them clockwise), so by
 // default anticlockwise faces are the back faces and are hidden.
@@ -277,6 +280,7 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'u': uvCheck_ = !uvCheck_; break;
     case 'c': colourByTail_ = !colourByTail_; break;
     case 't': textured_ = !textured_; break;
+    case 'g': alphaMode_ = (alphaMode_ + 1) % 3; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'p':
@@ -345,6 +349,8 @@ void ModelViewer::updateTitle() {
         title += std::string(" [") + kFaceNames[faces_] + "]";
     if (colourByTail_)
         title += " [colour: texture number]";
+    if (alphaMode_)
+        title += std::string(" [") + kAlphaNames[alphaMode_] + "]";
     if (uvCheck_)
         title += " [UV check]";
     sys_.setWindowTitle(title);
@@ -388,8 +394,8 @@ void ModelViewer::render() {
     std::vector<std::vector<ScreenVertex>> outlines;
     std::vector<ViewVertex> poly;
     std::vector<ScreenVertex> projected;
-    // Faces whose texture has an alpha layer are blended over the rest, so
-    // they're drawn in a second pass.
+    // With alpha as transparency, faces whose texture has an alpha layer are
+    // blended over the rest, so they're drawn in a second pass.
     for (int pass = 0; pass < 2; ++pass)
     for (const auto& face : model_.faces) {
         if (soloPart_ >= 0 && int(face.part) != soloPart_)
@@ -400,7 +406,8 @@ void ModelViewer::render() {
         if (textured_ && !colourByTail_ && textureIndex < modelTextures_.size() &&
             !modelTextures_[textureIndex].rgba.empty())
             tex = &modelTextures_[textureIndex];
-        const bool blended = tex && tex->format == 6;
+        const bool hasAlpha = tex && tex->format == 6;
+        const bool blended = hasAlpha && alphaMode_ == 2;
         if (blended != (pass == 1))
             continue;
         const auto& verts = model_.parts[face.part].vertices;
@@ -460,6 +467,8 @@ void ModelViewer::render() {
                     if (c[3] == 0)
                         return false; // colour key or fully transparent: nothing drawn
                     a = blended ? float(c[3]) / 255.0f : 1.0f;
+                    if (hasAlpha && alphaMode_ == 1) // glow: alpha keeps the texel lit
+                        k = std::max(k, float(c[3]) / 255.0f);
                 }
                 for (int i = 0; i < 3; ++i)
                     out[i] = uint8_t(std::min(255.0f, c[i] * k * a + float(out[i]) * (1 - a)));

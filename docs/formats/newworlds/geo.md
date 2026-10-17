@@ -87,6 +87,21 @@ at all, such as the `_s` outlines, is drawn untextured.
 In the other corners of a face, the same value holds the part number (0 in
 part 0), so it isn't a per-corner texture choice.
 
+Variants share textures: the `fedbuild.cat` models `frps_a`, `frps_b`,
+`frps_c` and their damaged versions `frps_ad`, `frps_bd`, `frps_cd` all use
+`lbp/txr/fed/frps` and `frps_g`.
+
+**`_g` textures** (`k_bop_g`, `frps_g`, `kcs_g`, …) have an alpha layer.
+Treated as transparency, it makes parts of hulls see-through, and more of
+the damaged versions, so it is probably something else, such as a glow or
+lighting map. The viewer's G key switches between ignoring it, glow and
+transparency. Not settled.
+
+**Ground tiles** (`concrete`, `alien14`, …) find no textures this way. The
+planet archives hold terrain textures such as `lbp/txr/map/alp/green01` and
+`cliff01` (in `alpwrld.cat`, next to the `.gmf` maps), so the maps
+presumably assign them.
+
 ## Winding and file names
 
 **Front faces are clockwise.** Drawn with x, y, z as a right-handed, z-up
