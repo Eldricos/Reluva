@@ -526,7 +526,7 @@ int cmdLbpInfo(int argc, char** argv) {
         const std::string prefix = argv[3];
         Bytes alpha(pixels);
         for (size_t i = 0; i < pixels; ++i)
-            alpha[i] = tex.rgba[i * 4 + 3];
+            alpha[i] = tex.alpha.empty() ? tex.rgba[i * 4 + 3] : tex.alpha[i];
         uint8_t grey[256 * 4];
         for (int i = 0; i < 256; ++i)
             grey[i * 4] = grey[i * 4 + 1] = grey[i * 4 + 2] = uint8_t(i), grey[i * 4 + 3] = 0;

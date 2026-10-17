@@ -159,7 +159,9 @@ void TextureViewer::drawTexture(const Texture& tex) {
         uint8_t* dst = screen_.row(y0 + y) + x0 * 4;
         for (int x = 0; x < w; ++x, dst += 4) {
             const uint8_t* src = &tex.rgba[(size_t(sy) * size_t(tex.width) + size_t(x * down / up)) * 4];
-            const int a = src[3];
+            // Colour key, then the alpha layer if there is one.
+            const size_t i = size_t(sy) * size_t(tex.width) + size_t(x * down / up);
+            const int a = src[3] && !tex.alpha.empty() ? tex.alpha[i] : src[3];
             for (int c = 0; c < 3; ++c)
                 dst[c] = uint8_t((src[c] * a + dst[c] * (255 - a)) / 255);
         }

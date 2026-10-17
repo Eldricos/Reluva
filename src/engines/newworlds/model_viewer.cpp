@@ -12,9 +12,9 @@ namespace {
 
 constexpr int kFilterCount = 3;
 constexpr const char* kFilterNames[kFilterCount] = {"all", "multi-part", "failed"};
-// How a texture's alpha layer (format 6, e.g. k_bop_g) is used. It isn't
-// known yet; hulls shouldn't be see-through, so the default ignores it.
-constexpr const char* kAlphaNames[3] = {"alpha ignored", "alpha as glow", "alpha as transparency"};
+// How a texture's alpha layer (format 6) is used. In k_bop_g it marks the
+// lights, so by default it's a glow map: alpha keeps texels lit.
+constexpr const char* kAlphaNames[3] = {"alpha as glow", "alpha ignored", "alpha as transparency"};
 constexpr const char* kOutlineNames[3] = {"solid", "solid + outlines", "outlines"};
 // Front faces are clockwise on screen (models store them clockwise), so by
 // default anticlockwise faces are the back faces and are hidden.
@@ -349,7 +349,7 @@ void ModelViewer::updateTitle() {
         title += std::string(" [") + kFaceNames[faces_] + "]";
     if (colourByTail_)
         title += " [colour: texture number]";
-    if (alphaMode_)
+    if (alphaMode_) // glow is the default
         title += std::string(" [") + kAlphaNames[alphaMode_] + "]";
     if (uvCheck_)
         title += " [UV check]";
@@ -406,7 +406,7 @@ void ModelViewer::render() {
         if (textured_ && !colourByTail_ && textureIndex < modelTextures_.size() &&
             !modelTextures_[textureIndex].rgba.empty())
             tex = &modelTextures_[textureIndex];
-        const bool hasAlpha = tex && tex->format == 6;
+        const bool hasAlpha = tex && !tex->alpha.empty();
         const bool blended = hasAlpha && alphaMode_ == 2;
         if (blended != (pass == 1))
             continue;
@@ -463,12 +463,16 @@ void ModelViewer::render() {
                     int ty = int(std::floor(v * float(tex->height))) % tex->height;
                     tx += tx < 0 ? tex->width : 0;
                     ty += ty < 0 ? tex->height : 0;
-                    c = &tex->rgba[(size_t(ty) * size_t(tex->width) + size_t(tx)) * 4];
+                    const size_t texel = size_t(ty) * size_t(tex->width) + size_t(tx);
+                    c = &tex->rgba[texel * 4];
                     if (c[3] == 0)
-                        return false; // colour key or fully transparent: nothing drawn
-                    a = blended ? float(c[3]) / 255.0f : 1.0f;
-                    if (hasAlpha && alphaMode_ == 1) // glow: alpha keeps the texel lit
-                        k = std::max(k, float(c[3]) / 255.0f);
+                        return false; // colour key: nothing drawn
+                    const float layer = hasAlpha ? float(tex->alpha[texel]) / 255.0f : 1.0f;
+                    a = blended ? layer : 1.0f;
+                    if (hasAlpha && alphaMode_ == 0) // glow: alpha keeps the texel lit
+                        k = std::max(k, layer);
+                    if (a <= 0)
+                        return false;
                 }
                 for (int i = 0; i < 3; ++i)
                     out[i] = uint8_t(std::min(255.0f, c[i] * k * a + float(out[i]) * (1 - a)));

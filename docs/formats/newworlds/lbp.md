@@ -18,7 +18,9 @@ u32 colour-key flag  0 = no key, 1 = a key index follows
 u32 width
 u32 height
 layer 1              width × height bytes: palette indices
-layer 2              format 6 only: width × height bytes of alpha (0 transparent, 255 opaque)
+layer 2              format 6 only: width × height bytes of alpha. In model
+                     textures such as k_bop_g it is a light map (255 where the
+                     lights are), not transparency
 ```
 
 ### Formats
@@ -51,8 +53,9 @@ width) for every group, e.g.
 | `res/kurtscou/kscout1l.lbp` | 12.012 | 5 | 64 | 60 |
 | `lbp/txr/solsys/tabras01.mp0` (format 6) | 2.016 | 254 | 256 | 256 |
 
-For format 6 with a key, the decoder makes keyed pixels transparent and uses
-the alpha layer for the rest.
+For format 6 with a key, keyed pixels are transparent; the decoder keeps the
+alpha layer separately (`Texture::alpha`), since in model textures it is a
+light map rather than transparency.
 
 **The key index is the transparent colour.** `reluva-tool tex-keys` over all 69
 colour-keyed textures in the retail archives:

@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/texture.h"
 
+#include <cstddef>
 #include <string>
 
 namespace reluva::newworlds {
@@ -67,6 +68,10 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
     out.width = int(w);
     out.height = int(h);
     out.rgba.resize(pixels * 4);
+    if (layers == 2)
+        out.alpha.assign(data.begin() + std::ptrdiff_t(alpha), data.begin() + std::ptrdiff_t(alpha + pixels));
+    else
+        out.alpha.clear();
     for (size_t i = 0; i < pixels; ++i) {
         const uint8_t index = data[indices + i];
         uint8_t* px = &out.rgba[i * 4];
@@ -78,9 +83,7 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
         } else {
             px[0] = px[1] = px[2] = 0;
         }
-        px[3] = layers == 2 ? data[alpha + i] : 255;
-        if (out.colourKeyed && index == out.keyIndex)
-            px[3] = 0;
+        px[3] = out.colourKeyed && index == out.keyIndex ? 0 : 255;
     }
     return Error::success();
 }

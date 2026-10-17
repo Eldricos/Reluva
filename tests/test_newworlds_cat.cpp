@@ -259,21 +259,21 @@ void testTexture() {
     Texture t;
     CHECK(!decodeTexture(textureBytes(4, 2), t));
     CHECK(t.width == 4 && t.height == 2 && t.rgba.size() == 32);
-    CHECK(t.rgba[0] == 0xf0 && t.rgba[1] == 0x20 && t.rgba[2] == 0x10 && t.rgba[3] == 0); // pixel 0
-    CHECK(t.rgba[4] == 0x00 && t.rgba[5] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 10); // pixel 1
-    CHECK(t.rgba[31] == 70);
+    CHECK(t.rgba[0] == 0xf0 && t.rgba[1] == 0x20 && t.rgba[2] == 0x10 && t.rgba[3] == 255); // pixel 0
+    CHECK(t.rgba[4] == 0x00 && t.rgba[5] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 255); // pixel 1
+    CHECK(t.alpha.size() == 8 && t.alpha[0] == 0 && t.alpha[1] == 10 && t.alpha[7] == 70); // separate layer
 
     // Format 1: one layer, opaque.
     CHECK(!decodeTexture(textureBytes(4, 2, 1), t));
     CHECK(t.format == 1 && t.width == 4 && t.height == 2 && !t.colourKeyed);
-    CHECK(t.rgba[4] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 255);
+    CHECK(t.rgba[4] == 0x00 && t.rgba[6] == 0xff && t.rgba[7] == 255 && t.alpha.empty());
 
     // Colour key: pixels using the key index become transparent.
     CHECK(!decodeTexture(textureBytes(5, 3, 1, 1), t));
     CHECK(t.colourKeyed && t.keyIndex == 1 && t.width == 5 && t.height == 3);
     CHECK(t.rgba[3] == 255 && t.rgba[7] == 0);            // index 0 opaque, index 1 keyed out
     CHECK(!decodeTexture(textureBytes(4, 2, 6, 0), t));
-    CHECK(t.rgba[3] == 0 && t.rgba[7] == 10);             // key overrides alpha; others keep it
+    CHECK(t.rgba[3] == 0 && t.rgba[7] == 255 && t.alpha[1] == 10); // key is separate from the alpha layer
 
     CHECK(decodeTexture(textureBytes(4, 2, 7), t)); // unknown format
     auto bad = textureBytes(4, 2);
