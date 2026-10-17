@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
 #include <vector>
 
 namespace reluva::newworlds {
@@ -16,11 +17,13 @@ struct ScreenVertex {
     float x, y; // pixels; pixel centres are at +0.5
     float invZ; // 1 / view-space depth: larger is nearer
     float u, v; // texture coordinates
+    float s = 1; // light level, interpolated for smooth shading
 };
 
 // Software triangle rasteriser with a depth buffer, drawing into an RGBA32
 // surface. A top-left fill rule draws each pixel of a shared edge once, and
-// texture coordinates are interpolated with perspective correction.
+// texture coordinates (and light levels) are interpolated with perspective
+// correction.
 class Rasterizer {
 public:
     void begin(Surface& target) {
@@ -28,9 +31,10 @@ public:
         depth_.assign(size_t(target.w) * size_t(target.h), 0.0f);
     }
 
-    // shade(u, v, rgba) sets the pixel's colour (4 bytes, R G B A; it may blend
-    // with what's there) and returns whether to record its depth: false for a
-    // transparent or translucent texel, so it doesn't hide faces drawn later.
+    // shade(u, v, rgba), or shade(u, v, light, rgba), sets the pixel's colour
+    // (4 bytes, R G B A; it may blend with what's there) and returns whether to
+    // record its depth: false for a transparent or translucent texel, so it
+    // doesn't hide faces drawn later.
     template <typename Shade>
     void drawTriangle(const ScreenVertex& a, const ScreenVertex& b, const ScreenVertex& c, Shade&& shade) {
         const ScreenVertex* v0 = &a;
@@ -67,7 +71,15 @@ public:
                     continue;
                 const float u = (b0 * v0->u * v0->invZ + b1 * v1->u * v1->invZ + b2 * v2->u * v2->invZ) / invZ;
                 const float v = (b0 * v0->v * v0->invZ + b1 * v1->v * v1->invZ + b2 * v2->v * v2->invZ) / invZ;
-                if (shade(u, v, row + x * 4))
+                bool opaque;
+                if constexpr (std::is_invocable_v<Shade, float, float, float, uint8_t*>) {
+                    const float light =
+                        (b0 * v0->s * v0->invZ + b1 * v1->s * v1->invZ + b2 * v2->s * v2->invZ) / invZ;
+                    opaque = shade(u, v, light, row + x * 4);
+                } else {
+                    opaque = shade(u, v, row + x * 4);
+                }
+                if (opaque)
                     depthRow[x] = invZ;
             }
         }

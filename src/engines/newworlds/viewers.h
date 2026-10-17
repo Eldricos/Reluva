@@ -64,7 +64,7 @@ private:
 //   Left/Right: previous/next   PageUp/PageDown: jump 10   Home/End: first/last
 //   Mouse drag or W/A/S/D: rotate   wheel or +/-: zoom   R: reset the view
 //   Space: spin   P: show one part at a time   U: texture-coordinate checks
-//   C: colour by texture number instead of texturing
+//   C: colour by texture number instead of texturing   H: smooth or flat shading
 //   L: outlines (solid, solid + outlines, outlines only)
 //   B: back faces (hidden, shown, only back faces)   F: filter (all, multi-part, failed)
 class ModelViewer {
@@ -106,7 +106,7 @@ private:
 
     float yaw_ = 0, pitch_ = 0, zoom_ = 1;
     int soloPart_ = -1; // -1: all parts
-    bool spin_ = false, uvCheck_ = false, colourByTail_ = false, textured_ = true;
+    bool spin_ = false, uvCheck_ = false, colourByTail_ = false, textured_ = true, smooth_ = true;
     int outlines_ = 0, faces_ = 0; // faces_: 0 front only, 1 both sides, 2 back only
     int alphaMode_ = 0;            // see kAlphaNames
     bool dragging_ = false;
@@ -120,7 +120,8 @@ private:
 // models. See docs/formats/newworlds/gmf.md.
 //   Left/Right: previous/next map   Mouse drag: rotate   wheel or +/-: zoom
 //   W/A/S/D: move   Q/E: turn   R: reset the view   L: outlines   K: walls
-//   O: placed objects (trees, rocks) on/off   T: textures on/off   G: colouring (the models' own textures; the map's
+//   O: placed objects (trees, rocks) on/off   H: smooth or flat shading
+//   T: textures on/off   G: colouring (the models' own textures; the map's
 //   terrain codes in its colour table)
 class MapViewer {
 public:
@@ -188,7 +189,7 @@ private:
     Texture underlay_; // ground showing through tiles with GmfMap::Tile::underlay
 
     float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
-    bool textured_ = true, outlines_ = false, walls_ = true, scenery_ = true;
+    bool textured_ = true, outlines_ = false, walls_ = true, scenery_ = true, smooth_ = true;
     int colouring_ = 0; // see kColouringNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;

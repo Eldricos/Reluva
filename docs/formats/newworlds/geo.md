@@ -29,7 +29,9 @@ faces          face count × face; face 0's header is the file header:
                  u32 corners
                  u32 part     which part the face belongs to (see Parts)
                  corners × 32 bytes: u32 vertex, f32 u, f32 v (both × 65536),
-                 5 × u32 extra; in the last corner, extra[4] picks the texture
+                 5 × u32 extra: extra[0] is the corner's normal, an index into
+                 the part's second normal list (smooth shading); in the last
+                 corner, extra[4] picks the texture
 bounds         u32 last face's part, u32 ?, u32 part count,
                u32 attachment count (2 in rb_mid, 4 in fcarb, 6 in rms_d)
                f32 centre x, f32 centre y, f32 radius
@@ -173,5 +175,7 @@ would flip both the picture and the winding) isn't confirmed yet.
   each corner's texture coordinates (sometimes a 1 in the last word).
 - Attachment data; the terrain grid's exact layout; the second texture set in
   terrain tiles; the trailer.
-- What the two normal lists are (vertex and face normals?).
+- The first normal list: one entry per distinct face direction, probably
+  face normals (`hole_01`: 13 for 16 faces), but no face field is known to
+  index it.
 - Larger 3D unit models haven't been checked yet.

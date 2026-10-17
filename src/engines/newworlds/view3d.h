@@ -29,6 +29,7 @@ inline Vec normalize(Vec a) {
 // A polygon corner in view space (x right, y up, z away from the camera).
 struct ViewVertex {
     float x, y, z, u, v;
+    float s = 1; // light level
 };
 
 // A camera looking at `centre` from `distance` away, turned by yaw about z and
@@ -51,7 +52,7 @@ struct OrbitCamera {
     }
     Vec directionToView(Vec n) const { return {dot(n, right), dot(n, up), dot(n, forward)}; }
     ScreenVertex project(const ViewVertex& p) const {
-        return {halfW + focal * p.x / p.z, halfH - focal * p.y / p.z, 1.0f / p.z, p.u, p.v};
+        return {halfW + focal * p.x / p.z, halfH - focal * p.y / p.z, 1.0f / p.z, p.u, p.v, p.s};
     }
 };
 
@@ -67,7 +68,7 @@ inline std::vector<ViewVertex> clipNear(const std::vector<ViewVertex>& in, float
         if (aIn != bIn) {
             const float t = (nearZ - a.z) / (b.z - a.z);
             out.push_back({a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, nearZ, a.u + (b.u - a.u) * t,
-                           a.v + (b.v - a.v) * t});
+                           a.v + (b.v - a.v) * t, a.s + (b.s - a.s) * t});
         }
     }
     return out;

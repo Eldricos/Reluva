@@ -20,7 +20,8 @@ struct GeoModel {
     struct Corner {
         uint32_t vertex;    // index into the face's part's vertices
         float u, v;         // texture coordinates, 0..1
-        uint32_t extra[5];  // unknown; in parts above 0, extra[4] is the part
+        uint32_t extra[5];  // extra[0]: the corner's normal, in the part's second
+                            // normal list; in parts above 0, extra[4] is the part
                             // number except in a face's last corner
     };
     struct Face {

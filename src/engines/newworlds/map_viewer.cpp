@@ -377,6 +377,7 @@ void MapViewer::handleEvent(const Event& ev) {
     case 'l': outlines_ = !outlines_; break;
     case 'k': walls_ = !walls_; break;
     case 'o': scenery_ = !scenery_; break;
+    case 'h': smooth_ = !smooth_; break;
     case key::Right: show((current_ + 1) % n); return;
     case key::Left: show((current_ + n - 1) % n); return;
     default: return;
@@ -411,6 +412,8 @@ void MapViewer::updateTitle() {
         title += " [no walls]";
     if (!scenery_)
         title += " [no objects]";
+    if (!smooth_)
+        title += " [flat shading]";
     if (!textured_)
         title += " [untextured]";
     else
@@ -450,12 +453,18 @@ void MapViewer::render() {
     std::vector<ViewVertex> poly;
     std::vector<ScreenVertex> projected;
     std::vector<std::vector<ScreenVertex>> outlines;
+    // How lit a surface facing direction (x, y, z) is, both sides alike.
+    auto lightLevel = [&](float x, float y, float z) {
+        return 0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{x, y, z}), light));
+    };
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
+            const auto& normalLists = m.geo.parts[face.part].normalLists;
+            const auto& fn = m.faceNormals[fi];
             poly.clear();
             for (const auto& corner : face.corners) {
                 const auto& v = verts[corner.vertex];
@@ -466,6 +475,11 @@ void MapViewer::render() {
                 poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z},
                                           planar ? (x + kTileSize / 2) / kTileSize : corner.u,
                                           planar ? (y + kTileSize / 2) / kTileSize : corner.v));
+                // Smooth shading: the corner's own normal (its first extra
+                // value numbers the part's second normal list), else the face's.
+                const bool own = smooth_ && normalLists.size() > 1 && corner.extra[0] < normalLists[1].size();
+                const GeoModel::Vec3 n = own ? normalLists[1][corner.extra[0]] : fn;
+                poly.back().s = lightLevel(c * n.x - s * n.y, s * n.x + c * n.y, n.z);
             }
             poly = clipNear(poly, cam.nearZ);
             if (poly.size() < 3)
@@ -482,17 +496,13 @@ void MapViewer::render() {
             if (area <= 0)
                 continue;
             ++drawnFaces_;
-            const auto& fn = m.faceNormals[fi];
-            const float nx = c * fn.x - s * fn.y, ny = s * fn.x + c * fn.y;
-            const float intensity =
-                0.45f + 0.55f * std::fabs(dot(cam.directionToView(Vec{nx, ny, fn.z}), light));
             const uint32_t textureIndex = face.corners.back().extra[4];
             const Texture* tex = textured_ && textureIndex < m.textures.size() &&
                                          !m.textures[textureIndex].rgba.empty()
                                      ? &m.textures[textureIndex]
                                      : nullptr;
             const bool codes = textured_ && ground && colouring_ == 1;
-            auto shade = [&](float u, float v, uint8_t* out) {
+            auto shade = [&](float u, float v, float intensity, uint8_t* out) {
                 static const uint8_t plain[3] = {170, 180, 195};
                 const uint8_t* col = plain;
                 if (codes) {

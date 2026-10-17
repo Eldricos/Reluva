@@ -204,6 +204,7 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'g': alphaMode_ = (alphaMode_ + 1) % 3; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
+    case 'h': smooth_ = !smooth_; break;
     case 'p':
         if (!model_.parts.empty())
             soloPart_ = soloPart_ + 1 >= int(model_.parts.size()) ? -1 : soloPart_ + 1;
@@ -271,6 +272,8 @@ void ModelViewer::updateTitle() {
         title += std::string(" [") + kFaceNames[faces_] + "]";
     if (colourByTail_)
         title += " [colour: texture number]";
+    if (!smooth_)
+        title += " [flat shading]";
     if (alphaMode_) // glow is the default
         title += std::string(" [") + kAlphaNames[alphaMode_] + "]";
     if (uvCheck_)
@@ -337,7 +340,18 @@ void ModelViewer::render() {
             poly.push_back(cam.toView(Vec{a.x, a.y, a.z}, face.corners[i].u, face.corners[i].v));
         }
         normal = normalize(normal);
-        const Vec viewNormal = cam.directionToView(normal);
+        // Light levels per corner: from the corner's own normal (its first
+        // extra value numbers the part's second normal list) when shading
+        // smoothly, else from the face's.
+        const auto& normalLists = model_.parts[face.part].normalLists;
+        for (size_t i = 0; i < face.corners.size(); ++i) {
+            const uint32_t k = face.corners[i].extra[0];
+            Vec n = normal;
+            if (smooth_ && normalLists.size() > 1 && k < normalLists[1].size())
+                n = Vec{normalLists[1][k].x, normalLists[1][k].y, normalLists[1][k].z};
+            const float d = std::fabs(dot(cam.directionToView(n), light));
+            poly[i].s = tex ? 0.45f + 0.55f * d : 0.3f + 0.7f * d;
+        }
 
         poly = clipNear(poly, cam.nearZ);
         if (poly.size() < 3)
@@ -358,12 +372,10 @@ void ModelViewer::render() {
             continue;
 
         if (outlines_ != 2) {
-            const float intensity = tex ? 0.45f + 0.55f * std::fabs(dot(viewNormal, light))
-                                        : 0.3f + 0.7f * std::fabs(dot(viewNormal, light));
             // Untextured: colour by part, or by the texture number.
             const uint8_t* base = kPartColours[(colourByTail_ ? textureIndex : face.part) % 8];
             const bool check = uvCheck_;
-            auto shade = [&](float u, float v, uint8_t* out) {
+            auto shade = [&](float u, float v, float intensity, uint8_t* out) {
                 float k = intensity;
                 if (check && ((int(std::floor(u * 8)) + int(std::floor(v * 8))) & 1))
                     k *= 0.55f;
