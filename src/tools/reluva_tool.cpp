@@ -17,6 +17,8 @@
 //   reluva-tool table <file> [per row] [offset]    show 4-byte values compactly, N per row
 //   reluva-tool geo-info <file.geo> [out.obj]      decode a model; optionally export it as OBJ
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
+//   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
+//                                                  corner, and dump the bytes where the walk stops
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
@@ -28,6 +30,7 @@
 #include <map>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -867,6 +870,43 @@ int cmdGeoInfo(int argc, char** argv) {
     return 0;
 }
 
+int cmdGeoFaces(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool geo-faces <file.geo>\n");
+        return 2;
+    }
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    // Same walk as parseGeo, but any fourth header word is accepted and shown.
+    const uint32_t faceCount = rd32(d, 4);
+    std::printf("%zu bytes, %u faces\n", d.size(), faceCount);
+    size_t p = 0;
+    for (uint32_t i = 0; i < faceCount; ++i) {
+        const uint32_t n = rd32(d, p + 8);
+        if (n < 3 || n > 256 || p + 16 + size_t(n) * 32 > d.size()) {
+            std::printf("face %u at 0x%zx: bad header (%u, %u, %u, %u); bytes around it:\n", i, p, rd32(d, p),
+                        rd32(d, p + 4), n, rd32(d, p + 12));
+            hexdump(d, p >= 0x60 ? p - 0x60 : 0, 0x160);
+            return 1;
+        }
+        std::printf("face %u at 0x%zx: (%u, %u, %u, %u)\n", i, p, rd32(d, p), rd32(d, p + 4), n, rd32(d, p + 12));
+        p += 16;
+        for (uint32_t k = 0; k < n; ++k, p += 32) {
+            float u, v;
+            const uint32_t ub = rd32(d, p + 4), vb = rd32(d, p + 8);
+            std::memcpy(&u, &ub, 4);
+            std::memcpy(&v, &vb, 4);
+            std::printf("    v %-4u uv %9.4f %9.4f  rest %u %u %u %u %u\n", rd32(d, p), double(u / 65536),
+                        double(v / 65536), rd32(d, p + 12), rd32(d, p + 16), rd32(d, p + 20), rd32(d, p + 24),
+                        rd32(d, p + 28));
+        }
+    }
+    std::printf("faces end at 0x%zx; next bytes:\n", p);
+    hexdump(d, p, 0x100);
+    return 0;
+}
+
 int cmdGeoSurvey(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool geo-survey <file.cat>...\n");
@@ -891,13 +931,20 @@ int cmdGeoSurvey(int argc, char** argv) {
                 ++ok;
                 continue;
             }
-            // Group by message with numbers removed.
+            // Group by message with numbers (decimal or 0x hex) removed.
             std::string key;
-            for (char c : err.message)
-                if (!(c >= '0' && c <= '9') && c != 'x')
-                    key += c;
-                else if (key.empty() || key.back() != '#')
+            const std::string& msg = err.message;
+            for (size_t i = 0; i < msg.size();) {
+                if (msg[i] >= '0' && msg[i] <= '9') {
+                    if (msg.compare(i, 2, "0x") == 0)
+                        i += 2;
+                    while (i < msg.size() && std::isxdigit(static_cast<unsigned char>(msg[i])))
+                        ++i;
                     key += '#';
+                } else {
+                    key += msg[i++];
+                }
+            }
             failures[key].push_back(std::string(argv[a]) + ": " + e.name + " (" + std::to_string(d.size()) +
                                     " bytes): " + err.message);
         }
@@ -940,6 +987,8 @@ int main(int argc, char** argv) {
         return cmdGeoInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-survey") == 0)
         return cmdGeoSurvey(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
+        return cmdGeoFaces(argc, argv);
     std::fprintf(stderr,
                  "usage:\n"
                  "  reluva-tool hexdump <file> [offset] [length]\n"
@@ -954,6 +1003,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool table <file> [values per row] [offset]\n"
                  "  reluva-tool geo-info <file.geo> [out.obj]\n"
                  "  reluva-tool geo-survey <file.cat>...\n"
+                 "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
     return 2;
 }
