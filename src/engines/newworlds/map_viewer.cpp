@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
@@ -61,10 +62,17 @@ void MapViewer::show(int index) {
     archiveModels_.clear();
     const EntryRef& ref = maps_[size_t(index)];
     CatArchive& cat = *archives_[ref.archive];
-    // A tile's model number counts the .geo files of the map's archive.
+    // A tile's model number counts the .geo files of the map's archive, in
+    // the order tileModelOrder gives.
+    std::vector<size_t> geoEntries;
+    std::vector<std::string> geoNames;
     for (size_t i = 0; i < cat.entries().size(); ++i)
-        if (cat.entries()[i].tag == cattag::Geometry)
-            archiveModels_.push_back(i);
+        if (cat.entries()[i].tag == cattag::Geometry) {
+            geoEntries.push_back(i);
+            geoNames.push_back(cat.entries()[i].name);
+        }
+    for (size_t k : tileModelOrder(geoNames))
+        archiveModels_.push_back(geoEntries[k]);
     std::vector<uint8_t> data;
     // Walls get the archive's last full-size cliff texture (icewrld's
     // cliff07, which no ground model's name matches). A guess.
@@ -99,10 +107,9 @@ void MapViewer::resetView() {
     dirty_ = true;
 }
 
-// A tile's ground model, decoded once per map, with its own textures: the one
-// named like the model without its underscore (ice_07: ice07) first, then
-// those the usual rule finds. Which textures the game really uses isn't known
-// (see docs/formats/newworlds/gmf.md); faces numbering others are untextured.
+// A tile's ground model, decoded once per map, with its textures. Which
+// textures the game gives ground tiles isn't known (see
+// docs/formats/newworlds/gmf.md); chooseGroundTextures picks them by role.
 const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     auto found = tileModels_.find(index);
     if (found != tileModels_.end())
@@ -111,11 +118,11 @@ const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     if (index >= archiveModels_.size())
         m.error = "model " + std::to_string(index) + " of " + std::to_string(archiveModels_.size());
     else
-        loadModel(archiveModels_[index], m);
+        loadModel(archiveModels_[index], m, true);
     return m;
 }
 
-void MapViewer::loadModel(size_t entryIndex, TileModel& m) {
+void MapViewer::loadModel(size_t entryIndex, TileModel& m, bool ground) {
     CatArchive& cat = *archives_[maps_[size_t(current_)].archive];
     const auto& entry = cat.entries()[entryIndex];
     m.name = entry.name;
@@ -145,21 +152,25 @@ void MapViewer::loadModel(size_t entryIndex, TileModel& m) {
     size_t needed = 0;
     for (const auto& face : m.geo.faces)
         needed = std::max<size_t>(needed, face.corners.back().extra[4] + 1);
-    std::vector<const TextureFile*> slots = findModelTextures(m.name, textureFiles_, needed);
     std::string folder, stem, ext;
     splitName(m.name, folder, stem, ext);
-    std::string joined;
-    for (char c : stem)
-        if (c != '_')
-            joined += c;
-    for (const TextureFile& t : textureFiles_)
-        if (t.folder == folder && t.stem == joined) {
-            if (slots.empty())
-                slots.push_back(&t);
-            else
-                slots[0] = &t;
-            break;
+    std::vector<const TextureFile*> slots;
+    if (ground) {
+        // Ground tiles: by the role of each slot's faces (ground_textures.h).
+        std::vector<std::string> planet;
+        for (const TextureFile& t : textureFiles_)
+            if (t.folder == folder)
+                planet.push_back(t.stem);
+        for (const std::string& want : chooseGroundTextures(stem, m.geo, planet)) {
+            const TextureFile* found = nullptr;
+            for (const TextureFile& t : textureFiles_)
+                if (t.folder == folder && t.stem == want)
+                    found = &t;
+            slots.push_back(found);
         }
+    } else {
+        slots = findModelTextures(m.name, textureFiles_, needed);
+    }
     for (const TextureFile* t : slots) {
         Texture tex;
         if (t) {
@@ -257,7 +268,7 @@ void MapViewer::placeScenery() {
             splitName(full, folder, stem, ext);
             if (stem != name || full.find("/lod/") != std::string::npos)
                 continue;
-            loadModel(entry, sceneryModels_[type]);
+            loadModel(entry, sceneryModels_[type], false);
             break;
         }
     const float square = kBlockSize / 16;

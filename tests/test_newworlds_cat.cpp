@@ -414,6 +414,11 @@ void testGmf() {
     CHECK(m.scenery.size() == 1 && m.scenery[0].bx == 0 && m.scenery[0].x == 7 && m.scenery[0].y == 7);
     CHECK(m.scenery[0].type == 1 && m.scenery[0].turn == 4 && m.scenery[0].variant == 2 && m.scenery[0].extra == 50);
     CHECK(m.palette.size() == 2 && m.palette[1][0] == 0x42 && m.palette[1][1] == 0xc6 && m.palette[1][2] == 0xf9);
+    // Model numbers: the planet's fixed tile list first, then the rest, lod last.
+    const std::vector<std::string> geos = {"geo/map/d/brid_01.geo", "geo/map/d/d_01.geo", "geo/map/d/lod/d_01.geo",
+                                           "geo/map/d/needle_0.geo", "geo/map/d/d_26.geo", "geo/map/d/ramp.geo"};
+    const std::vector<size_t> order = tileModelOrder(geos);
+    CHECK((order == std::vector<size_t>{1, 0, 5, 4, 3, 2}));
     auto bad = tinyGmf();
     bad[bad.size() - 1024 - 10] = 5; // the last cell uses block 5 of 1
     CHECK(parseGmf(bad, m));

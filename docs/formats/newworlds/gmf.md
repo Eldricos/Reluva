@@ -100,10 +100,18 @@ their outlines (transparency), not light maps.
 
 Checked on the 7 maps of `icewrld.cat`:
 
-- A tile's type-20 header's third value is the number of its ground model
-  among the `.geo` files of the map's archive, in archive order (counting from
-  0, `lod/` models included). Shifting the numbering by one in either
-  direction halves how many edges meet, so this is right.
+- A tile's type-20 header's third value is the number of its ground model.
+  The numbers don't follow the archive's order but a fixed list of the
+  planet's tiles: `<base>_01`-`22`, `brid_01`, `brid_02`, `concrete`,
+  `concact`, `crack_03`-`06`, `crack_08`, `hole_01`-`03`, `ramp`,
+  `<base>_23`-`26` (those the archive has; `<base>` is `ice`, `alpin`,
+  `des`), then the archive's other main models (`arche_01`, `water_01`, …)
+  and then its `lod/` models, both in archive order. `icewrld` happens to
+  store them in that order. Checked by how many tile edges meet (heights at
+  5 points within 80 units): `deswrld` maps 46-64% in archive order, 88-93%
+  this way; `alpwrld` 81-93% and 89-94% (`alpwrld` has no `concact`, and
+  leaving a gap for it scores worse); numbers past the main models in
+  `deswrld` maps (50) fit the `lod/` model at that place.
 - **Rotation:** bits 14-15 of the fourth value turn the model anticlockwise
   by that many quarter turns about the tile's centre. Bits 16-17 take three
   values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't
@@ -155,12 +163,30 @@ five layers are for (unit types? heights?) isn't known.
 
 Neither the map nor the ground models name their textures. Each face numbers
 a texture among its model's own (0-6, as for other models; see
-[geo.md](geo.md#textures)), with UVs across the whole tile (`hole_01`'s
-crater spans 0-1). The planet's textures fit the models' names only in part:
-`hole01`-`hole03`, `crack01`, `ramp01`, `concrete`, and `ice01`-`ice08` for
-the 26 `ice_` models, several of which number more than one texture. Matching
-textures to faces by colour across seams gave no consistent answer. The
-assignment is probably held elsewhere (another archive or the game itself).
+[geo.md](geo.md#textures)). Findings so far:
+
+- The 26 numbered tiles have the same geometry on every planet (`ice_01`,
+  `alpin_01` and `des_01` are identical), and mostly the same texture
+  numbering; where it differs (`ice_01`'s slope is texture 0, `alpin_01`'s
+  texture 1), that fits textures numbered in name order, as for other
+  models, with different names per planet.
+- The planets' textures are named by role: `alpwrld` and `deswrld` have
+  `low01`-`07`, `med01`-`02`, `top01`, `cliff01`-`05`, `ramp01`, and four
+  plain variants (`green01`-`04`, `sand01`-`04`); `icewrld` has `ice01`-`08`,
+  `blue01`-`04`, `snow01`-`02`, `rock01`-`03`, `cliff01`-`06`. Some carry a
+  tile's number: `low07` is plain flat ground, like tile 07.
+- The pictures are drawn for the tiles' texture coordinates: `alpin_01`'s
+  low edge, slope and top faces fall on `cliff01`'s grass strip, rock and
+  snow; `alpin_10`'s top and slope on `med02`'s snow and rock.
+- Matching textures to faces by colour (across seams, or by the colour
+  expected for snow, rock and grass) gave no consistent answer.
+
+So the exact assignment is probably in the game itself. The viewer gives
+each texture number a texture by the shape of its faces (high, middle or
+low flat ground, or slope: `top`/`snow`, `med`/`rock`, `low`/`ice` or a
+plain variant, `cliff`), preferring one numbered like the tile; holes,
+cracks, ramps, bridges, water and concrete use their own
+(`reluva-tool ground-textures <planet.cat>` lists the choices).
 `cliff07`, which no model's name matches, may be the texture for the walls
 between levels.
 
@@ -170,7 +196,8 @@ textures.
 
 ## Open questions
 
-- Which textures the ground models' faces use.
+- Which textures the ground models' faces use (the viewer's are chosen by
+  role).
 - What the five layers of terrain codes are for.
 - How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid

@@ -4,6 +4,7 @@
 #include "engines/newworlds/gmf.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cstring>
 #include <string>
 
@@ -129,6 +130,49 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
         out.palette.push_back({data[p + 2], data[p + 1], data[p]});
     }
     return Error::success();
+}
+
+std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
+    auto stem = [](const std::string& name) {
+        const size_t slash = name.rfind('/'), dot = name.rfind('.');
+        const size_t from = slash == std::string::npos ? 0 : slash + 1;
+        return name.substr(from, (dot == std::string::npos || dot < from ? name.size() : dot) - from);
+    };
+    auto isLod = [](const std::string& name) { return name.find("/lod/") != std::string::npos; };
+    // The base family: the one with a model numbered _26 (ice_26, alpin_26).
+    std::string base;
+    for (const auto& n : geoNames) {
+        const std::string s = stem(n);
+        if (!isLod(n) && s.size() > 3 && s.compare(s.size() - 3, 3, "_26") == 0)
+            base = s.substr(0, s.size() - 3);
+    }
+    std::vector<std::string> wanted;
+    char number[8];
+    for (int i = 1; i <= 22; ++i) {
+        std::snprintf(number, sizeof number, "_%02d", i);
+        wanted.push_back(base + number);
+    }
+    for (const char* n : {"brid_01", "brid_02", "concrete", "concact", "crack_03", "crack_04", "crack_05", "crack_06",
+                          "crack_08", "hole_01", "hole_02", "hole_03", "ramp"})
+        wanted.push_back(n);
+    for (int i = 23; i <= 26; ++i) {
+        std::snprintf(number, sizeof number, "_%02d", i);
+        wanted.push_back(base + number);
+    }
+    std::vector<size_t> order;
+    std::vector<bool> used(geoNames.size());
+    for (const auto& w : wanted)
+        for (size_t i = 0; i < geoNames.size(); ++i)
+            if (!used[i] && !isLod(geoNames[i]) && !base.empty() && stem(geoNames[i]) == w) {
+                order.push_back(i);
+                used[i] = true;
+                break;
+            }
+    for (int lod = 0; lod < 2; ++lod)
+        for (size_t i = 0; i < geoNames.size(); ++i)
+            if (!used[i] && isLod(geoNames[i]) == bool(lod))
+                order.push_back(i);
+    return order;
 }
 
 } // namespace reluva::newworlds

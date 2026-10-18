@@ -160,7 +160,9 @@ private:
     void resetView();
     void render();
     void updateTitle();
-    void loadModel(size_t entry, TileModel& m); // an entry of the map's archive
+    // An entry of the map's archive; ground tiles get textures by role, other
+    // models those named after them.
+    void loadModel(size_t entry, TileModel& m, bool ground);
     const TileModel& tileModel(uint32_t index);
     float groundHeight(float x, float y);
     void placeScenery();
@@ -180,7 +182,7 @@ private:
 
     GmfMap map_;
     std::string status_;                 // decode error, if any
-    std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, in order
+    std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, by model number
     std::map<uint32_t, TileModel> tileModels_;
     std::map<uint32_t, TileEdges> tileEdges_;
     Texture wallTexture_; // the map archive's last cliff texture, if any

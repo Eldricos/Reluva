@@ -19,6 +19,8 @@
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
 //   reluva-tool geo-textures [-a] <file.cat>...    show which textures each model gets (by default
 //                                                  only models with too few, with similar names)
+//   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
+//                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
 //                                                  one record (or where the walk stops)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
@@ -31,6 +33,7 @@
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/model_textures.h"
 
 #include <map>
@@ -989,6 +992,51 @@ int cmdGeoFaces(int argc, char** argv) {
     return 0;
 }
 
+int cmdGroundTextures(int argc, char** argv) {
+    if (argc != 3) {
+        std::fprintf(stderr, "usage: reluva-tool ground-textures <planet.cat>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    nw::CatArchive cat;
+    if (reluva::Error err = cat.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::vector<uint8_t> data;
+    for (const auto& e : cat.entries()) {
+        std::string folder, stem, ext;
+        nw::splitName(e.name, folder, stem, ext);
+        static const char* const kScenery[] = {"tree", "tree_s", "rock", "frn_spec", "bush"};
+        if (e.tag != nw::cattag::Geometry || e.name.find("/map/") == std::string::npos ||
+            e.name.find("/lod/") != std::string::npos ||
+            std::any_of(std::begin(kScenery), std::end(kScenery), [&](const char* n) { return stem == n; }))
+            continue;
+        std::vector<std::string> planet;
+        for (const auto& t : cat.entries()) {
+            std::string tf, ts, te;
+            nw::splitName(t.name, tf, ts, te);
+            if (t.tag == nw::cattag::Texture && tf == folder && (te == "mp0" || te == "lbp"))
+                planet.push_back(ts);
+        }
+        nw::GeoModel m;
+        if (cat.read(e, data) || nw::parseGeo(data, m)) {
+            std::printf("%-12s doesn't decode\n", stem.c_str());
+            continue;
+        }
+        const auto picks = nw::chooseGroundTextures(stem, m, planet);
+        std::printf("%-12s", stem.c_str());
+        for (size_t s = 0; s < picks.size(); ++s) {
+            size_t faces = 0;
+            for (const auto& f : m.faces)
+                faces += f.corners.back().extra[4] == s;
+            std::printf("  %zu: %s (%zu)", s, picks[s].empty() ? "?" : picks[s].c_str(), faces);
+        }
+        std::printf("\n");
+    }
+    return 0;
+}
+
 int cmdGeoTextures(int argc, char** argv) {
     int first = 2;
     const bool all = argc > 2 && std::strcmp(argv[2], "-a") == 0;
@@ -1321,6 +1369,8 @@ int main(int argc, char** argv) {
         return cmdGmfInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-textures") == 0)
         return cmdGeoTextures(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
+        return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
         return cmdGeoFaces(argc, argv);
     std::fprintf(stderr,
@@ -1338,6 +1388,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-info <file.geo> [out.obj]\n"
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
+                 "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");
