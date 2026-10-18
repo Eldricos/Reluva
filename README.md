@@ -57,7 +57,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   rotate, use the wheel to zoom, **W/A/S/D** to move, **Q/E** to turn,
   **Left/Right** for the next map, **T** for textures, **G** to colour the ground by its terrain codes or show resource deposits, **O** for the placed trees and rocks, **H** for smooth or flat shading, **K** for
   the walls between levels and **L** for outlines. For sounds, **Space** (or
-  **Enter**) plays or stops the selected one and **A** plays each as it's selected.
+  **Enter**) plays or stops the selected one, **A** plays each as it's selected and **F**
+  lists every copy of the sounds the archives store more than once.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
 (`~/.local/share/reluva/reluva/` on Linux, `%APPDATA%\reluva\reluva\` on Windows).

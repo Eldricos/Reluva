@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <map>
 
 namespace reluva::newworlds {
 
@@ -16,6 +17,27 @@ SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives)
             if (entries[i].tag == cattag::Wave)
                 sounds_.push_back({a, i});
     }
+    // Find the copies by their size and a hash of their bytes (FNV-1a).
+    std::map<std::pair<size_t, uint64_t>, size_t> seen;
+    for (size_t s = 0; s < sounds_.size(); ++s) {
+        CatArchive& cat = *archives_[sounds_[s].archive];
+        std::vector<uint8_t> data;
+        if (cat.read(cat.entries()[sounds_[s].entry], data))
+            firstCopy_.push_back(s); // unreadable: shown on its own, with the error
+        else {
+            uint64_t hash = 14695981039346656037ull;
+            for (uint8_t b : data)
+                hash = (hash ^ b) * 1099511628211ull;
+            firstCopy_.push_back(seen.emplace(std::make_pair(data.size(), hash), s).first->second);
+        }
+    }
+    for (size_t s = 0; s < sounds_.size(); ++s)
+        if (showCopies_ || firstCopy_[s] == s)
+            shownSounds_.push_back(s);
+}
+
+const std::string& SoundViewer::nameOf(size_t sound) const {
+    return archives_[sounds_[sound].archive]->entries()[sounds_[sound].entry].name;
 }
 
 SoundViewer::~SoundViewer() {
@@ -36,10 +58,24 @@ void SoundViewer::activate() {
 void SoundViewer::deactivate() { stop(); }
 
 void SoundViewer::handleKey(uint32_t k) {
-    const int n = int(sounds_.size());
+    const int n = int(shownSounds_.size());
     if (n == 0)
         return;
     switch (k) {
+    case 'f': {
+        // List every copy, or only the first of each.
+        const size_t sound = shownSounds_[size_t(current_)];
+        showCopies_ = !showCopies_;
+        shownSounds_.clear();
+        for (size_t s = 0; s < sounds_.size(); ++s)
+            if (showCopies_ || firstCopy_[s] == s)
+                shownSounds_.push_back(s);
+        const auto it = std::find(shownSounds_.begin(), shownSounds_.end(), firstCopy_[sound]);
+        const auto at = std::find(shownSounds_.begin(), shownSounds_.end(), sound);
+        current_ = int((at != shownSounds_.end() ? at : it) - shownSounds_.begin());
+        updateTitle();
+        break;
+    }
     case key::Right: show((current_ + 1) % n); break;
     case key::Left: show((current_ + n - 1) % n); break;
     case key::PageDown: show(std::min(current_ + 10, n - 1)); break;
@@ -72,7 +108,7 @@ void SoundViewer::show(int index) {
     stop();
     current_ = index;
     status_.clear();
-    const EntryRef& ref = sounds_[size_t(index)];
+    const EntryRef& ref = sounds_[shownSounds_[size_t(index)]];
     CatArchive& cat = *archives_[ref.archive];
     std::vector<uint8_t> data;
     auto sound = std::make_shared<Sound>();
@@ -189,11 +225,12 @@ void SoundViewer::draw() {
 }
 
 void SoundViewer::updateTitle() {
-    if (sounds_.empty())
+    if (shownSounds_.empty())
         return;
-    const EntryRef& ref = sounds_[size_t(current_)];
-    std::string title = "New Worlds sounds " + std::to_string(current_ + 1) + "/" + std::to_string(sounds_.size()) +
-                        ": " + archives_[ref.archive]->entries()[ref.entry].name + " (";
+    const size_t current = shownSounds_[size_t(current_)];
+    std::string title = std::string("New Worlds sounds ") + (showCopies_ ? "[all] " : "") +
+                        std::to_string(current_ + 1) + "/" + std::to_string(shownSounds_.size()) + ": " +
+                        nameOf(current) + " (";
     std::shared_ptr<const Sound> sound;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -206,6 +243,22 @@ void SoundViewer::updateTitle() {
         std::snprintf(info, sizeof info, "%d Hz, %s, %.2f s", sound->rate, sound->channels == 1 ? "mono" : "stereo",
                       double(sound->frames()) / sound->rate);
         title += std::string(info) + (sound->format == 0x11 ? ", IMA ADPCM" : ", PCM") + ")";
+    }
+    // Its copies: how many, and any other names.
+    size_t copies = 0;
+    std::vector<std::string> names;
+    for (size_t s = 0; s < sounds_.size(); ++s) {
+        if (firstCopy_[s] != firstCopy_[current])
+            continue;
+        ++copies;
+        if (nameOf(s) != nameOf(current) && std::find(names.begin(), names.end(), nameOf(s)) == names.end())
+            names.push_back(nameOf(s));
+    }
+    if (copies > 1) {
+        title += " [" + std::to_string(copies) + " copies";
+        for (size_t i = 0; i < names.size(); ++i)
+            title += (i ? ", " : "; also ") + names[i];
+        title += "]";
     }
     title += playing() ? " [playing]" : " (Space: play)";
     if (autoPlay_)

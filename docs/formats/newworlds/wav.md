@@ -51,8 +51,24 @@ Checked against ffmpeg's decoder: the samples differ by at most 33, from
 ffmpeg computing `diff` exactly rather than by the shifts above; lengths
 differ by the few samples ffmpeg keeps past the `fact` count.
 
+## Copies
+
+The archives store some sounds many times over, each copy a full file of
+its own. In `kliactor.cat`, 62 of the 85 are different: 13 general sounds
+(weapons, shields, doors, each vehicle's start-up), then a set of 12 per
+vehicle (`apc`, `fgs`, `mdb`, `pa`, `dt`, `sv`), 8 voice lines numbered 001,
+002, 004 and 005 with two variants each, followed by four copies of the
+short refusal `kneg1.wav`. Those four look like slots of a fixed set that
+the vehicle has no line of its own for. The Federation archives reportedly
+do the same with `fneg1.wav`, stored also as `default.wav`, `pass.wav` and
+`fail.wav`. What each slot is for isn't known yet.
+
+`reluva-tool wav-info <archive.cat>` marks each copy with the first one it
+repeats.
+
 ## In Reluva
 
 The data viewer's last page (**Tab**) lists the sounds with their waveform;
 **Space** or **Enter** plays or stops one, **A** plays each as it's
-selected.
+selected. Copies are listed once, with their count and other names in the
+title; **F** lists every copy.

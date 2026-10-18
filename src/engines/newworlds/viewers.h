@@ -240,11 +240,19 @@ private:
     bool playing() const;
     void draw();
     void updateTitle();
+    const std::string& nameOf(size_t sound) const;
 
     System& sys_;
     Surface& screen_;
     const Archives& archives_;
     std::vector<EntryRef> sounds_;
+    // The archives store some sounds many times over (kliactor has kneg1.wav
+    // 24 times, in 4 slots of each vehicle's set), sometimes under other
+    // names: each sound's first copy, and the sounds listed (all, or only
+    // the first of each set of copies).
+    std::vector<size_t> firstCopy_;
+    std::vector<size_t> shownSounds_;
+    bool showCopies_ = false;
     bool shown_ = false, autoPlay_ = false, audioStarted_ = false, wasPlaying_ = false;
     int current_ = 0;
     std::string status_;

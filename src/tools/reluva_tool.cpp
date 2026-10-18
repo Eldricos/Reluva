@@ -1082,14 +1082,15 @@ int cmdWavInfo(int argc, char** argv) {
         return 2;
     }
     namespace nw = reluva::newworlds;
-    auto describe = [](const std::string& name, const std::vector<uint8_t>& data) {
+    auto describe = [](const std::string& name, const std::vector<uint8_t>& data, const std::string& note = "") {
         nw::Sound s;
         if (reluva::Error err = nw::decodeWav(data, s)) {
             std::printf("%-28s %s\n", name.c_str(), err.message.c_str());
             return false;
         }
-        std::printf("%-28s format %#x, %d channel%s, %d Hz, %zu frames (%.2f s)\n", name.c_str(), s.format,
-                    s.channels, s.channels == 1 ? "" : "s", s.rate, s.frames(), double(s.frames()) / s.rate);
+        std::printf("%-28s format %#x, %d channel%s, %d Hz, %zu frames (%.2f s)%s\n", name.c_str(), s.format,
+                    s.channels, s.channels == 1 ? "" : "s", s.rate, s.frames(), double(s.frames()) / s.rate,
+                    note.c_str());
         return true;
     };
     const std::string path = argv[2];
@@ -1099,14 +1100,26 @@ int cmdWavInfo(int argc, char** argv) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
+        // Some sounds are stored many times over, under the same or other
+        // names: note each copy's first.
         unsigned count = 0, good = 0;
+        std::map<std::string, unsigned> first; // bytes -> entry number
         std::vector<uint8_t> data;
-        for (const auto& e : cat.entries())
-            if (e.tag == nw::cattag::Wave) {
-                ++count;
-                good += !cat.read(e, data) && describe(e.name, data);
+        for (size_t i = 0; i < cat.entries().size(); ++i) {
+            const auto& e = cat.entries()[i];
+            if (e.tag != nw::cattag::Wave)
+                continue;
+            ++count;
+            if (cat.read(e, data)) {
+                std::printf("%-28s cannot be read\n", e.name.c_str());
+                continue;
             }
-        std::printf("%u sounds, %u decode\n", count, good);
+            const auto [it, added] = first.emplace(std::string(data.begin(), data.end()), unsigned(i));
+            const std::string note =
+                added ? "" : " copy of " + cat.entries()[it->second].name + " (entry " + std::to_string(it->second) + ")";
+            good += describe(e.name, data, note);
+        }
+        std::printf("%u sounds (%zu different), %u decode\n", count, first.size(), good);
         return good == count ? 0 : 1;
     }
     std::vector<uint8_t> data;
