@@ -86,7 +86,8 @@ table has `~MISSION PASS~` and `~MISSION FAIL~` pages, so these look like
 the missions' voice-over slots (briefing pages, then pass and fail) with
 no recording, filled with the stand-in sound. The `default` counts don't
 match the tables' page counts (10, 10 and 11 pages before the pass page),
-so which page each slot goes with isn't known.
+so which page each slot goes with isn't known. `klimisc.cat` and
+`rommisc.cat` have no such slots (only `alert003.wav`).
 
 `reluva-tool wav-info <archive.cat>` marks each copy with the first one it
 repeats.
