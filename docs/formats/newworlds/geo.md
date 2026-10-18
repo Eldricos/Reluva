@@ -120,7 +120,31 @@ facing and texture-coordinate range per number):
 - Faces about 250 units across showing a whole texture (`fsc`, `fss_a`) are
   something smaller: lights or signs.
 
+`rombuild.cat` and `forbuild.cat` show the same structure: the Romulan,
+Metar, Taubat and Hubrin buildings also end in a door number (the last
+number in 48 of the 49 Klingon, Romulan and native buildings that have one;
+the Federation's 19 put an apron after it in 8). Their door textures are
+all sheets of frames (`r_door`, `rvdoor`, `dooranim`, `m_door`, `t_door3`),
+so either the game shows door faces one frame at a time, which would make
+the Federation's and Klingons' doors `pdoor`/`door2` and `kdoor_h`…
+rather than the single pictures, or their doors are something else. The
+viewer leaves those doors untextured. A texture named after the model with
+`_door` (`mch_door`, the Metar colony hub's) is that model's door and
+doesn't take a number in the name order (`mch`: `mch`, `mch_g`, ?,
+`mch_door`).
+
 The rest of the shared numbers stay unknown and are drawn untextured.
+
+**Whose buildings:** `forbuild.cat` (folder `bad`) holds the native races'
+buildings, named by their metamodels in `misc.cat` (`mdl/bad/`): `h…` the
+Hubrin (`hcp` containment pillar; `hf` an "ancient fortress"), `m…` the
+Metar (`mch` colony hub, `mport` portal; their units `mb`, `md`, `mj`, `mn`,
+`mr`, `my` and the starship `mss`), `t…` the Taubat (`th` house, `tt`
+temple, `tw` workshop, `tsg` static gun), and one Orion tank (`odv`): the
+sides `game.ini` numbers 4-6 (see [level.md](level.md)). The `_p` models
+are the empires' building **portals** (`fedconyardportalmetamodel`) and the
+natives' **interiors** (`taubattempleinteriormetamodel`); which textures
+they use isn't known (the Romulans have a `portal1`).
 
 The viewer's rule: a model uses the textures named exactly after it or after
 it plus `_` and a suffix, in name order from 0, preferring its own folder

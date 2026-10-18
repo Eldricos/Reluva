@@ -108,9 +108,12 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
 
     // One of each name (some are stored both as .lbp and as a mipmap set),
     // in name order (the list is sorted by stem).
+    // A texture named <model>_door (mch_door) is the model's door, which
+    // addDoorTextures places; it doesn't take a number in the name order.
     std::vector<const TextureFile*> own;
     for (const TextureFile* t : found)
-        if (std::none_of(own.begin(), own.end(), [&](const TextureFile* x) { return x->stem == t->stem; }))
+        if (!endsWith(t->stem, "_door") &&
+            std::none_of(own.begin(), own.end(), [&](const TextureFile* x) { return x->stem == t->stem; }))
             own.push_back(t);
     std::vector<const TextureFile*> out(std::max(needed, own.size()), nullptr);
     std::copy(own.begin(), own.end(), out.begin());
@@ -150,11 +153,16 @@ void addDoorTextures(const GeoModel& geo, const std::string& modelName, const st
                      std::vector<const TextureFile*>& slots) {
     std::string folder, base, ext;
     splitName(modelName, folder, base, ext);
-    // Each side's single closed door: the other door textures are 4 x 4
-    // sheets of opening frames, which a face showing a whole texture can't be.
+    // The model's own door (mch_door), else its side's single closed door
+    // (the Federation's and Klingons'; the other door textures are 4 x 4
+    // sheets of opening frames, and the Romulans and natives have only
+    // those, so their doors stay unknown).
     const TextureFile* door = nullptr;
     for (const TextureFile& t : textures)
         if (t.folder == folder && (t.stem == "door3" || t.stem == "kcdoor"))
+            door = &t;
+    for (const TextureFile& t : textures)
+        if (t.folder == folder && t.stem == base + "_door")
             door = &t;
     if (!door)
         return;

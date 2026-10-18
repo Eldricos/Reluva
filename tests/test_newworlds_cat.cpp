@@ -582,6 +582,9 @@ void testModelTextures() {
     std::vector<const TextureFile*> slots(3, nullptr);
     addDoorTextures(g, "geo/fed/fch.geo", doors, slots);
     CHECK(!slots[0] && slots[1] == &doors[0] && !slots[2]);
+    doors.push_back({"fch_door", "fed", {0, 0}}); // a model's own door wins
+    addDoorTextures(g, "geo/fed/fch.geo", doors, slots);
+    CHECK(slots[1] == &doors[2]);
 }
 
 void testRasterizer() {

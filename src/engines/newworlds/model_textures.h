@@ -44,9 +44,9 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
 // its last number or near it (fch, accom, landpad, kab, kief, ksc, ...).
 bool isDoorSlot(const GeoModel& geo, uint32_t slot);
 
-// Gives a model's door numbers its side's closed-door texture (door3 in
-// lbp/txr/fed, kcdoor in lbp/txr/kln), replacing what the name rule put there
-// (fch's second number is its door, not fch_g).
+// Gives a model's door numbers its own door texture (mch_door), else its
+// side's closed door (door3 in lbp/txr/fed, kcdoor in lbp/txr/kln), replacing
+// what the name rule put there (fch's second number is its door, not fch_g).
 void addDoorTextures(const GeoModel& geo, const std::string& modelName, const std::vector<TextureFile>& textures,
                      std::vector<const TextureFile*>& slots);
 
