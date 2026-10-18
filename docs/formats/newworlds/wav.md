@@ -53,15 +53,29 @@ differ by the few samples ffmpeg keeps past the `fact` count.
 
 ## Copies
 
-The archives store some sounds many times over, each copy a full file of
-its own. In `kliactor.cat`, 62 of the 85 are different: 13 general sounds
-(weapons, shields, doors, each vehicle's start-up), then a set of 12 per
-vehicle (`apc`, `fgs`, `mdb`, `pa`, `dt`, `sv`), 8 voice lines numbered 001,
-002, 004 and 005 with two variants each, followed by four copies of the
-short refusal `kneg1.wav`. Those four look like slots of a fixed set that
-the vehicle has no line of its own for. The Federation archives reportedly
-do the same with `fneg1.wav`, stored also as `default.wav`, `pass.wav` and
-`fail.wav`. What each slot is for isn't known yet.
+The actor archives store some sounds many times over, each copy a full
+file of its own:
+
+| Archive | Sounds | Different | General | Per vehicle (12 each) |
+|---|---|---|---|---|
+| `kliactor.cat` | 85 | 62 | 13 | `apc`, `fgs`, `mdb`, `pa`, `dt`, `sv` |
+| `fedactor.cat` | 91 | 68 | 19 | `apc`, `fgs`, `msg`, `pa`, `pv`, `sv` |
+
+The general sounds (weapons, shields, doors, crates, each vehicle's
+start-up) come first. Each vehicle's set of 12 is then always:
+
+```
+line A voice 1, line B voice 1, line A voice 2, line B voice 2,
+line C voice 1, line D voice 1, line C voice 2, line D voice 2,
+4 × the side's refusal sound (kneg1.wav, 0.79 s; fneg1.wav, 0.40 s; 11025 Hz)
+```
+
+for example `fapc003a, fapc004a, fapc003b, fapc004b, fapc007a, fapc012a,
+fapc007b, fapc012b`, then `fneg1` four times. The number is the line
+(1-12, each vehicle using four of them) and the letter the voice (a-e;
+two per vehicle). So a set looks like three groups of four responses, the
+last group the same refusal for every vehicle; which group is played when
+(selecting, ordering, refusing?) isn't known yet.
 
 `reluva-tool wav-info <archive.cat>` marks each copy with the first one it
 repeats.
