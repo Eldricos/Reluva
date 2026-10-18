@@ -545,7 +545,8 @@ void testModelTextures() {
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
         tex.push_back({name, "kln", {0, 0}});
     tex.push_back({"kwb", "fed", {0, 0}}); // same name elsewhere: the model's own folder wins
-    for (const char* name : {"fhf_g", "fpdt", "fpdt_s", "fvpy", "fvpy", "landpad"})
+    for (const char* name : {"fapc", "fapc_g", "fapc_l", "fconb", "fconb_a", "fhf_g", "fpdt", "fpdt_s", "fvpy", "fvpy",
+                             "landpad"})
         tex.push_back({name, "fed", {0, 0}});
     auto names = [&](const char* model, size_t needed) {
         std::string out;
@@ -562,6 +563,9 @@ void testModelTextures() {
     CHECK(names("geo/fed/fpdt.geo", 2) == "fpdt@fed ?");          // fpdt_s is the outline's
     CHECK(names("geo/fed/fvpy_a.geo", 1) == "fvpy@fed");          // duplicates count once
     CHECK(names("geo/fed/landpd_d.geo", 2) == "landpad@fed ?");   // a shortened name
+    CHECK(names("geo/fed/fapc2.geo", 3) == "fapc@fed fapc_g@fed fapc_l@fed"); // a number apart
+    CHECK(names("geo/fed/fapc2_l.geo", 1) == "fapc_l@fed");                   // its low-detail texture
+    CHECK(names("geo/fed/fconbee.geo", 2) == "fconb@fed fconb_a@fed");        // the texture's name shortened
     // A door: one upright 1000-unit face showing the whole texture, number 1;
     // a roof face (number 2) isn't.
     GeoModel g;

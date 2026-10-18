@@ -93,7 +93,7 @@ private:
     void drawLine(float x0, float y0, float x1, float y1, const uint8_t* colour = nullptr);
     void loadTextures(const std::string& modelName);
     void loadMetamodel(const std::string& modelName);
-    void loadAnimations(const std::string& stem);
+    void loadAnimations(const std::string& stem, const std::string& modelFolder);
     int channelOfNode(uint32_t node) const;
 
     System& sys_;
@@ -118,6 +118,7 @@ private:
     int selectedPoint_ = -1; // -1: none
     struct Animation {
         std::string name;                              // conbee, fcmwalk
+        std::string state;                             // the .mdl state it plays: walk, manipulate
         std::vector<std::vector<PartTransform>> frames; // per frame, per animated part
     };
     std::vector<Animation> animations_;

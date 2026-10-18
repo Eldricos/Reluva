@@ -35,9 +35,28 @@ parts list's name → the animated list's number), each vertex as
 That makes the crew walk with their limbs joined, and the construction
 vehicle swing its arm through 180° and back over its 16 frames.
 
+## The sets in every actor archive
+
+Checked on all four actor archives (October 2026):
+
+| Archive | Sets | Frames | Model (its `.mdl` states) |
+|---|---|---|---|
+| `fedactor` | `fed/fconb` | 17 | `fconbee`, the construction vehicle (`reference`, `manipulate`) |
+| `kliactor` | `kln/conbee` | 16 | `conbee` |
+| `romactor` | `rom/rcb` | 17 | `rcb` |
+| all three | `fed/fcmstand`, `fed/fcmwalk` | 1, 10 | every side's `crewman` (`reference`, `stand`, `walk`) |
+| `foractor` | none | | |
+
+So a set plays the state it's named after (`fcmstand`: stand,
+`fcmwalk`: walk), or the model's only other state (the construction
+vehicles': manipulate), and the crewmen of all sides share one set of
+animations, stored under `fed/` in each archive (identical copies). The
+Federation's set is named `fconb` for the model `fconbee`. The animated
+list's numbers are each part's position in the frames: `conbee` lists
+`arm=0 boom=2 grabber=1`, `fconbee` and `rcb` `arm=0 boom=1 grabber=2`, and
+both play correctly that way.
+
 ## Open questions
 
-- Which frames belong to which state (`stand`, `walk`, `manipulate`) and at
-  what speed: the names suggest it (fcmstand, fcmwalk), but nothing found
-  links them; the viewer plays 10 frames a second.
-- Animations for the other crews and vehicles (only `kliactor.cat` checked).
+- At what speed the frames play (the viewer plays 10 a second), and whether
+  `walk` loops.

@@ -63,7 +63,9 @@ Across `misc.cat`:
 | `normal`, `low_detail` / `normal` | 4 |
 
 The animated models' states are animations; their frames are the `.arf`
-files (see [arf.md](arf.md)).
+files, a set per state named after it (`fcmwalk` for `walk`; see
+[arf.md](arf.md)). The `_p` models' metamodels are the empires' building
+portals (`fedconyardportalmetamodel`) and the natives' interiors.
 
 ## Reference pose
 

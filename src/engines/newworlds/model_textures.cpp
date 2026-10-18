@@ -4,6 +4,7 @@
 #include "engines/newworlds/model_textures.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstddef>
 #include <string>
@@ -67,7 +68,8 @@ bool abbreviates(const std::string& shortName, const std::string& full) {
 // A model's own textures are named after it: k_bop uses k_bop_a, k_bop_b and
 // k_bop_g. A variant such as k_bop_l with no textures of its own uses those
 // of the name without the suffix (except the flat _s outlines), and a
-// shortened name (landpd_d) those of a texture it abbreviates (landpad).
+// shortened name (landpd_d) those of a texture it abbreviates (landpad);
+// failing that, names differing by a number or a shortening (fapc2: fapc).
 // Textures in the model's own folder (kln for geo/kln/k_bop.geo) are
 // preferred, and _s textures belong to the _s models only.
 //
@@ -80,6 +82,7 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
     std::string folder, base, ext;
     splitName(modelName, folder, base, ext);
     const bool outline = endsWith(base, "_s");
+    const bool lowDetail = endsWith(base, "_l");
     std::vector<const TextureFile*> found;
     auto collect = [&](auto&& matches) {
         for (int sameFolder = 1; sameFolder >= 0 && found.empty(); --sameFolder)
@@ -105,7 +108,31 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
             const size_t us = t.stem.find('_');
             return t.folder == folder && abbreviates(base, t.stem.substr(0, us));
         });
+    // Or names that differ by a number or a shortening: fapc2 uses fapc,
+    // rsv rsv2, r_bop r_bop5-7, fconbee fconb and fconb_a.
+    auto stripDigits = [](std::string n) {
+        while (!n.empty() && std::isdigit(static_cast<unsigned char>(n.back())))
+            n.pop_back();
+        return n;
+    };
+    if (found.empty() && !outline)
+        collect([&](const TextureFile& t) {
+            if (t.folder != folder)
+                return false;
+            // The texture's name without a _suffix (for r_bop5: the whole name).
+            std::string name = t.stem;
+            if (const size_t us = name.rfind('_'); us != std::string::npos && us + 3 >= name.size() && us > 0)
+                name.resize(us);
+            const std::string a = stripDigits(base), b = stripDigits(name);
+            return !b.empty() && (a == b || (b.size() >= 4 && a.size() > b.size() && a.compare(0, b.size(), b) == 0));
+        });
 
+    // A low-detail model found its family's textures under another name
+    // (fapc2_l: fapc, fapc_g, fapc_l): its own is the _l one.
+    if (lowDetail && !endsWith(base, "_l") &&
+        std::any_of(found.begin(), found.end(), [](const TextureFile* t) { return endsWith(t->stem, "_l"); }))
+        found.erase(std::remove_if(found.begin(), found.end(), [](const TextureFile* t) { return !endsWith(t->stem, "_l"); }),
+                    found.end());
     // One of each name (some are stored both as .lbp and as a mipmap set),
     // in name order (the list is sorted by stem).
     // A texture named <model>_door (mch_door) is the model's door, which

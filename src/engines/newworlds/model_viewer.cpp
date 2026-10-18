@@ -167,7 +167,7 @@ void ModelViewer::loadMetamodel(const std::string& modelName) {
         if (hasMdl_)
             break;
     }
-    loadAnimations(stem);
+    loadAnimations(stem, folder);
 }
 
 // The animation channel (.mdl animated list) a geometry node is moved by:
@@ -183,15 +183,23 @@ int ModelViewer::channelOfNode(uint32_t node) const {
 
 // The .arf frames that fit the model: one transform per animated part,
 // grouped by name without the frame number (conbee00 ... conbee15: conbee;
-// fcmwalk0 ... fcmwalk9: fcmwalk), those named like the model first. Which
-// animation belongs to which state isn't stored anywhere found yet.
-void ModelViewer::loadAnimations(const std::string& stem) {
+// fcmwalk0 ... fcmwalk9: fcmwalk). A set plays the state it's named after
+// (fcmstand: stand, fcmwalk: walk), or the model's only state other than
+// "reference" (the construction vehicles' conbee, fconb, rcb: manipulate).
+// Sets named like the model come first (fconb for fconbee), then those in
+// its folder, then the rest (every side's crewmen use the fed/ sets). The
+// actor archives repeat some sets (fcmwalk in each), so each frame counts once.
+void ModelViewer::loadAnimations(const std::string& stem, const std::string& modelFolder) {
     animations_.clear();
     animation_ = -1;
     animFrame_ = 0;
     if (!hasMdl_ || mdl_.animated.empty() || mdl_.reference.size() != mdl_.animated.size())
         return;
-    std::map<std::string, std::vector<std::pair<std::string, EntryRef>>> sets;
+    struct Set {
+        std::string folder;
+        std::map<std::string, EntryRef> frames; // by frame name, sorted
+    };
+    std::map<std::string, Set> sets;
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i) {
@@ -202,18 +210,23 @@ void ModelViewer::loadAnimations(const std::string& stem) {
             std::string name = frame;
             while (!name.empty() && std::isdigit(static_cast<unsigned char>(name.back())))
                 name.pop_back();
-            sets[name].push_back({frame, EntryRef{a, i}});
+            Set& set = sets[name];
+            set.folder = folder;
+            set.frames.emplace(frame, EntryRef{a, i}); // the first copy wins
         }
     }
+    std::vector<std::string> otherStates;
+    for (const auto& st : mdl_.states)
+        if (!st.empty() && st != "reference")
+            otherStates.push_back(st);
+    std::vector<std::pair<int, Animation>> found;
     std::vector<uint8_t> data;
-    for (auto& [name, frames] : sets) {
-        std::sort(frames.begin(), frames.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
-        Animation anim{name, {}};
-        for (const auto& f : frames) {
-            CatArchive& cat = *archives_[f.second.archive];
+    for (auto& [name, set] : sets) {
+        Animation anim{name, {}, {}};
+        for (const auto& [frame, ref] : set.frames) {
+            CatArchive& cat = *archives_[ref.archive];
             std::vector<PartTransform> t;
-            if (cat.read(cat.entries()[f.second.entry], data) || parseArf(data, t) ||
-                t.size() != mdl_.animated.size()) {
+            if (cat.read(cat.entries()[ref.entry], data) || parseArf(data, t) || t.size() != mdl_.animated.size()) {
                 anim.frames.clear();
                 break;
             }
@@ -221,11 +234,17 @@ void ModelViewer::loadAnimations(const std::string& stem) {
         }
         if (anim.frames.empty())
             continue;
-        if (name.rfind(stem, 0) == 0)
-            animations_.insert(animations_.begin(), std::move(anim));
-        else
-            animations_.push_back(std::move(anim));
+        for (const auto& st : otherStates)
+            if (name.size() > st.size() && name.compare(name.size() - st.size(), st.size(), st) == 0)
+                anim.state = st;
+        if (anim.state.empty() && otherStates.size() == 1)
+            anim.state = otherStates[0];
+        const bool named = name.rfind(stem, 0) == 0 || (name.size() >= 4 && stem.rfind(name, 0) == 0);
+        found.push_back({named ? 0 : set.folder == modelFolder ? 1 : 2, std::move(anim)});
     }
+    std::stable_sort(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+    for (auto& f : found)
+        animations_.push_back(std::move(f.second));
 }
 
 void ModelViewer::loadTextures(const std::string& modelName) {
@@ -390,7 +409,7 @@ void ModelViewer::updateTitle() {
         title += "; " + std::to_string(model_.attachments.size()) + " points";
         if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
             const auto& a = animations_[size_t(animation_)];
-            title += "; animation " + a.name + " frame " + std::to_string(animFrame_ % int(a.frames.size()) + 1) + "/" +
+            title += "; animation " + a.name + (a.state.empty() ? "" : " (" + a.state + ")") + " frame " + std::to_string(animFrame_ % int(a.frames.size()) + 1) + "/" +
                      std::to_string(a.frames.size());
         } else if (!animations_.empty()) {
             title += "; " + std::to_string(animations_.size()) + " animations (K)";
