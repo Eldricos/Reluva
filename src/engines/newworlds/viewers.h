@@ -5,6 +5,7 @@
 
 #include "common/events.h"
 #include "common/system.h"
+#include "common/audio/mixer.h"
 #include "common/audio/sound.h"
 #include "common/types.h"
 #include "engines/newworlds/cat_archive.h"
@@ -21,7 +22,6 @@
 #include <filesystem>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -271,10 +271,11 @@ private:
     int current_ = 0;
     std::string status_;
     // Shared with the audio thread.
-    mutable std::mutex mutex_;
-    std::shared_ptr<const audio::Sound> sound_;
-    double position_ = 0; // in the sound's frames
-    bool playing_ = false;
+    std::shared_ptr<const audio::Sound> sound_; // the one shown
+    // Playback through the shared mixer (created with the output rate when
+    // first needed); one sound at a time here.
+    std::unique_ptr<audio::Mixer> mixer_;
+    audio::SoundHandle playing_ = audio::kNoSound;
 };
 
 // Shows the string tables (.stb), word-wrapped, with their ids.

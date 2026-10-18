@@ -87,7 +87,10 @@ music.
 
 The shared audio code (`src/common/audio/`, for every engine) decodes both
 formats: `decodeSound` picks WAV (PCM, IMA ADPCM) or MP3 (through minimp3,
-`third_party/minimp3`) by content. The data viewer's sounds page lists the
+`third_party/minimp3`) by content, and `Mixer` (`mixer.h`) plays any number of decoded sounds at
+once: resampled to the output rate, each with its volume, pan and looping,
+and music, speech and effects volumes for the game's settings. The data
+viewer's sounds page lists the
 game folder's loose `.mp3` and `.wav` files after the archives' sounds and
 plays them; `reluva-tool wav-info` and `wav-decode` take MP3s too. The voice
 MP3s decode to within 1 of ffmpeg's samples.

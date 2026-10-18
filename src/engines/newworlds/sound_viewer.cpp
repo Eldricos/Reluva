@@ -150,63 +150,34 @@ void SoundViewer::show(int index) {
         status_ = err.message;
     else if (Error err2 = audio::decodeSound(data, *sound))
         status_ = err2.message;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sound_ = status_.empty() ? sound : nullptr;
-    }
+    sound_ = status_.empty() ? sound : nullptr;
     draw();
     updateTitle();
     if (autoPlay_)
         play();
 }
 
-bool SoundViewer::playing() const {
-    std::lock_guard<std::mutex> lock(mutex_);
-    return playing_;
-}
+bool SoundViewer::playing() const { return mixer_ && mixer_->isPlaying(playing_); }
 
 void SoundViewer::play() {
-    if (!audioStarted_) {
-        // Mix the current sound into the output, resampled linearly.
-        Error err = sys_.startAudio([this](int16_t* out, int frames) {
-            std::lock_guard<std::mutex> lock(mutex_);
-            const int rate = sys_.audioRate();
-            for (int i = 0; i < frames; ++i) {
-                int16_t left = 0, right = 0;
-                if (playing_ && sound_ && sound_->frames()) {
-                    const size_t n = sound_->frames(), ch = size_t(sound_->channels);
-                    const size_t f = size_t(position_);
-                    if (f + 1 >= n) {
-                        playing_ = false;
-                    } else {
-                        const double t = position_ - double(f);
-                        auto at = [&](size_t frame, size_t c) { return double(sound_->samples[frame * ch + c]); };
-                        left = int16_t(at(f, 0) * (1 - t) + at(f + 1, 0) * t);
-                        right = ch > 1 ? int16_t(at(f, 1) * (1 - t) + at(f + 1, 1) * t) : left;
-                        position_ += double(sound_->rate) / double(rate);
-                    }
-                }
-                out[2 * i] = left;
-                out[2 * i + 1] = right;
-            }
-        });
-        if (err) {
+    if (!mixer_) {
+        auto mixer = std::make_unique<audio::Mixer>(sys_.audioRate());
+        if (Error err = audio::startMixerOutput(sys_, *mixer)) {
             status_ = err.message;
             updateTitle();
             return;
         }
+        mixer_ = std::move(mixer);
         audioStarted_ = true;
     }
-    std::lock_guard<std::mutex> lock(mutex_);
-    if (sound_) {
-        position_ = 0;
-        playing_ = true;
-    }
+    mixer_->stop(playing_);
+    playing_ = mixer_->play(sound_, audio::SoundType::Effects);
 }
 
 void SoundViewer::stop() {
-    std::lock_guard<std::mutex> lock(mutex_);
-    playing_ = false;
+    if (mixer_)
+        mixer_->stop(playing_);
+    playing_ = audio::kNoSound;
 }
 
 void SoundViewer::draw() {
@@ -219,12 +190,10 @@ void SoundViewer::draw() {
     std::shared_ptr<const audio::Sound> sound;
     double position = 0;
     bool playing = false;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sound = sound_;
-        position = position_;
-        playing = playing_;
-    }
+    sound = sound_;
+    playing = this->playing();
+    if (playing)
+        position = mixer_->position(playing_);
     auto plot = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
         if (x < 0 || y < 0 || x >= w || y >= h)
             return;
@@ -266,10 +235,7 @@ void SoundViewer::updateTitle() {
                         std::to_string(current_ + 1) + "/" + std::to_string(shownSounds_.size()) + ": " +
                         nameOf(current) + " in " + archiveOf(current) + " (";
     std::shared_ptr<const audio::Sound> sound;
-    {
-        std::lock_guard<std::mutex> lock(mutex_);
-        sound = sound_;
-    }
+    sound = sound_;
     if (!status_.empty() || !sound) {
         title += status_ + ")";
     } else {

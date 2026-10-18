@@ -4,6 +4,7 @@
 // Small self-contained tests for common/. No framework, to keep deps at zero.
 
 #include "common/audio/decode.h"
+#include "common/audio/mixer.h"
 #include "common/audio/mp3.h"
 #include "common/audio/wav.h"
 #include "data/tone440_mp3.h"
@@ -15,6 +16,7 @@
 #include "common/text.h"
 
 #include <cstdio>
+#include <memory>
 #include <fstream>
 #include <string>
 
@@ -160,6 +162,55 @@ static void testMp3() {
     CHECK(bool(decodeMp3(std::vector<uint8_t>(100, 0), t))); // no frames
 }
 
+static void testMixer() {
+    using namespace reluva::audio;
+    auto make = [](int rate, int channels, std::vector<int16_t> samples) {
+        auto s = std::make_shared<Sound>();
+        s->rate = rate, s->channels = channels, s->samples = std::move(samples);
+        return std::shared_ptr<const Sound>(s);
+    };
+    std::vector<int16_t> out(40);
+    Mixer m(22050);
+    // A sound at the output rate plays sample for sample, then stops and frees its channel.
+    const SoundHandle a = m.play(make(22050, 1, std::vector<int16_t>(10, 1000)), SoundType::Effects);
+    CHECK(a != kNoSound && m.isPlaying(a));
+    m.mix(out.data(), 12);
+    CHECK(out[0] == 1000 && out[1] == 1000 && out[18] == 1000 && out[19] == 1000 && out[20] == 0 && out[23] == 0);
+    CHECK(!m.isPlaying(a));
+    m.mix(out.data(), 4);
+    CHECK(out[0] == 0 && out[7] == 0); // silence with nothing playing
+    // Two sounds add up, and clamp at 16 bits.
+    m.play(make(22050, 1, {30000, 1000}), SoundType::Effects);
+    m.play(make(22050, 1, {30000, -3000}), SoundType::Music);
+    m.mix(out.data(), 2);
+    CHECK(out[0] == 32767 && out[2] == -2000 && out[3] == -2000);
+    // Volumes: the sound's and its type's multiply.
+    m.setTypeVolume(SoundType::Music, kMaxVolume / 2);
+    m.play(make(22050, 1, {1000}), SoundType::Music, kMaxVolume / 2);
+    m.mix(out.data(), 1);
+    CHECK(out[0] == 250 && out[1] == 250 && m.typeVolume(SoundType::Music) == 128);
+    m.setTypeVolume(SoundType::Music, kMaxVolume);
+    // Pan: full right silences the left.
+    m.play(make(22050, 1, {1000}), SoundType::Speech, kMaxVolume, kMaxPan);
+    m.mix(out.data(), 1);
+    CHECK(out[0] == 0 && out[1] == 1000);
+    // Resampling: an 11025 Hz ramp at 22050 Hz gets a frame in between each.
+    const SoundHandle r = m.play(make(11025, 1, {0, 100, 200, 300}), SoundType::Effects);
+    m.mix(out.data(), 4);
+    CHECK(out[0] == 0 && out[2] == 50 && out[4] == 100 && out[6] == 150 && m.position(r) == 2.0);
+    m.stopAll();
+    // Stereo keeps its channels; a loop repeats until stopped.
+    const SoundHandle l = m.play(make(22050, 2, {10, -10, 20, -20}), SoundType::Music, kMaxVolume, 0, true);
+    m.mix(out.data(), 5);
+    CHECK(out[0] == 10 && out[1] == -10 && out[2] == 20 && out[3] == -20 && out[4] == 10 && out[8] == 10);
+    CHECK(m.isPlaying(l) && m.isTypePlaying(SoundType::Music) && !m.isTypePlaying(SoundType::Speech));
+    m.stopType(SoundType::Music);
+    m.mix(out.data(), 2);
+    CHECK(!m.isPlaying(l) && out[0] == 0);
+    // Nothing to play.
+    CHECK(m.play(nullptr, SoundType::Effects) == kNoSound && m.play(make(22050, 1, {}), SoundType::Effects) == kNoSound);
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
@@ -167,6 +218,7 @@ int main() {
     testFont();
     testWav();
     testMp3();
+    testMixer();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)

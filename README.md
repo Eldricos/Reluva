@@ -12,7 +12,7 @@ included: you point Reluva at your own installed copy.
 src/common/        platform-independent core: System interface, events,
                    surfaces, config, case-insensitive file lookup, detection,
                    text and a built-in font
-  audio/           sound decoders shared by every engine: WAV (PCM, IMA ADPCM), MP3
+  audio/           sound decoders and the mixer, shared by every engine: WAV (PCM, IMA ADPCM), MP3
 third_party/       outside code Reluva builds in, each with its licence (minimp3)
 src/backends/sdl3/ the only code that touches SDL (window, rendering, input, audio)
 src/launcher/      Dear ImGui game list: add / remove / start games

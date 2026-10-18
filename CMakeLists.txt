@@ -57,6 +57,7 @@ add_library(reluva_common STATIC
     src/common/md5.cpp
     src/common/detection.cpp
     src/common/audio/decode.cpp
+    src/common/audio/mixer.cpp
     src/common/audio/mp3.cpp
     src/common/audio/wav.cpp
     src/common/font.cpp
