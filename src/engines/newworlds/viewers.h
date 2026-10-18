@@ -169,7 +169,6 @@ private:
     void makeUnderlay();
     const TileEdges& tileEdges(uint32_t tile);
     static TileEdges edgesOf(const GeoModel& geo, int rotation);
-    void fitModelNumbers(CatArchive& cat, size_t mainCount);
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
 
@@ -185,8 +184,6 @@ private:
     GmfMap map_;
     std::string status_;                 // decode error, if any
     std::vector<size_t> archiveModels_;  // entry indices of the map archive's .geo files, by model number
-    size_t fittedArchive_ = size_t(-1);  // the archive fitModelNumbers last checked, and its result
-    std::vector<size_t> fittedModels_;
     std::map<uint32_t, TileModel> tileModels_;
     std::map<uint32_t, TileEdges> tileEdges_;
     Texture wallTexture_; // the map archive's last cliff texture, if any

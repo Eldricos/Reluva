@@ -121,9 +121,8 @@ Checked on the 7 maps of `icewrld.cat`:
   `brid_02` 28 or 33; so the table above is wrong there for `icewrld` and
   `deswrld` too. Flat-edged pieces (cracks, `hole_02`, concrete, tiles
   23-26) fit any flat place, so their places can't be told apart this way.
-  The map viewer starts from the table and, once per archive, swaps two
-  numbers' models wherever that makes clearly more tile edges meet in its
-  maps. `icewrld` stores its
+  Letting the map viewer swap numbers by edges made `icewrld` worse
+  (bridges on flat ground), so it uses the table as it is. `icewrld` stores its
   models in exactly the general order. Found with two checks: how many tile
   edges meet (heights at 5 points within 80 units), and the tiles' terrain
   codes compared with `icewrld`'s, whose numbering is known (they match
