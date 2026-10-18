@@ -7,7 +7,6 @@
 #include <array>
 #include <cctype>
 #include <cmath>
-#include <cstdlib>
 #include <initializer_list>
 
 namespace reluva::newworlds {
@@ -98,18 +97,17 @@ std::vector<std::string> chooseGroundTextures(const std::string& modelStem, cons
         area[face.corners.back().extra[4]][faceRole(std::fabs(nz) / len, z)] += len / 2;
     }
 
-    // Flat low ground: the model's own number (low07, ice07), else the
-    // planet's four plain variants (green, sand, blue) in turn.
+    // Flat low ground: the model's own number (low07, ice07), else the plain
+    // flat texture (low07, tile 07's), else the planet's plain variant
+    // (green01, sand01, blue01; the other three have patterns drawn for
+    // particular tiles).
     auto low = [&] {
         for (const char* f : {"low", "ice"})
             if (!roleNumber.empty() && names.has(f + roleNumber))
                 return f + roleNumber;
-        const int n = roleNumber.empty() ? 1 : std::atoi(roleNumber.c_str());
-        const std::string variant = "0" + std::to_string((n + 3) % 4 + 1);
-        for (const char* f : {"green", "sand", "blue"})
-            if (names.has(f + variant))
-                return f + variant;
-        return names.pick({"low", "ice", "green", "sand", "blue"}, "");
+        if (names.has("low07"))
+            return std::string("low07");
+        return names.pick({"green", "sand", "blue", "low", "ice"}, "");
     };
     auto byRole = [&](Role r) -> std::string {
         switch (r) {

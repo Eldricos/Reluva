@@ -418,7 +418,8 @@ void testGmf() {
     const std::vector<std::string> geos = {"geo/map/d/brid_01.geo", "geo/map/d/d_01.geo", "geo/map/d/lod/d_01.geo",
                                            "geo/map/d/needle_0.geo", "geo/map/d/d_26.geo", "geo/map/d/ramp.geo"};
     const std::vector<size_t> order = tileModelOrder(geos);
-    CHECK((order == std::vector<size_t>{1, 0, 5, 4, 3, 2}));
+    CHECK(order.size() == 42 && order[0] == 1 && order[22] == 0 && order[24] == kNoModel && order[34] == 5 &&
+          order[38] == 4 && order[40] == 3 && order[41] == 2);
     auto bad = tinyGmf();
     bad[bad.size() - 1024 - 10] = 5; // the last cell uses block 5 of 1
     CHECK(parseGmf(bad, m));

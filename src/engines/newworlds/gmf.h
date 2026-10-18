@@ -69,12 +69,16 @@ struct GmfMap {
 Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out);
 
 // How a map's model numbers count its archive's .geo files (full names, in
-// archive order): returns the indices into geoNames in model-number order.
-// Not archive order: a fixed list of the planet's tiles (base_01-22, brid_01,
-// brid_02, concrete, concact, crack_03-06, crack_08, hole_01-03, ramp,
-// base_23-26, those present), then the archive's other main models, then its
-// lod/ models, both in archive order. "base" is the family numbered 01-26
-// (ice, alpin, des). icewrld stores them in this order already.
+// archive order): returns, per model number, an index into geoNames, or
+// kNoModel for a number with no model. Not archive order but fixed places
+// (see docs/formats/newworlds/gmf.md): base_01-22, brid_01, brid_02,
+// concrete, concact, crack_03-06, crack_08, hole_01-03, ramp, base_23-26,
+// then 39-40 icecave1/arche_01 and icecave2/needle_0, 44-47 water_01-04,
+// 48-49 mount_01-02; a missing model leaves its place empty (alpwrld
+// differs between 22 and 40; see gmf.cpp). Then any other
+// main models, then the lod/ models, both in archive order. "base" is the
+// family numbered 01-26 (ice, alpin, des).
+constexpr size_t kNoModel = size_t(-1);
 std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames);
 
 } // namespace reluva::newworlds

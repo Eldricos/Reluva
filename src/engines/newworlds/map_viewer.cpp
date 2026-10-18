@@ -72,7 +72,7 @@ void MapViewer::show(int index) {
             geoNames.push_back(cat.entries()[i].name);
         }
     for (size_t k : tileModelOrder(geoNames))
-        archiveModels_.push_back(geoEntries[k]);
+        archiveModels_.push_back(k == kNoModel ? kNoModel : geoEntries[k]);
     std::vector<uint8_t> data;
     // Walls get the archive's last full-size cliff texture (icewrld's
     // cliff07, which no ground model's name matches). A guess.
@@ -115,8 +115,8 @@ const MapViewer::TileModel& MapViewer::tileModel(uint32_t index) {
     if (found != tileModels_.end())
         return found->second;
     TileModel& m = tileModels_[index];
-    if (index >= archiveModels_.size())
-        m.error = "model " + std::to_string(index) + " of " + std::to_string(archiveModels_.size());
+    if (index >= archiveModels_.size() || archiveModels_[index] == kNoModel)
+        m.error = "no model numbered " + std::to_string(index);
     else
         loadModel(archiveModels_[index], m, true);
     return m;
@@ -263,6 +263,8 @@ void MapViewer::placeScenery() {
     CatArchive& cat = *archives_[maps_[size_t(current_)].archive];
     for (const auto& [type, name] : kModels)
         for (size_t entry : archiveModels_) {
+            if (entry == kNoModel)
+                continue;
             const std::string& full = cat.entries()[entry].name;
             std::string folder, stem, ext;
             splitName(full, folder, stem, ext);
@@ -534,11 +536,14 @@ void MapViewer::render() {
                     ty += ty < 0 ? tt->height : 0;
                     const size_t texel = size_t(ty) * size_t(tt->width) + size_t(tx);
                     col = &tt->rgba[texel * 4];
-                    // On the planets the alpha layer is transparency (the
-                    // trees' and bushes' outlines, the ground round a hole).
-                    const float a = col[3] == 0 ? 0.0f
-                                    : tt->alpha.empty() ? 1.0f
-                                                        : float(tt->alpha[texel]) / 255;
+                    // On the planets the alpha layer is transparency: the
+                    // trees' and bushes' outlines, the ground round a hole.
+                    // Other ground tiles are opaque (water02-04 have alpha
+                    // layers, presumably for the game's own water effect).
+                    const bool opaqueGround = ground && !ground->underlay;
+                    const float a = col[3] == 0 && !opaqueGround             ? 0.0f
+                                    : tt->alpha.empty() || opaqueGround ? 1.0f
+                                                                       : float(tt->alpha[texel]) / 255;
                     if (a < 1 && ground && ground->underlay && !underlay_.rgba.empty()) {
                         // Ground shows through, at the same texture coordinates.
                         const Texture& g = underlay_;

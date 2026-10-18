@@ -101,17 +101,26 @@ their outlines (transparency), not light maps.
 Checked on the 7 maps of `icewrld.cat`:
 
 - A tile's type-20 header's third value is the number of its ground model.
-  The numbers don't follow the archive's order but a fixed list of the
-  planet's tiles: `<base>_01`-`22`, `brid_01`, `brid_02`, `concrete`,
-  `concact`, `crack_03`-`06`, `crack_08`, `hole_01`-`03`, `ramp`,
-  `<base>_23`-`26` (those the archive has; `<base>` is `ice`, `alpin`,
-  `des`), then the archive's other main models (`arche_01`, `water_01`, …)
-  and then its `lod/` models, both in archive order. `icewrld` happens to
-  store them in that order. Checked by how many tile edges meet (heights at
-  5 points within 80 units): `deswrld` maps 46-64% in archive order, 88-93%
-  this way; `alpwrld` 81-93% and 89-94% (`alpwrld` has no `concact`, and
-  leaving a gap for it scores worse); numbers past the main models in
-  `deswrld` maps (50) fit the `lod/` model at that place.
+  The numbers don't follow the archive's order but fixed places, a missing
+  model leaving its place empty:
+
+  | Numbers | Models |
+  |---|---|
+  | 0-21 | `<base>_01`-`22` (`<base>`: `ice`, `alpin`, `des`) |
+  | 22-34 | `brid_01`, `brid_02`, `concrete`, `concact`, `crack_03`-`06`, `crack_08`, `hole_01`-`03`, `ramp` |
+  | 35-38 | `<base>_23`-`26` |
+  | 39, 40 | `icecave1`, `icecave2` / `arche_01`, `needle_0` |
+  | 44-49 | `water_01`-`04`, `mount_01`, `mount_02` (`alpwrld`) |
+  | after the last place used | the `lod/` models, in archive order |
+
+  `alpwrld`'s maps differ at 22-38: 25 is empty (it has no `concact`), then
+  `crack_03`-`06`, `hole_02`, `hole_03`, `crack_08`, `alpin_23`-`26`,
+  `hole_01`, `ramp` (37-38 rarely used, less sure). `icewrld` stores its
+  models in exactly the general order. Found with two checks: how many tile
+  edges meet (heights at 5 points within 80 units), and the tiles' terrain
+  codes compared with `icewrld`'s, whose numbering is known (they match
+  almost exactly when the numbering is right). Edges meeting: `deswrld`
+  46-64% in archive order, 88-93% this way; `alpwrld` 81-93%, now 90-93%.
 - **Rotation:** bits 14-15 of the fourth value turn the model anticlockwise
   by that many quarter turns about the tile's centre. Bits 16-17 take three
   values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't

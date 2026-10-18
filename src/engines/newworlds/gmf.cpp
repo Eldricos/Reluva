@@ -146,28 +146,53 @@ std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
         if (!isLod(n) && s.size() > 3 && s.compare(s.size() - 3, 3, "_26") == 0)
             base = s.substr(0, s.size() - 3);
     }
-    std::vector<std::string> wanted;
+    // The fixed places, each with the names that can fill it ("" for none).
+    std::vector<std::vector<std::string>> places;
     char number[8];
-    for (int i = 1; i <= 22; ++i) {
+    auto baseTile = [&](int i) {
         std::snprintf(number, sizeof number, "_%02d", i);
-        wanted.push_back(base + number);
+        return base + number;
+    };
+    for (int i = 1; i <= 22; ++i)
+        places.push_back({baseTile(i)});
+    if (base == "alpin") {
+        // alpwrld's maps number some tiles differently (found by which models
+        // make tile edges meet and by the tiles' terrain codes; 37-40 are
+        // rarely used and less sure).
+        for (const char* n : {"brid_01", "brid_02", "concrete", "", "crack_03", "crack_04", "crack_05", "crack_06",
+                              "hole_02", "hole_03", "crack_08"})
+            places.push_back({n});
+        for (int i = 23; i <= 26; ++i)
+            places.push_back({baseTile(i)});
+        places.push_back({"hole_01"});
+        places.push_back({"ramp"});
+    } else {
+        for (const char* n : {"brid_01", "brid_02", "concrete", "concact", "crack_03", "crack_04", "crack_05",
+                              "crack_06", "crack_08", "hole_01", "hole_02", "hole_03", "ramp"})
+            places.push_back({n});
+        for (int i = 23; i <= 26; ++i)
+            places.push_back({baseTile(i)});
     }
-    for (const char* n : {"brid_01", "brid_02", "concrete", "concact", "crack_03", "crack_04", "crack_05", "crack_06",
-                          "crack_08", "hole_01", "hole_02", "hole_03", "ramp"})
-        wanted.push_back(n);
-    for (int i = 23; i <= 26; ++i) {
-        std::snprintf(number, sizeof number, "_%02d", i);
-        wanted.push_back(base + number);
-    }
+    places.push_back({"icecave1", "arche_01"}); // 39
+    places.push_back({"icecave2", "needle_0"}); // 40
+    places.resize(44);                          // 41-43: not seen used
+    for (const char* n : {"water_01", "water_02", "water_03", "water_04", "mount_01", "mount_02"})
+        places.push_back({n}); // 44-49
+
     std::vector<size_t> order;
     std::vector<bool> used(geoNames.size());
-    for (const auto& w : wanted)
-        for (size_t i = 0; i < geoNames.size(); ++i)
-            if (!used[i] && !isLod(geoNames[i]) && !base.empty() && stem(geoNames[i]) == w) {
-                order.push_back(i);
-                used[i] = true;
-                break;
-            }
+    for (const auto& names : places) {
+        size_t found = kNoModel;
+        for (size_t i = 0; i < geoNames.size() && found == kNoModel && !base.empty(); ++i)
+            for (const auto& n : names)
+                if (!used[i] && !isLod(geoNames[i]) && stem(geoNames[i]) == n)
+                    found = i;
+        if (found != kNoModel)
+            used[found] = true;
+        order.push_back(found);
+    }
+    while (!order.empty() && order.back() == kNoModel)
+        order.pop_back(); // the lod models follow the last place filled
     for (int lod = 0; lod < 2; ++lod)
         for (size_t i = 0; i < geoNames.size(); ++i)
             if (!used[i] && isLod(geoNames[i]) == bool(lod))
