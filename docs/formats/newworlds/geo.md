@@ -114,9 +114,14 @@ facing and texture-coordinate range per number):
   out: `kcdoor` would sort before `kief` and `ksc`, but is their last number.
   A model can also skip one of its own textures: `fch`'s second number is its
   door, not `fch_g`.
-- **Aprons:** many buildings have one up-facing face showing a quarter or
-  half of a texture (in front of `frps_a`'s door, on `fsc` and `foodstor`):
-  a shared texture, not yet identified.
+- **Aprons:** many Federation buildings have one or two up-facing faces
+  showing a quarter or the whole of a texture (in front of `frps_a`'s door,
+  on `fsc`, `foodstor`, `fcy`, `fvpy_a`): **`pad`**. Its colour is plain
+  yellow, but its alpha layer holds four panels of hazard stripes (one with
+  arrows), one per quarter, matching those faces' texture coordinates; drawn
+  with the alpha as transparency they are the striped aprons of the
+  building portraits in `fedgui.cat` (see [gui.md](gui.md)). So outside the
+  `_g` textures, alpha is transparency.
 - Faces about 250 units across showing a whole texture (`fsc`, `fss_a`) are
   something smaller: lights or signs.
 
@@ -151,7 +156,8 @@ it plus `_` and a suffix, in name order from 0, preferring its own folder
 (`kln`). A model without any, such as a `_l` version, uses those of its name
 without the suffix, and a shortened name such as `landpd_d` those of the
 texture it abbreviates (`landpad`). `_s` textures belong to the `_s` models.
-Then door numbers (as above) get the side's door. A model without a match at
+Then door numbers (as above) get the side's door, and unfilled apron numbers
+(one or two up-facing faces) the side's `pad`. A model without a match at
 all, such as the `_s` outlines, is drawn untextured.
 
 In the other corners of a face, the same value holds the part number (0 in

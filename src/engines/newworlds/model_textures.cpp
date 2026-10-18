@@ -171,4 +171,44 @@ void addDoorTextures(const GeoModel& geo, const std::string& modelName, const st
             slots[i] = door;
 }
 
+bool isPadSlot(const GeoModel& geo, uint32_t slot) {
+    unsigned faces = 0;
+    for (const auto& f : geo.faces) {
+        if (f.corners.back().extra[4] != slot)
+            continue;
+        if (++faces > 2)
+            return false;
+        const auto& vs = geo.parts[f.part].vertices;
+        float nx = 0, ny = 0, nz = 0;
+        for (size_t i = 0; i < f.corners.size(); ++i) {
+            const auto& p = vs[f.corners[i].vertex];
+            const auto& q = vs[f.corners[(i + 1) % f.corners.size()].vertex];
+            nx += (p.y - q.y) * (p.z + q.z);
+            ny += (p.z - q.z) * (p.x + q.x);
+            nz += (p.x - q.x) * (p.y + q.y);
+        }
+        // Front faces are clockwise seen from the front, so an up-facing
+        // face's Newell normal points down.
+        const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+        if (len <= 0 || -nz / len < 0.9f)
+            return false;
+    }
+    return faces > 0;
+}
+
+void addPadTextures(const GeoModel& geo, const std::string& modelName, const std::vector<TextureFile>& textures,
+                    std::vector<const TextureFile*>& slots) {
+    std::string folder, base, ext;
+    splitName(modelName, folder, base, ext);
+    const TextureFile* pad = nullptr;
+    for (const TextureFile& t : textures)
+        if (t.folder == folder && t.stem == "pad")
+            pad = &t;
+    if (!pad)
+        return;
+    for (size_t i = 1; i < slots.size(); ++i)
+        if (!slots[i] && isPadSlot(geo, uint32_t(i)))
+            slots[i] = pad;
+}
+
 } // namespace reluva::newworlds

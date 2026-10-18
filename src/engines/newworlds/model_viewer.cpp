@@ -15,8 +15,10 @@ namespace {
 
 constexpr int kFilterCount = 3;
 constexpr const char* kFilterNames[kFilterCount] = {"all", "multi-part", "failed"};
-// How a texture's alpha layer (format 6) is used. In k_bop_g it marks the
-// lights, so by default it's a glow map: alpha keeps texels lit.
+// How a texture's alpha layer (format 6) is used. By default: in _g
+// textures (k_bop_g) it marks the lights, so it's a glow map, keeping texels
+// lit; in the others (pad's hazard stripes, the door frames) it's
+// transparency. The other two settings apply one way to all.
 constexpr const char* kAlphaNames[3] = {"alpha as glow", "alpha ignored", "alpha as transparency"};
 constexpr const char* kOutlineNames[3] = {"solid", "solid + outlines", "outlines"};
 // Front faces are clockwise on screen (models store them clockwise), so by
@@ -235,6 +237,7 @@ void ModelViewer::loadTextures(const std::string& modelName) {
     std::vector<uint8_t> data;
     std::vector<const TextureFile*> slots = findModelTextures(modelName, textureFiles_, needed);
     addDoorTextures(model_, modelName, textureFiles_, slots);
+    addPadTextures(model_, modelName, textureFiles_, slots);
     for (const TextureFile* t : slots) {
         // Unknown or unreadable textures stay empty, keeping the numbering;
         // their faces are drawn untextured.
@@ -503,7 +506,9 @@ void ModelViewer::render() {
             !modelTextures_[textureIndex].rgba.empty())
             tex = &modelTextures_[textureIndex];
         const bool hasAlpha = tex && !tex->alpha.empty();
-        const bool blended = hasAlpha && alphaMode_ == 2;
+        const std::string& texName = textureIndex < modelTextureNames_.size() ? modelTextureNames_[textureIndex] : "";
+        const bool glowMap = texName.size() > 2 && texName.compare(texName.size() - 2, 2, "_g") == 0;
+        const bool blended = hasAlpha && (alphaMode_ == 2 || (alphaMode_ == 0 && !glowMap));
         if (blended != (pass == 1))
             continue;
         const auto& verts = model_.parts[face.part].vertices;
@@ -575,7 +580,7 @@ void ModelViewer::render() {
                         return false; // colour key: nothing drawn
                     const float layer = hasAlpha ? float(tex->alpha[texel]) / 255.0f : 1.0f;
                     a = blended ? layer : 1.0f;
-                    if (hasAlpha && alphaMode_ == 0) // glow: alpha keeps the texel lit
+                    if (hasAlpha && alphaMode_ == 0 && glowMap) // glow: alpha keeps the texel lit
                         k = std::max(k, layer);
                     if (a <= 0)
                         return false;

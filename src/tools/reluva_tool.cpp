@@ -1936,6 +1936,7 @@ int cmdGeoTextures(int argc, char** argv) {
                     needed = std::max(needed, face.corners.back().extra[4] + 1);
             auto slots = nw::findModelTextures(e.name, textures, needed);
             nw::addDoorTextures(m, e.name, textures, slots);
+            nw::addPadTextures(m, e.name, textures, slots);
             const size_t found = size_t(std::count_if(slots.begin(), slots.end(), [](auto* t) { return t; }));
             const bool tooFew = found < needed;
             if (found == 0)

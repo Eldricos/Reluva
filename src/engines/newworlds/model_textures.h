@@ -50,4 +50,15 @@ bool isDoorSlot(const GeoModel& geo, uint32_t slot);
 void addDoorTextures(const GeoModel& geo, const std::string& modelName, const std::vector<TextureFile>& textures,
                      std::vector<const TextureFile*>& slots);
 
+// Whether a texture number is a building's apron: one or two up-facing
+// faces. The Federation's are pad, whose alpha layer holds four panels of
+// hazard stripes, one per quarter; the faces show one quarter or the whole
+// (the portraits in fedgui.cat show the striped aprons).
+bool isPadSlot(const GeoModel& geo, uint32_t slot);
+
+// Gives a model's unfilled apron numbers its side's pad texture (only the
+// Federation has one).
+void addPadTextures(const GeoModel& geo, const std::string& modelName, const std::vector<TextureFile>& textures,
+                    std::vector<const TextureFile*>& slots);
+
 } // namespace reluva::newworlds
