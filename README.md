@@ -47,7 +47,7 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
 - New Worlds currently opens as a data viewer. **Tab** switches between models,
-  textures and maps, **Left/Right** step through them and **F** cycles filters. For
+  textures, maps and sounds, **Left/Right** step through them and **F** cycles filters. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used, **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations
@@ -56,7 +56,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   and **R** to reset the view. Maps are built from their ground tiles: drag to
   rotate, use the wheel to zoom, **W/A/S/D** to move, **Q/E** to turn,
   **Left/Right** for the next map, **T** for textures, **G** to colour the ground by its terrain codes or show resource deposits, **O** for the placed trees and rocks, **H** for smooth or flat shading, **K** for
-  the walls between levels and **L** for outlines.
+  the walls between levels and **L** for outlines. For sounds, **Space** (or
+  **Enter**) plays or stops the selected one and **A** plays each as it's selected.
 
 The config is saved as `reluva.ini` in SDL's preferences folder
 (`~/.local/share/reluva/reluva/` on Linux, `%APPDATA%\reluva\reluva\` on Windows).

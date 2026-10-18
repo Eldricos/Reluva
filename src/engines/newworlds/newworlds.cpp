@@ -25,6 +25,7 @@ namespace {
 using newworlds::CatArchive;
 using newworlds::MapViewer;
 using newworlds::ModelViewer;
+using newworlds::SoundViewer;
 using newworlds::TextureViewer;
 
 // Detection table. Built with `reluva --hash`: each entry needs the size and
@@ -54,22 +55,26 @@ public:
         ModelViewer models(sys_, screen_, archives_);
         TextureViewer textures(sys_, screen_, archives_);
         MapViewer maps(sys_, screen_, archives_);
-        const size_t counts[3] = {models.count(), textures.count(), maps.count()};
-        if (counts[0] + counts[1] + counts[2] == 0)
-            return Error::fail("No models, textures or maps found in " + target_.path.string());
-        // Viewer 0 shows models, 1 textures, 2 maps; Tab moves to the next
-        // one that has something to show. They draw into the screen, so it
-        // must exist before the first activate().
+        SoundViewer sounds(sys_, screen_, archives_);
+        constexpr int kViewers = 4;
+        const size_t counts[kViewers] = {models.count(), textures.count(), maps.count(), sounds.count()};
+        if (counts[0] + counts[1] + counts[2] + counts[3] == 0)
+            return Error::fail("No models, textures, maps or sounds found in " + target_.path.string());
+        // Viewer 0 shows models, 1 textures, 2 maps, 3 sounds; Tab moves to
+        // the next one that has something to show. They draw into the
+        // screen, so it must exist before the first activate().
         int viewer = 0;
         while (counts[viewer] == 0)
-            viewer = (viewer + 1) % 3;
+            viewer = (viewer + 1) % kViewers;
         auto activate = [&] {
             if (viewer == 0)
                 models.activate();
             else if (viewer == 1)
                 textures.activate();
-            else
+            else if (viewer == 2)
                 maps.activate();
+            else
+                sounds.activate();
         };
         activate();
 
@@ -81,8 +86,10 @@ public:
                 if (ev.type == EventType::KeyDown && ev.key == key::Escape)
                     return Error::success();
                 if (ev.type == EventType::KeyDown && ev.key == key::Tab) {
+                    if (viewer == 3)
+                        sounds.deactivate();
                     do
-                        viewer = (viewer + 1) % 3;
+                        viewer = (viewer + 1) % kViewers;
                     while (counts[viewer] == 0);
                     activate();
                     continue;
@@ -93,11 +100,15 @@ public:
                     textures.handleKey(ev.key);
                 else if (viewer == 2)
                     maps.handleEvent(ev);
+                else if (viewer == 3 && ev.type == EventType::KeyDown)
+                    sounds.handleKey(ev.key);
             }
             if (viewer == 0)
                 models.update(sys_.getMillis());
             else if (viewer == 2)
                 maps.update(sys_.getMillis());
+            else if (viewer == 3)
+                sounds.update(sys_.getMillis());
             sys_.updateScreen(screen_);
             sys_.delayMillis(10);
         }

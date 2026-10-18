@@ -21,6 +21,8 @@
 //                                                  only models with too few, with similar names)
 //   reluva-tool mdl-info <file.mdl | file.cat>     show a metamodel's names and states, or survey every
 //                                                  one in an archive
+//   reluva-tool wav-info <file.wav | file.cat>     show a sound's format and length, or survey an archive's
+//   reluva-tool wav-decode <in.wav> <out.wav>      decode a sound to 16-bit PCM
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -37,6 +39,7 @@
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
+#include "engines/newworlds/wav.h"
 #include "engines/newworlds/model_textures.h"
 
 #include <map>
@@ -1073,6 +1076,73 @@ int cmdMdlInfo(int argc, char** argv) {
     return 0;
 }
 
+int cmdWavInfo(int argc, char** argv) {
+    if (argc != 3) {
+        std::fprintf(stderr, "usage: reluva-tool wav-info <file.wav | file.cat>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    auto describe = [](const std::string& name, const std::vector<uint8_t>& data) {
+        nw::Sound s;
+        if (reluva::Error err = nw::decodeWav(data, s)) {
+            std::printf("%-28s %s\n", name.c_str(), err.message.c_str());
+            return false;
+        }
+        std::printf("%-28s format %#x, %d channel%s, %d Hz, %zu frames (%.2f s)\n", name.c_str(), s.format,
+                    s.channels, s.channels == 1 ? "" : "s", s.rate, s.frames(), double(s.frames()) / s.rate);
+        return true;
+    };
+    const std::string path = argv[2];
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
+        nw::CatArchive cat;
+        if (reluva::Error err = cat.open(path)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        unsigned count = 0, good = 0;
+        std::vector<uint8_t> data;
+        for (const auto& e : cat.entries())
+            if (e.tag == nw::cattag::Wave) {
+                ++count;
+                good += !cat.read(e, data) && describe(e.name, data);
+            }
+        std::printf("%u sounds, %u decode\n", count, good);
+        return good == count ? 0 : 1;
+    }
+    std::vector<uint8_t> data;
+    if (!readFile(path.c_str(), data)) {
+        std::fprintf(stderr, "cannot open %s\n", path.c_str());
+        return 1;
+    }
+    return describe(path, data) ? 0 : 1;
+}
+
+int cmdWavDecode(int argc, char** argv) {
+    if (argc != 4) {
+        std::fprintf(stderr, "usage: reluva-tool wav-decode <in.wav> <out.wav>\n");
+        return 2;
+    }
+    std::vector<uint8_t> data;
+    if (!readFile(argv[2], data)) {
+        std::fprintf(stderr, "cannot open %s\n", argv[2]);
+        return 1;
+    }
+    reluva::newworlds::Sound s;
+    if (reluva::Error err = reluva::newworlds::decodeWav(data, s)) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    const std::vector<uint8_t> out = reluva::newworlds::encodePcmWav(s);
+    std::ofstream f(argv[3], std::ios::binary);
+    f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
+    if (!f) {
+        std::fprintf(stderr, "cannot write %s\n", argv[3]);
+        return 1;
+    }
+    std::printf("%zu frames at %d Hz written to %s\n", s.frames(), s.rate, argv[3]);
+    return 0;
+}
+
 int cmdGroundTextures(int argc, char** argv) {
     if (argc != 3) {
         std::fprintf(stderr, "usage: reluva-tool ground-textures <planet.cat>\n");
@@ -1452,6 +1522,10 @@ int main(int argc, char** argv) {
         return cmdGeoTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "mdl-info") == 0)
         return cmdMdlInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "wav-info") == 0)
+        return cmdWavInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "wav-decode") == 0)
+        return cmdWavDecode(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1472,6 +1546,8 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
                  "  reluva-tool mdl-info <file.mdl | file.cat>\n"
+                 "  reluva-tool wav-info <file.wav | file.cat>\n"
+                 "  reluva-tool wav-decode <in.wav> <out.wav>\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"

@@ -13,9 +13,11 @@
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/texture.h"
+#include "engines/newworlds/wav.h"
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -216,6 +218,41 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
+};
+
+// Plays the sounds (.wav) and shows their waveforms.
+//   Left/Right: previous/next   PageUp/PageDown: jump 10   Home/End: first/last
+//   Space or Enter: play/stop   A: play each sound on selecting it
+class SoundViewer {
+public:
+    SoundViewer(System& sys, Surface& screen, const Archives& archives);
+    ~SoundViewer();
+    size_t count() const { return sounds_.size(); }
+    void activate();
+    void deactivate(); // stops playing when switching to another viewer
+    void handleKey(uint32_t key);
+    void update(uint64_t nowMs);
+
+private:
+    void show(int index);
+    void play();
+    void stop();
+    bool playing() const;
+    void draw();
+    void updateTitle();
+
+    System& sys_;
+    Surface& screen_;
+    const Archives& archives_;
+    std::vector<EntryRef> sounds_;
+    bool shown_ = false, autoPlay_ = false, audioStarted_ = false, wasPlaying_ = false;
+    int current_ = 0;
+    std::string status_;
+    // Shared with the audio thread.
+    mutable std::mutex mutex_;
+    std::shared_ptr<const Sound> sound_;
+    double position_ = 0; // in the sound's frames
+    bool playing_ = false;
 };
 
 } // namespace reluva::newworlds
