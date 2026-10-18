@@ -58,4 +58,16 @@ struct GeoModel {
 
 Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out);
 
+// A ground tile model's heights along its four sides (0 east, 1 north,
+// 2 west, 3 south, after turning it rotation quarter turns anticlockwise),
+// at 5 even points from the side's low-coordinate end, interpolated from
+// the vertices on the side; a side with no vertices isn't present. Used to
+// see where neighbouring tiles meet.
+struct TileSides {
+    bool present[4] = {};
+    float z[4][5] = {};
+};
+constexpr float kGroundTileSize = 8192; // ground models span -4096..4096 in x and y
+TileSides tileSides(const GeoModel& geo, int rotation);
+
 } // namespace reluva::newworlds

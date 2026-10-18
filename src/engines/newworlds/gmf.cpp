@@ -132,6 +132,14 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
     return Error::success();
 }
 
+int tileAt(const GmfMap& map, int tx, int ty) {
+    if (tx < 0 || ty < 0 || tx >= 2 * map.width || ty >= 2 * map.height)
+        return -1;
+    static constexpr int kSlotAt[2][2] = {{0, 3}, {1, 2}}; // [x][y] within the block
+    const auto& block = map.blocks[map.cells[size_t(ty / 2) * size_t(map.width) + size_t(tx / 2)].block];
+    return int(block[size_t(kSlotAt[tx % 2][ty % 2])]);
+}
+
 std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
     auto stem = [](const std::string& name) {
         const size_t slash = name.rfind('/'), dot = name.rfind('.');
@@ -139,7 +147,8 @@ std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
         return name.substr(from, (dot == std::string::npos || dot < from ? name.size() : dot) - from);
     };
     auto isLod = [](const std::string& name) { return name.find("/lod/") != std::string::npos; };
-    // The base family: the one with a model numbered _26 (ice_26, alpin_26).
+    // The base family: the one with a model numbered _26 (ice_26, alpin_26,
+    // vol_26; alien_ goes on to 29).
     std::string base;
     for (const auto& n : geoNames) {
         const std::string s = stem(n);
@@ -147,37 +156,46 @@ std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
             base = s.substr(0, s.size() - 3);
     }
     // The fixed places, each with the names that can fill it ("" for none).
+    // Found by fitting every map of all six planets: each tile's terrain
+    // layers trace its model's height, and neighbouring tiles' edges meet
+    // (99% of edges, up from 90% with the earlier table; see gmf.md). The
+    // flat models (base 17-20 and 23-26, concrete, hole_02) can't be told
+    // apart that way, so their places are less sure.
     std::vector<std::vector<std::string>> places;
     char number[8];
     auto baseTile = [&](int i) {
         std::snprintf(number, sizeof number, "_%02d", i);
         return base + number;
     };
-    for (int i = 1; i <= 22; ++i)
-        places.push_back({baseTile(i)});
-    if (base == "alpin") {
-        // alpwrld's maps number some tiles differently (found by which models
-        // make tile edges meet and by the tiles' terrain codes; 37-40 are
-        // rarely used and less sure).
-        for (const char* n : {"brid_01", "brid_02", "concrete", "", "crack_03", "crack_04", "crack_05", "crack_06",
-                              "hole_02", "hole_03", "crack_08"})
-            places.push_back({n});
-        for (int i = 23; i <= 26; ++i)
-            places.push_back({baseTile(i)});
-        places.push_back({"hole_01"});
-        places.push_back({"ramp"});
-    } else {
-        for (const char* n : {"brid_01", "brid_02", "concrete", "concact", "crack_03", "crack_04", "crack_05",
-                              "crack_06", "crack_08", "hole_01", "hole_02", "hole_03", "ramp"})
-            places.push_back({n});
-        for (int i = 23; i <= 26; ++i)
-            places.push_back({baseTile(i)});
-    }
-    places.push_back({"icecave1", "arche_01"}); // 39
-    places.push_back({"icecave2", "needle_0"}); // 40
-    places.resize(44);                          // 41-43: not seen used
-    for (const char* n : {"water_01", "water_02", "water_03", "water_04", "mount_01", "mount_02"})
-        places.push_back({n}); // 44-49
+    for (int i = 1; i <= 16; ++i)
+        places.push_back({baseTile(i)});              // 0-15
+    places.push_back({"hole_01"});                    // 16: a plateau at the top level
+    places.push_back({baseTile(21)});                 // 17: not used by any map seen
+    places.push_back({baseTile(22)});                 // 18: the third corner slope
+    places.push_back({baseTile(20)});                 // 19
+    places.push_back({baseTile(18)});                 // 20
+    for (const char* n : {"crack_03", "crack_04", "crack_05", "crack_06", "", "crack_08"})
+        places.push_back({n});                        // 21-26: crack_0N at 18 + N
+    for (const char* n : {"brid_01", "brid_02", "ramp", "concrete", "hole_03", "hole_02", "concact"})
+        places.push_back({n});                        // 27-33
+    places.push_back({baseTile(19)});                 // 34
+    for (int i = 23; i <= 26; ++i)
+        places.push_back({baseTile(i)});              // 35-38
+    places.push_back({baseTile(17)});                 // 39
+    places.push_back({""});                           // 40: flat ground, model unknown
+    for (const char* n : {"ball_01", "ball_02", "ball_03"})
+        places.push_back({n});                        // 41-43 (alnwrld)
+    places.push_back({"water_01"});                   // 44-47: alpwrld's water; alnwrld's
+    places.push_back({"water_02", baseTile(27)});     // shallow alien_27-29 (their order
+    places.push_back({"water_03", baseTile(28)});     // isn't sure)
+    places.push_back({"water_04", baseTile(29)});
+    places.push_back({"mount_01"});                   // 48-49
+    places.push_back({"mount_02"});
+    places.push_back({"arche_01"});                   // 50-51 (deswrld)
+    places.push_back({"needle_0"});
+    places.push_back({"icecave1", "lavafall"});       // 52 (icewrld, vlcwrld)
+    places.push_back({"icecave2"});                   // 53
+    places.push_back({"finger_1"});                   // 54 (redwrld)
 
     std::vector<size_t> order;
     std::vector<bool> used(geoNames.size());
@@ -191,10 +209,8 @@ std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
             used[found] = true;
         order.push_back(found);
     }
-    while (!order.empty() && order.back() == kNoModel)
-        order.pop_back(); // the lod models follow the last place filled
     // Then the lod/ models, and last the rest (placed objects' models: tree,
-    // rock, ...), which maps don't number: icewrld's 52 is lod/ice_12.
+    // rock, ...), which no map's tiles use.
     for (int lod = 1; lod >= 0; --lod)
         for (size_t i = 0; i < geoNames.size(); ++i)
             if (!used[i] && isLod(geoNames[i]) == bool(lod))

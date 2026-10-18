@@ -283,60 +283,7 @@ void MapViewer::placeScenery() {
     }
 }
 
-int MapViewer::tileAt(int tx, int ty) const {
-    if (tx < 0 || ty < 0 || tx >= 2 * map_.width || ty >= 2 * map_.height)
-        return -1;
-    static constexpr int kSlotAt[2][2] = {{0, 3}, {1, 2}}; // [x][y] within the block
-    const auto& block = map_.blocks[map_.cells[size_t(ty / 2) * size_t(map_.width) + size_t(tx / 2)].block];
-    return int(block[size_t(kSlotAt[tx % 2][ty % 2])]);
-}
-
-// Edge heights at 5 points along each side, from the model's vertices that
-// lie on the side (linear in between), after the tile's rotation.
-MapViewer::TileEdges MapViewer::edgesOf(const GeoModel& geo, int rotation) {
-    TileEdges e;
-    std::vector<std::pair<float, float>> side[4]; // (position along the side, height)
-    for (const auto& part : geo.parts)
-        for (const auto& v : part.vertices) {
-            float x = v.x, y = v.y;
-            for (int k = 0; k < rotation; ++k) {
-                const float t = x;
-                x = -y;
-                y = t;
-            }
-            const float h = kTileSize / 2;
-            if (std::fabs(x - h) < 2)
-                side[0].push_back({y, v.z});
-            if (std::fabs(y - h) < 2)
-                side[1].push_back({x, v.z});
-            if (std::fabs(x + h) < 2)
-                side[2].push_back({y, v.z});
-            if (std::fabs(y + h) < 2)
-                side[3].push_back({x, v.z});
-        }
-    for (int s = 0; s < 4; ++s) {
-        auto& pts = side[s];
-        if (pts.empty())
-            continue;
-        std::sort(pts.begin(), pts.end());
-        e.present[s] = true;
-        for (int k = 0; k < 5; ++k) {
-            const float t = -kTileSize / 2 + float(k) * kTileSize / 4;
-            float z = pts.front().second;
-            for (size_t i = 0; i + 1 < pts.size(); ++i)
-                if (t >= pts[i].first && t <= pts[i + 1].first) {
-                    const float span = pts[i + 1].first - pts[i].first;
-                    z = span > 0 ? pts[i].second + (pts[i + 1].second - pts[i].second) * (t - pts[i].first) / span
-                                 : pts[i].second;
-                    break;
-                }
-            if (t > pts.back().first)
-                z = pts.back().second;
-            e.z[s][k] = z;
-        }
-    }
-    return e;
-}
+int MapViewer::tileAt(int tx, int ty) const { return newworlds::tileAt(map_, tx, ty); }
 
 const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
     auto found = tileEdges_.find(tileIndex);
@@ -346,7 +293,7 @@ const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
     const GmfMap::Tile& tile = map_.tiles[tileIndex];
     const TileModel& m = tileModel(tile.model);
     if (m.error.empty())
-        e = edgesOf(m.geo, tile.rotation);
+        e = tileSides(m.geo, tile.rotation);
     return e;
 }
 

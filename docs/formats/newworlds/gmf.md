@@ -98,36 +98,48 @@ their outlines (transparency), not light maps.
 
 ## Tiles and ground models
 
-Checked on the 7 maps of `icewrld.cat`:
+Checked on all 31 maps of the six planet archives (`icewrld`, `deswrld`,
+`alpwrld`, `alnwrld`, `redwrld`, `vlcwrld`):
 
 - A tile's type-20 header's third value is the number of its ground model.
-  The numbers don't follow the archive's order but fixed places, a missing
-  model leaving its place empty:
+  The numbers don't follow the archive's order (which differs per planet:
+  `deswrld` stores its bridges first) but one list of fixed places, the same
+  on every planet, a missing model leaving its place empty (`<base>`: `ice`,
+  `alpin`, `des`, `vol`, `red`, `alien`):
 
   | Numbers | Models |
   |---|---|
-  | 0-21 | `<base>_01`-`22` (`<base>`: `ice`, `alpin`, `des`) |
-  | 22-34 | `brid_01`, `brid_02`, `concrete`, `concact`, `crack_03`-`06`, `crack_08`, `hole_01`-`03`, `ramp` |
+  | 0-15 | `<base>_01`-`16` |
+  | 16 | `hole_01` (a plateau at the top level) |
+  | 17, 18, 19, 20 | `<base>_21` (17 isn't used by any map), `<base>_22`, `<base>_20`, `<base>_18` |
+  | 21-26 | `crack_03`, `04`, `05`, `06`, (none: there's no `crack_07`), `crack_08`: `crack_0N` at 18 + N |
+  | 27-33 | `brid_01`, `brid_02`, `ramp`, `concrete`, `hole_03`, `hole_02`, `concact` |
+  | 34 | `<base>_19` |
   | 35-38 | `<base>_23`-`26` |
-  | 39, 40 | `icecave1`, `icecave2` / `arche_01`, `needle_0` |
-  | 44-49 | `water_01`-`04`, `mount_01`, `mount_02` (`alpwrld`) |
-  | after the last place used | the `lod/` models, in archive order |
+  | 39, 40 | `<base>_17`; 40 is flat ground whose model isn't known |
+  | 41-43 | `ball_01`-`03` (`alnwrld`) |
+  | 44-47 | `water_01`-`04` (`alpwrld`); `alien_27`-`29` at 45-47 (`alnwrld`, order not sure) |
+  | 48, 49 | `mount_01`, `mount_02` (`alpwrld`) |
+  | 50, 51 | `arche_01`, `needle_0` (`deswrld`) |
+  | 52, 53 | `icecave1`, `icecave2` (`icewrld`); `lavafall` at 52 (`vlcwrld`) |
+  | 54 | `finger_1` (`redwrld`) |
+  | after the places | the `lod/` models, in archive order (no map uses them) |
 
-  `alpwrld`'s maps differ at 22-38: 25 is empty (it has no `concact`), then
-  `crack_03`-`06`, `hole_02`, `hole_03`, `crack_08`, `alpin_23`-`26`,
-  `hole_01`, `ramp` (37-38 rarely used, less sure). The places of the
-  pieces whose edges aren't flat agree across the three planets when fitted
-  freely by edges: `brid_01` 27, `ramp` 29, `hole_03` 31 (`deswrld`: 33),
-  `brid_02` 28 or 33; so the table above is wrong there for `icewrld` and
-  `deswrld` too. Flat-edged pieces (cracks, `hole_02`, concrete, tiles
-  23-26) fit any flat place, so their places can't be told apart this way.
-  Letting the map viewer swap numbers by edges made `icewrld` worse
-  (bridges on flat ground), so it uses the table as it is. `icewrld` stores its
-  models in exactly the general order. Found with two checks: how many tile
-  edges meet (heights at 5 points within 80 units), and the tiles' terrain
-  codes compared with `icewrld`'s, whose numbering is known (they match
-  almost exactly when the numbering is right). Edges meeting: `deswrld`
-  46-64% in archive order, 88-93% this way; `alpwrld` 81-93%, now 90-93%.
+  Found by fitting every map: each tile's terrain layers give its heights
+  (see [Terrain codes](#terrain-codes)), and neighbouring tiles' edges must
+  meet (heights at 5 points within 80 units). `reluva-tool gmf-fit
+  <planet.cat>` checks a numbering both ways, `-m` for a summary, `-o file`
+  to try another, `-h` per number by heights. With this table 98-99.6 % of
+  tile edges meet on every planet (the earlier table, with `alpwrld`'s own
+  variant: 89-94 %) and 87 % of cells match the layers (65-74 %); the rest is
+  mostly the layers' coarse steps on slopes. The shaped pieces are sure
+  (base 0-16, 18, cracks, bridges, ramp, holes, the planets' own models);
+  the flat ones (`<base>_17`-`20`, `_23`-`26`, `concrete`, `hole_02`) look
+  alike to both checks, so which flat place each takes is the earlier
+  table's guess where it still fits. Still unplaced: 40 (flat), 44 on
+  `alnwrld`, 48-49 on `alnwrld` (top-level plateaus), 52-53 on `alpwrld`
+  (a slope like `alpin_01` and a top-level plateau), 54 on `icewrld` (a
+  middle-level plateau), each used by a few tiles.
 - **Rotation:** bits 14-15 of the fourth value turn the model anticlockwise
   by that many quarter turns about the tile's centre. Bits 16-17 take three
   values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't
@@ -142,11 +154,9 @@ Checked on the 7 maps of `icewrld.cat`:
 - Ground models span -4096..4096 in x and y (a tile is 8192 units, a block
   16384). Heights come in levels built into the models: 0, 3264 and 7360
   (`ice_08` is a plateau at 3264, `ice_09` at 7360; cliffs and ramps join
-  them). Most remaining mismatches are flat `ice_19` tiles at 0 beside
-  `ice_09` plateaus (1687 of 2900 in `f1`), even inside one block, and
-  nothing tested (cell values, block bytes, tile fields, other rotations or
-  mirroring) lifts them. The terrain codes (below) agree they are low ground:
-  they are real pits in the plateau, so the game must draw walls there.
+  them). The "flat `ice_19` tiles at 0 beside `ice_09` plateaus" that
+  were most of the mismatches with the earlier table are number 18, which
+  is `ice_22`, a corner slope down from the plateau.
 - **Bit 24** of the fourth value is set only on `hole_02` tiles (in every
   `icewrld` map). `hole_02` is a bowl whose texture (`hole02`) is transparent
   round the hole, so ground must show through there: presumably the bit
@@ -158,9 +168,15 @@ Checked on the 7 maps of `icewrld.cat`:
 
 ## Terrain codes
 
-A type-20 record's five 8 x 8 grids are **not** textures, as first thought:
-`hole_03`, `ramp` and `concrete` tiles, which look nothing alike, carry the
-same grids, and `ice_09`'s plateau has the same codes in all five layers.
+A type-20 record's five 8 x 8 grids are **not** textures, as first thought,
+but a **height map**: how many of the five layers a cell has (non-zero
+codes) is the ground's level there, 1 at height 0, 3 at 3264, 5 at 7360, 2
+and 4 on slopes (about 1 + height / 1840). That holds for the model the
+tile's number gives with the table above, at the tile's rotation, for 87 %
+of cells on every planet; the layers' slopes are coarser than the models'
+(a slope tile can match its mirror image as well), so slopes are told
+apart by their edges instead. (Under the earlier, wrong numbering `hole_03`,
+`ramp` and `concrete` tiles seemed to share grids.)
 Each cell holds a code from 1 to 18, or 0 for none. Codes 1, 2, 4, 7, 10,
 13, 15 and 18 appear only in a grid's first row and column, the others only
 inside it, and they come in pairs (border 15 with inner 9, 2 with 11, 13
@@ -172,8 +188,8 @@ light blue and lowland dark blue, and the first row and column draw a grid:
 a minimap or terrain-type map. Cells are in map orientation (row 0 at the
 south, column 0 at the west, after the tile's rotation). Higher layers cover
 parts of a tile in staircase shapes; the 8 bytes after the grids are bit
-masks of rows (`ff ff fc f0 f0 e0 c0 c0`) matching those shapes. What the
-five layers are for (unit types? heights?) isn't known.
+masks of rows (`ff ff fc f0 f0 e0 c0 c0`) matching those shapes: the
+levels, for the game's own use (movement, placing buildings).
 
 ### Textures
 
@@ -214,7 +230,8 @@ textures.
 
 - Which textures the ground models' faces use (the viewer's are chosen by
   role).
-- What the five layers of terrain codes are for.
+- What the terrain codes' values mean, beyond the layers giving heights.
+- The few unplaced numbers (see the table) and the flat models' exact places.
 - How the game builds and textures the walls between levels.
 - Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
   entries' second value's low 12 bits; the placed objects' bits

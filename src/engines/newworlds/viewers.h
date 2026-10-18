@@ -169,10 +169,7 @@ private:
 
     // A tile's edge heights after its rotation, at 5 points along each side
     // (east, north, west, south); a side without vertices on it is missing.
-    struct TileEdges {
-        bool present[4] = {};
-        float z[4][5] = {};
-    };
+    using TileEdges = TileSides;
 
     // A placed object, ready to draw.
     struct Placed {
@@ -193,7 +190,6 @@ private:
     void placeScenery();
     void makeUnderlay();
     const TileEdges& tileEdges(uint32_t tile);
-    static TileEdges edgesOf(const GeoModel& geo, int rotation);
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
 

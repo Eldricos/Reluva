@@ -25,6 +25,7 @@
 //   reluva-tool wav-decode <in.wav> <out.wav>      decode a sound to 16-bit PCM
 //   reluva-tool fif-info <file.fif | file.cat>     show a font's glyph table, or list an archive's fonts
 //   reluva-tool level-info <level.dat> [file.cat...] list the missions, with the archives holding their maps
+//   reluva-tool gmf-fit [-a] <planet.cat> [map]    check the model numbering by how tiles' edges meet
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -1169,6 +1170,520 @@ int cmdWavInfo(int argc, char** argv) {
     return describe(path, data) ? 0 : 1;
 }
 
+// For each model number a planet's maps use, how well each ground model would
+// fit there: the share of the number's tile sides that meet their neighbours
+// (all 5 heights within 80), the neighbours taking their models from
+// tileModelOrder. The model the numbering gives should fit best.
+int cmdGmfFit(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool gmf-fit [-a] <planet.cat> [map]\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    bool archiveOrder = false, table = false, layersMode = false, heightMode = false, jointMode = false,
+         summaryMode = false, rotationScan = false;
+    const char* orderFile = nullptr;
+    while (argc >= 3 && argv[2][0] == '-' && argv[2][1] != 0 && argv[2][2] == 0) {
+        if (argv[2][1] == 'o' && argc >= 4) {
+            orderFile = argv[3];
+            argv += 2, argc -= 2;
+            continue;
+        }
+        archiveOrder |= argv[2][1] == 'a';
+        table |= argv[2][1] == 't';
+        layersMode |= argv[2][1] == 'l';
+        heightMode |= argv[2][1] == 'h';
+        jointMode |= argv[2][1] == 'j';
+        summaryMode |= argv[2][1] == 'm';
+        rotationScan |= argv[2][1] == 'r';
+        ++argv, --argc;
+    }
+    if (argc < 3)
+        return 2;
+    nw::CatArchive cat;
+    if (reluva::Error err = cat.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::vector<std::string> geoNames;
+    std::vector<const nw::CatEntry*> geoEntries, maps;
+    for (const auto& e : cat.entries()) {
+        if (e.tag == nw::cattag::Geometry)
+            geoNames.push_back(e.name), geoEntries.push_back(&e);
+        if (e.tag == nw::cattag::Gmf && (argc < 4 || e.name.find(argv[3]) != std::string::npos))
+            maps.push_back(&e);
+    }
+    // -a: number the models in plain archive order instead; -o file: the
+    // numbering from a file of "number model-stem" lines.
+    std::vector<size_t> order = nw::tileModelOrder(geoNames);
+    if (archiveOrder)
+        for (size_t i = 0; i < order.size() || i < geoNames.size(); ++i)
+            order.resize(geoNames.size()), order[i] = i;
+    if (orderFile) {
+        order.assign(order.size(), nw::kNoModel);
+        std::ifstream in(orderFile);
+        unsigned n;
+        std::string stem;
+        while (in >> n >> stem) {
+            if (n >= order.size())
+                order.resize(n + 1, nw::kNoModel);
+            for (size_t g = 0; g < geoNames.size(); ++g)
+                if (geoNames[g].find("/lod/") == std::string::npos &&
+                    geoNames[g].size() > stem.size() + 5 &&
+                    geoNames[g].compare(geoNames[g].size() - stem.size() - 4, stem.size() + 4, stem + ".geo") == 0 &&
+                    geoNames[g][geoNames[g].size() - stem.size() - 5] == '/')
+                    order[n] = g;
+        }
+    }
+    // Each ground model's sides at each rotation (lod/ and scenery models
+    // aren't candidates).
+    std::vector<std::array<nw::TileSides, 4>> sides(geoNames.size());
+    std::vector<bool> candidate(geoNames.size());
+    Bytes d;
+    for (size_t g = 0; g < geoNames.size(); ++g) {
+        nw::GeoModel geo;
+        if (cat.read(*geoEntries[g], d) || nw::parseGeo(d, geo))
+            continue;
+        candidate[g] = true;
+        for (int r = 0; r < 4; ++r)
+            sides[g][size_t(r)] = nw::tileSides(geo, r);
+    }
+    // -s: each model's sides instead, as heights in levels of 1000 (east,
+    // north, west, south; 5 points each, low coordinate first).
+    if (argc >= 4 && std::strcmp(argv[3], "-s") == 0) {
+        for (size_t g = 0; g < geoNames.size(); ++g) {
+            if (!candidate[g] || geoNames[g].find("/lod/") != std::string::npos)
+                continue;
+            std::printf("%2zu %-24s", g, geoNames[g].c_str());
+            const auto& t = sides[g][0];
+            for (int sd = 0; sd < 4; ++sd) {
+                std::printf(" ");
+                for (int k = 0; k < 5; ++k)
+                    std::printf(t.present[sd] ? "%2d" : " .", int(std::lround(t.z[sd][k] / 1000)));
+            }
+            std::printf("\n");
+        }
+        return 0;
+    }
+    // Each model's surface height at the centre of each cell of its 8 x 8
+    // grid, in the maps' terrain-layer units (1 at 0, 3 at 3264, 5 at 7360:
+    // 1 + z / 1840), for each rotation, cells in map orientation (row 0 south,
+    // column 0 west).
+    std::vector<std::array<std::array<int, 64>, 4>> levels(geoNames.size());
+    for (size_t g = 0; g < geoNames.size(); ++g) {
+        nw::GeoModel geo;
+        if (!candidate[g] || cat.read(*geoEntries[g], d) || nw::parseGeo(d, geo))
+            continue;
+        auto heightAt = [&](float x, float y) {
+            float best = -1e9f;
+            for (const auto& f : geo.faces) {
+                const auto& vs = geo.parts[f.part].vertices;
+                for (size_t i = 1; i + 1 < f.corners.size(); ++i) {
+                    const auto& a = vs[f.corners[0].vertex];
+                    const auto& b = vs[f.corners[i].vertex];
+                    const auto& c = vs[f.corners[i + 1].vertex];
+                    const float det = (b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y);
+                    if (std::fabs(det) < 1e-3f)
+                        continue;
+                    const float l1 = ((b.y - c.y) * (x - c.x) + (c.x - b.x) * (y - c.y)) / det;
+                    const float l2 = ((c.y - a.y) * (x - c.x) + (a.x - c.x) * (y - c.y)) / det;
+                    const float l3 = 1 - l1 - l2;
+                    if (l1 < -1e-4f || l2 < -1e-4f || l3 < -1e-4f)
+                        continue;
+                    best = std::max(best, l1 * a.z + l2 * b.z + l3 * c.z);
+                }
+            }
+            return best;
+        };
+        for (int r = 0; r < 4; ++r)
+            for (int row = 0; row < 8; ++row)
+                for (int col = 0; col < 8; ++col) {
+                    // The cell's centre in map orientation, turned back into the model's frame.
+                    float x = -nw::kGroundTileSize / 2 + (float(col) + 0.5f) * nw::kGroundTileSize / 8;
+                    float y = -nw::kGroundTileSize / 2 + (float(row) + 0.5f) * nw::kGroundTileSize / 8;
+                    for (int k = 0; k < r; ++k) {
+                        const float t = x;
+                        x = y;
+                        y = -t;
+                    }
+                    const float z = heightAt(x, y);
+                    // In tenths of a level, so slopes compare within a level.
+                    levels[g][size_t(r)][size_t(row * 8 + col)] = z < -1e8f ? -100 : int(std::lround(10 + z / 184));
+                }
+    }
+    auto layerCount = [](const nw::GmfMap::Tile& t, int cell) {
+        int n = 0;
+        for (int l = 0; l < nw::GmfMap::kLayers; ++l)
+            n += t.layers[size_t(l * 64 + cell)] != 0;
+        return n;
+    };
+    auto shortName = [&](size_t g) {
+        if (g == nw::kNoModel)
+            return std::string("-");
+        const std::string& n = geoNames[g];
+        return n.substr(n.rfind('/') + 1);
+    };
+    auto meets = [](const nw::TileSides& a, int sa, const nw::TileSides& b, int sb) {
+        for (int k = 0; k < 5; ++k)
+            if (std::fabs(a.z[sa][k] - b.z[sb][k]) >= 80)
+                return false;
+        return true;
+    };
+    if (jointMode) {
+        // -j: search for the numbering that best fits the planet's maps:
+        // each number may take only models whose heights fit its tiles'
+        // terrain layers (within 10 points of the best: the layers only roughly
+        // follow slopes), and among those, swaps
+        // between numbers are kept while more tile edges meet.
+        struct Pair { uint32_t na, nb; int ra, rb, side; };
+        std::vector<Pair> pairs;
+        std::map<uint32_t, std::vector<std::pair<unsigned, unsigned>>> heightTally; // number -> per model (met, seen)
+        std::map<uint32_t, unsigned> uses;
+        for (const nw::CatEntry* me : maps) {
+            nw::GmfMap map;
+            if (cat.read(*me, d) || nw::parseGmf(d, map))
+                continue;
+            for (int ty = 0; ty < 2 * map.height; ++ty)
+                for (int tx = 0; tx < 2 * map.width; ++tx)
+                    for (int sd = 0; sd < 2; ++sd) {
+                        const int a = nw::tileAt(map, tx, ty), b = nw::tileAt(map, tx + (sd == 0), ty + (sd == 1));
+                        if (a < 0 || b < 0)
+                            continue;
+                        const auto& ta = map.tiles[size_t(a)];
+                        const auto& tb = map.tiles[size_t(b)];
+                        pairs.push_back({ta.model, tb.model, ta.rotation, tb.rotation, sd});
+                    }
+            for (const auto& t : map.tiles) {
+                ++uses[t.model];
+                auto& tally = heightTally[t.model];
+                tally.resize(geoNames.size());
+                for (size_t g = 0; g < geoNames.size(); ++g) {
+                    if (!candidate[g])
+                        continue;
+                    for (int cell = 0; cell < 64; ++cell) {
+                        ++tally[g].second;
+                        tally[g].first += std::abs(levels[g][size_t(t.rotation)][size_t(cell)] - 10 * layerCount(t, cell)) < 10;
+                    }
+                }
+            }
+        }
+        auto isMain = [&](size_t g) { return candidate[g] && geoNames[g].find("/lod/") == std::string::npos; };
+        std::map<uint32_t, std::vector<bool>> allowed;
+        std::map<uint32_t, std::vector<double>> heightScore;
+        for (auto& [n, tally] : heightTally) {
+            double best = 0;
+            auto& hs = heightScore[n];
+            hs.assign(geoNames.size(), 0);
+            for (size_t g = 0; g < geoNames.size(); ++g)
+                if (isMain(g) && tally[g].second)
+                    hs[g] = double(tally[g].first) / tally[g].second, best = std::max(best, hs[g]);
+            auto& al = allowed[n];
+            al.assign(geoNames.size(), false);
+            for (size_t g = 0; g < geoNames.size(); ++g)
+                al[g] = isMain(g) && hs[g] >= best - 0.10;
+        }
+        std::map<uint32_t, size_t> assign;
+        for (const auto& [n, c] : uses)
+            assign[n] = n < order.size() ? order[n] : nw::kNoModel;
+        const std::map<uint32_t, size_t> start = assign;
+        auto pairMet = [&](const Pair& p) -> int {
+            const size_t ga = assign[p.na], gb = assign[p.nb];
+            if (ga == nw::kNoModel || gb == nw::kNoModel || !candidate[ga] || !candidate[gb])
+                return 0;
+            const auto& sa = sides[ga][size_t(p.ra)];
+            const auto& sb = sides[gb][size_t(p.rb)];
+            if (!sa.present[p.side] || !sb.present[p.side + 2])
+                return 0;
+            return meets(sa, p.side, sb, p.side + 2) ? 1 : 0;
+        };
+        // The pairs touching each number, for scoring a change quickly.
+        std::map<uint32_t, std::vector<size_t>> touching;
+        for (size_t i = 0; i < pairs.size(); ++i) {
+            touching[pairs[i].na].push_back(i);
+            if (pairs[i].nb != pairs[i].na)
+                touching[pairs[i].nb].push_back(i);
+        }
+        auto localScore = [&](uint32_t a, uint32_t b) {
+            int total = 0;
+            for (size_t i : touching[a])
+                total += pairMet(pairs[i]);
+            for (size_t i : touching[b])
+                if (pairs[i].na != a && pairs[i].nb != a)
+                    total += pairMet(pairs[i]);
+            return total;
+        };
+        auto fits = [&](uint32_t n, size_t g) { return g == nw::kNoModel ? false : allowed[n][g]; };
+        // Numbers whose model doesn't fit their heights take any fitting model first.
+        auto inUse = [&](size_t c) {
+            for (const auto& [m, gm] : assign)
+                if (gm == c)
+                    return true;
+            return false;
+        };
+        for (auto& [n, g] : assign)
+            if (!fits(n, g))
+                for (size_t c = 0; c < geoNames.size(); ++c)
+                    if (allowed[n][c] && !inUse(c)) {
+                        g = c;
+                        break;
+                    }
+        for (int pass = 0; pass < 20; ++pass) {
+            bool improved = false;
+            for (auto& [n, g] : assign) {
+                for (size_t c = 0; c < geoNames.size(); ++c) {
+                    if (c == g || !fits(n, c))
+                        continue;
+                    // The number using c now, if any, takes n's model (if it fits there).
+                    uint32_t other = n;
+                    for (const auto& [m, gm] : assign)
+                        if (gm == c && m != n)
+                            other = m;
+                    if (other != n && !fits(other, g))
+                        continue;
+                    const int before = localScore(n, other);
+                    const size_t old = g;
+                    g = c;
+                    if (other != n)
+                        assign[other] = old;
+                    const int after = localScore(n, other);
+                    if (after > before) {
+                        improved = true;
+                    } else {
+                        g = old;
+                        if (other != n)
+                            assign[other] = c;
+                    }
+                }
+            }
+            if (!improved)
+                break;
+        }
+        int met = 0, seen = 0;
+        for (const auto& p : pairs) {
+            met += pairMet(p);
+            const size_t ga = assign[p.na], gb = assign[p.nb];
+            seen += ga != nw::kNoModel && gb != nw::kNoModel && candidate[ga] && candidate[gb];
+        }
+        std::printf("%zu maps, %zu tile pairs, %.1f%% of edges meet\n", maps.size(), pairs.size(),
+                    seen ? 100.0 * met / seen : 0.0);
+        for (const auto& [n, g] : assign) {
+            const size_t s0 = start.at(n);
+            std::printf("  %3u x%-5u %-14s height %5.1f%%%s\n", n, uses[n], shortName(g).c_str(),
+                        g == nw::kNoModel ? 0.0 : 100 * heightScore[n][g],
+                        g == s0 ? "" : ("   (table: " + shortName(s0) + ")").c_str());
+        }
+        return 0;
+    }
+    if (summaryMode) {
+        // -m: only the share of tile edges that meet with this numbering, and
+        // of tile cells whose terrain layers match the model's height.
+        unsigned met = 0, seen = 0, cellsOk = 0, cells = 0;
+        for (const nw::CatEntry* me : maps) {
+            nw::GmfMap map;
+            if (cat.read(*me, d) || nw::parseGmf(d, map))
+                continue;
+            auto modelOf = [&](uint32_t number) { return number < order.size() ? order[number] : nw::kNoModel; };
+            for (int ty = 0; ty < 2 * map.height; ++ty)
+                for (int tx = 0; tx < 2 * map.width; ++tx)
+                    for (int sd = 0; sd < 2; ++sd) {
+                        const int a = nw::tileAt(map, tx, ty), b = nw::tileAt(map, tx + (sd == 0), ty + (sd == 1));
+                        if (a < 0 || b < 0)
+                            continue;
+                        const auto& ta = map.tiles[size_t(a)];
+                        const auto& tb = map.tiles[size_t(b)];
+                        const size_t ga = modelOf(ta.model), gb = modelOf(tb.model);
+                        ++seen;
+                        if (ga == nw::kNoModel || gb == nw::kNoModel || !candidate[ga] || !candidate[gb])
+                            continue;
+                        const auto& sa = sides[ga][size_t(ta.rotation)];
+                        const auto& sb = sides[gb][size_t(tb.rotation)];
+                        met += sa.present[sd] && sb.present[sd + 2] && meets(sa, sd, sb, sd + 2);
+                    }
+            for (const auto& t : map.tiles) {
+                const size_t g = modelOf(t.model);
+                for (int cell = 0; cell < 64; ++cell) {
+                    ++cells;
+                    cellsOk += g != nw::kNoModel && candidate[g] &&
+                               std::abs(levels[g][size_t(t.rotation)][size_t(cell)] - 10 * layerCount(t, cell)) < 10;
+                }
+            }
+        }
+        std::printf("%zu maps: %.1f%% of tile edges meet, %.1f%% of cells match the terrain layers\n", maps.size(),
+                    seen ? 100.0 * met / seen : 0.0, cells ? 100.0 * cellsOk / cells : 0.0);
+        return 0;
+    }
+    for (const nw::CatEntry* me : maps) {
+        nw::GmfMap map;
+        if (cat.read(*me, d) || nw::parseGmf(d, map)) {
+            std::printf("%s: doesn't read\n", me->name.c_str());
+            continue;
+        }
+        // Neighbouring tile pairs: (tile, side 0 east or 1 north, neighbour).
+        struct Pair { int a, side, b; };
+        std::vector<Pair> pairs;
+        for (int ty = 0; ty < 2 * map.height; ++ty)
+            for (int tx = 0; tx < 2 * map.width; ++tx)
+                for (int s = 0; s < 2; ++s) {
+                    const int a = nw::tileAt(map, tx, ty), b = nw::tileAt(map, tx + (s == 0), ty + (s == 1));
+                    if (a >= 0 && b >= 0)
+                        pairs.push_back({a, s, b});
+                }
+        std::map<uint32_t, unsigned> uses;
+        for (const auto& t : map.tiles)
+            ++uses[t.model];
+        if (rotationScan) {
+            // -r: per number, each tile's best-fitting models and rotations by
+            // heights; tallies of (model, stored rotation - fitted rotation).
+            for (const auto& [number, count] : uses) {
+                std::map<std::string, unsigned> tally;
+                for (const auto& t : map.tiles) {
+                    if (t.model != number)
+                        continue;
+                    // The best-fitting models and rotations for this tile (ties all count).
+                    int bestOk = -1;
+                    std::vector<std::string> best;
+                    for (size_t g = 0; g < geoNames.size(); ++g) {
+                        if (!candidate[g] || geoNames[g].find("/lod/") != std::string::npos)
+                            continue;
+                        for (int r = 0; r < 4; ++r) {
+                            int ok = 0;
+                            for (int cell = 0; cell < 64; ++cell)
+                                ok += std::abs(levels[g][size_t(r)][size_t(cell)] - 10 * layerCount(t, cell)) < 10;
+                            const std::string key = shortName(g) + " d" + std::to_string((t.rotation - r + 4) % 4);
+                            if (ok > bestOk)
+                                bestOk = ok, best = {key};
+                            else if (ok == bestOk)
+                                best.push_back(key);
+                        }
+                    }
+                    for (const auto& k : best)
+                        ++tally[k];
+                }
+                std::vector<std::pair<unsigned, std::string>> v;
+                for (auto& [k, c] : tally)
+                    v.push_back({c, k});
+                std::sort(v.rbegin(), v.rend());
+                std::printf("%3u x%-3u", number, count);
+                for (size_t i = 0; i < v.size() && i < 6; ++i)
+                    std::printf("  %s:%u", v[i].second.c_str(), v[i].first);
+                std::printf("\n");
+            }
+            continue;
+        }
+        if (layersMode) {
+            // -l: per number, a rotation-0 tile's count of non-zero terrain
+            // layers per cell (row 7 = north first), beside the assigned
+            // model's heights per cell (vertex mean, in levels of 1000).
+            for (const auto& [number, count] : uses) {
+                const nw::GmfMap::Tile* sample = nullptr;
+                for (const auto& t : map.tiles)
+                    if (t.model == number && (!sample || t.rotation == 0))
+                        sample = sample && sample->rotation == 0 ? sample : &t;
+                const size_t g = number < order.size() ? order[number] : nw::kNoModel;
+                std::printf("%u (x%u, rotation %d) %s\n", number, count, sample->rotation,
+                            g == nw::kNoModel ? "-" : geoNames[g].c_str());
+                nw::GeoModel geo;
+                const bool haveGeo = g != nw::kNoModel && !cat.read(*geoEntries[g], d) && !nw::parseGeo(d, geo);
+                for (int row = 7; row >= 0; --row) {
+                    std::printf("   ");
+                    for (int col = 0; col < 8; ++col) {
+                        int n = 0;
+                        for (int l = 0; l < nw::GmfMap::kLayers; ++l)
+                            n += sample->layers[size_t(l * 64 + row * 8 + col)] != 0;
+                        std::printf("%d", n);
+                    }
+                    std::printf("   ");
+                    for (int col = 0; col < 8 && haveGeo; ++col) {
+                        const float cell = nw::kGroundTileSize / 8, x0 = -nw::kGroundTileSize / 2 + col * cell,
+                                    y0 = -nw::kGroundTileSize / 2 + row * cell;
+                        double z = 0;
+                        int k = 0;
+                        for (const auto& part : geo.parts)
+                            for (const auto& v : part.vertices)
+                                if (v.x >= x0 - 1 && v.x <= x0 + cell + 1 && v.y >= y0 - 1 && v.y <= y0 + cell + 1)
+                                    z += v.z, ++k;
+                        if (k)
+                            std::printf("%2d", int(std::lround(z / k / 1000)));
+                        else
+                            std::printf(" .");
+                    }
+                    std::printf("\n");
+                }
+            }
+            continue;
+        }
+        if (!table)
+            std::printf("%s (%zu tiles):\n", me->name.c_str(), map.tiles.size());
+        auto modelOf = [&](uint32_t number) { return number < order.size() ? order[number] : nw::kNoModel; };
+        for (const auto& [number, count] : uses) {
+            const size_t given = modelOf(number);
+            // Score every candidate in this number's place.
+            std::vector<std::pair<double, size_t>> scores;
+            unsigned sidesSeen = 0;
+            for (size_t g = 0; g < geoNames.size() && heightMode; ++g) {
+                if (!candidate[g])
+                    continue;
+                // -h: the share of the number's tiles' cells whose terrain
+                // layer count is the model's height there.
+                unsigned met = 0, seen = 0;
+                for (const auto& t : map.tiles) {
+                    if (t.model != number)
+                        continue;
+                    for (int cell = 0; cell < 64; ++cell) {
+                        ++seen;
+                        met += std::abs(levels[g][size_t(t.rotation)][size_t(cell)] - 10 * layerCount(t, cell)) < 10;
+                    }
+                }
+                sidesSeen = std::max(sidesSeen, seen);
+                scores.push_back({seen ? double(met) / seen : 0, g});
+            }
+            for (size_t g = 0; g < geoNames.size() && !heightMode; ++g) {
+                if (!candidate[g])
+                    continue;
+                unsigned met = 0, seen = 0;
+                for (const Pair& p : pairs) {
+                    const auto& ta = map.tiles[size_t(p.a)];
+                    const auto& tb = map.tiles[size_t(p.b)];
+                    const bool ina = ta.model == number, inb = tb.model == number;
+                    if (ina == inb)
+                        continue; // only sides against other numbers
+                    const size_t ga = ina ? g : modelOf(ta.model), gb = inb ? g : modelOf(tb.model);
+                    if (ga == nw::kNoModel || gb == nw::kNoModel || !candidate[ga] || !candidate[gb])
+                        continue;
+                    const auto& sa = sides[ga][size_t(ta.rotation)];
+                    const auto& sb = sides[gb][size_t(tb.rotation)];
+                    const int oa = p.side, ob = p.side + 2;
+                    if (!sa.present[oa] || !sb.present[ob])
+                        continue;
+                    ++seen;
+                    met += meets(sa, oa, sb, ob);
+                }
+                sidesSeen = std::max(sidesSeen, seen);
+                scores.push_back({seen ? double(met) / seen : 0, g});
+            }
+            std::sort(scores.begin(), scores.end(), [](auto& x, auto& y) { return x.first > y.first; });
+            if (table) {
+                // -t: every candidate, for analysis: map number uses sides model score
+                for (const auto& [sc, g] : scores)
+                    std::printf("T %s %u %u %u %s %.4f\n", me->name.c_str(), number, count, sidesSeen,
+                                shortName(g).c_str(), sc);
+                continue;
+            }
+            double givenScore = -1;
+            for (const auto& [sc, g] : scores)
+                if (g == given)
+                    givenScore = sc;
+            const bool best = !scores.empty() && (scores[0].second == given || scores[0].first <= givenScore);
+            std::printf("  %3u x%-4u %-10s %5.1f%%   best %-10s %5.1f%%, %-10s %5.1f%%  (%u sides)%s\n", number, count,
+                        shortName(given).c_str(), givenScore < 0 ? 0.0 : 100 * givenScore,
+                        scores.size() > 0 ? shortName(scores[0].second).c_str() : "", scores.size() > 0 ? 100 * scores[0].first : 0.0,
+                        scores.size() > 1 ? shortName(scores[1].second).c_str() : "", scores.size() > 1 ? 100 * scores[1].first : 0.0,
+                        sidesSeen, best ? "" : "  <-");
+        }
+    }
+    return 0;
+}
+
 int cmdLevelInfo(int argc, char** argv) {
     if (argc < 3) {
         std::fprintf(stderr, "usage: reluva-tool level-info <level.dat> [file.cat...]\n");
@@ -1675,6 +2190,8 @@ int main(int argc, char** argv) {
         return cmdFifInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "level-info") == 0)
         return cmdLevelInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "gmf-fit") == 0)
+        return cmdGmfFit(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1699,6 +2216,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool wav-decode <in.wav> <out.wav>\n"
                  "  reluva-tool fif-info <file.fif | file.cat>\n"
                  "  reluva-tool level-info <level.dat> [file.cat...]\n"
+                 "  reluva-tool gmf-fit [-m|-h|-l|-r|-j|-t|-a|-o file] <planet.cat> [map]\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"

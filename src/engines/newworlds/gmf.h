@@ -68,16 +68,22 @@ struct GmfMap {
 
 Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out);
 
+// The tile record at a tile position (x east, y north, from the map's
+// south-west corner, 2 tiles per block), or -1 outside the map.
+int tileAt(const GmfMap& map, int tx, int ty);
+
 // How a map's model numbers count its archive's .geo files (full names, in
 // archive order): returns, per model number, an index into geoNames, or
-// kNoModel for a number with no model. Not archive order but fixed places
-// (see docs/formats/newworlds/gmf.md): base_01-22, brid_01, brid_02,
-// concrete, concact, crack_03-06, crack_08, hole_01-03, ramp, base_23-26,
-// then 39-40 icecave1/arche_01 and icecave2/needle_0, 44-47 water_01-04,
-// 48-49 mount_01-02; a missing model leaves its place empty (alpwrld
-// differs between 22 and 40; see gmf.cpp). Then the lod/ models, then any
-// other main models (tree, rock, ...), both in archive order. "base" is the
-// family numbered 01-26 (ice, alpin, des).
+// kNoModel for a number with no model. Not archive order (which differs per
+// planet) but one list of fixed places for all six planets (see
+// docs/formats/newworlds/gmf.md): base_01-16, hole_01, base_21, base_22,
+// base_20, base_18, crack_03-06, -, crack_08, brid_01-02, ramp, concrete,
+// hole_03, hole_02, concact, base_19, base_23-26, base_17, -, then the
+// planets' own models at 41-54 (balls, water, mountains, arch and needle,
+// caves or lava fall, finger). A missing model leaves its place empty. Then
+// the lod/ models, then any other main models (tree, rock, ...), both in
+// archive order. "base" is the family numbered 01-26 (ice, alpin, des, vol,
+// red, alien).
 constexpr size_t kNoModel = size_t(-1);
 std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames);
 
