@@ -84,5 +84,5 @@ repeats.
 
 The data viewer's last page (**Tab**) lists the sounds with their waveform;
 **Space** or **Enter** plays or stops one, **A** plays each as it's
-selected. Copies are listed once, with their count and other names in the
-title; **F** lists every copy.
+selected. The title names the sound's archive. Copies are listed once, with their
+count and any other names and archives in the title; **F** lists every copy.

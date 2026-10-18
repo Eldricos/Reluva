@@ -40,6 +40,10 @@ const std::string& SoundViewer::nameOf(size_t sound) const {
     return archives_[sounds_[sound].archive]->entries()[sounds_[sound].entry].name;
 }
 
+std::string SoundViewer::archiveOf(size_t sound) const {
+    return archives_[sounds_[sound].archive]->path().filename().string();
+}
+
 SoundViewer::~SoundViewer() {
     if (audioStarted_)
         sys_.stopAudio();
@@ -230,7 +234,7 @@ void SoundViewer::updateTitle() {
     const size_t current = shownSounds_[size_t(current_)];
     std::string title = std::string("New Worlds sounds ") + (showCopies_ ? "[all] " : "") +
                         std::to_string(current_ + 1) + "/" + std::to_string(shownSounds_.size()) + ": " +
-                        nameOf(current) + " (";
+                        nameOf(current) + " in " + archiveOf(current) + " (";
     std::shared_ptr<const Sound> sound;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -244,15 +248,20 @@ void SoundViewer::updateTitle() {
                       double(sound->frames()) / sound->rate);
         title += std::string(info) + (sound->format == 0x11 ? ", IMA ADPCM" : ", PCM") + ")";
     }
-    // Its copies: how many, and any other names.
+    // Its copies: how many, and any other names or archives they're in.
     size_t copies = 0;
     std::vector<std::string> names;
     for (size_t s = 0; s < sounds_.size(); ++s) {
         if (firstCopy_[s] != firstCopy_[current])
             continue;
         ++copies;
-        if (nameOf(s) != nameOf(current) && std::find(names.begin(), names.end(), nameOf(s)) == names.end())
-            names.push_back(nameOf(s));
+        std::string where;
+        if (nameOf(s) != nameOf(current))
+            where = nameOf(s);
+        if (archiveOf(s) != archiveOf(current))
+            where += (where.empty() ? "in " : " in ") + archiveOf(s);
+        if (!where.empty() && std::find(names.begin(), names.end(), where) == names.end())
+            names.push_back(where);
     }
     if (copies > 1) {
         title += " [" + std::to_string(copies) + " copies";

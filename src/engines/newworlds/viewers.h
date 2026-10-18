@@ -241,6 +241,7 @@ private:
     void draw();
     void updateTitle();
     const std::string& nameOf(size_t sound) const;
+    std::string archiveOf(size_t sound) const; // its archive's file name
 
     System& sys_;
     Surface& screen_;
