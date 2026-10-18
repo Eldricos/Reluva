@@ -11,6 +11,7 @@
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
@@ -525,6 +526,19 @@ void testFif() {
     CHECK(bool(parseFif(b, f))); // a byte too many
 }
 
+void testLevels() {
+    std::vector<Level> l;
+    CHECK(!parseLevelList("// format comment\r\nF1,2,Power Corrupts\r\n// J1,6,Defiant\r\n"
+                          "J1,3,Into the Arena\r\n\r\n//C9,2,(Bonus) \"Slaver's Run\"  \r\n",
+                          l));
+    CHECK(l.size() == 4 && l[0].shortName == "F1" && l[0].maxPlayers == 2 && l[0].title == "Power Corrupts");
+    CHECK(l[1].commentedOut && l[1].title == "Defiant" && !l[2].commentedOut);
+    CHECK(l[3].commentedOut && l[3].title == "(Bonus) \"Slaver's Run\"");
+    CHECK(levelForMap(l, "map/f1.gmf") == &l[0] && levelForMap(l, "MAP\\J1.GMF") == &l[2]);
+    CHECK(levelForMap(l, "map/kurt64.gmf") == nullptr);
+    CHECK(bool(parseLevelList("F1,two,Power Corrupts\n", l)));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -616,6 +630,7 @@ int main() {
     testArf();
     testWav();
     testFif();
+    testLevels();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

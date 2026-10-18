@@ -24,6 +24,7 @@
 //   reluva-tool wav-info <file.wav | file.cat>     show a sound's format and length, or survey an archive's
 //   reluva-tool wav-decode <in.wav> <out.wav>      decode a sound to 16-bit PCM
 //   reluva-tool fif-info <file.fif | file.cat>     show a font's glyph table, or list an archive's fonts
+//   reluva-tool level-info <level.dat> [file.cat...] list the missions, with the archives holding their maps
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -39,6 +40,7 @@
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/levels.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/wav.h"
@@ -1167,6 +1169,45 @@ int cmdWavInfo(int argc, char** argv) {
     return describe(path, data) ? 0 : 1;
 }
 
+int cmdLevelInfo(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool level-info <level.dat> [file.cat...]\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    Bytes d;
+    if (!readFile(argv[2], d))
+        return 1;
+    std::vector<nw::Level> levels;
+    if (reluva::Error err = nw::parseLevelList(std::string_view(reinterpret_cast<const char*>(d.data()), d.size()),
+                                               levels)) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    // Which of the given archives holds each level's map.
+    std::vector<std::pair<std::string, std::string>> maps; // map name, archive
+    for (int a = 3; a < argc; ++a) {
+        nw::CatArchive cat;
+        if (reluva::Error err = cat.open(argv[a])) {
+            std::fprintf(stderr, "%s: %s\n", argv[a], err.message.c_str());
+            continue;
+        }
+        for (const auto& e : cat.entries())
+            if (e.tag == nw::cattag::Gmf)
+                maps.emplace_back(e.name, std::filesystem::path(argv[a]).filename().string());
+    }
+    for (const auto& l : levels) {
+        std::string where;
+        for (const auto& [map, archive] : maps)
+            if (nw::levelForMap(levels, map) == &l)
+                where += (where.empty() ? "" : ", ") + map + " in " + archive;
+        std::printf("%-5s %d  %-28s %s%s\n", l.shortName.c_str(), l.maxPlayers, l.title.c_str(),
+                    l.commentedOut ? "(commented out) " : "", where.c_str());
+    }
+    std::printf("%zu levels\n", levels.size());
+    return 0;
+}
+
 int cmdFifInfo(int argc, char** argv) {
     if (argc != 3) {
         std::fprintf(stderr, "usage: reluva-tool fif-info <file.fif | file.cat>\n");
@@ -1632,6 +1673,8 @@ int main(int argc, char** argv) {
         return cmdWavDecode(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "fif-info") == 0)
         return cmdFifInfo(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "level-info") == 0)
+        return cmdLevelInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1655,6 +1698,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool wav-info <file.wav | file.cat>\n"
                  "  reluva-tool wav-decode <in.wav> <out.wav>\n"
                  "  reluva-tool fif-info <file.fif | file.cat>\n"
+                 "  reluva-tool level-info <level.dat> [file.cat...]\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"

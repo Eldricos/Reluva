@@ -82,7 +82,8 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/sound_viewer.cpp
     src/engines/newworlds/string_viewer.cpp
     src/engines/newworlds/fif.cpp
-    src/engines/newworlds/font_viewer.cpp)
+    src/engines/newworlds/font_viewer.cpp
+    src/engines/newworlds/levels.cpp)
 target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warnings)
 
 # --- executable: SDL3 backend + ImGui launcher --------------------------------

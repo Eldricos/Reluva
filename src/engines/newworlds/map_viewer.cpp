@@ -421,8 +421,11 @@ void MapViewer::updateTitle() {
         return;
     const EntryRef& ref = maps_[size_t(current_)];
     std::string title = "New Worlds maps " + std::to_string(current_ + 1) + "/" + std::to_string(maps_.size()) +
-                        ": " + archives_[ref.archive]->entries()[ref.entry].name + " (" +
-                        archives_[ref.archive]->path().filename().string();
+                        ": " + archives_[ref.archive]->entries()[ref.entry].name;
+    if (const Level* level = levelForMap(levels_, archives_[ref.archive]->entries()[ref.entry].name))
+        title += " [" + level->shortName + " \"" + level->title + "\", " + std::to_string(level->maxPlayers) +
+                 (level->maxPlayers == 1 ? " player" : " players") + (level->commentedOut ? ", not listed" : "") + "]";
+    title += " (" + archives_[ref.archive]->path().filename().string();
     if (!status_.empty()) {
         sys_.setWindowTitle(title + "; " + status_ + ")");
         return;

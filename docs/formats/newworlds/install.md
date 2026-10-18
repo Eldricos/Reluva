@@ -21,7 +21,7 @@ release, and of the same install with an unofficial fan patch applied
     (presumably neutral/foreign), each with `actor`, `build`, `gui`, `misc`
   - per planet type: `alnwrld`, `alpwrld`, `deswrld`, `icewrld`, `redwrld`, `vlcwrld`
   - shared: `glblgame`, `glblgui`, `misc`
-- `game.ini`, `level.dat`, `olevel.dat`, `kapla.rse`: small settings and data files.
+- `game.ini`, `level.dat` (the mission list, see [level.md](level.md)), `olevel.dat`, `kapla.rse`: small settings and data files.
 - `Media/`: standard MP3 and WAV files (voice per faction in `FedVO`,
   `KlingVO`, `RomVO`; `Music`; `Misc` sound effects and tutorial voice).
 - `SFC2.BIK` plus the movies on the CD: Bink video. A clean install doesn't

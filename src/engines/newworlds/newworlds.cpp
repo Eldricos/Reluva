@@ -16,6 +16,8 @@
 #include "common/fs.h"
 
 #include <algorithm>
+#include <fstream>
+#include <iterator>
 #include <memory>
 
 namespace reluva {
@@ -57,6 +59,7 @@ public:
         ModelViewer models(sys_, screen_, archives_);
         TextureViewer textures(sys_, screen_, archives_);
         MapViewer maps(sys_, screen_, archives_);
+        maps.setLevels(readLevels());
         SoundViewer sounds(sys_, screen_, archives_);
         StringViewer strings(sys_, screen_, archives_);
         FontViewer fonts(sys_, screen_, archives_);
@@ -132,6 +135,20 @@ public:
     }
 
 private:
+    // The main menu's mission list, if the game folder has one; a missing
+    // or unreadable level.dat only loses the missions' names.
+    std::vector<newworlds::Level> readLevels() const {
+        std::vector<newworlds::Level> levels;
+        const auto path = fs::findFile(target_.path, "level.dat");
+        if (!path)
+            return levels;
+        std::ifstream in(*path, std::ios::binary);
+        const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+        if (newworlds::parseLevelList(text, levels))
+            levels.clear();
+        return levels;
+    }
+
     Error openArchives() {
         std::vector<std::filesystem::path> paths;
         std::error_code ec;

@@ -228,6 +228,6 @@ records, the placed objects, the grid (blocks and deposits) and the colour
 table. The only parts not understood are per tile model (the type-21 links)
 or per cell (the low bits above), so units, buildings and starting colonies
 can't be stored here: they presumably come from the missions, which
-`level.dat` names by a "parser short name" (`F1`, …) but whose scripts
-aren't in any archive (probably inside `STNW.exe`). The concrete tiles in
+[`level.dat`](level.md) names by a "parser short name" (`F1`, the map's
+name) but whose scripts aren't in any archive (probably inside `STNW.exe`). The concrete tiles in
 `f1` are a few scattered groups of 1-3 tiles, not a colony's pad.

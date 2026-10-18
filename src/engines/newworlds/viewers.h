@@ -10,6 +10,7 @@
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
@@ -148,6 +149,8 @@ private:
 class MapViewer {
 public:
     MapViewer(System& sys, Surface& screen, const Archives& archives);
+    // level.dat's missions, to name each map's mission in the title.
+    void setLevels(std::vector<Level> levels) { levels_ = std::move(levels); }
     size_t count() const { return maps_.size(); }
     void activate();
     void handleEvent(const Event& ev);
@@ -199,6 +202,7 @@ private:
     const Archives& archives_;
     Rasterizer raster_;
     std::vector<EntryRef> maps_;
+    std::vector<Level> levels_;
     std::vector<TextureFile> textureFiles_;
     bool shown_ = false;
     int current_ = 0;
