@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "common/font.h"
+#include "common/text.h"
 #include "engines/newworlds/viewers.h"
 
 #include <algorithm>
@@ -18,7 +19,6 @@ constexpr Color kTextColor{220, 224, 232};
 constexpr Color kHeadingColor{255, 200, 80}; // ~HEADING~
 constexpr Color kFormatColor{120, 200, 255}; // printf codes: %d, %%
 constexpr int kMargin = 4;
-constexpr int kIdColumns = 5; // "  12 "
 
 bool endsWith(const std::string& s, const char* suffix) {
     const size_t n = std::char_traits<char>::length(suffix);
@@ -98,6 +98,23 @@ StringViewer::StringViewer(System& sys, Surface& screen, const Archives& archive
             if (!entries[i].container && (entries[i].tag == cattag::Strings || endsWith(entries[i].name, ".stb")))
                 tables_.push_back({a, i});
     }
+    fonts_ = loadGameFonts(archives_);
+}
+
+int StringViewer::measure(std::string_view text) const {
+    if (font_ < 0)
+        return int(font::length(text)) * font::kAdvance * scale_;
+    return fonts_[size_t(font_)].textWidth(text) * scale_;
+}
+
+int StringViewer::lineHeight() const {
+    return (font_ < 0 ? font::kLineHeight : fonts_[size_t(font_)].lineHeight) * scale_;
+}
+
+int StringViewer::drawSpan(int x, int y, std::string_view text, Color color) {
+    if (font_ < 0)
+        return font::drawText(screen_, x, y, text, color, scale_);
+    return fonts_[size_t(font_)].drawText(screen_, x, y, text, color, scale_);
 }
 
 void StringViewer::activate() {
@@ -111,7 +128,7 @@ void StringViewer::activate() {
 }
 
 int StringViewer::rows() const {
-    return std::max(1, (screen_.h - 2 * kMargin) / (font::kLineHeight * scale_));
+    return std::max(1, (screen_.h - 2 * kMargin) / lineHeight());
 }
 
 void StringViewer::handleKey(uint32_t k) {
@@ -135,6 +152,11 @@ void StringViewer::handleKey(uint32_t k) {
         break;
     case '-':
         scale_ = std::max(scale_ - 1, 1);
+        layout();
+        break;
+    case 'f':
+        // The next font: the built-in one, then each of the game's.
+        font_ = font_ + 1 < int(fonts_.size()) ? font_ + 1 : -1;
         layout();
         break;
     default: return;
@@ -163,16 +185,14 @@ void StringViewer::show(int index) {
 
 void StringViewer::layout() {
     lines_.clear();
-    const int columns = std::max(kIdColumns + 10, (screen_.w - 2 * kMargin) / (font::kAdvance * scale_));
-    const size_t width = size_t(columns - kIdColumns);
+    const int idWidth = measure("9999 ");
+    const int width = std::max(measure("MMMMMMMMMM"), screen_.w - 2 * kMargin - idWidth);
     for (const StringTable::String& s : table_.strings()) {
-        char id[16];
-        std::snprintf(id, sizeof id, "%4u ", s.id);
-        Line line{{id, kIdColor}};
-        size_t used = 0; // characters on this line after the id column
+        Line line{std::to_string(s.id), {}};
+        int used = 0; // pixels on this line after the id column
         auto newLine = [&] {
             lines_.push_back(std::move(line));
-            line = Line{{std::string(kIdColumns, ' '), kIdColor}};
+            line = Line{};
             used = 0;
         };
         for (const Piece& p : piecesOf(s.text)) {
@@ -181,23 +201,29 @@ void StringViewer::layout() {
                     newLine();
                 continue;
             }
-            const size_t len = font::length(p.text);
+            const int w = measure(p.text);
             if (p.space) {
-                if (used > 0 && used + len <= width)
-                    line.push_back({p.text, p.color}), used += len;
+                if (used > 0 && used + w <= width)
+                    line.spans.push_back({p.text, p.color}), used += w;
                 continue;
             }
-            if (used > 0 && used + len > width)
+            if (used > 0 && used + w > width)
                 newLine();
-            // Words longer than a line are cut.
-            for (size_t at = 0; at < p.text.size();) {
-                std::string part = p.text.substr(at, width);
-                at += part.size();
-                if (used > 0 && used + font::length(part) > width)
+            // Words longer than a line are cut, a character at a time.
+            std::string part;
+            for (size_t i = 0; i < p.text.size();) {
+                const size_t from = i;
+                text::nextUtf8(p.text, i);
+                const std::string ch = p.text.substr(from, i - from);
+                if (!part.empty() && used + measure(part + ch) > width) {
+                    line.spans.push_back({part, p.color});
                     newLine();
-                used += font::length(part);
-                line.push_back({std::move(part), p.color});
+                    part.clear();
+                }
+                part += ch;
             }
+            used += measure(part);
+            line.spans.push_back({std::move(part), p.color});
         }
         lines_.push_back(std::move(line));
     }
@@ -210,15 +236,19 @@ void StringViewer::draw() {
         for (int x = 0; x < screen_.w; ++x, row += 4)
             row[0] = kBackground.r, row[1] = kBackground.g, row[2] = kBackground.b, row[3] = 255;
     }
-    const int lineHeight = font::kLineHeight * scale_;
     if (!status_.empty()) {
         font::drawText(screen_, kMargin, kMargin, status_, kHeadingColor, scale_);
         return;
     }
+    const int idWidth = measure("9999 ");
     for (int r = 0; r < rows() && top_ + r < int(lines_.size()); ++r) {
-        int x = kMargin;
-        for (const Span& span : lines_[size_t(top_ + r)])
-            x = font::drawText(screen_, x, kMargin + r * lineHeight, span.text, span.color, scale_);
+        const Line& line = lines_[size_t(top_ + r)];
+        const int y = kMargin + r * lineHeight();
+        // Ids right-aligned in their column.
+        drawSpan(kMargin + idWidth - measure(line.id + " "), y, line.id, kIdColor);
+        int x = kMargin + idWidth;
+        for (const Span& span : line.spans)
+            x = drawSpan(x, y, span.text, span.color);
     }
 }
 
@@ -233,6 +263,7 @@ void StringViewer::updateTitle() {
         title += status_ + ")";
     } else {
         title += std::to_string(table_.strings().size()) + " strings)";
+        title += font_ < 0 ? " [built-in font]" : " [font " + fonts_[size_t(font_)].name + "]";
         if (int(lines_.size()) > rows())
             title += " lines " + std::to_string(top_ + 1) + "-" +
                      std::to_string(std::min(top_ + rows(), int(lines_.size()))) + " of " +

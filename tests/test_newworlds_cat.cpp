@@ -6,6 +6,7 @@
 
 #include "engines/newworlds/arf.h"
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
@@ -499,6 +500,31 @@ void testWav() {
     CHECK(bool(decodeWav(b, s))); // cut inside the fmt chunk
 }
 
+void testFif() {
+    // Three glyphs from 32: space (2 wide), '!' (1 wide), '"' (none).
+    std::vector<uint8_t> b(std::begin("FONTPROP"), std::end("FONTPROP") - 1);
+    b.push_back(32); b.push_back(0); b.push_back(3); b.push_back(0);
+    put32(b, 2); put32(b, 4); put32(b, 0);
+    for (uint32_t v : {0u, 0u, 2u, 4u, 2u, 0u, 1u, 4u, 0u, 0u, 0u, 0u})
+        put32(b, v);
+    GameFont f;
+    CHECK(!parseFif(b, f));
+    CHECK(f.first == 32 && f.lineHeight == 4 && f.size == 2 && f.glyphs.size() == 3);
+    CHECK(f.glyphs[1].x == 2 && f.glyphs[1].width == 1 && f.glyphs[2].height == 0);
+    // No glyph for '"' or U+2603: drawn as '?', which this font lacks too.
+    CHECK(f.glyph('!') == &f.glyphs[1] && f.glyph('"') == nullptr && f.glyph(0x2603) == nullptr);
+    CHECK(f.textWidth(" ! !") == 2 + 1 + 2 + 1);
+    // '!' is a full-coverage column: drawn red over black at x = 2 after the space.
+    f.imageWidth = 3, f.imageHeight = 4;
+    f.coverage = {0, 0, 255, 0, 0, 255, 0, 0, 128, 0, 0, 0};
+    Surface s;
+    s.create(8, 4, PixelFormat::RGBA32);
+    CHECK(f.drawText(s, 0, 0, " !", {200, 0, 0}) == 3);
+    CHECK(s.row(0)[2 * 4] == 200 && s.row(2)[2 * 4] == 100 && s.row(3)[2 * 4] == 0 && s.row(0)[1 * 4] == 0);
+    b.push_back(0);
+    CHECK(bool(parseFif(b, f))); // a byte too many
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -589,6 +615,7 @@ int main() {
     testMdl();
     testArf();
     testWav();
+    testFif();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

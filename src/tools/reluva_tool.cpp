@@ -23,6 +23,7 @@
 //                                                  one in an archive
 //   reluva-tool wav-info <file.wav | file.cat>     show a sound's format and length, or survey an archive's
 //   reluva-tool wav-decode <in.wav> <out.wav>      decode a sound to 16-bit PCM
+//   reluva-tool fif-info <file.fif | file.cat>     show a font's glyph table, or list an archive's fonts
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -33,6 +34,7 @@
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
@@ -1165,6 +1167,60 @@ int cmdWavInfo(int argc, char** argv) {
     return describe(path, data) ? 0 : 1;
 }
 
+int cmdFifInfo(int argc, char** argv) {
+    if (argc != 3) {
+        std::fprintf(stderr, "usage: reluva-tool fif-info <file.fif | file.cat>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    auto summary = [](const nw::GameFont& f) {
+        size_t drawn = 0;
+        int widest = 0;
+        for (const auto& g : f.glyphs) {
+            drawn += g.height > 0;
+            widest = std::max(widest, g.width);
+        }
+        char line[160];
+        std::snprintf(line, sizeof line, "codes %u-%zu, %zu drawn, line height %d, size %d, widest %d", f.first,
+                      f.first + f.glyphs.size() - 1, drawn, f.lineHeight, f.size, widest);
+        return std::string(line);
+    };
+    const std::string path = argv[2];
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
+        auto cat = std::make_unique<nw::CatArchive>();
+        if (reluva::Error err = cat->open(path)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        unsigned listed = 0;
+        for (const auto& e : cat->entries())
+            listed += e.tag == nw::cattag::Fif;
+        nw::Archives archives;
+        archives.push_back(std::move(cat));
+        const auto fonts = nw::loadGameFonts(archives);
+        for (const auto& f : fonts)
+            std::printf("%-16s %dx%d image; %s\n", f.name.c_str(), f.imageWidth, f.imageHeight, summary(f).c_str());
+        std::printf("%u font entries, %zu different fonts read\n", listed, fonts.size());
+        return 0;
+    }
+    Bytes d;
+    if (!readFile(path.c_str(), d))
+        return 1;
+    nw::GameFont f;
+    if (reluva::Error err = nw::parseFif(d, f)) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::printf("%s\n", summary(f).c_str());
+    for (size_t i = 0; i < f.glyphs.size(); ++i) {
+        const auto& g = f.glyphs[i];
+        const uint32_t code = f.first + uint32_t(i);
+        std::printf("  %3u %c  x %3d y %3d  %2d x %2d%s\n", code, code < 127 ? char(code) : ' ', g.x, g.y, g.width,
+                    g.height, g.height ? "" : "  (none)");
+    }
+    return 0;
+}
+
 int cmdWavDecode(int argc, char** argv) {
     if (argc != 4) {
         std::fprintf(stderr, "usage: reluva-tool wav-decode <in.wav> <out.wav>\n");
@@ -1574,6 +1630,8 @@ int main(int argc, char** argv) {
         return cmdWavInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "wav-decode") == 0)
         return cmdWavDecode(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "fif-info") == 0)
+        return cmdFifInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1596,6 +1654,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool mdl-info <file.mdl | file.cat>\n"
                  "  reluva-tool wav-info <file.wav | file.cat>\n"
                  "  reluva-tool wav-decode <in.wav> <out.wav>\n"
+                 "  reluva-tool fif-info <file.fif | file.cat>\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"

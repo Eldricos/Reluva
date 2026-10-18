@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "common/font.h"
+#include "common/text.h"
 
 #include <array>
 
@@ -133,33 +134,14 @@ const std::array<Bitmap, 95>& bitmaps() {
     return table;
 }
 
-// The next code point of UTF-8 text (U+FFFD for a bad sequence).
-uint32_t next(std::string_view s, size_t& i) {
-    const auto b = [&](size_t k) { return uint8_t(s[k]); };
-    const uint8_t c = b(i++);
-    int extra = c >= 0xf0 ? 3 : c >= 0xe0 ? 2 : c >= 0xc0 ? 1 : 0;
-    if (c >= 0x80 && extra == 0)
-        return 0xfffd;
-    uint32_t cp = extra == 3 ? c & 0x07u : extra == 2 ? c & 0x0fu : extra == 1 ? c & 0x1fu : c;
-    for (; extra > 0; --extra) {
-        if (i >= s.size() || (b(i) & 0xc0) != 0x80)
-            return 0xfffd;
-        cp = cp << 6 | (b(i++) & 0x3fu);
-    }
-    return cp;
-}
-
 // The ASCII character a code point is drawn as.
 char asAscii(uint32_t cp) {
+    cp = text::toLatin1(cp);
     if (cp >= 32 && cp < 127)
         return char(cp);
-    if (cp == '\t')
-        return ' ';
     switch (cp) {
     case 0xa0: return ' ';
-    case 0x2018: case 0x2019: case 0xb4: return '\'';
-    case 0x201c: case 0x201d: return '"';
-    case 0x2013: case 0x2014: return '-';
+    case 0xb4: return '\'';
     case 0xd7: return 'x';
     default: break;
     }
@@ -176,7 +158,7 @@ char asAscii(uint32_t cp) {
 size_t length(std::string_view utf8) {
     size_t n = 0;
     for (size_t i = 0; i < utf8.size(); ++n)
-        next(utf8, i);
+        text::nextUtf8(utf8, i);
     return n;
 }
 
@@ -184,7 +166,7 @@ int drawText(Surface& surface, int x, int y, std::string_view utf8, Color color,
     if (surface.format != PixelFormat::RGBA32)
         return x;
     for (size_t i = 0; i < utf8.size();) {
-        const char c = asAscii(next(utf8, i));
+        const char c = asAscii(text::nextUtf8(utf8, i));
         const Bitmap& glyph = bitmaps()[size_t(c - 32)];
         for (int row = 0; row < kH; ++row)
             for (int col = 0; col < kW; ++col) {

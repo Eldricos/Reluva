@@ -30,9 +30,9 @@ Tags seen in the 23 retail archives:
 | `0x16` | file | `.lbp`, `.mp0`–`.mp4`, `.eb0`, `.eb1`, `.fbp` | textures, see [lbp.md](lbp.md) (and one `.stb` in `misc.cat`) |
 | `0x17` | file | `.geo` | models, see [geo.md](geo.md); source size always differs |
 | `0x25` | file | `.arf` | only in the `*actor` archives |
-| `0x26` | file | `.fif` | inside `0x27` in the `*gui` archives |
-| `0x27` | container | | inside `0x28` |
-| `0x28` | container | | in the `*gui` archives |
+| `0x26` | file | `.fif` | font glyph table, see [fif.md](fif.md); inside `0x27` in the `*gui` archives |
+| `0x27` | container | | inside `0x28`: a font's `.fif` and its `.fbp` image |
+| `0x28` | container | | one font, in the `*gui` archives |
 | `0x29` | container | | texture set: an `.mmb` followed by texture levels |
 | `0x2a` | file | `.mmb` | 8 bytes in the cases seen; first item of a `0x29` set |
 | `0x2c` | file | `.mdl` | 522 in `misc.cat` |

@@ -7,6 +7,7 @@
 #include "common/system.h"
 #include "common/types.h"
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/fif.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/mdl.h"
@@ -278,23 +279,51 @@ private:
         std::string text;
         Color color;
     };
-    using Line = std::vector<Span>;
+    struct Line {
+        std::string id; // on a string's first line
+        std::vector<Span> spans;
+    };
 
     void show(int index);
     void layout(); // wraps the table into lines_ for the screen's width
     void draw();
     void updateTitle();
     int rows() const; // lines that fit on the screen
+    // Text in the current font: Reluva's own, or one of the game's.
+    int measure(std::string_view text) const;
+    int lineHeight() const;
+    int drawSpan(int x, int y, std::string_view text, Color color);
 
     System& sys_;
     Surface& screen_;
     const Archives& archives_;
     std::vector<EntryRef> tables_;
+    std::vector<GameFont> fonts_;
+    int font_ = -1; // index in fonts_, -1 for the built-in font
     bool shown_ = false;
     int current_ = 0, top_ = 0, scale_ = 1;
     StringTable table_;
     std::string status_;
     std::vector<Line> lines_;
+};
+
+// Shows the game's fonts: each one's characters and some sample text.
+class FontViewer {
+public:
+    FontViewer(System& sys, Surface& screen, const Archives& archives);
+    size_t count() const { return fonts_.size(); }
+    void activate();
+    void handleKey(uint32_t key);
+
+private:
+    void draw();
+    void updateTitle();
+
+    System& sys_;
+    Surface& screen_;
+    std::vector<GameFont> fonts_;
+    int current_ = 0, scale_ = 2;
+    bool boxes_ = false; // outline each glyph's box
 };
 
 } // namespace reluva::newworlds
