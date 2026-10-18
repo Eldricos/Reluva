@@ -23,15 +23,23 @@ MP3s named after the mission and a number from 005 (`F1005`, `K12009`,
 
 Exactly the missions with text in the side's misc archive (`fedmisc`,
 `klimisc`, `rommisc`; no J5), mission 14 with its own recordings though it
-reuses 12's map. The numbers start at 5 everywhere, and in the string
-tables ids 1-4 are the title, stardate line and the unspoken headings
-(stellar cartography, incoming transmission, planetary data), so each
-file is presumably the spoken version of the string with its number: every
-file has a string of that id (`fed01.stb` ids 5-15 for `F1005`-`F1015`).
-The sizes don't follow the strings' lengths, though (correlation 0.02:
-`F1013`, "Objectives incomplete", is 87,550 bytes), so the voice may say
-more than the text; not confirmed until the recordings are heard. The
-counts don't match the `default.wav` slots in `fedmisc.cat`.
+reuses 12's map.
+
+**The recordings are speeches, not the strings read aloud.** Heard
+(October 2026): `F1005` (34 s) opens the briefing, "I wish I could be there
+to brief you in person but the…"; `F1012` (6 s) "This mineral field should
+supply complete resources…"; `F1013` (11 s) "While the Taubat government
+is desperate to involve the Federation…"; `F1015` (10 s) "The situation
+couldn't be much worse, you'll be caught between the greed…". String 12 of
+`fed01.stb` is the mission-pass page and 13 the fail page, so the numbers
+aren't string ids, though every file's number happens to be one: they're
+the mission's speech clips in order, from 005 (the opening briefing),
+played at points the mission's script decides (which isn't in the data
+files; presumably `STNW.exe`). That's why their sizes don't follow the
+strings' lengths.
+
+**Format:** MPEG-2 Layer III, 64 kbit/s, 22,050 Hz, mono, with an ID3v2
+tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).
 
 ## Announcements (`Misc`)
 
@@ -77,6 +85,5 @@ music.
 
 ## Open questions
 
-- What each mission recording says (its length, and whether it reads its
-  string).
+- When each mission's speeches play (the scripts aren't in the data).
 - Which of the eight lines per side is what.
