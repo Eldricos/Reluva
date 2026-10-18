@@ -233,7 +233,9 @@ void ModelViewer::loadTextures(const std::string& modelName) {
     for (const auto& face : model_.faces)
         needed = std::max<size_t>(needed, face.corners.back().extra[4] + 1);
     std::vector<uint8_t> data;
-    for (const TextureFile* t : findModelTextures(modelName, textureFiles_, needed)) {
+    std::vector<const TextureFile*> slots = findModelTextures(modelName, textureFiles_, needed);
+    addDoorTextures(model_, modelName, textureFiles_, slots);
+    for (const TextureFile* t : slots) {
         // Unknown or unreadable textures stay empty, keeping the numbering;
         // their faces are drawn untextured.
         Texture tex;

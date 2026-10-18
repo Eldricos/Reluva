@@ -4,6 +4,7 @@
 #include "engines/newworlds/model_textures.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <string>
 
@@ -70,9 +71,10 @@ bool abbreviates(const std::string& shortName, const std::string& full) {
 // Textures in the model's own folder (kln for geo/kln/k_bop.geo) are
 // preferred, and _s textures belong to the _s models only.
 //
-// The faces number the plain textures from 0 in name order; the _g light map
-// is the last number (k_bop: 0 k_bop_a, 1 k_bop_b, 2 k_bop_g). Numbers in
-// between are shared textures with other names, which aren't known.
+// The faces number the model's own textures from 0 in name order, the _g
+// texture after its base (k_bop: 0 k_bop_a, 1 k_bop_b, 2 k_bop_g; frps_a:
+// 0 frps, 1 frps_g). Later numbers are shared textures with other names
+// (doors: see addDoorTextures).
 std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
                                                   const std::vector<TextureFile>& textures, size_t needed) {
     std::string folder, base, ext;
@@ -104,17 +106,61 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
             return t.folder == folder && abbreviates(base, t.stem.substr(0, us));
         });
 
-    // One of each name (some are stored both as .lbp and as a mipmap set).
-    std::vector<const TextureFile*> plain, glow;
-    for (const TextureFile* t : found) {
-        auto& list = endsWith(t->stem, "_g") ? glow : plain;
-        if (std::none_of(list.begin(), list.end(), [&](const TextureFile* x) { return x->stem == t->stem; }))
-            list.push_back(t);
-    }
-    std::vector<const TextureFile*> out(std::max(needed, plain.size() + glow.size()), nullptr);
-    std::copy(plain.begin(), plain.end(), out.begin());
-    std::copy(glow.begin(), glow.end(), out.end() - std::ptrdiff_t(glow.size()));
+    // One of each name (some are stored both as .lbp and as a mipmap set),
+    // in name order (the list is sorted by stem).
+    std::vector<const TextureFile*> own;
+    for (const TextureFile* t : found)
+        if (std::none_of(own.begin(), own.end(), [&](const TextureFile* x) { return x->stem == t->stem; }))
+            own.push_back(t);
+    std::vector<const TextureFile*> out(std::max(needed, own.size()), nullptr);
+    std::copy(own.begin(), own.end(), out.begin());
     return out;
+}
+
+bool isDoorSlot(const GeoModel& geo, uint32_t slot) {
+    unsigned faces = 0;
+    for (const auto& f : geo.faces) {
+        if (f.corners.back().extra[4] != slot)
+            continue;
+        if (++faces > 2)
+            return false;
+        // Upright, and showing (nearly) the whole texture.
+        const auto& vs = geo.parts[f.part].vertices;
+        float nx = 0, ny = 0, nz = 0, u0 = 1, u1 = 0, v0 = 1, v1 = 0;
+        for (size_t i = 0; i < f.corners.size(); ++i) {
+            const auto& p = vs[f.corners[i].vertex];
+            const auto& q = vs[f.corners[(i + 1) % f.corners.size()].vertex];
+            nx += (p.y - q.y) * (p.z + q.z);
+            ny += (p.z - q.z) * (p.x + q.x);
+            nz += (p.x - q.x) * (p.y + q.y);
+            u0 = std::min(u0, f.corners[i].u), u1 = std::max(u1, f.corners[i].u);
+            v0 = std::min(v0, f.corners[i].v), v1 = std::max(v1, f.corners[i].v);
+        }
+        const float len = std::sqrt(nx * nx + ny * ny + nz * nz);
+        // Doors can lean (fch's 20 degrees, kab's 40) but don't face up, and
+        // are at least 500 units across (the 250-unit faces showing a whole
+        // texture in fsc and fss_a are something else: lights, signs).
+        if (len <= 0 || std::fabs(nz) / len > 0.7f || len / 2 < 250000 || u1 - u0 < 0.9f || v1 - v0 < 0.6f)
+            return false;
+    }
+    return faces > 0;
+}
+
+void addDoorTextures(const GeoModel& geo, const std::string& modelName, const std::vector<TextureFile>& textures,
+                     std::vector<const TextureFile*>& slots) {
+    std::string folder, base, ext;
+    splitName(modelName, folder, base, ext);
+    // Each side's single closed door: the other door textures are 4 x 4
+    // sheets of opening frames, which a face showing a whole texture can't be.
+    const TextureFile* door = nullptr;
+    for (const TextureFile& t : textures)
+        if (t.folder == folder && (t.stem == "door3" || t.stem == "kcdoor"))
+            door = &t;
+    if (!door)
+        return;
+    for (size_t i = 1; i < slots.size(); ++i) // slot 0 is always the model's main texture
+        if (isDoorSlot(geo, uint32_t(i)))
+            slots[i] = door;
 }
 
 } // namespace reluva::newworlds

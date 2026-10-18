@@ -558,10 +558,30 @@ void testModelTextures() {
     CHECK(names("geo/kln/kcs_l.geo", 1) == "kcs_l");                     // its own texture first
     CHECK(names("geo/kln/kcs_s.geo", 1) == "?");                          // outlines don't fall back
     CHECK(names("geo/fed/kwb.geo", 1) == "kwb@fed");
-    CHECK(names("geo/fed/fhf.geo", 3) == "? ? fhf_g@fed");       // the light map is the last number
+    CHECK(names("geo/fed/fhf.geo", 3) == "fhf_g@fed ? ?");       // own textures from 0, _g included
     CHECK(names("geo/fed/fpdt.geo", 2) == "fpdt@fed ?");          // fpdt_s is the outline's
     CHECK(names("geo/fed/fvpy_a.geo", 1) == "fvpy@fed");          // duplicates count once
     CHECK(names("geo/fed/landpd_d.geo", 2) == "landpad@fed ?");   // a shortened name
+    // A door: one upright 1000-unit face showing the whole texture, number 1;
+    // a roof face (number 2) isn't.
+    GeoModel g;
+    g.parts.resize(1);
+    g.parts[0].vertices = {{0, 0, 0}, {1000, 0, 0}, {1000, 0, 1000}, {0, 0, 1000},
+                           {0, 0, 1000}, {1000, 0, 1000}, {1000, 1000, 1000}, {0, 1000, 1000}};
+    auto face = [&](uint32_t first, uint32_t slot) {
+        GeoModel::Face f;
+        for (uint32_t i = 0; i < 4; ++i)
+            f.corners.push_back({first + i, float(i == 1 || i == 2), float(i >= 2), {0, 0, 0, 0, slot}});
+        g.faces.push_back(f);
+    };
+    face(4, 0);
+    face(0, 1);
+    face(4, 2);
+    CHECK(isDoorSlot(g, 1) && !isDoorSlot(g, 2) && !isDoorSlot(g, 3));
+    std::vector<TextureFile> doors = {{"door3", "fed", {0, 0}}, {"kcdoor", "kln", {0, 0}}};
+    std::vector<const TextureFile*> slots(3, nullptr);
+    addDoorTextures(g, "geo/fed/fch.geo", doors, slots);
+    CHECK(!slots[0] && slots[1] == &doors[0] && !slots[2]);
 }
 
 void testRasterizer() {

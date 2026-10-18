@@ -26,6 +26,7 @@
 //   reluva-tool fif-info <file.fif | file.cat>     show a font's glyph table, or list an archive's fonts
 //   reluva-tool level-info <level.dat> [file.cat...] list the missions, with the archives holding their maps
 //   reluva-tool gmf-fit [-a] <planet.cat> [map]    check the model numbering by how tiles' edges meet
+//   reluva-tool geo-slots <file.geo>...             per texture number: faces, area, facing, texture coordinates
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -1170,6 +1171,58 @@ int cmdWavInfo(int argc, char** argv) {
     return describe(path, data) ? 0 : 1;
 }
 
+// Per texture number of each model: how many faces use it, their area, how
+// they face (share of area facing up, down or sideways) and the range of
+// their texture coordinates, to tell what kind of texture each must be.
+int cmdGeoSlots(int argc, char** argv) {
+    if (argc < 3) {
+        std::fprintf(stderr, "usage: reluva-tool geo-slots <file.geo>...\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    for (int a = 2; a < argc; ++a) {
+        Bytes d;
+        nw::GeoModel geo;
+        if (!readFile(argv[a], d) || nw::parseGeo(d, geo)) {
+            std::printf("%s: doesn't read\n", argv[a]);
+            continue;
+        }
+        struct Slot { unsigned faces = 0; double area = 0, up = 0, down = 0, tilt = 0; float u0 = 1e9f, u1 = -1e9f, v0 = 1e9f, v1 = -1e9f; };
+        std::map<uint32_t, Slot> slots;
+        for (const auto& f : geo.faces) {
+            Slot& sl = slots[f.corners.back().extra[4]];
+            ++sl.faces;
+            const auto& vs = geo.parts[f.part].vertices;
+            double nx = 0, ny = 0, nz = 0;
+            for (size_t i = 0; i < f.corners.size(); ++i) {
+                const auto& p = vs[f.corners[i].vertex];
+                const auto& q = vs[f.corners[(i + 1) % f.corners.size()].vertex];
+                nx += (p.y - q.y) * (p.z + q.z);
+                ny += (p.z - q.z) * (p.x + q.x);
+                nz += (p.x - q.x) * (p.y + q.y);
+                sl.u0 = std::min(sl.u0, f.corners[i].u), sl.u1 = std::max(sl.u1, f.corners[i].u);
+                sl.v0 = std::min(sl.v0, f.corners[i].v), sl.v1 = std::max(sl.v1, f.corners[i].v);
+            }
+            const double area = std::sqrt(nx * nx + ny * ny + nz * nz) / 2;
+            sl.area += area;
+            if (area > 0) {
+                const double c = nz / (2 * area); // faces are clockwise from the front, so -c is up
+                sl.tilt += std::fabs(c) * area;  // |cos| of the angle from vertical axis, area-weighted
+                if (-c > 0.7)
+                    sl.up += area;
+                else if (c > 0.7)
+                    sl.down += area;
+            }
+        }
+        std::printf("%s:\n", argv[a]);
+        for (const auto& [n, sl] : slots)
+            std::printf("  %u: %3u faces, area %9.0f, up %3.0f%% down %3.0f%%, u %5.2f..%5.2f v %5.2f..%5.2f, tilt %.2f\n", n,
+                        sl.faces, sl.area, sl.area ? 100 * sl.up / sl.area : 0, sl.area ? 100 * sl.down / sl.area : 0,
+                        sl.u0, sl.u1, sl.v0, sl.v1, sl.area ? sl.tilt / sl.area : 0);
+    }
+    return 0;
+}
+
 // For each model number a planet's maps use, how well each ground model would
 // fit there: the share of the number's tile sides that meet their neighbours
 // (all 5 heights within 80), the neighbours taking their models from
@@ -1881,7 +1934,8 @@ int cmdGeoTextures(int argc, char** argv) {
             if (!cat->read(e, data) && !nw::parseGeo(data, m))
                 for (const auto& face : m.faces)
                     needed = std::max(needed, face.corners.back().extra[4] + 1);
-            const auto slots = nw::findModelTextures(e.name, textures, needed);
+            auto slots = nw::findModelTextures(e.name, textures, needed);
+            nw::addDoorTextures(m, e.name, textures, slots);
             const size_t found = size_t(std::count_if(slots.begin(), slots.end(), [](auto* t) { return t; }));
             const bool tooFew = found < needed;
             if (found == 0)
@@ -2192,6 +2246,8 @@ int main(int argc, char** argv) {
         return cmdLevelInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "gmf-fit") == 0)
         return cmdGmfFit(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-slots") == 0)
+        return cmdGeoSlots(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -2217,6 +2273,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool fif-info <file.fif | file.cat>\n"
                  "  reluva-tool level-info <level.dat> [file.cat...]\n"
                  "  reluva-tool gmf-fit [-m|-h|-l|-r|-j|-t|-a|-o file] <planet.cat> [map]\n"
+                 "  reluva-tool geo-slots <file.geo>...\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"

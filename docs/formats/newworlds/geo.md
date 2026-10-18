@@ -85,27 +85,50 @@ small 128 × 128 one). So the textures are numbered in name order.
 
 `reluva-tool geo-textures <file.cat>...` applies the rule below to every model
 and lists the ones it finds no textures for (`-a` lists every model's).
-Known misses: `landpd_d`, which looks like `landpad` but doesn't share its
-name; textures also look misplaced on some models, such as `fpdt` and
+Known misses: textures look misplaced on some models, such as `fpdt` and
 `fhf_p`.
 
 Buildings also use **shared textures** with names of their own:
 `fedbuild.cat` has `pad`, `door2`, `door3`, `pdoor`, `f_in2`..`f_in4`,
-`deckanim` and `webspark`, and `fss_a` numbers 6 textures while only `fss`
-and `fss_g` are named after it. No file lists which shared textures a model
-uses: their names appear in no other file (the `.mdl` files list docking
-points and states, `constructed` and `deconstructed`, but no textures), and
-the archive's order doesn't follow the models. So those numbers stay unknown
-for now and are drawn untextured.
+`deckanim` and `webspark`; `klibuild.cat` the Klingon equivalents (`kcdoor`,
+`kdoor_h`..`kdoor_h3`, `kdeckan`, `k_in1`, `k_in2`, …). No file lists which
+shared textures a model uses: their names appear in no other file (the
+`.mdl` files list docking points and states, `constructed` and
+`deconstructed`, but no textures), and the archive's order doesn't follow
+the models.
 
-The viewer's rule, still to be checked on more models: a model uses the
-textures named exactly after it or after it plus `_` and a suffix, in name
-order, preferring its own folder (`kln`). A model without any, such as a `_l`
-version, uses those of its name without the suffix, and a shortened name such
-as `landpd_d` those of the texture it abbreviates (`landpad`). The plain
-textures take the numbers from 0, and the `_g` light map the last one (as in
-`k_bop`); `_s` textures belong to the `_s` models. A model without a match
-at all, such as the `_s` outlines, is drawn untextured.
+Comparing the two archives (October 2026) placed one of them, by the shape
+of each number's faces (`reluva-tool geo-slots <file.geo>` lists faces, area,
+facing and texture-coordinate range per number):
+
+- **Own textures come first, in name order, `_g` included**: `frps_a`,
+  `fss_a` and `kch` number `frps`, `frps_g` (six roof faces), …; the `_g`
+  isn't the last number, as first thought.
+- **Doors:** nearly every building has a number used by one or two faces,
+  at least 500 units across and not facing up, each showing the whole
+  texture: the door, as the last number or near it (`fch`, `accom`,
+  `landpad`, `kab`, `kief`, `ksc`, `klf`, `kvy`, `krps`, `kcy`, `kch`, …).
+  A face showing a whole texture can't use the 4 x 4 sheets of opening
+  frames (`kdoor_h`, `door2`, `pdoor`), so it's each side's single closed
+  door: `kcdoor` (64 x 32) and `door3` (32 x 32). Pure name order is ruled
+  out: `kcdoor` would sort before `kief` and `ksc`, but is their last number.
+  A model can also skip one of its own textures: `fch`'s second number is its
+  door, not `fch_g`.
+- **Aprons:** many buildings have one up-facing face showing a quarter or
+  half of a texture (in front of `frps_a`'s door, on `fsc` and `foodstor`):
+  a shared texture, not yet identified.
+- Faces about 250 units across showing a whole texture (`fsc`, `fss_a`) are
+  something smaller: lights or signs.
+
+The rest of the shared numbers stay unknown and are drawn untextured.
+
+The viewer's rule: a model uses the textures named exactly after it or after
+it plus `_` and a suffix, in name order from 0, preferring its own folder
+(`kln`). A model without any, such as a `_l` version, uses those of its name
+without the suffix, and a shortened name such as `landpd_d` those of the
+texture it abbreviates (`landpad`). `_s` textures belong to the `_s` models.
+Then door numbers (as above) get the side's door. A model without a match at
+all, such as the `_s` outlines, is drawn untextured.
 
 In the other corners of a face, the same value holds the part number (0 in
 part 0), so it isn't a per-corner texture choice.
