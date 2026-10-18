@@ -12,35 +12,71 @@ Media/
 
 ## Voice-overs (`FedVO`, `KlingVO`, `RomVO`)
 
-`FedVO` holds 135 MP3s named after the mission and a number from 005:
+MP3s named after the mission and a number from 005 (`F1005`, `K12009`,
+`J1R011`; joint missions carry the side's letter: `J1F`, `J1K`, `J1R`):
 
-| Missions | Files |
-|---|---|
-| F1 | `F1005`-`F1015` (11) |
-| F2 | `F2005`-`F2012` (8) |
-| F3 | `F3005`-`F3017` (13) |
-| F8 | `F8005`-`F8014` (10) |
-| F12 | `F12005`-`F12010` (6) |
-| F14 | `F14005`-`F14013` (9) |
-| J1 (Federation side) | `J1F005`, `J1F006`, `J1F010`-`J1F021` (14; no 007-009) |
-| J2, J3, J4, J6, J7, J8, J9 | `J<n>F005` up to `J<n>F009`-`J<n>F014` |
+| Folder | Missions | Files |
+|---|---|---|
+| `FedVO` | F1 (005-015), F2 (005-012), F3 (005-017), F8 (005-014), F12 (005-010), F14 (005-013); J1F (005, 006, 010-021), J2F-J9F | 135 |
+| `KlingVO` | K1 (005-013), K2 (005-012), K7 (005-013), K8 (005-015), K12 (005-013, plus a `K12009A`), K14 (005-011); J1K-J9K | 120 |
+| `RomVO` | R1 (005-013), R2 (005-016, no 012), R8 (005-014), R9 (005-014), R12 (005-009), R14 (005-010); J1R-J9R | 116 |
 
-So the missions with Federation voice are those in `level.dat` for which
-`fedmisc.cat` has text (F1, F2, F3, F8, F12, F14 and the joint missions;
-there's no J5), and F14 has its own recordings though it reuses F12's map.
-The joint missions' files carry the side's letter (`J1F`), presumably
-`J1K` and `J1R` in the other folders.
+Exactly the missions with text in the side's misc archive (`fedmisc`,
+`klimisc`, `rommisc`; no J5), mission 14 with its own recordings though it
+reuses 12's map. The numbers start at 5 everywhere, and in the string
+tables ids 1-4 are the title, stardate line and the unspoken headings
+(stellar cartography, incoming transmission, planetary data), so each
+file is presumably the spoken version of the string with its number: every
+file has a string of that id (`fed01.stb` ids 5-15 for `F1005`-`F1015`).
+The sizes don't follow the strings' lengths, though (correlation 0.02:
+`F1013`, "Objectives incomplete", is 87,550 bytes), so the voice may say
+more than the text; not confirmed until the recordings are heard. The
+counts don't match the `default.wav` slots in `fedmisc.cat`.
 
-Every file's number is an id in its mission's string table (`fed01.stb`
-has ids 5-15 for `F1005`-`F1015`; `jnt01fed.stb` 5-21), but the files'
-sizes don't follow those strings' lengths (correlation 0.02: `F1013`, for
-"Objectives incomplete", is 87,550 bytes, longer than several objectives'),
-so whether each recording speaks that string isn't confirmed; the voice
-may be fuller than the briefing text. The counts don't match the
-`default.wav` slots in `fedmisc.cat` either (7 for fed01, 11 files here).
+## Announcements (`Misc`)
+
+WAV files, the same for every mission:
+
+- **Building complete** (`com`), one per building type and side:
+  Klingon `A_k…com` (17: `ka` accommodation, `kams`, `kapg`, `kch` colony
+  hub, `kcy` construction yard, `kdt`, `klf` livestock farm, `kms` mining
+  station, `kpg` power generator, `kpht` photon artillery, `krp` resource
+  processor, `ksb` sickbay, `ksf`, `ksg` static gun, `kss` science
+  station, `ktp` transporter pad, `kvy` vehicle yard), Federation
+  `B_f…com` (17: `fab`, `fams`, `fapg`, `fcy`, `fhf` hydroponics farm,
+  `fms`, `fpg`, `fpht`, `fpt`, `frp`, `fsb`, `fsby`, `fsc`, `fsf`, `fsg`,
+  `ftp`, `fvy`), Romulan `B_r…com` (10). `fed01.stb`'s "Vehicle yard
+  completed, Sir." is such a message.
+- **Events**, per side (`f`, `k`, `r`): `atckvoc` (under attack),
+  `lowpowr` (low power), `miswin` / `mislose` (mission won / lost),
+  `objmet` (objective met).
+- **Eight lines per side**, each in one voice (`FED001c` … `FED008a`,
+  `KLI001a` … `KLI008b`, `ROM001b` … `ROM008b`): numbered and lettered like
+  the vehicles' voice lines in the actor archives (line, then voice a-e),
+  so probably generic unit responses.
+- **Tutorials:** `Tutor01`-`tutor41` and `tut-2_01`-`tut-2_27` (MP3), the
+  training and tutorial missions' speech (`cvr03.stb`'s `~INSTRUCTION~`
+  pages).
+
+## Music (`Music`)
+
+MP3s:
+
+- **A theme per planet type**, about 2.9 MB each: `AlpineStart`
+  (`alpwrld`), `DesertStart` (`deswrld`), `IceStart` (`icewrld`),
+  `LavaStart` (`vlcwrld`), `MarsStart` (`redwrld`, the red / barren worlds)
+  and `MountainStart` (by elimination `alnwrld`).
+- **A theme per race met:** `Federation_`, `Klingon_`, `Romulan_`,
+  `Hubrin_`, `Metar_`, `Taubat_Encounter`.
+- **Stings per side** (Federation, Klingon, Romulan): big danger, colony
+  in danger, general danger, mission failed, mission succeeded, objective
+  met, mystery; and `birdofprey`, `RomBirdofPrey`, `fedcrashedss`.
+
+`StarTrek.wav` (2.9 MB, in `Media/` itself) is presumably the main menu's
+music.
 
 ## Open questions
 
-- The `KlingVO`, `RomVO`, `Misc` (sound effects and tutorial voice) and
-  `Music` listings.
-- What each recording says (its length, and whether it reads its string).
+- What each mission recording says (its length, and whether it reads its
+  string).
+- Which of the eight lines per side is what.
