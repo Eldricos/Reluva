@@ -56,10 +56,15 @@ add_library(reluva_common STATIC
     src/common/fs.cpp
     src/common/md5.cpp
     src/common/detection.cpp
+    src/common/audio/decode.cpp
+    src/common/audio/mp3.cpp
     src/common/audio/wav.cpp
     src/common/font.cpp
     src/common/text.cpp)
 target_include_directories(reluva_common PUBLIC src)
+# Third-party headers (third_party/, see each README) as system includes, so
+# our warnings don't apply to them.
+target_include_directories(reluva_common SYSTEM PRIVATE third_party/minimp3)
 target_link_libraries(reluva_common PRIVATE reluva_warnings)
 
 # --- engines: talk only to common/ --------------------------------------------
@@ -102,6 +107,7 @@ if(RELUVA_BUILD_TESTS)
     enable_testing()
     add_executable(reluva_tests tests/test_common.cpp)
     target_link_libraries(reluva_tests PRIVATE reluva_common reluva_warnings)
+    target_include_directories(reluva_tests PRIVATE tests)
     add_test(NAME common COMMAND reluva_tests)
 
     add_executable(reluva_newworlds_tests tests/test_newworlds_cat.cpp)

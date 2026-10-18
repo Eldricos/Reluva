@@ -21,8 +21,8 @@
 //                                                  only models with too few, with similar names)
 //   reluva-tool mdl-info <file.mdl | file.cat>     show a metamodel's names and states, or survey every
 //                                                  one in an archive
-//   reluva-tool wav-info <file.wav | file.cat>     show a sound's format and length, or survey an archive's
-//   reluva-tool wav-decode <in.wav> <out.wav>      decode a sound to 16-bit PCM
+//   reluva-tool wav-info <file.wav | file.mp3 | file.cat>     show a sound's format and length, or survey an archive's
+//   reluva-tool wav-decode <in.wav | in.mp3> <out.wav>      decode a sound to 16-bit PCM
 //   reluva-tool fif-info <file.fif | file.cat>     show a font's glyph table, or list an archive's fonts
 //   reluva-tool level-info <level.dat> [file.cat...] list the missions, with the archives holding their maps
 //   reluva-tool gmf-fit [-a] <planet.cat> [map]    check the model numbering by how tiles' edges meet
@@ -36,6 +36,7 @@
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
+#include "common/audio/decode.h"
 #include "common/audio/wav.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
@@ -1119,19 +1120,19 @@ int cmdMdlInfo(int argc, char** argv) {
 
 int cmdWavInfo(int argc, char** argv) {
     if (argc != 3) {
-        std::fprintf(stderr, "usage: reluva-tool wav-info <file.wav | file.cat>\n");
+        std::fprintf(stderr, "usage: reluva-tool wav-info <file.wav | file.mp3 | file.cat>\n");
         return 2;
     }
     namespace nw = reluva::newworlds;
     auto describe = [](const std::string& name, const std::vector<uint8_t>& data, const std::string& note = "") {
         reluva::audio::Sound s;
-        if (reluva::Error err = reluva::audio::decodeWav(data, s)) {
+        if (reluva::Error err = reluva::audio::decodeSound(data, s)) {
             std::printf("%-28s %s\n", name.c_str(), err.message.c_str());
             return false;
         }
-        std::printf("%-28s format %#x, %d channel%s, %d Hz, %zu frames (%.2f s)%s\n", name.c_str(), s.format,
-                    s.channels, s.channels == 1 ? "" : "s", s.rate, s.frames(), double(s.frames()) / s.rate,
-                    note.c_str());
+        std::printf("%-28s %s, %d channel%s, %d Hz, %zu frames (%.2f s)%s\n", name.c_str(),
+                    reluva::audio::formatName(s.format), s.channels, s.channels == 1 ? "" : "s", s.rate, s.frames(),
+                    double(s.frames()) / s.rate, note.c_str());
         return true;
     };
     const std::string path = argv[2];
@@ -1832,7 +1833,7 @@ int cmdFifInfo(int argc, char** argv) {
 
 int cmdWavDecode(int argc, char** argv) {
     if (argc != 4) {
-        std::fprintf(stderr, "usage: reluva-tool wav-decode <in.wav> <out.wav>\n");
+        std::fprintf(stderr, "usage: reluva-tool wav-decode <in.wav | in.mp3> <out.wav>\n");
         return 2;
     }
     std::vector<uint8_t> data;
@@ -1841,7 +1842,7 @@ int cmdWavDecode(int argc, char** argv) {
         return 1;
     }
     reluva::audio::Sound s;
-    if (reluva::Error err = reluva::audio::decodeWav(data, s)) {
+    if (reluva::Error err = reluva::audio::decodeSound(data, s)) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -2269,8 +2270,8 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
                  "  reluva-tool mdl-info <file.mdl | file.cat>\n"
-                 "  reluva-tool wav-info <file.wav | file.cat>\n"
-                 "  reluva-tool wav-decode <in.wav> <out.wav>\n"
+                 "  reluva-tool wav-info <file.wav | file.mp3 | file.cat>\n"
+                 "  reluva-tool wav-decode <in.wav | in.mp3> <out.wav>\n"
                  "  reluva-tool fif-info <file.fif | file.cat>\n"
                  "  reluva-tool level-info <level.dat> [file.cat...]\n"
                  "  reluva-tool gmf-fit [-m|-h|-l|-r|-j|-t|-a|-o file] <planet.cat> [map]\n"

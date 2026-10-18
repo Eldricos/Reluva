@@ -3,7 +3,10 @@
 
 // Small self-contained tests for common/. No framework, to keep deps at zero.
 
+#include "common/audio/decode.h"
+#include "common/audio/mp3.h"
 #include "common/audio/wav.h"
+#include "data/tone440_mp3.h"
 #include "common/config.h"
 #include "common/detection.h"
 #include "common/font.h"
@@ -136,12 +139,34 @@ static void testWav() {
     CHECK(bool(decodeWav(b, s))); // cut inside the fmt chunk
 }
 
+static void testMp3() {
+    using namespace reluva::audio;
+    const std::vector<uint8_t> tone(std::begin(kTone440Mp3), std::end(kTone440Mp3));
+    Sound s;
+    CHECK(!decodeMp3(tone, s));
+    CHECK(s.format == kFormatMp3 && s.rate == 22050 && s.channels == 1);
+    // About 0.2 s (whole frames of 576 samples, plus the encoder's delay).
+    CHECK(s.frames() >= 4410 && s.frames() <= 4410 + 3 * 576);
+    // 440 Hz: about 2 x 440 x 0.1 = 88 zero crossings in the middle 0.1 s.
+    int crossings = 0;
+    for (size_t i = 1102; i < 3307; ++i)
+        crossings += (s.samples[i - 1] < 0) != (s.samples[i] < 0);
+    CHECK(crossings >= 84 && crossings <= 92);
+    // The same after an ID3v2 tag (header, 5 bytes of padding), and through decodeSound.
+    std::vector<uint8_t> tagged = {'I', 'D', '3', 3, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0};
+    tagged.insert(tagged.end(), tone.begin(), tone.end());
+    Sound t;
+    CHECK(!decodeSound(tagged, t) && t.samples == s.samples);
+    CHECK(bool(decodeMp3(std::vector<uint8_t>(100, 0), t))); // no frames
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
     testUtf16();
     testFont();
     testWav();
+    testMp3();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)
