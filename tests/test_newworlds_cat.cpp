@@ -15,7 +15,6 @@
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
-#include "engines/newworlds/wav.h"
 
 #include <cmath>
 #include <cstdio>
@@ -477,30 +476,6 @@ void testArf() {
     CHECK(bool(parseArf(b, t))); // a byte short
 }
 
-void testWav() {
-    // One 8-byte IMA ADPCM block: header (sample 100, index 0), then nibbles
-    // 4, 0, 0, ... (low nibble first); the fact chunk keeps 5 frames.
-    std::vector<uint8_t> b;
-    auto put16 = [&](uint16_t v) { b.push_back(uint8_t(v)); b.push_back(uint8_t(v >> 8)); };
-    auto tag = [&](const char* t) { b.insert(b.end(), t, t + 4); };
-    tag("RIFF"); put32(b, 0); tag("WAVE");
-    tag("fmt "); put32(b, 20);
-    put16(0x11); put16(1); put32(b, 22050); put32(b, 22050); put16(8); put16(4); put16(2); put16(9);
-    tag("fact"); put32(b, 4); put32(b, 5);
-    tag("data"); put32(b, 8);
-    for (uint8_t v : {100, 0, 0, 0, 0x04, 0, 0, 0})
-        b.push_back(v);
-    Sound s;
-    CHECK(!decodeWav(b, s));
-    CHECK(s.rate == 22050 && s.channels == 1 && s.format == 0x11);
-    CHECK((s.samples == std::vector<int16_t>{100, 107, 108, 109, 109}));
-    // Back through 16-bit PCM unchanged.
-    Sound pcm;
-    CHECK(!decodeWav(encodePcmWav(s), pcm));
-    CHECK(pcm.format == 1 && pcm.rate == 22050 && pcm.samples == s.samples);
-    b.resize(20);
-    CHECK(bool(decodeWav(b, s))); // cut inside the fmt chunk
-}
 
 void testFif() {
     // Three glyphs from 32: space (2 wide), '!' (1 wide), '"' (none).
@@ -656,7 +631,6 @@ int main() {
     testGmf();
     testMdl();
     testArf();
-    testWav();
     testFif();
     testLevels();
     testModelTextures();

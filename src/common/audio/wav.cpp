@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
-#include "engines/newworlds/wav.h"
+#include "common/audio/wav.h"
 
 #include <algorithm>
 #include <cstring>
 #include <string>
 
-namespace reluva::newworlds {
+namespace reluva::audio {
 
 namespace {
 
@@ -155,4 +155,4 @@ std::vector<uint8_t> encodePcmWav(const Sound& s) {
     return b;
 }
 
-} // namespace reluva::newworlds
+} // namespace reluva::audio

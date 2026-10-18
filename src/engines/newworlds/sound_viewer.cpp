@@ -3,6 +3,8 @@
 
 #include "engines/newworlds/viewers.h"
 
+#include "common/audio/wav.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <map>
@@ -115,10 +117,10 @@ void SoundViewer::show(int index) {
     const EntryRef& ref = sounds_[shownSounds_[size_t(index)]];
     CatArchive& cat = *archives_[ref.archive];
     std::vector<uint8_t> data;
-    auto sound = std::make_shared<Sound>();
+    auto sound = std::make_shared<audio::Sound>();
     if (Error err = cat.read(cat.entries()[ref.entry], data))
         status_ = err.message;
-    else if (Error err2 = decodeWav(data, *sound))
+    else if (Error err2 = audio::decodeWav(data, *sound))
         status_ = err2.message;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -186,7 +188,7 @@ void SoundViewer::draw() {
         for (int x = 0; x < w; ++x, row += 4)
             row[0] = 22, row[1] = 26, row[2] = 38, row[3] = 255;
     }
-    std::shared_ptr<const Sound> sound;
+    std::shared_ptr<const audio::Sound> sound;
     double position = 0;
     bool playing = false;
     {
@@ -235,7 +237,7 @@ void SoundViewer::updateTitle() {
     std::string title = std::string("New Worlds sounds ") + (showCopies_ ? "[all] " : "") +
                         std::to_string(current_ + 1) + "/" + std::to_string(shownSounds_.size()) + ": " +
                         nameOf(current) + " in " + archiveOf(current) + " (";
-    std::shared_ptr<const Sound> sound;
+    std::shared_ptr<const audio::Sound> sound;
     {
         std::lock_guard<std::mutex> lock(mutex_);
         sound = sound_;

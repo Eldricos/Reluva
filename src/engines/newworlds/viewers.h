@@ -5,6 +5,7 @@
 
 #include "common/events.h"
 #include "common/system.h"
+#include "common/audio/sound.h"
 #include "common/types.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
@@ -16,7 +17,6 @@
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
-#include "engines/newworlds/wav.h"
 
 #include <map>
 #include <memory>
@@ -262,7 +262,7 @@ private:
     std::string status_;
     // Shared with the audio thread.
     mutable std::mutex mutex_;
-    std::shared_ptr<const Sound> sound_;
+    std::shared_ptr<const audio::Sound> sound_;
     double position_ = 0; // in the sound's frames
     bool playing_ = false;
 };

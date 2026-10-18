@@ -36,6 +36,7 @@
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
+#include "common/audio/wav.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
@@ -45,7 +46,6 @@
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
-#include "engines/newworlds/wav.h"
 #include "engines/newworlds/model_textures.h"
 
 #include <map>
@@ -1124,8 +1124,8 @@ int cmdWavInfo(int argc, char** argv) {
     }
     namespace nw = reluva::newworlds;
     auto describe = [](const std::string& name, const std::vector<uint8_t>& data, const std::string& note = "") {
-        nw::Sound s;
-        if (reluva::Error err = nw::decodeWav(data, s)) {
+        reluva::audio::Sound s;
+        if (reluva::Error err = reluva::audio::decodeWav(data, s)) {
             std::printf("%-28s %s\n", name.c_str(), err.message.c_str());
             return false;
         }
@@ -1840,12 +1840,12 @@ int cmdWavDecode(int argc, char** argv) {
         std::fprintf(stderr, "cannot open %s\n", argv[2]);
         return 1;
     }
-    reluva::newworlds::Sound s;
-    if (reluva::Error err = reluva::newworlds::decodeWav(data, s)) {
+    reluva::audio::Sound s;
+    if (reluva::Error err = reluva::audio::decodeWav(data, s)) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
-    const std::vector<uint8_t> out = reluva::newworlds::encodePcmWav(s);
+    const std::vector<uint8_t> out = reluva::audio::encodePcmWav(s);
     std::ofstream f(argv[3], std::ios::binary);
     f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
     if (!f) {

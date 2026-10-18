@@ -3,6 +3,7 @@
 
 // Small self-contained tests for common/. No framework, to keep deps at zero.
 
+#include "common/audio/wav.h"
 #include "common/config.h"
 #include "common/detection.h"
 #include "common/font.h"
@@ -105,11 +106,42 @@ static void testFont() {
     font::drawText(s, 15, 10, "W", {255, 0, 0}, 2); // clipped, not out of bounds
 }
 
+static void testWav() {
+    using namespace reluva::audio;
+    // One 8-byte IMA ADPCM block: header (sample 100, index 0), then nibbles
+    // 4, 0, 0, ... (low nibble first); the fact chunk keeps 5 frames.
+    std::vector<uint8_t> b;
+    auto put32 = [](std::vector<uint8_t>& v, uint32_t x) {
+        for (int i = 0; i < 4; ++i)
+            v.push_back(uint8_t(x >> (8 * i)));
+    };
+    auto put16 = [&](uint16_t v) { b.push_back(uint8_t(v)); b.push_back(uint8_t(v >> 8)); };
+    auto tag = [&](const char* t) { b.insert(b.end(), t, t + 4); };
+    tag("RIFF"); put32(b, 0); tag("WAVE");
+    tag("fmt "); put32(b, 20);
+    put16(0x11); put16(1); put32(b, 22050); put32(b, 22050); put16(8); put16(4); put16(2); put16(9);
+    tag("fact"); put32(b, 4); put32(b, 5);
+    tag("data"); put32(b, 8);
+    for (uint8_t v : {100, 0, 0, 0, 0x04, 0, 0, 0})
+        b.push_back(v);
+    Sound s;
+    CHECK(!decodeWav(b, s));
+    CHECK(s.rate == 22050 && s.channels == 1 && s.format == 0x11);
+    CHECK((s.samples == std::vector<int16_t>{100, 107, 108, 109, 109}));
+    // Back through 16-bit PCM unchanged.
+    Sound pcm;
+    CHECK(!decodeWav(encodePcmWav(s), pcm));
+    CHECK(pcm.format == 1 && pcm.rate == 22050 && pcm.samples == s.samples);
+    b.resize(20);
+    CHECK(bool(decodeWav(b, s))); // cut inside the fmt chunk
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
     testUtf16();
     testFont();
+    testWav();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)
