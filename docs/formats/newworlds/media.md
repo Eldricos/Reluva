@@ -83,6 +83,15 @@ MP3s:
 `StarTrek.wav` (2.9 MB, in `Media/` itself) is presumably the main menu's
 music.
 
+## In Reluva
+
+The shared audio code (`src/common/audio/`, for every engine) decodes both
+formats: `decodeSound` picks WAV (PCM, IMA ADPCM) or MP3 (through minimp3,
+`third_party/minimp3`) by content. The data viewer's sounds page lists the
+game folder's loose `.mp3` and `.wav` files after the archives' sounds and
+plays them; `reluva-tool wav-info` and `wav-decode` take MP3s too. The voice
+MP3s decode to within 1 of ffmpeg's samples.
+
 ## Open questions
 
 - When each mission's speeches play (the scripts aren't in the data).

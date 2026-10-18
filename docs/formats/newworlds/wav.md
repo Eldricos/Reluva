@@ -94,7 +94,10 @@ repeats.
 
 ## In Reluva
 
-The data viewer's last page (**Tab**) lists the sounds with their waveform;
+The decoder is in `src/common/audio/wav.cpp`, shared by every engine.
+The data viewer's sounds page (**Tab**) lists the sounds with their waveform
+(and the game folder's loose `.mp3`/`.wav` files after them, see
+[media.md](media.md));
 **Space** or **Enter** plays or stops one, **A** plays each as it's
 selected. The title names the sound's archive. Copies are listed once, with their
 count and any other names and archives in the title; **F** lists every copy.

@@ -10,15 +10,18 @@ included: you point Reluva at your own installed copy.
 
 ```
 src/common/        platform-independent core: System interface, events,
-                   surfaces, config, case-insensitive file lookup, detection
+                   surfaces, config, case-insensitive file lookup, detection,
+                   text and a built-in font
+  audio/           sound decoders shared by every engine: WAV (PCM, IMA ADPCM), MP3
+third_party/       outside code Reluva builds in, each with its licence (minimp3)
 src/backends/sdl3/ the only code that touches SDL (window, rendering, input, audio)
 src/launcher/      Dear ImGui game list: add / remove / start games
 src/engines/       one directory per engine, plus registry.cpp listing them
   testbed/         built-in test "game" that exercises the backend
-  newworlds/       Star Trek: New Worlds: archive, string table, texture and
-                   model readers; currently runs as a model and texture viewer
+  newworlds/       Star Trek: New Worlds: readers for its archives and their
+                   files; currently runs as a data viewer
 src/tools/         reluva-tool, utilities for studying game data
-tests/             unit tests for common/
+tests/             unit tests for common/ and the engines
 ```
 
 Engines only use `common/` and `engines/engine.h`. They never include SDL.

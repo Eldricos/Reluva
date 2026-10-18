@@ -60,7 +60,7 @@ public:
         TextureViewer textures(sys_, screen_, archives_);
         MapViewer maps(sys_, screen_, archives_);
         maps.setLevels(readLevels());
-        SoundViewer sounds(sys_, screen_, archives_);
+        SoundViewer sounds(sys_, screen_, archives_, target_.path);
         StringViewer strings(sys_, screen_, archives_);
         FontViewer fonts(sys_, screen_, archives_);
         constexpr int kViewers = 6;

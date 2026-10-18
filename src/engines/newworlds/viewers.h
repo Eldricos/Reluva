@@ -18,6 +18,7 @@
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 
+#include <filesystem>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -228,7 +229,9 @@ private:
 //   Space or Enter: play/stop   A: play each sound on selecting it
 class SoundViewer {
 public:
-    SoundViewer(System& sys, Surface& screen, const Archives& archives);
+    // gameDir: the game folder, whose loose .mp3 and .wav files (Media/) are
+    // listed after the archives' sounds; empty for none.
+    SoundViewer(System& sys, Surface& screen, const Archives& archives, const std::filesystem::path& gameDir = {});
     ~SoundViewer();
     size_t count() const { return sounds_.size(); }
     void activate();
@@ -249,7 +252,14 @@ private:
     System& sys_;
     Surface& screen_;
     const Archives& archives_;
-    std::vector<EntryRef> sounds_;
+    // A sound in an archive, or a loose file in the game folder.
+    struct Item {
+        EntryRef ref{0, 0};
+        std::filesystem::path file; // empty for an archive's
+        std::string name;           // the archive's name for it, or the path in the game folder
+    };
+    Error read(size_t sound, std::vector<uint8_t>& data) const;
+    std::vector<Item> sounds_;
     // The archives store some sounds many times over (kliactor has kneg1.wav
     // 24 times, in 4 slots of each vehicle's set), sometimes under other
     // names: each sound's first copy, and the sounds listed (all, or only

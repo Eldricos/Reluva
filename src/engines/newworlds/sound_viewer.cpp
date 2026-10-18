@@ -3,28 +3,30 @@
 
 #include "engines/newworlds/viewers.h"
 
-#include "common/audio/wav.h"
+#include "common/audio/decode.h"
+#include "common/fs.h"
 
 #include <algorithm>
 #include <cstdio>
+#include <fstream>
+#include <iterator>
 #include <map>
 
 namespace reluva::newworlds {
 
-SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives)
+SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives, const std::filesystem::path& gameDir)
     : sys_(sys), screen_(screen), archives_(archives) {
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
             if (entries[i].tag == cattag::Wave)
-                sounds_.push_back({a, i});
+                sounds_.push_back({{a, i}, {}, entries[i].name});
     }
-    // Find the copies by their size and a hash of their bytes (FNV-1a).
+    // Find the archives' copies by their size and a hash of their bytes (FNV-1a).
     std::map<std::pair<size_t, uint64_t>, size_t> seen;
     for (size_t s = 0; s < sounds_.size(); ++s) {
-        CatArchive& cat = *archives_[sounds_[s].archive];
         std::vector<uint8_t> data;
-        if (cat.read(cat.entries()[sounds_[s].entry], data))
+        if (read(s, data))
             firstCopy_.push_back(s); // unreadable: shown on its own, with the error
         else {
             uint64_t hash = 14695981039346656037ull;
@@ -33,17 +35,45 @@ SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives)
             firstCopy_.push_back(seen.emplace(std::make_pair(data.size(), hash), s).first->second);
         }
     }
+    // Then the game folder's loose sounds (New Worlds' Media/: voice, music),
+    // by path; these aren't read until shown.
+    std::vector<std::pair<std::string, std::filesystem::path>> loose;
+    std::error_code ec;
+    if (!gameDir.empty())
+        for (std::filesystem::recursive_directory_iterator it(gameDir, ec), end; !ec && it != end; it.increment(ec)) {
+            const std::string ext = fs::toLower(it->path().extension().string());
+            if (it->is_regular_file(ec) && (ext == ".mp3" || ext == ".wav"))
+                loose.push_back({it->path().lexically_relative(gameDir).generic_string(), it->path()});
+        }
+    std::sort(loose.begin(), loose.end(),
+              [](const auto& x, const auto& y) { return fs::toLower(x.first) < fs::toLower(y.first); });
+    for (auto& [name, path] : loose) {
+        firstCopy_.push_back(sounds_.size());
+        sounds_.push_back({{0, 0}, std::move(path), std::move(name)});
+    }
     for (size_t s = 0; s < sounds_.size(); ++s)
         if (showCopies_ || firstCopy_[s] == s)
             shownSounds_.push_back(s);
 }
 
-const std::string& SoundViewer::nameOf(size_t sound) const {
-    return archives_[sounds_[sound].archive]->entries()[sounds_[sound].entry].name;
+Error SoundViewer::read(size_t sound, std::vector<uint8_t>& data) const {
+    const Item& item = sounds_[sound];
+    if (item.file.empty()) {
+        CatArchive& cat = *archives_[item.ref.archive];
+        return cat.read(cat.entries()[item.ref.entry], data);
+    }
+    std::ifstream in(item.file, std::ios::binary);
+    if (!in)
+        return Error::fail("cannot open " + item.file.string());
+    data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    return Error::success();
 }
 
+const std::string& SoundViewer::nameOf(size_t sound) const { return sounds_[sound].name; }
+
 std::string SoundViewer::archiveOf(size_t sound) const {
-    return archives_[sounds_[sound].archive]->path().filename().string();
+    const Item& item = sounds_[sound];
+    return item.file.empty() ? archives_[item.ref.archive]->path().filename().string() : "the game folder";
 }
 
 SoundViewer::~SoundViewer() {
@@ -114,13 +144,11 @@ void SoundViewer::show(int index) {
     stop();
     current_ = index;
     status_.clear();
-    const EntryRef& ref = sounds_[shownSounds_[size_t(index)]];
-    CatArchive& cat = *archives_[ref.archive];
     std::vector<uint8_t> data;
     auto sound = std::make_shared<audio::Sound>();
-    if (Error err = cat.read(cat.entries()[ref.entry], data))
+    if (Error err = read(shownSounds_[size_t(index)], data))
         status_ = err.message;
-    else if (Error err2 = audio::decodeWav(data, *sound))
+    else if (Error err2 = audio::decodeSound(data, *sound))
         status_ = err2.message;
     {
         std::lock_guard<std::mutex> lock(mutex_);
@@ -248,7 +276,7 @@ void SoundViewer::updateTitle() {
         char info[96];
         std::snprintf(info, sizeof info, "%d Hz, %s, %.2f s", sound->rate, sound->channels == 1 ? "mono" : "stereo",
                       double(sound->frames()) / sound->rate);
-        title += std::string(info) + (sound->format == 0x11 ? ", IMA ADPCM" : ", PCM") + ")";
+        title += std::string(info) + ", " + audio::formatName(sound->format) + ")";
     }
     // Its copies: how many, and any other names or archives they're in.
     size_t copies = 0;
