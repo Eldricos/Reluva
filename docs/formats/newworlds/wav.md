@@ -1,8 +1,8 @@
 # Star Trek: New Worlds: `.wav` sounds
 
 Status: **fully decoded**. Stored in the `.cat` archives with chunk tag
-`0x33` under `stnwsfx/` (85 in `kliactor.cat`, 3 each in the alpine and
-desert planet archives). Worked out from the files themselves, October 2026.
+`0x33` under `stnwsfx/` (85 in `kliactor.cat`, 91 in `fedactor.cat`, 35 in
+`fedmisc.cat`, 3 each in the alpine and desert planet archives). Worked out from the files themselves, October 2026.
 `reluva-tool wav-info <file.wav | archive.cat>` shows one or surveys them
 all; `reluva-tool wav-decode <in.wav> <out.wav>` writes 16-bit PCM. All
 decode.
@@ -76,6 +76,17 @@ fapc007b, fapc012b`, then `fneg1` four times. The number is the line
 two per vehicle). So a set looks like three groups of four responses, the
 last group the same refusal for every vehicle; which group is played when
 (selecting, ordering, refusing?) isn't known yet.
+
+The same refusal sound is in `fedmisc.cat` 34 more times, as
+`default.wav`, `pass.wav` and `fail.wav` (byte for byte `fneg1.wav`; 58
+copies in all). There they follow the mission string tables: after
+`fed01.stb` 7 `default` then `pass` and `fail`, after `fed02.stb` 8, and
+after `fed14.stb` (following `fed03`, `fed08` and `fed12`) 13. Each mission
+table has `~MISSION PASS~` and `~MISSION FAIL~` pages, so these look like
+the missions' voice-over slots (briefing pages, then pass and fail) with
+no recording, filled with the stand-in sound. The `default` counts don't
+match the tables' page counts (10, 10 and 11 pages before the pass page),
+so which page each slot goes with isn't known.
 
 `reluva-tool wav-info <archive.cat>` marks each copy with the first one it
 repeats.
