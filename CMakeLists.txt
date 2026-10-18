@@ -56,6 +56,7 @@ add_library(reluva_common STATIC
     src/common/fs.cpp
     src/common/md5.cpp
     src/common/detection.cpp
+    src/common/font.cpp
     src/common/text.cpp)
 target_include_directories(reluva_common PUBLIC src)
 target_link_libraries(reluva_common PRIVATE reluva_warnings)
@@ -78,7 +79,8 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/map_viewer.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp
-    src/engines/newworlds/sound_viewer.cpp)
+    src/engines/newworlds/sound_viewer.cpp
+    src/engines/newworlds/string_viewer.cpp)
 target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warnings)
 
 # --- executable: SDL3 backend + ImGui launcher --------------------------------

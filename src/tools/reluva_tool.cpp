@@ -9,7 +9,7 @@
 //                                                  layout and work out unknown entry kinds
 //   reluva-tool cat-list <file>                    list a .cat file's contents
 //   reluva-tool cat-extract <file> <dir> [filter]  extract files whose name contains filter
-//   reluva-tool stb-dump <file.stb>                print a string table
+//   reluva-tool stb-dump <file.stb | file.cat>     print a string table, or list an archive's
 //   reluva-tool tex-survey <file.cat>...           group every texture by header layout
 //   reluva-tool tex-keys <file.cat>...             compare each colour key with the image corners
 //   reluva-tool chunks <file>                      try to read any file as a (u16 tag, u32 size) chunk tree
@@ -429,13 +429,48 @@ int cmdCatExtract(int argc, char** argv) {
 
 int cmdStbDump(int argc, char** argv) {
     if (argc < 3) {
-        std::fprintf(stderr, "usage: reluva-tool stb-dump <file.stb>\n");
+        std::fprintf(stderr, "usage: reluva-tool stb-dump <file.stb | file.cat>\n");
         return 2;
+    }
+    namespace nw = reluva::newworlds;
+    const std::string path = argv[2];
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
+        // Every table in the archive (one in misc.cat has the texture tag).
+        nw::CatArchive cat;
+        if (reluva::Error err = cat.open(path)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        unsigned count = 0, good = 0;
+        Bytes d;
+        for (const auto& e : cat.entries()) {
+            const bool stb = e.name.size() > 4 && e.name.compare(e.name.size() - 4, 4, ".stb") == 0;
+            if (e.container || (e.tag != nw::cattag::Strings && !stb))
+                continue;
+            ++count;
+            nw::StringTable table;
+            reluva::Error err = cat.read(e, d);
+            if (!err)
+                err = table.parse(d);
+            if (err) {
+                std::printf("%-28s %s\n", e.name.c_str(), err.message.c_str());
+                continue;
+            }
+            ++good;
+            uint32_t maxId = 0;
+            for (const auto& s : table.strings())
+                maxId = std::max(maxId, s.id);
+            const std::string first = table.strings().empty() ? "" : table.strings()[0].text.substr(0, 40);
+            std::printf("%-28s %3zu strings, ids up to %3u  %s\n", e.name.c_str(), table.strings().size(), maxId,
+                        first.c_str());
+        }
+        std::printf("%u string tables, %u read\n", count, good);
+        return good == count ? 0 : 1;
     }
     Bytes d;
     if (!readFile(argv[2], d))
         return 1;
-    reluva::newworlds::StringTable table;
+    nw::StringTable table;
     reluva::Error err = table.parse(d);
     for (const auto& s : table.strings())
         std::printf("%6u  %s\n", s.id, s.text.c_str());
@@ -1549,7 +1584,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool cat-probe <file.cat> [-q]\n"
                  "  reluva-tool cat-list <file.cat>\n"
                  "  reluva-tool cat-extract <file.cat> <output dir> [name filter]\n"
-                 "  reluva-tool stb-dump <file.stb>\n"
+                 "  reluva-tool stb-dump <file.stb | file.cat>\n"
                  "  reluva-tool tex-survey <file.cat>...\n"
                  "  reluva-tool tex-keys <file.cat>...\n"
                  "  reluva-tool chunks <file>\n"

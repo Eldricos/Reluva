@@ -26,6 +26,7 @@ using newworlds::CatArchive;
 using newworlds::MapViewer;
 using newworlds::ModelViewer;
 using newworlds::SoundViewer;
+using newworlds::StringViewer;
 using newworlds::TextureViewer;
 
 // Detection table. Built with `reluva --hash`: each entry needs the size and
@@ -56,11 +57,13 @@ public:
         TextureViewer textures(sys_, screen_, archives_);
         MapViewer maps(sys_, screen_, archives_);
         SoundViewer sounds(sys_, screen_, archives_);
-        constexpr int kViewers = 4;
-        const size_t counts[kViewers] = {models.count(), textures.count(), maps.count(), sounds.count()};
-        if (counts[0] + counts[1] + counts[2] + counts[3] == 0)
-            return Error::fail("No models, textures, maps or sounds found in " + target_.path.string());
-        // Viewer 0 shows models, 1 textures, 2 maps, 3 sounds; Tab moves to
+        StringViewer strings(sys_, screen_, archives_);
+        constexpr int kViewers = 5;
+        const size_t counts[kViewers] = {models.count(), textures.count(), maps.count(), sounds.count(),
+                                         strings.count()};
+        if (counts[0] + counts[1] + counts[2] + counts[3] + counts[4] == 0)
+            return Error::fail("No models, textures, maps, sounds or strings found in " + target_.path.string());
+        // Viewer 0 shows models, 1 textures, 2 maps, 3 sounds, 4 strings; Tab moves to
         // the next one that has something to show. They draw into the
         // screen, so it must exist before the first activate().
         int viewer = 0;
@@ -73,8 +76,10 @@ public:
                 textures.activate();
             else if (viewer == 2)
                 maps.activate();
-            else
+            else if (viewer == 3)
                 sounds.activate();
+            else
+                strings.activate();
         };
         activate();
 
@@ -102,6 +107,8 @@ public:
                     maps.handleEvent(ev);
                 else if (viewer == 3 && ev.type == EventType::KeyDown)
                     sounds.handleKey(ev.key);
+                else if (viewer == 4 && ev.type == EventType::KeyDown)
+                    strings.handleKey(ev.key);
             }
             if (viewer == 0)
                 models.update(sys_.getMillis());

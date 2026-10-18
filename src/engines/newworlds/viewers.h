@@ -12,6 +12,7 @@
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
+#include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/wav.h"
 
@@ -262,6 +263,38 @@ private:
     std::shared_ptr<const Sound> sound_;
     double position_ = 0; // in the sound's frames
     bool playing_ = false;
+};
+
+// Shows the string tables (.stb), word-wrapped, with their ids.
+class StringViewer {
+public:
+    StringViewer(System& sys, Surface& screen, const Archives& archives);
+    size_t count() const { return tables_.size(); }
+    void activate();
+    void handleKey(uint32_t key);
+
+private:
+    struct Span {
+        std::string text;
+        Color color;
+    };
+    using Line = std::vector<Span>;
+
+    void show(int index);
+    void layout(); // wraps the table into lines_ for the screen's width
+    void draw();
+    void updateTitle();
+    int rows() const; // lines that fit on the screen
+
+    System& sys_;
+    Surface& screen_;
+    const Archives& archives_;
+    std::vector<EntryRef> tables_;
+    bool shown_ = false;
+    int current_ = 0, top_ = 0, scale_ = 1;
+    StringTable table_;
+    std::string status_;
+    std::vector<Line> lines_;
 };
 
 } // namespace reluva::newworlds

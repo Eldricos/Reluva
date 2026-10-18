@@ -5,6 +5,7 @@
 
 #include "common/config.h"
 #include "common/detection.h"
+#include "common/font.h"
 #include "common/fs.h"
 #include "common/md5.h"
 #include "common/text.h"
@@ -90,10 +91,25 @@ static void testUtf16() {
     CHECK(text::utf16leToUtf8(nullptr, 0).empty());
 }
 
+static void testFont() {
+    using namespace reluva;
+    CHECK(font::length("Caf\xc3\xa9 \xe2\x80\x99") == 6); // é and ’ are one character each
+    Surface s;
+    s.create(20, 12, PixelFormat::RGBA32);
+    const int end = font::drawText(s, 1, 1, "I|", {255, 0, 0});
+    CHECK(end == 1 + 2 * font::kAdvance);
+    // 'I' has its middle column set from row 1 to 5 and a bar on row 0.
+    auto red = [&](int x, int y) { return s.row(y)[x * 4] == 255 && s.row(y)[x * 4 + 1] == 0; };
+    CHECK(red(3, 1) && red(2, 1) && red(4, 1) && !red(1, 2) && red(3, 4) && !red(0, 0));
+    CHECK(red(9, 7) && !red(9, 8)); // '|' runs rows 0-6
+    font::drawText(s, 15, 10, "W", {255, 0, 0}, 2); // clipped, not out of bounds
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
     testUtf16();
+    testFont();
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)
