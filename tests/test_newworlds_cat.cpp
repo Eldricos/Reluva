@@ -4,6 +4,7 @@
 // Tests for the New Worlds .cat reader against archives built here, following
 // docs/formats/newworlds/cat.md, so no game data is needed.
 
+#include "engines/newworlds/arf.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -363,7 +364,7 @@ void testGeo() {
 
     err = parseGeo(triangleGeo(false, false, true), m);
     CHECK(!err && m.parts.size() == 2 && m.faces[1].part == 1 && m.parts[1].vertices.size() == 3 &&
-          m.parts[1].unknown == 1);
+          m.parts[1].node == 1);
 
     auto bad = triangleGeo();
     bad[bad.size() - 16] = 7; // last edge now starts at vertex 7
@@ -450,6 +451,26 @@ void testMdl() {
     CHECK(m.title == "testmetamodel" && m.parts.size() == 2 && m.parts[1].name == "turret_1" && m.parts[1].value == 1);
     CHECK(m.points.size() == 1 && m.points[0].name == "gun_muzzle_1" && m.places.empty() && m.animated.empty());
     CHECK(m.states.size() == 2 && m.states[1] == "low detail");
+}
+
+// An animation frame: u32 count, then per part 9 f32 rotation, f32 scale and
+// a position chunk (u16 0x1c, u32 12, 3 f32).
+void testArf() {
+    std::vector<uint8_t> b;
+    auto putf = [&](float f) { uint32_t v; std::memcpy(&v, &f, 4); put32(b, v); };
+    put32(b, 2);
+    for (int part = 0; part < 2; ++part) {
+        for (float f : {0.f, 0.f, -1.f, 0.f, 1.f, 0.f, 1.f, 0.f, 0.f, 1.f})
+            putf(f);
+        b.push_back(0x1c); b.push_back(0);
+        put32(b, 12);
+        putf(float(part)); putf(2); putf(52);
+    }
+    std::vector<PartTransform> t;
+    CHECK(!parseArf(b, t));
+    CHECK(t.size() == 2 && t[1].position.x == 1 && t[1].position.z == 52 && t[0].rotation[2] == -1 && t[0].scale == 1);
+    b.pop_back();
+    CHECK(bool(parseArf(b, t))); // a byte short
 }
 
 void testModelTextures() {
@@ -540,6 +561,7 @@ int main() {
     testGeo();
     testGmf();
     testMdl();
+    testArf();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

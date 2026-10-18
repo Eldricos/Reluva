@@ -62,9 +62,18 @@ Across `misc.cat`:
 | `mid_section`, `mid_tail_section`, `mid_head_section`, `mid_head_tail_section` | 3 |
 | `normal`, `low_detail` / `normal` | 4 |
 
-The animated models' states are presumably animations; `kliactor.cat`
-holds `.arf` files (tag `0x25`, e.g. `conbee00.arf`-`conbee15.arf`), not yet
-studied.
+The animated models' states are animations; their frames are the `.arf`
+files (see [arf.md](arf.md)).
+
+## Reference pose
+
+In models with animated parts, after the states: u32 the animated count, a
+u32 1, a pair of numbers per animated part (conbee: (0, 1), (1, 2), (2, 3);
+crewman: (0, 0) … (12, 12); perhaps part and node), four more u32 (conbee
+1, 2, 1, 3; crewman 1, 3, 1, 13), then one 58-byte transform per animated
+part (as in [arf.md](arf.md)): the pose the geometry is stored in. conbee's
+arm pivots at (−73, −299, 16), the end of its arm's geometry. More
+transforms follow (conbee: 18 more), not yet understood.
 
 ## Geometry
 
@@ -104,4 +113,4 @@ guns' points are at (±4022, −3180, −3327) and the nose gun's at (0, −4206
 - How list 0's nodes map to the geometry's parts, and the turrets' pivots.
 - The 40 bytes before each attachment's position.
 - The records after each state's geometry; the values before the first.
-- The `.arf` animations.
+- The numbers before the reference pose and the transforms after it.

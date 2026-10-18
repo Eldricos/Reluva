@@ -67,6 +67,7 @@ private:
 //   Space: spin   P: show one part at a time   U: texture-coordinate checks
 //   C: colour by texture number instead of texturing   H: smooth or flat shading
 //   M: the model's points (from its .mdl) on/off   N: select the next point
+//   K: play the next animation that fits the model (.arf frames), then none
 //   L: outlines (solid, solid + outlines, outlines only)
 //   B: back faces (hidden, shown, only back faces)   F: filter (all, multi-part, failed)
 class ModelViewer {
@@ -87,6 +88,8 @@ private:
     void drawLine(float x0, float y0, float x1, float y1, const uint8_t* colour = nullptr);
     void loadTextures(const std::string& modelName);
     void loadMetamodel(const std::string& modelName);
+    void loadAnimations(const std::string& stem);
+    int channelOfNode(uint32_t node) const;
 
     System& sys_;
     Surface& screen_;
@@ -108,6 +111,14 @@ private:
     MdlModel mdl_;
     bool hasMdl_ = false, markers_ = true;
     int selectedPoint_ = -1; // -1: none
+    struct Animation {
+        std::string name;                              // conbee, fcmwalk
+        std::vector<std::vector<PartTransform>> frames; // per frame, per animated part
+    };
+    std::vector<Animation> animations_;
+    int animation_ = -1, animFrame_ = 0; // -1: the stored pose
+    uint64_t animMs_ = 0;
+    static constexpr uint64_t kFrameMs = 100;
     float centre_[3] = {0, 0, 0};
     float size_ = 1; // distance from the centre to the farthest vertex
 

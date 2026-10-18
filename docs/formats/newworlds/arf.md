@@ -1,0 +1,43 @@
+# Star Trek: New Worlds: `.arf` animation frames
+
+Status: **known**. Chunk tag `0x25`, stored with the models (27 in
+`kliactor.cat`: `geo/kln/conbee00.arf`-`conbee15.arf`, the construction
+vehicle's arm; `geo/fed/fcmstand.arf` and `fcmwalk0.arf`-`fcmwalk9.arf`, a
+crew member standing and walking). Worked out October 2026; the model viewer
+plays them (K).
+
+Each file is one frame of an animation: where every animated part is.
+
+```
+u32 count            the model's animated parts (conbee 3, crew 13)
+count × 58 bytes, in the order of the .mdl's animated list:
+    9 × f32          rotation, row by row (a proper rotation in every file)
+    f32              scale (1 in every file)
+    u16 0x1c, u32 12, 3 × f32 position
+```
+
+The same 58-byte record holds a `.geo`'s attachments and a `.mdl`'s
+reference pose (see [mdl.md](mdl.md)). Positions and rotations are in the
+model's own space, not relative to a parent part: in `fcmstand` the
+positions are the joints (neck (0, 2, 52), hips (±6, 0, −10), knees
+(±8, 0, −40), ankles (±8, 1, −71), shoulders (±20, 1, 45), elbows
+(±23, 1, 18)).
+
+## Posing a model
+
+A model's geometry is stored in its reference pose, which its `.mdl` gives
+(one record per animated part after the states). A part moves with the
+animated part of the same name (geometry part's node number → the `.mdl`
+parts list's name → the animated list's number), each vertex as
+
+    v' = frame position + frame rotation × reference rotation^T × (v − reference position)
+
+That makes the crew walk with their limbs joined, and the construction
+vehicle swing its arm through 180° and back over its 16 frames.
+
+## Open questions
+
+- Which frames belong to which state (`stand`, `walk`, `manipulate`) and at
+  what speed: the names suggest it (fcmstand, fcmwalk), but nothing found
+  links them; the viewer plays 10 frames a second.
+- Animations for the other crews and vehicles (only `kliactor.cat` checked).

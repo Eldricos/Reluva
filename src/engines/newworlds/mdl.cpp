@@ -4,6 +4,7 @@
 #include "engines/newworlds/mdl.h"
 
 #include <cctype>
+#include <cmath>
 
 namespace reluva::newworlds {
 
@@ -104,6 +105,22 @@ Error parseMdl(const std::vector<uint8_t>& data, MdlModel& out) {
         if (name == "terminate")
             break;
         out.states.push_back(name);
+    }
+    // Animated models: after the states, u32 count, pairs of numbers (part
+    // and node?) and a few values, then the reference pose, one transform per
+    // animated part; found by its first position chunk.
+    if (!out.animated.empty()) {
+        for (size_t q = p; r.has(q, kTransformSize * out.animated.size()); ++q) {
+            PartTransform t;
+            if (!readTransform(data, q, t) || std::fabs(t.scale - 1) > 0.01f)
+                continue;
+            for (size_t i = 0; i < out.animated.size(); ++i) {
+                if (!readTransform(data, q + i * kTransformSize, t))
+                    return Error::fail("reference pose at " + std::to_string(q) + " ends after " + std::to_string(i));
+                out.reference.push_back(t);
+            }
+            break;
+        }
     }
     return Error::success();
 }

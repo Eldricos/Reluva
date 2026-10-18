@@ -73,6 +73,7 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/model_textures.cpp
     src/engines/newworlds/ground_textures.cpp
     src/engines/newworlds/mdl.cpp
+    src/engines/newworlds/arf.cpp
     src/engines/newworlds/map_viewer.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp)

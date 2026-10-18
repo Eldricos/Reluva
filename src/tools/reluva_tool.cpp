@@ -893,7 +893,7 @@ int cmdGeoInfo(int argc, char** argv) {
             lists += (lists.empty() ? "" : "+") + std::to_string(list.size());
         std::printf("  part %zu (%u): %zu faces, %zu vertices, %zu edges, normal lists of %s; x %g..%g, y %g..%g, "
                     "z %g..%g\n",
-                    pi, part.unknown, faces, part.vertices.size(), part.edges.size(),
+                    pi, part.node, faces, part.vertices.size(), part.edges.size(),
                     lists.empty() ? "none" : lists.c_str(), double(lo[0]),
                     double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
     }
@@ -1061,6 +1061,15 @@ int cmdMdlInfo(int argc, char** argv) {
     for (const auto& s : m.states)
         std::printf(" \"%s\"", s.c_str());
     std::printf("\n");
+    for (size_t i = 0; i < m.reference.size(); ++i) {
+        const auto& t = m.reference[i];
+        std::string name = "#" + std::to_string(i);
+        for (const auto& a : m.animated)
+            if (a.value == int32_t(i))
+                name = a.name;
+        std::printf("  reference pose %zu %-16s at (%g, %g, %g)\n", i, name.c_str(), double(t.position.x),
+                    double(t.position.y), double(t.position.z));
+    }
     return 0;
 }
 

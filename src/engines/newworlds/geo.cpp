@@ -16,7 +16,7 @@ constexpr size_t kCornerSize = 32;
 constexpr float kUvScale = 1.0f / 65536.0f;
 constexpr uint32_t kMaxCount = 1u << 20;
 constexpr uint32_t kMaxParts = 256;
-constexpr uint32_t kMaxPartValue = 255; // sanity limit for a part's unknown first value
+constexpr uint32_t kMaxPartValue = 255; // sanity limit for a part's node number
 
 struct Reader {
     const std::vector<uint8_t>& d;
@@ -141,7 +141,7 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         if (!r.has(p, 8) || r.u32(p) > kMaxPartValue)
             return Error::fail(where + " starts with " + std::to_string(r.has(p, 4) ? r.u32(p) : 0));
         GeoModel::Part part;
-        part.unknown = r.u32(p);
+        part.node = r.u32(p);
         const uint32_t vertexCount = r.u32(p + 4);
         p += 8;
         if (vertexCount > kMaxCount || !r.has(p, size_t(vertexCount) * 12))

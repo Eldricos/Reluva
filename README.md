@@ -50,7 +50,7 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   textures and maps, **Left/Right** step through them and **F** cycles filters. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
-  for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used, **H** for smooth or flat shading, **M** for the model's points (from its .mdl) and **N** to select the next one
+  for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used, **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations
   (glow, ignored, transparency), **C** to
   colour faces by texture number, **B** to show back faces
   and **R** to reset the view. Maps are built from their ground tiles: drag to

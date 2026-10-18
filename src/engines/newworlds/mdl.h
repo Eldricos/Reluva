@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/types.h"
+#include "engines/newworlds/arf.h"
 
 #include <cstdint>
 #include <string>
@@ -25,6 +26,9 @@ struct MdlModel {
     std::vector<Name> places;   // muzzle_flash_1, BAY_0, VEHICLE_DOCK
     std::vector<Name> animated; // the parts animations move (crewman's limbs, conbee's arm)
     std::vector<std::string> states; // normal / low detail, constructed / deconstructed, stand / walk
+    // For animated models: where each animated part is in the pose the
+    // geometry is stored in (the first records after the states).
+    std::vector<PartTransform> reference;
 };
 
 Error parseMdl(const std::vector<uint8_t>& data, MdlModel& out);

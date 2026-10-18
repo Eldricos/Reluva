@@ -35,7 +35,7 @@ struct GeoModel {
     };
     // A separately numbered piece of the model (most models have one).
     struct Part {
-        uint32_t unknown = 0; // first value: 0, or 1 in ptank_l's part 1
+        uint32_t node = 0; // which of the .mdl's nodes (parts list) it is: 0-12 in crewman
         std::vector<Vec3> vertices;
         std::vector<std::vector<Vec3>> normalLists;
         std::vector<Edge> edges;

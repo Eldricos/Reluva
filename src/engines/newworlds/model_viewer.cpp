@@ -5,6 +5,7 @@
 #include "engines/newworlds/viewers.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cmath>
 
@@ -162,7 +163,66 @@ void ModelViewer::loadMetamodel(const std::string& modelName) {
         std::vector<uint8_t> data;
         hasMdl_ = !cat.read(cat.entries()[found->second.entry], data) && !parseMdl(data, mdl_);
         if (hasMdl_)
-            return;
+            break;
+    }
+    loadAnimations(stem);
+}
+
+// The animation channel (.mdl animated list) a geometry node is moved by:
+// the node's name in the parts list, then that name's animated entry.
+int ModelViewer::channelOfNode(uint32_t node) const {
+    for (const auto& p : mdl_.parts)
+        if (p.value == int32_t(node))
+            for (const auto& a : mdl_.animated)
+                if (a.name == p.name)
+                    return a.value;
+    return -1;
+}
+
+// The .arf frames that fit the model: one transform per animated part,
+// grouped by name without the frame number (conbee00 ... conbee15: conbee;
+// fcmwalk0 ... fcmwalk9: fcmwalk), those named like the model first. Which
+// animation belongs to which state isn't stored anywhere found yet.
+void ModelViewer::loadAnimations(const std::string& stem) {
+    animations_.clear();
+    animation_ = -1;
+    animFrame_ = 0;
+    if (!hasMdl_ || mdl_.animated.empty() || mdl_.reference.size() != mdl_.animated.size())
+        return;
+    std::map<std::string, std::vector<std::pair<std::string, EntryRef>>> sets;
+    for (size_t a = 0; a < archives_.size(); ++a) {
+        const auto& entries = archives_[a]->entries();
+        for (size_t i = 0; i < entries.size(); ++i) {
+            if (entries[i].tag != cattag::Arf)
+                continue;
+            std::string folder, frame, ext;
+            splitName(entries[i].name, folder, frame, ext);
+            std::string name = frame;
+            while (!name.empty() && std::isdigit(static_cast<unsigned char>(name.back())))
+                name.pop_back();
+            sets[name].push_back({frame, EntryRef{a, i}});
+        }
+    }
+    std::vector<uint8_t> data;
+    for (auto& [name, frames] : sets) {
+        std::sort(frames.begin(), frames.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
+        Animation anim{name, {}};
+        for (const auto& f : frames) {
+            CatArchive& cat = *archives_[f.second.archive];
+            std::vector<PartTransform> t;
+            if (cat.read(cat.entries()[f.second.entry], data) || parseArf(data, t) ||
+                t.size() != mdl_.animated.size()) {
+                anim.frames.clear();
+                break;
+            }
+            anim.frames.push_back(std::move(t));
+        }
+        if (anim.frames.empty())
+            continue;
+        if (name.rfind(stem, 0) == 0)
+            animations_.insert(animations_.begin(), std::move(anim));
+        else
+            animations_.push_back(std::move(anim));
     }
 }
 
@@ -243,6 +303,10 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'm': markers_ = !markers_; break;
+    case 'k':
+        animation_ = animation_ + 1 >= int(animations_.size()) ? -1 : animation_ + 1;
+        animFrame_ = 0;
+        break;
     case 'n':
         selectedPoint_ = selectedPoint_ + 1 >= int(model_.attachments.size()) ? -1 : selectedPoint_ + 1;
         break;
@@ -272,6 +336,12 @@ void ModelViewer::update(uint64_t nowMs) {
     if (spin_ && lastMs_) {
         yaw_ += float(nowMs - lastMs_) * kSpinPerMs;
         dirty_ = true;
+    }
+    if (animation_ >= 0 && nowMs >= animMs_ + kFrameMs) {
+        animMs_ = nowMs;
+        ++animFrame_;
+        dirty_ = true;
+        updateTitle();
     }
     lastMs_ = nowMs;
     if (dirty_) {
@@ -313,6 +383,13 @@ void ModelViewer::updateTitle() {
         for (size_t i = 0; i < mdl_.states.size(); ++i)
             title += (i ? "/" : ": ") + (mdl_.states[i].empty() ? std::string("(unnamed)") : mdl_.states[i]);
         title += "; " + std::to_string(model_.attachments.size()) + " points";
+        if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
+            const auto& a = animations_[size_t(animation_)];
+            title += "; animation " + a.name + " frame " + std::to_string(animFrame_ % int(a.frames.size()) + 1) + "/" +
+                     std::to_string(a.frames.size());
+        } else if (!animations_.empty()) {
+            title += "; " + std::to_string(animations_.size()) + " animations (K)";
+        }
         if (selectedPoint_ >= 0 && size_t(selectedPoint_) < model_.attachments.size()) {
             std::string name = "#" + std::to_string(selectedPoint_);
             for (const auto& n : mdl_.points)
@@ -367,6 +444,46 @@ void ModelViewer::render() {
     const OrbitCamera cam(Vec{centre_[0], centre_[1], centre_[2]}, yaw_, pitch_, size_ * 2.6f * zoom_, w, h);
     const Vec light = normalize(Vec{-0.4f, 0.5f, -0.75f}); // towards the light, in view space
 
+    // The animation's current frame, per part: v' = frame position +
+    // frame rotation * reference rotation^T * (v - reference position).
+    struct Pose {
+        bool moved = false;
+        float m[9];
+        Vec from, to;
+    };
+    std::vector<Pose> poses(model_.parts.size());
+    if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
+        const auto& frames = animations_[size_t(animation_)].frames;
+        const auto& frame = frames[size_t(animFrame_) % frames.size()];
+        for (size_t pi = 0; pi < model_.parts.size(); ++pi) {
+            const int channel = channelOfNode(model_.parts[pi].node);
+            if (channel < 0 || size_t(channel) >= frame.size() || size_t(channel) >= mdl_.reference.size())
+                continue;
+            const PartTransform& f = frame[size_t(channel)];
+            const PartTransform& r = mdl_.reference[size_t(channel)];
+            Pose& pose = poses[pi];
+            pose.moved = true;
+            for (int i = 0; i < 3; ++i)
+                for (int j = 0; j < 3; ++j) {
+                    float sum = 0;
+                    for (int k = 0; k < 3; ++k)
+                        sum += f.rotation[i * 3 + k] * r.rotation[j * 3 + k];
+                    pose.m[i * 3 + j] = sum;
+                }
+            pose.from = Vec{r.position.x, r.position.y, r.position.z};
+            pose.to = Vec{f.position.x, f.position.y, f.position.z};
+        }
+    }
+    auto turn = [](const Pose& p, Vec v) {
+        return Vec{p.m[0] * v.x + p.m[1] * v.y + p.m[2] * v.z, p.m[3] * v.x + p.m[4] * v.y + p.m[5] * v.z,
+                   p.m[6] * v.x + p.m[7] * v.y + p.m[8] * v.z};
+    };
+    auto posed = [&](uint32_t part, const GeoModel::Vec3& v) {
+        const Pose& p = poses[part];
+        const Vec at{v.x, v.y, v.z};
+        return p.moved ? p.to + turn(p, at - p.from) : at;
+    };
+
     raster_.begin(screen_);
     std::vector<std::vector<ScreenVertex>> outlines;
     std::vector<ViewVertex> poly;
@@ -393,12 +510,12 @@ void ModelViewer::render() {
         Vec normal{0, 0, 0};
         poly.clear();
         for (size_t i = 0; i < face.corners.size(); ++i) {
-            const auto& a = verts[face.corners[i].vertex];
-            const auto& b = verts[face.corners[(i + 1) % face.corners.size()].vertex];
+            const Vec a = posed(face.part, verts[face.corners[i].vertex]);
+            const Vec b = posed(face.part, verts[face.corners[(i + 1) % face.corners.size()].vertex]);
             normal.x += (a.y - b.y) * (a.z + b.z);
             normal.y += (a.z - b.z) * (a.x + b.x);
             normal.z += (a.x - b.x) * (a.y + b.y);
-            poly.push_back(cam.toView(Vec{a.x, a.y, a.z}, face.corners[i].u, face.corners[i].v));
+            poly.push_back(cam.toView(a, face.corners[i].u, face.corners[i].v));
         }
         normal = normalize(normal);
         // Light levels per corner: from the corner's own normal (its first
@@ -408,8 +525,11 @@ void ModelViewer::render() {
         for (size_t i = 0; i < face.corners.size(); ++i) {
             const uint32_t k = face.corners[i].extra[0];
             Vec n = normal;
-            if (smooth_ && normalLists.size() > 1 && k < normalLists[1].size())
+            if (smooth_ && normalLists.size() > 1 && k < normalLists[1].size()) {
                 n = Vec{normalLists[1][k].x, normalLists[1][k].y, normalLists[1][k].z};
+                if (poses[face.part].moved)
+                    n = turn(poses[face.part], n);
+            }
             const float d = std::fabs(dot(cam.directionToView(n), light));
             poly[i].s = tex ? 0.45f + 0.55f * d : 0.3f + 0.7f * d;
         }
