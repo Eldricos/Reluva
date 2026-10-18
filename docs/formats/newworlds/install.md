@@ -23,8 +23,7 @@ release, and of the same install with an unofficial fan patch applied
   - per planet type: `alnwrld`, `alpwrld`, `deswrld`, `icewrld`, `redwrld`, `vlcwrld`
   - shared: `glblgame`, `glblgui`, `misc`
 
-  That's 22; an earlier listing counted 23 archives, so one may be missing
-  from this list.
+  24 in all, every one in the install.
 - `game.ini`, `level.dat`, `olevel.dat`, `kapla.rse`: the screen size and side numbers, and the mission lists; see [level.md](level.md).
 - `Media/`: standard MP3 and WAV files (voice per faction in `FedVO`,
   `KlingVO`, `RomVO`; `Music`; `Misc` sound effects and tutorial voice).

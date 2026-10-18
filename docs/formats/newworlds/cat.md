@@ -1,6 +1,6 @@
 # Star Trek: New Worlds: `.cat` archives
 
-Status: **archive structure fully understood** (verified on all 23 retail
+Status: **archive structure fully understood** (verified on all 24 retail
 archives); the formats of the stored files are not studied yet. Reader:
 `src/engines/newworlds/cat_archive.cpp`.
 Worked out from hex dumps and `reluva-tool cat-probe` runs on the clean
@@ -19,7 +19,7 @@ The whole file is a tree of chunks. Every chunk is:
 | 2 | u32 | payload size (excluding these 6 bytes) |
 | 6 | … | payload |
 
-Tags seen in the 23 retail archives:
+Tags seen in the 24 retail archives:
 
 | Tag | Kind | Stored extensions | Notes |
 |---|---|---|---|
@@ -98,7 +98,7 @@ environment-map textures), `.geo` (geometry), `.wav`.
 `reluva-tool cat-probe` walks the table using only the rules above and checks
 that every chunk starts where the previous one ended, that the walk ends
 exactly at the end of the table chunk, and that the last chunk ends exactly
-at the end of the file. All 23 archives of the retail install pass.
+at the end of the file. All 24 archives of the retail install pass.
 
 ## Open questions
 
