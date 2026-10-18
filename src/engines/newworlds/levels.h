@@ -29,4 +29,25 @@ Error parseLevelList(std::string_view text, std::vector<Level>& out);
 // ignoring case; listed levels before commented-out ones; nullptr if none.
 const Level* levelForMap(const std::vector<Level>& levels, std::string_view mapName);
 
+// What a mission's short name ties together (see docs/formats/newworlds/level.md
+// and media.md). A side is 'F', 'K' or 'R'.
+
+// The sides a mission is played from: all three for a joint mission (J1),
+// else the campaign's ('F' for F1; the Federation for the others).
+std::vector<char> missionSides(std::string_view shortName);
+// Its string table in the side's misc archive: "str/eng/miss/fed01.stb" for
+// F1, "jnt01klg.stb" for J1 as the Klingons, "cvr03.stb" for the C
+// missions, "tst.stb" for Test; empty if none is known (E1-E3).
+std::string missionTableName(std::string_view shortName, char side);
+// The maps to try, best first: "map/f1.gmf"; mission 14 then 12's map, whose
+// world its briefing names.
+std::vector<std::string> missionMapNames(std::string_view shortName);
+// Its voice clips (Media/FedVO/F1005.mp3, .../KlingVO/J1K005.mp3): the stem
+// starts with the short name, a joint mission's then the side's letter, and
+// goes on with three digits and perhaps a letter (K12009A). Ignores case.
+bool isMissionClip(std::string_view stem, std::string_view shortName, char side);
+// The music for a planet archive's maps ("icewrld.cat" -> "IceStart", the
+// stem of Media/Music/IceStart.mp3); empty if unknown.
+std::string planetTheme(std::string_view archiveName);
+
 } // namespace reluva::newworlds

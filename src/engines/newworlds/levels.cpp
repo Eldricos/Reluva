@@ -3,7 +3,9 @@
 
 #include "engines/newworlds/levels.h"
 
+#include <algorithm>
 #include <cctype>
+#include <utility>
 
 namespace reluva::newworlds {
 
@@ -82,6 +84,96 @@ const Level* levelForMap(const std::vector<Level>& levels, std::string_view mapN
             if (l.commentedOut == commented && sameName(l.shortName, stem))
                 return &l;
     return nullptr;
+}
+
+namespace {
+
+char upper(char c) { return char(std::toupper(static_cast<unsigned char>(c))); }
+
+bool isJoint(std::string_view shortName) { return shortName.size() > 1 && upper(shortName[0]) == 'J'; }
+
+// The mission's number as two digits ("F1" -> "01"); empty if it has none.
+std::string twoDigits(std::string_view shortName) {
+    std::string_view digits = shortName.substr(std::min<size_t>(1, shortName.size()));
+    if (digits.empty() || digits.size() > 2)
+        return {};
+    for (char c : digits)
+        if (!std::isdigit(static_cast<unsigned char>(c)))
+            return {};
+    return digits.size() == 1 ? "0" + std::string(digits) : std::string(digits);
+}
+
+const char* sidePrefix(char side) {
+    switch (upper(side)) {
+    case 'F': return "fed";
+    case 'K': return "klg";
+    case 'R': return "rom";
+    default: return nullptr;
+    }
+}
+
+} // namespace
+
+std::vector<char> missionSides(std::string_view shortName) {
+    if (isJoint(shortName))
+        return {'F', 'K', 'R'};
+    if (!shortName.empty() && (upper(shortName[0]) == 'K' || upper(shortName[0]) == 'R') &&
+        !twoDigits(shortName).empty())
+        return {upper(shortName[0])};
+    return {'F'};
+}
+
+std::string missionTableName(std::string_view shortName, char side) {
+    const std::string folder = "str/eng/miss/";
+    if (sameName(shortName, "test"))
+        return folder + "tst.stb";
+    const std::string number = twoDigits(shortName);
+    if (number.empty())
+        return {};
+    const char* prefix = sidePrefix(side);
+    switch (upper(shortName[0])) {
+    case 'F':
+    case 'K':
+    case 'R':
+        prefix = sidePrefix(shortName[0]);
+        return folder + prefix + number + ".stb";
+    case 'J': return prefix ? folder + "jnt" + number + prefix + ".stb" : std::string();
+    case 'C': return folder + "cvr03.stb";
+    default: return {};
+    }
+}
+
+std::vector<std::string> missionMapNames(std::string_view shortName) {
+    std::string lower;
+    for (char c : shortName)
+        lower += char(std::tolower(static_cast<unsigned char>(c)));
+    std::vector<std::string> names = {"map/" + lower + ".gmf"};
+    if (lower.size() > 2 && lower.compare(lower.size() - 2, 2, "14") == 0)
+        names.push_back("map/" + lower.substr(0, lower.size() - 2) + "12.gmf");
+    return names;
+}
+
+bool isMissionClip(std::string_view stem, std::string_view shortName, char side) {
+    std::string prefix(shortName);
+    if (isJoint(shortName))
+        prefix += side;
+    if (stem.size() < prefix.size() + 3 || stem.size() > prefix.size() + 4 ||
+        !sameName(stem.substr(0, prefix.size()), prefix))
+        return false;
+    for (size_t i = prefix.size(); i < prefix.size() + 3; ++i)
+        if (!std::isdigit(static_cast<unsigned char>(stem[i])))
+            return false;
+    return stem.size() == prefix.size() + 3 || std::isalpha(static_cast<unsigned char>(stem.back()));
+}
+
+std::string planetTheme(std::string_view archiveName) {
+    static constexpr std::pair<const char*, const char*> kThemes[] = {
+        {"alpwrld.cat", "AlpineStart"}, {"deswrld.cat", "DesertStart"}, {"icewrld.cat", "IceStart"},
+        {"vlcwrld.cat", "LavaStart"},   {"redwrld.cat", "MarsStart"},   {"alnwrld.cat", "MountainStart"}};
+    for (const auto& [archive, theme] : kThemes)
+        if (sameName(archiveName, archive))
+            return theme;
+    return {};
 }
 
 } // namespace reluva::newworlds

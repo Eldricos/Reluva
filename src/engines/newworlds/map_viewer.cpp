@@ -98,6 +98,21 @@ void MapViewer::show(int index) {
     updateTitle();
 }
 
+bool MapViewer::showMap(std::string_view name) {
+    const std::string wanted = CatArchive::normalizeName(name);
+    for (size_t i = 0; i < maps_.size(); ++i)
+        if (CatArchive::normalizeName(archives_[maps_[i].archive]->entries()[maps_[i].entry].name) == wanted) {
+            shown_ = true;
+            show(int(i));
+            return true;
+        }
+    return false;
+}
+
+std::string MapViewer::mapArchive() const {
+    return maps_.empty() ? std::string() : archives_[maps_[size_t(current_)].archive]->path().filename().string();
+}
+
 void MapViewer::resetView() {
     targetX_ = float(map_.width) * kBlockSize / 2;
     targetY_ = float(map_.height) * kBlockSize / 2;
@@ -358,6 +373,8 @@ void MapViewer::handleEvent(const Event& ev) {
 void MapViewer::update(uint64_t) {
     if (dirty_) {
         render();
+        if (overlay_)
+            overlay_();
         dirty_ = false;
         updateTitle();
     }
@@ -374,7 +391,8 @@ void MapViewer::updateTitle() {
                  (level->maxPlayers == 1 ? " player" : " players") + (level->commentedOut ? ", not listed" : "") + "]";
     title += " (" + archives_[ref.archive]->path().filename().string();
     if (!status_.empty()) {
-        sys_.setWindowTitle(title + "; " + status_ + ")");
+        title += "; " + status_ + ")";
+        sys_.setWindowTitle(titleFilter_ ? titleFilter_(title) : title);
         return;
     }
     title += "; " + std::to_string(map_.width) + " x " + std::to_string(map_.height) + " blocks, " +
@@ -391,7 +409,7 @@ void MapViewer::updateTitle() {
         title += " [untextured]";
     else
         title += std::string(" [") + kColouringNames[colouring_] + "]";
-    sys_.setWindowTitle(title);
+    sys_.setWindowTitle(titleFilter_ ? titleFilter_(title) : title);
 }
 
 // The terrain code of a tile's cell (column cx from the west, row cy from the

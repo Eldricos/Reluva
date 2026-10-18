@@ -14,8 +14,9 @@
 
 namespace reluva::newworlds {
 
-SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives, const std::filesystem::path& gameDir)
-    : sys_(sys), screen_(screen), archives_(archives) {
+SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives, audio::Mixer* mixer,
+                         const std::filesystem::path& gameDir)
+    : sys_(sys), screen_(screen), archives_(archives), mixer_(mixer) {
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
@@ -74,11 +75,6 @@ const std::string& SoundViewer::nameOf(size_t sound) const { return sounds_[soun
 std::string SoundViewer::archiveOf(size_t sound) const {
     const Item& item = sounds_[sound];
     return item.file.empty() ? archives_[item.ref.archive]->path().filename().string() : "the game folder";
-}
-
-SoundViewer::~SoundViewer() {
-    if (audioStarted_)
-        sys_.stopAudio();
 }
 
 void SoundViewer::activate() {
@@ -161,14 +157,9 @@ bool SoundViewer::playing() const { return mixer_ && mixer_->isPlaying(playing_)
 
 void SoundViewer::play() {
     if (!mixer_) {
-        auto mixer = std::make_unique<audio::Mixer>(sys_.audioRate());
-        if (Error err = audio::startMixerOutput(sys_, *mixer)) {
-            status_ = err.message;
-            updateTitle();
-            return;
-        }
-        mixer_ = std::move(mixer);
-        audioStarted_ = true;
+        status_ = "no audio output";
+        updateTitle();
+        return;
     }
     mixer_->stop(playing_);
     playing_ = mixer_->play(sound_, audio::SoundType::Effects);

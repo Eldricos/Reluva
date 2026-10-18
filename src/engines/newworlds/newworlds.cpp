@@ -8,8 +8,9 @@
 // owned copy. Never from leaked source code. See CONTRIBUTING.md.
 //
 // For now the engine is a data viewer: it opens every .cat archive in the
-// game folder and shows the models, the textures or the maps (see viewers.h
-// for the keys). Tab switches between them; Esc goes back to the launcher.
+// game folder and shows the missions, models, textures, maps, sounds,
+// strings or fonts (see viewers.h for the keys). Tab switches between them;
+// Esc goes back to the launcher.
 
 #include "engines/engine.h"
 #include "engines/newworlds/viewers.h"
@@ -26,6 +27,7 @@ namespace {
 
 using newworlds::CatArchive;
 using newworlds::MapViewer;
+using newworlds::MissionViewer;
 using newworlds::ModelViewer;
 using newworlds::SoundViewer;
 using newworlds::FontViewer;
@@ -59,35 +61,52 @@ public:
         ModelViewer models(sys_, screen_, archives_);
         TextureViewer textures(sys_, screen_, archives_);
         MapViewer maps(sys_, screen_, archives_);
-        maps.setLevels(readLevels());
-        SoundViewer sounds(sys_, screen_, archives_, target_.path);
+        const std::vector<newworlds::Level> levels = readLevels();
+        maps.setLevels(levels);
+        // One mixer for every page, playing for as long as the engine runs;
+        // without an audio device the pages show and don't play.
+        audio::Mixer mixer(sys_.audioRate());
+        const bool audioOut = !audio::startMixerOutput(sys_, mixer);
+        struct AudioStop {
+            System& sys;
+            bool on;
+            ~AudioStop() {
+                if (on)
+                    sys.stopAudio();
+            }
+        } audioStop{sys_, audioOut};
+        audio::Mixer* const output = audioOut ? &mixer : nullptr;
+        SoundViewer sounds(sys_, screen_, archives_, output, target_.path);
         StringViewer strings(sys_, screen_, archives_);
         FontViewer fonts(sys_, screen_, archives_);
-        constexpr int kViewers = 6;
-        const size_t counts[kViewers] = {models.count(),  textures.count(), maps.count(),
-                                         sounds.count(),  strings.count(),  fonts.count()};
+        MissionViewer missions(sys_, screen_, archives_, levels, output, target_.path);
+        constexpr int kViewers = 7;
+        const size_t counts[kViewers] = {missions.count(), models.count(),  textures.count(), maps.count(),
+                                         sounds.count(),   strings.count(), fonts.count()};
         size_t total = 0;
         for (size_t c : counts)
             total += c;
         if (total == 0)
-            return Error::fail("No models, textures, maps, sounds, strings or fonts found in " +
+            return Error::fail("No missions, models, textures, maps, sounds, strings or fonts found in " +
                                target_.path.string());
-        // Viewer 0 shows models, 1 textures, 2 maps, 3 sounds, 4 strings, 5 fonts; Tab moves to
-        // the next one that has something to show. They draw into the
-        // screen, so it must exist before the first activate().
+        // Viewer 0 shows missions, 1 models, 2 textures, 3 maps, 4 sounds, 5 strings, 6 fonts;
+        // Tab moves to the next one that has something to show. They draw
+        // into the screen, so it must exist before the first activate().
         int viewer = 0;
         while (counts[viewer] == 0)
             viewer = (viewer + 1) % kViewers;
         auto activate = [&] {
             if (viewer == 0)
-                models.activate();
+                missions.activate();
             else if (viewer == 1)
-                textures.activate();
+                models.activate();
             else if (viewer == 2)
-                maps.activate();
+                textures.activate();
             else if (viewer == 3)
-                sounds.activate();
+                maps.activate();
             else if (viewer == 4)
+                sounds.activate();
+            else if (viewer == 5)
                 strings.activate();
             else
                 fonts.activate();
@@ -102,7 +121,9 @@ public:
                 if (ev.type == EventType::KeyDown && ev.key == key::Escape)
                     return Error::success();
                 if (ev.type == EventType::KeyDown && ev.key == key::Tab) {
-                    if (viewer == 3)
+                    if (viewer == 0)
+                        missions.deactivate();
+                    else if (viewer == 4)
                         sounds.deactivate();
                     do
                         viewer = (viewer + 1) % kViewers;
@@ -111,23 +132,27 @@ public:
                     continue;
                 }
                 if (viewer == 0)
+                    missions.handleEvent(ev);
+                else if (viewer == 1)
                     models.handleEvent(ev);
-                else if (viewer == 1 && ev.type == EventType::KeyDown)
+                else if (viewer == 2 && ev.type == EventType::KeyDown)
                     textures.handleKey(ev.key);
-                else if (viewer == 2)
+                else if (viewer == 3)
                     maps.handleEvent(ev);
-                else if (viewer == 3 && ev.type == EventType::KeyDown)
-                    sounds.handleKey(ev.key);
                 else if (viewer == 4 && ev.type == EventType::KeyDown)
-                    strings.handleKey(ev.key);
+                    sounds.handleKey(ev.key);
                 else if (viewer == 5 && ev.type == EventType::KeyDown)
+                    strings.handleKey(ev.key);
+                else if (viewer == 6 && ev.type == EventType::KeyDown)
                     fonts.handleKey(ev.key);
             }
             if (viewer == 0)
+                missions.update(sys_.getMillis());
+            else if (viewer == 1)
                 models.update(sys_.getMillis());
-            else if (viewer == 2)
-                maps.update(sys_.getMillis());
             else if (viewer == 3)
+                maps.update(sys_.getMillis());
+            else if (viewer == 4)
                 sounds.update(sys_.getMillis());
             sys_.updateScreen(screen_);
             sys_.delayMillis(10);

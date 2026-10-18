@@ -513,6 +513,22 @@ void testLevels() {
     CHECK(levelForMap(l, "map/f1.gmf") == &l[0] && levelForMap(l, "MAP\\J1.GMF") == &l[2]);
     CHECK(levelForMap(l, "map/kurt64.gmf") == nullptr);
     CHECK(bool(parseLevelList("F1,two,Power Corrupts\n", l)));
+
+    CHECK(missionSides("F1") == std::vector<char>{'F'} && missionSides("K12") == std::vector<char>{'K'});
+    CHECK(missionSides("J4").size() == 3 && missionSides("C1") == std::vector<char>{'F'});
+    CHECK(missionTableName("F1", 'F') == "str/eng/miss/fed01.stb");
+    CHECK(missionTableName("K12", 'K') == "str/eng/miss/klg12.stb");
+    CHECK(missionTableName("R2", 'R') == "str/eng/miss/rom02.stb");
+    CHECK(missionTableName("J1", 'K') == "str/eng/miss/jnt01klg.stb");
+    CHECK(missionTableName("C5", 'F') == "str/eng/miss/cvr03.stb");
+    CHECK(missionTableName("Test", 'F') == "str/eng/miss/tst.stb" && missionTableName("E1", 'F').empty());
+    CHECK(missionMapNames("F1") == std::vector<std::string>{"map/f1.gmf"});
+    CHECK((missionMapNames("R14") == std::vector<std::string>{"map/r14.gmf", "map/r12.gmf"}));
+    CHECK(isMissionClip("F1005", "F1", 'F') && isMissionClip("f1015", "F1", 'F'));
+    CHECK(!isMissionClip("F12005", "F1", 'F') && isMissionClip("F12005", "F12", 'F'));
+    CHECK(isMissionClip("K12009A", "K12", 'K') && !isMissionClip("K12009", "K1", 'K'));
+    CHECK(isMissionClip("J1R011", "J1", 'R') && !isMissionClip("J1R011", "J1", 'F'));
+    CHECK(planetTheme("ICEWRLD.CAT") == "IceStart" && planetTheme("fedgui.cat").empty());
 }
 
 void testModelTextures() {

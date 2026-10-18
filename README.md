@@ -49,8 +49,12 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 - `reluva-tool` has developer tools for studying game data: `hexdump`,
   `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
 - In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
-- New Worlds currently opens as a data viewer. **Tab** switches between models,
-  textures, maps, sounds, strings and fonts, **Left/Right** step through them and **F** cycles filters. For
+- New Worlds currently opens as a data viewer. **Tab** switches between missions, models,
+  textures, maps, sounds, strings and fonts, **Left/Right** step through them and **F** cycles filters.
+  Missions (level.dat's list) show their map with the briefing over it: **Up/Down** turn its
+  pages, **B** hides it, **J** picks the side of a joint mission, **Space** plays the mission's
+  voice clip, **N/P** the next or previous one, **M** the planet's music; the map's keys work
+  too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used (by default glow in `_g` textures, transparency in the others), **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations

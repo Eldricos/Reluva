@@ -121,3 +121,25 @@ slots are elsewhere (presumably `STNW.exe`).
 
 The engine reads level.dat from the game folder, and the map viewer's title
 names each map's mission (`map/f1.gmf [F1 "Power Corrupts", 2 players]`).
+
+The data viewer's first page, **missions**, goes through level.dat's
+missions in its order, commented-out ones included (marked "not listed"),
+and puts together what the short name ties to (`levels.h`:
+`missionMapNames`, `missionTableName`, `missionSides`, `isMissionClip`,
+`planetTheme`):
+
+- the map, drawn as on the maps page (with its keys); mission 14 shows its
+  side's mission 12 map. Test, E1-E3 and the C missions have no map in the
+  planet archives. (The C missions' table is `cvr03`, and `alpwrld` holds
+  `coverd1`-`3`, so those may be theirs; not assumed.)
+- the briefing, a page at a time in the game's `fe8pt` font: the table's
+  `~HEADING~` strings, each a page, and the plain strings between them run
+  together (the title and stardate first; the in-game objectives and fail
+  reasons last). Joint missions have a table per side (**J**).
+- the voice clips from `Media/` (**Space**, **N**, **P**), played as speech
+  through the shared mixer, and the planet's music theme (**M**, looped,
+  under the speech).
+
+There are no units, buildings or starting colonies to show: the maps don't
+hold them ([gmf.md](gmf.md)), and nothing found in the data files says
+where they start.

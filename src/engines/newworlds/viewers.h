@@ -20,9 +20,11 @@
 #include "engines/newworlds/texture.h"
 
 #include <filesystem>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Data viewers used by the New Worlds engine until the game itself runs.
@@ -158,6 +160,18 @@ public:
     void handleEvent(const Event& ev);
     void update(uint64_t nowMs); // redraws when something changed
 
+    // For the missions page, which shows its maps through this viewer:
+    // shows the map with that name ("map/f1.gmf", in any archive, ignoring
+    // case); false if there's none.
+    bool showMap(std::string_view name);
+    // The archive the shown map is in ("icewrld.cat").
+    std::string mapArchive() const;
+    // Called after each redraw, to draw over the map.
+    void setOverlay(std::function<void()> overlay) { overlay_ = std::move(overlay); }
+    // Given the title this viewer would set, returns the one to set instead.
+    void setTitleFilter(std::function<std::string(const std::string&)> filter) { titleFilter_ = std::move(filter); }
+    void redraw() { dirty_ = true; }
+
 private:
     using Vec3 = GeoModel::Vec3;
     struct TileModel {
@@ -222,6 +236,8 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
+    std::function<void()> overlay_;
+    std::function<std::string(const std::string&)> titleFilter_;
 };
 
 // Plays the sounds (.wav) and shows their waveforms.
@@ -230,9 +246,10 @@ private:
 class SoundViewer {
 public:
     // gameDir: the game folder, whose loose .mp3 and .wav files (Media/) are
-    // listed after the archives' sounds; empty for none.
-    SoundViewer(System& sys, Surface& screen, const Archives& archives, const std::filesystem::path& gameDir = {});
-    ~SoundViewer();
+    // listed after the archives' sounds; empty for none. mixer: the engine's,
+    // playing into the System's output; nullptr when there's no output.
+    SoundViewer(System& sys, Surface& screen, const Archives& archives, audio::Mixer* mixer,
+                const std::filesystem::path& gameDir = {});
     size_t count() const { return sounds_.size(); }
     void activate();
     void deactivate(); // stops playing when switching to another viewer
@@ -267,14 +284,11 @@ private:
     std::vector<size_t> firstCopy_;
     std::vector<size_t> shownSounds_;
     bool showCopies_ = false;
-    bool shown_ = false, autoPlay_ = false, audioStarted_ = false, wasPlaying_ = false;
+    bool shown_ = false, autoPlay_ = false, wasPlaying_ = false;
     int current_ = 0;
     std::string status_;
-    // Shared with the audio thread.
     std::shared_ptr<const audio::Sound> sound_; // the one shown
-    // Playback through the shared mixer (created with the output rate when
-    // first needed); one sound at a time here.
-    std::unique_ptr<audio::Mixer> mixer_;
+    audio::Mixer* mixer_;                       // one sound at a time here
     audio::SoundHandle playing_ = audio::kNoSound;
 };
 
@@ -336,6 +350,70 @@ private:
     std::vector<GameFont> fonts_;
     int current_ = 0, scale_ = 2;
     bool boxes_ = false; // outline each glyph's box
+};
+
+// Shows the missions level.dat lists: each one's map (through a MapViewer,
+// so its keys move the view), its briefing pages from the side's string
+// table, its voice clips (Media/FedVO, KlingVO, RomVO) and its planet's
+// music. The maps hold no units, buildings or colonies (see
+// docs/formats/newworlds/gmf.md); where the missions put them isn't known.
+//   Left/Right: previous/next mission   Up/Down: briefing page
+//   B: briefing on/off   J: side (joint missions)
+//   Space: play/stop the voice clip   N/P: next/previous clip (and play it)
+//   M: the planet's music on/off   and the map viewer's keys
+class MissionViewer {
+public:
+    MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
+                  audio::Mixer* mixer, const std::filesystem::path& gameDir);
+    size_t count() const { return missions_.size(); }
+    void activate();
+    void deactivate(); // stops the sound when switching to another viewer
+    void handleEvent(const Event& ev);
+    void update(uint64_t nowMs);
+
+private:
+    struct Page {
+        std::string heading; // without the ~s; empty for the title page
+        std::string text;
+    };
+
+    void show(int index);
+    void loadSide(); // the briefing and clips for the mission's current side
+    void drawBriefing();
+    void drawNoMap();
+    std::string title(const std::string& mapTitle) const;
+    void updateTitle();
+    void redraw();
+    void playClip(int index);
+    void stopClip();
+    void startMusic(); // the shown map's planet theme, looped
+    void stopMusic();
+    bool clipPlaying() const;
+    // Reads and decodes one of the game folder's sound files.
+    std::shared_ptr<const audio::Sound> loadSound(const std::string& stem);
+    // Text in the briefing's font: the game's fe8pt if there, else Reluva's.
+    int measure(std::string_view text) const;
+    int lineHeight() const;
+    void drawText(int x, int y, std::string_view text, Color color);
+
+    System& sys_;
+    Surface& screen_;
+    const Archives& archives_;
+    std::vector<Level> missions_;
+    audio::Mixer* mixer_;
+    MapViewer map_;
+    std::vector<GameFont> fonts_;
+    const GameFont* font_ = nullptr;
+    // The game folder's loose MP3s, by upper-case stem (F1005 -> its path).
+    std::map<std::string, std::filesystem::path> mediaFiles_;
+
+    bool shown_ = false, hasMap_ = false, dirty_ = true, briefing_ = true, music_ = false, wasPlaying_ = false;
+    int current_ = 0, side_ = 0, page_ = 0, clip_ = 0;
+    std::string mapName_, mapNote_, mapTitle_, tableName_, status_, soundStatus_;
+    std::vector<Page> pages_;
+    std::vector<std::string> clips_; // stems, in order
+    audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
+    std::string musicName_;
 };
 
 } // namespace reluva::newworlds
