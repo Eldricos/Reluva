@@ -33,7 +33,8 @@ The short name is the mission's key across the files:
 
 - **its map:** `map/<name>.gmf` in one planet archive (`F1` → `map/f1.gmf`).
 - **its text:** `str/eng/miss/` in the side's misc archive: `F1` → `fed01.stb`,
-  `J1` → `jnt01fed.stb` (the Federation side of a joint mission). All the
+  `K1` → `klg01.stb` (`klimisc`), `R1` → `rom01.stb` (`rommisc`), `J1` →
+  `jnt01fed.stb`, `jnt01klg.stb` and `jnt01rom.stb`, one per side. All the
   C missions share `cvr03.stb`: training ("Duty first.", C1), the five
   tutorials (C4-C8) and C9-C11, in level.dat's order in the file, though by
   id "Slaver's Run" (C9, ids 57-61) sits between the fourth and fifth
@@ -48,13 +49,24 @@ The maps found so far:
 | `deswrld.cat` | `f2`, `r9`, `j7` (+ `demo1`) | desert world (F2) |
 | `alpwrld.cat` | `f3`, `j3`, `f12` (+ `coverd1`-`3`) | forest world (F3), temperate world (F12) |
 
-The missing maps are presumably in the planet archives not yet looked at,
-going by their briefings: the volcanic world of J6 in `vlcwrld`, and the
-dust world (F8) and barren world (J2) in `redwrld` or `alnwrld`. `kurt64`,
-`demo1` and `coverd1`-`3` aren't in level.dat. `cvr01.stb` and `cvr02.stb`
-("Careless Talk" on the arid world Varru, "A Friendly Little War" on the
-ice world Dukalion) may belong with the `coverd` maps (cover-disc demos?),
-though the `coverd` maps are in the alpine archive.
+Across all six planet archives and the three sides' mission text
+(`fedmisc`, `klimisc`, `rommisc`), each map's briefing names its kind of
+world, and the kinds go with the archives:
+
+| Planet archive | Briefings call it | Missions |
+|---|---|---|
+| `icewrld` | ice, snow, snow-covered, bleak | F1, J1, K7, K12, R8, R12 |
+| `deswrld` | desert | F2, R9, J7 |
+| `alpwrld` | forest, temperate | F3, F12, J3 |
+| `alnwrld` | dust | F8, K1, R2, J4, J8, J9 |
+| `redwrld` | barren (R1: "type 6") | J2, K8, R1 |
+| `vlcwrld` | volcanic | K2, J6 (and `k4`, not in level.dat) |
+
+No map exists for F14, K14 or R14 ("The Finest Hour"): each side's briefing
+names the same world as its mission 12 ("Death Rattle"), so 14 presumably
+reuses 12's map. The joint missions (J) have one table per side
+(`jnt01fed`, `jnt01klg`, `jnt01rom`, …) with the same briefing world.
+`kurt64`, `demo1`, `demo3`, `volc1` and `coverd1`-`3` aren't in level.dat.
 
 ## The other lists: `olevel.dat` and `kapla.rse`
 

@@ -3,7 +3,8 @@
 Status: **fully understood**. Reader: `src/engines/newworlds/string_table.cpp`.
 Stored in `.cat` archives with chunk tag `0x32`, under `str/eng/...`; one,
 `str/eng/frend.stb` in `misc.cat`, has the texture tag `0x16` instead.
-Checked on the 19 tables in `fedmisc.cat` and `misc.cat`, October 2026.
+Checked on the 47 tables in `fedmisc.cat`, `klimisc.cat`, `rommisc.cat`
+(14 each in the last two) and `misc.cat`, October 2026.
 `reluva-tool stb-dump <file.stb>` prints one; `reluva-tool stb-dump
 <archive.cat>` lists an archive's tables. All read exactly.
 

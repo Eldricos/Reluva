@@ -140,6 +140,24 @@ doesn't take a number in the name order (`mch`: `mch`, `mch_g`, ?,
 
 The rest of the shared numbers stay unknown and are drawn untextured.
 
+**Weapon effects** (in the `*misc` archives: beams, muzzle flashes,
+impacts, shields) name their textures their own way: beam segments
+(`mb_mid`, `_midh` head, `_midt` tail, `_midht` both) use the side's beam
+(`m_beam`, `t_beam`, `r_beam`; the Federation's `ph_mid*` use `phaser`), a
+muzzle flash the folder's muzzle texture with the same first letter
+(`mmuzzle`: `mbmuzzle`, `rmuzzle`: `rb_muzzl`), a shield its ripple
+(`fshield`: `fripple`), and `kdisrupt` `disrupt`. Names a number apart or
+shortened also match (`fapc2`: `fapc`; `fconbee`: `fconb`; `r_bop`:
+`r_bop5`-`7`), a low-detail model taking the `_l` one.
+
+**Star systems** (`glblgame.cat`, `geo/solsys/`: `karazin`, `jeddart`,
+`fico`, … one per mission's system, and `tabras`, Tabula Rasa) use generic
+planet textures (`solsys/ice`, `desert`, `alpine`, `red`, `volcanic`,
+`alien1`-`7`, `sun`, `stars1`-`4`). Several systems share one geometry
+(`karazin` and `fico` are identical: a star sphere, a small flat piece and
+four planets), so which textures each uses is the game's choice, not in the
+files; their metamodels name no parts.
+
 **Whose buildings:** `forbuild.cat` (folder `bad`) holds the native races'
 buildings, named by their metamodels in `misc.cat` (`mdl/bad/`): `h…` the
 Hubrin (`hcp` containment pillar; `hf` an "ancient fortress"), `m…` the

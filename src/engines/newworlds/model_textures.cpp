@@ -127,6 +127,31 @@ std::vector<const TextureFile*> findModelTextures(const std::string& modelName,
             return !b.empty() && (a == b || (b.size() >= 4 && a.size() > b.size() && a.compare(0, b.size(), b) == 0));
         });
 
+    // Weapon effects name their textures otherwise: beam segments
+    // (mb_mid, mb_midh, mb_midt, mb_midht) use the side's beam (m_beam;
+    // the Federation's ph_mid* phaser), a muzzle flash (mmuzzle, tmuzzle)
+    // the folder's muzzle texture starting with the same letter (mbmuzzle,
+    // t_muzzle), a shield its ripple (fripple), and kdisrupt disrupt: a
+    // texture named inside the model's.
+    if (found.empty() && !outline) {
+        const size_t mid = base.find("_mid");
+        std::string want;
+        if (mid != std::string::npos && base.compare(0, 2, "ph") == 0)
+            want = "phaser";
+        else if (mid != std::string::npos && mid >= 2 && base[mid - 1] == 'b')
+            want = base.substr(0, mid - 1) + "_beam";
+        collect([&](const TextureFile& t) {
+            if (t.folder != folder)
+                return false;
+            if (!want.empty())
+                return t.stem == want;
+            if (base.find("muzzle") != std::string::npos)
+                return t.stem.find("muzzl") != std::string::npos && t.stem[0] == base[0];
+            if (base.find("shield") != std::string::npos) // fshield: fripple, the shield's ripple
+                return t.stem.find("ripple") != std::string::npos && t.stem[0] == base[0];
+            return t.stem.size() >= 5 && base.size() > t.stem.size() && base.find(t.stem) != std::string::npos;
+        });
+    }
     // A low-detail model found its family's textures under another name
     // (fapc2_l: fapc, fapc_g, fapc_l): its own is the _l one.
     if (lowDetail && !endsWith(base, "_l") &&
