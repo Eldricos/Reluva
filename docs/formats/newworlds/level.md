@@ -95,7 +95,8 @@ HubLevel=6
 The screen size (640×480, the size the data viewers draw at), and a number
 for each side: the three playable races, then the native races the
 missions' text names: the Taubat, the Metar ("the Metar colony core") and the
-Hubrin. What the numbers are used for isn't
+Hubrin, whose buildings and units are in `forbuild.cat` (see
+[geo.md](geo.md)). What the numbers are used for isn't
 known; they may be the sides' player numbers in the missions.
 
 ## Not here
