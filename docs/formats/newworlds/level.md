@@ -2,7 +2,8 @@
 
 Status: **fully understood**. Reader: `src/engines/newworlds/levels.cpp`.
 A loose text file in the game folder (1,134 bytes, CRLF lines): the
-missions the main menu offers. `reluva-tool level-info <level.dat>
+missions the main menu offers. `olevel.dat`, `kapla.rse` and `game.ini` are
+covered below. `reluva-tool level-info <level.dat>
 [planet.cat...]` lists them, with the archives holding their maps.
 
 ```
@@ -54,6 +55,48 @@ dust world (F8) and barren world (J2) in `redwrld` or `alnwrld`. `kurt64`,
 ("Careless Talk" on the arid world Varru, "A Friendly Little War" on the
 ice world Dukalion) may belong with the `coverd` maps (cover-disc demos?),
 though the `coverd` maps are in the alpine archive.
+
+## The other lists: `olevel.dat` and `kapla.rse`
+
+Two more files in the same format sit beside it, perhaps lists from other
+builds. `olevel.dat` (1,241 bytes, presumably "old level") is `level.dat`
+with the bonus missions enabled under other short names (`U9`-`U11` instead
+of `C9`-`C11`) and six more; `kapla.rse` (1,346 bytes) has the same, three
+odd test entries (`U2,2,LOSTYOU`, `U3,3,LOSTME`, `U3,2,WHATARUE`) and the six
+renamed:
+
+| Short name | `olevel.dat` | `kapla.rse` | Planet archive |
+|---|---|---|---|
+| `D1` | Forest of Brad | Head to Head: Lupercal Jade | `alpwrld` |
+| `D2` | Ice of Brad | Head to Head: Nemphos | `icewrld` |
+| `D3` | Volcano of Brad | Head to Head: Lestrigon | `vlcwrld` |
+| `D4` | Desert of Brad | Head to Head: Karalute | `deswrld` |
+| `D5` | Alien of Brad | Head to Head: Xix Xix | `alnwrld` |
+| `D6` | Red of Brad | Head to Head: Pellion Red | `redwrld` |
+
+That names the six planet types, one per world archive; the archive column
+follows from the names (and, for `alpwrld`, from F3's "forest world" being
+in it). No `d1`-`d6` maps are in the three planet archives seen.
+
+## `game.ini`
+
+```
+[STNW]
+GAMEXRES= 640
+GAMEYRES=480
+FedLevel=1
+KliLevel=2
+RomLevel=3
+TauLevel=4
+MetLevel=5
+HubLevel=6
+```
+
+The screen size (640×480, the size the data viewers draw at), and a number
+for each side: the three playable races, then the native races the
+missions' text names: the Taubat, the Metar ("the Metar colony core") and the
+Hubrin. What the numbers are used for isn't
+known; they may be the sides' player numbers in the missions.
 
 ## Not here
 
