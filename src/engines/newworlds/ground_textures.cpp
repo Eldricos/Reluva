@@ -131,8 +131,8 @@ std::vector<std::string> chooseGroundTextures(const std::string& modelStem, cons
             pick = names.has(family + number) ? family + number : names.pick({family.c_str()}, "");
         else if (family == "concrete" || family == "concact")
             pick = "concrete";
-        else if (family == "needle" || family == "arche")
-            pick = names.pick({family.c_str()}, "");
+        else if ((family == "needle" || family == "arche") && slope)
+            pick = names.pick({family.c_str()}, ""); // flat ground round them by role
         else if (family == "brid" && !slope)
             pick = names.has("brid" + number)    ? "brid" + number // icewrld has bramp01-02 instead
                    : names.has("bramp" + number) ? "bramp" + number

@@ -115,7 +115,15 @@ Checked on the 7 maps of `icewrld.cat`:
 
   `alpwrld`'s maps differ at 22-38: 25 is empty (it has no `concact`), then
   `crack_03`-`06`, `hole_02`, `hole_03`, `crack_08`, `alpin_23`-`26`,
-  `hole_01`, `ramp` (37-38 rarely used, less sure). `icewrld` stores its
+  `hole_01`, `ramp` (37-38 rarely used, less sure). The places of the
+  pieces whose edges aren't flat agree across the three planets when fitted
+  freely by edges: `brid_01` 27, `ramp` 29, `hole_03` 31 (`deswrld`: 33),
+  `brid_02` 28 or 33; so the table above is wrong there for `icewrld` and
+  `deswrld` too. Flat-edged pieces (cracks, `hole_02`, concrete, tiles
+  23-26) fit any flat place, so their places can't be told apart this way.
+  The map viewer starts from the table and, once per archive, swaps two
+  numbers' models wherever that makes clearly more tile edges meet in its
+  maps. `icewrld` stores its
   models in exactly the general order. Found with two checks: how many tile
   edges meet (heights at 5 points within 80 units), and the tiles' terrain
   codes compared with `icewrld`'s, whose numbering is known (they match

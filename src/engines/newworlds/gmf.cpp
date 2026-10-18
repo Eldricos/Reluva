@@ -193,7 +193,9 @@ std::vector<size_t> tileModelOrder(const std::vector<std::string>& geoNames) {
     }
     while (!order.empty() && order.back() == kNoModel)
         order.pop_back(); // the lod models follow the last place filled
-    for (int lod = 0; lod < 2; ++lod)
+    // Then the lod/ models, and last the rest (placed objects' models: tree,
+    // rock, ...), which maps don't number: icewrld's 52 is lod/ice_12.
+    for (int lod = 1; lod >= 0; --lod)
         for (size_t i = 0; i < geoNames.size(); ++i)
             if (!used[i] && isLod(geoNames[i]) == bool(lod))
                 order.push_back(i);

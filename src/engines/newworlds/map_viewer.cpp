@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <tuple>
 
 namespace reluva::newworlds {
 
@@ -71,8 +72,20 @@ void MapViewer::show(int index) {
             geoEntries.push_back(i);
             geoNames.push_back(cat.entries()[i].name);
         }
-    for (size_t k : tileModelOrder(geoNames))
+    size_t mainCount = size_t(-1); // numbers before the first lod/ model
+    for (size_t k : tileModelOrder(geoNames)) {
+        if (k != kNoModel && geoNames[k].find("/lod/") != std::string::npos)
+            mainCount = std::min(mainCount, archiveModels_.size());
         archiveModels_.push_back(k == kNoModel ? kNoModel : geoEntries[k]);
+    }
+    // Checked once per archive: every map in it numbers the same way.
+    if (fittedArchive_ != ref.archive || fittedModels_.empty()) {
+        fitModelNumbers(cat, mainCount);
+        fittedArchive_ = ref.archive;
+        fittedModels_ = archiveModels_;
+    } else {
+        archiveModels_ = fittedModels_;
+    }
     std::vector<uint8_t> data;
     // Walls get the archive's last full-size cliff texture (icewrld's
     // cliff07, which no ground model's name matches). A guess.
@@ -293,20 +306,13 @@ int MapViewer::tileAt(int tx, int ty) const {
 
 // Edge heights at 5 points along each side, from the model's vertices that
 // lie on the side (linear in between), after the tile's rotation.
-const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
-    auto found = tileEdges_.find(tileIndex);
-    if (found != tileEdges_.end())
-        return found->second;
-    TileEdges& e = tileEdges_[tileIndex];
-    const GmfMap::Tile& tile = map_.tiles[tileIndex];
-    const TileModel& m = tileModel(tile.model);
-    if (!m.error.empty())
-        return e;
+MapViewer::TileEdges MapViewer::edgesOf(const GeoModel& geo, int rotation) {
+    TileEdges e;
     std::vector<std::pair<float, float>> side[4]; // (position along the side, height)
-    for (const auto& part : m.geo.parts)
+    for (const auto& part : geo.parts)
         for (const auto& v : part.vertices) {
             float x = v.x, y = v.y;
-            for (int k = 0; k < tile.rotation; ++k) {
+            for (int k = 0; k < rotation; ++k) {
                 const float t = x;
                 x = -y;
                 y = t;
@@ -343,6 +349,121 @@ const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
         }
     }
     return e;
+}
+
+const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
+    auto found = tileEdges_.find(tileIndex);
+    if (found != tileEdges_.end())
+        return found->second;
+    TileEdges& e = tileEdges_[tileIndex];
+    const GmfMap::Tile& tile = map_.tiles[tileIndex];
+    const TileModel& m = tileModel(tile.model);
+    if (m.error.empty())
+        e = edgesOf(m.geo, tile.rotation);
+    return e;
+}
+
+// Check the special models' numbers (22 to the end of the main models)
+// against all the archive's maps: swap two numbers' models wherever that
+// makes clearly more tile edges meet. tileModelOrder's places come from the
+// three planets studied and are partly wrong for some numbers (icewrld's 29
+// and 31 are mid-level pieces, not cracks or hole_01); flat pieces all fit
+// the same edges, so ties keep the default.
+void MapViewer::fitModelNumbers(CatArchive& cat, size_t mainCount) {
+    // How often each pair of (number, turn) tiles meet, east or north.
+    struct Meeting {
+        uint32_t a, b;
+        int ra, rb, side; // side 0: b is east of a; 1: north
+        bool operator<(const Meeting& o) const {
+            return std::tie(a, b, ra, rb, side) < std::tie(o.a, o.b, o.ra, o.rb, o.side);
+        }
+    };
+    std::map<Meeting, unsigned> meetings;
+    std::vector<uint8_t> data;
+    for (const auto& e : cat.entries()) {
+        GmfMap m;
+        if (e.tag != cattag::Gmf || cat.read(e, data) || parseGmf(data, m))
+            continue;
+        auto at = [&](int tx, int ty) -> const GmfMap::Tile* {
+            if (tx < 0 || ty < 0 || tx >= 2 * m.width || ty >= 2 * m.height)
+                return nullptr;
+            static constexpr int kSlotAt[2][2] = {{0, 3}, {1, 2}};
+            const auto& block = m.blocks[m.cells[size_t(ty / 2) * size_t(m.width) + size_t(tx / 2)].block];
+            return &m.tiles[block[size_t(kSlotAt[tx % 2][ty % 2])]];
+        };
+        for (int ty = 0; ty < 2 * m.height; ++ty)
+            for (int tx = 0; tx < 2 * m.width; ++tx)
+                for (int side = 0; side < 2; ++side) {
+                    const GmfMap::Tile* a = at(tx, ty);
+                    const GmfMap::Tile* b = at(tx + (side == 0), ty + (side == 1));
+                    if (a && b)
+                        ++meetings[{a->model, b->model, a->rotation, b->rotation, side}];
+                }
+    }
+    std::map<std::pair<size_t, int>, TileEdges> cache; // (entry, turn)
+    std::map<size_t, GeoModel> geos;
+    auto edges = [&](size_t entry, int rotation) -> const TileEdges& {
+        auto found = cache.find({entry, rotation});
+        if (found != cache.end())
+            return found->second;
+        TileEdges& e = cache[{entry, rotation}];
+        if (entry == kNoModel)
+            return e;
+        if (!geos.count(entry)) {
+            GeoModel& g = geos[entry];
+            if (cat.read(cat.entries()[entry], data) || parseGeo(data, g))
+                g = GeoModel{};
+        }
+        e = edgesOf(geos[entry], rotation);
+        return e;
+    };
+    auto entryOf = [&](uint32_t n) { return n < archiveModels_.size() ? archiveModels_[n] : kNoModel; };
+    // Placed objects' models (tree, rock, ...) aren't ground tiles.
+    auto isScenery = [&](uint32_t n) {
+        const size_t e = entryOf(n);
+        if (e == kNoModel)
+            return false;
+        std::string folder, stem, ext;
+        splitName(cat.entries()[e].name, folder, stem, ext);
+        return stem == "tree" || stem == "tree_s" || stem == "rock" || stem == "frn_spec" || stem == "bush";
+    };
+    // Edges meeting among those touching number n or k.
+    auto score = [&](uint32_t n, uint32_t k) {
+        unsigned good = 0;
+        for (const auto& [mt, count] : meetings) {
+            if (mt.a != n && mt.b != n && mt.a != k && mt.b != k)
+                continue;
+            const TileEdges& ea = edges(entryOf(mt.a), mt.ra);
+            const TileEdges& eb = edges(entryOf(mt.b), mt.rb);
+            const int sa = mt.side, sb = mt.side + 2; // east meets west, north south
+            if (!ea.present[sa] || !eb.present[sb])
+                continue;
+            bool meet = true;
+            for (int i = 0; i < 5; ++i)
+                meet = meet && std::fabs(ea.z[sa][i] - eb.z[sb][i]) < 80;
+            good += meet ? count : 0;
+        }
+        return good;
+    };
+    const uint32_t from = 22, to = uint32_t(std::min(mainCount, archiveModels_.size()));
+    for (int round = 0; round < 4; ++round) {
+        bool changed = false;
+        for (uint32_t n = from; n < to; ++n)
+            for (uint32_t k = n + 1; k < to; ++k) {
+                if (archiveModels_[n] == archiveModels_[k] || isScenery(n) || isScenery(k))
+                    continue;
+                const unsigned before = score(n, k);
+                std::swap(archiveModels_[n], archiveModels_[k]);
+                const unsigned after = score(n, k);
+                if (after > before + std::max(20u, before / 10)) {
+                    changed = true;
+                } else {
+                    std::swap(archiveModels_[n], archiveModels_[k]);
+                }
+            }
+        if (!changed)
+            break;
+    }
 }
 
 void MapViewer::handleEvent(const Event& ev) {
@@ -541,9 +662,9 @@ void MapViewer::render() {
                     // Other ground tiles are opaque (water02-04 have alpha
                     // layers, presumably for the game's own water effect).
                     const bool opaqueGround = ground && !ground->underlay;
-                    const float a = col[3] == 0 && !opaqueGround             ? 0.0f
+                    const float a = col[3] == 0                         ? 0.0f
                                     : tt->alpha.empty() || opaqueGround ? 1.0f
-                                                                       : float(tt->alpha[texel]) / 255;
+                                                                        : float(tt->alpha[texel]) / 255;
                     if (a < 1 && ground && ground->underlay && !underlay_.rgba.empty()) {
                         // Ground shows through, at the same texture coordinates.
                         const Texture& g = underlay_;
