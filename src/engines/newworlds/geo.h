@@ -41,7 +41,17 @@ struct GeoModel {
         std::vector<Edge> edges;
     };
 
+    // A named point (a turret's axis, a gun's muzzle, a docking point); the
+    // .mdl names them in order (see docs/formats/newworlds/mdl.md).
+    struct Attachment {
+        float frame[10];  // 40 bytes before the position: probably its orientation (layout unknown)
+        Vec3 position;
+    };
+
     float centreX = 0, centreY = 0, radius = 0;
+    uint32_t nodeCount = 0;  // the .mdl's part names (first value of the attachment block)
+    uint32_t placeCount = 0; // the .mdl's named places (muzzle flashes, bays)
+    std::vector<Attachment> attachments;
     std::vector<Face> faces;
     std::vector<Part> parts;
 };

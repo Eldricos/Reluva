@@ -9,6 +9,7 @@
 #include "engines/newworlds/texture.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 
@@ -425,6 +426,32 @@ void testGmf() {
     CHECK(parseGmf(bad, m));
 }
 
+// A metamodel: title, four name lists (the first with leftovers after it,
+// as when its count is larger than its entries), then u32 0 and the states.
+void testMdl() {
+    std::vector<uint8_t> b;
+    auto name = [&](const char* n, uint32_t v) {
+        char buf[32] = {};
+        std::snprintf(buf, sizeof buf, "%s", n);
+        b.insert(b.end(), buf, buf + 32);
+        put32(b, v);
+    };
+    char title[32] = "testmetamodel";
+    b.insert(b.end(), title, title + 32);
+    put32(b, 3); name("main", 0); name("turret_1", 1); name("terminate", 0xffffffffu);
+    put32(b, 0x150); put32(b, 0x009a0300); // leftovers
+    put32(b, 1); name("gun_muzzle_1", 0); name("terminate", 0xffffffffu);
+    put32(b, 0); name("terminate", 0xffffffffu);
+    put32(b, 0); name("terminate", 0xffffffffu);
+    put32(b, 0); put32(b, 2); name("normal", 0); name("low detail", 1); name("terminate", 0xffffffffu);
+    MdlModel m;
+    Error err = parseMdl(b, m);
+    CHECK(!err);
+    CHECK(m.title == "testmetamodel" && m.parts.size() == 2 && m.parts[1].name == "turret_1" && m.parts[1].value == 1);
+    CHECK(m.points.size() == 1 && m.points[0].name == "gun_muzzle_1" && m.places.empty() && m.animated.empty());
+    CHECK(m.states.size() == 2 && m.states[1] == "low detail");
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -512,6 +539,7 @@ int main() {
     testTexture();
     testGeo();
     testGmf();
+    testMdl();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

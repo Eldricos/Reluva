@@ -9,6 +9,7 @@
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/texture.h"
@@ -65,6 +66,7 @@ private:
 //   Mouse drag or W/A/S/D: rotate   wheel or +/-: zoom   R: reset the view
 //   Space: spin   P: show one part at a time   U: texture-coordinate checks
 //   C: colour by texture number instead of texturing   H: smooth or flat shading
+//   M: the model's points (from its .mdl) on/off   N: select the next point
 //   L: outlines (solid, solid + outlines, outlines only)
 //   B: back faces (hidden, shown, only back faces)   F: filter (all, multi-part, failed)
 class ModelViewer {
@@ -82,8 +84,9 @@ private:
     void resetView();
     void render();
     void updateTitle();
-    void drawLine(float x0, float y0, float x1, float y1);
+    void drawLine(float x0, float y0, float x1, float y1, const uint8_t* colour = nullptr);
     void loadTextures(const std::string& modelName);
+    void loadMetamodel(const std::string& modelName);
 
     System& sys_;
     Surface& screen_;
@@ -101,6 +104,10 @@ private:
 
     GeoModel model_;
     std::string status_; // decode error, if any
+    std::map<std::string, EntryRef> metamodels_; // .mdl files by "folder/stem"
+    MdlModel mdl_;
+    bool hasMdl_ = false, markers_ = true;
+    int selectedPoint_ = -1; // -1: none
     float centre_[3] = {0, 0, 0};
     float size_ = 1; // distance from the centre to the farthest vertex
 

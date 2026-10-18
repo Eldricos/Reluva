@@ -5,6 +5,7 @@
 #include "engines/newworlds/viewers.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <cmath>
 
 namespace reluva::newworlds {
@@ -101,6 +102,8 @@ void ModelViewer::show(int index) {
     if (!status_.empty())
         model_ = GeoModel{};
     loadTextures(cat.entries()[ref.entry].name);
+    loadMetamodel(cat.entries()[ref.entry].name);
+    selectedPoint_ = -1;
 
     // Frame the model: centre of its bounding box, distance to the farthest vertex.
     float lo[3] = {1e30f, 1e30f, 1e30f}, hi[3] = {-1e30f, -1e30f, -1e30f};
@@ -126,6 +129,41 @@ void ModelViewer::show(int index) {
     }
     dirty_ = true;
     updateTitle();
+}
+
+// The model's .mdl: the same folder and name under mdl/ (geo/kln/k_bop.geo:
+// mdl/kln/k_bop.mdl), or without the underscore (geo/map/ice/ice_07.geo:
+// mdl/ice/ice07.mdl), or without a suffix (k_bop_l: k_bop).
+void ModelViewer::loadMetamodel(const std::string& modelName) {
+    hasMdl_ = false;
+    mdl_ = MdlModel{};
+    if (metamodels_.empty())
+        for (size_t a = 0; a < archives_.size(); ++a) {
+            const auto& entries = archives_[a]->entries();
+            for (size_t i = 0; i < entries.size(); ++i)
+                if (entries[i].tag == cattag::Mdl) {
+                    std::string folder, stem, ext;
+                    splitName(entries[i].name, folder, stem, ext);
+                    metamodels_.emplace(folder + "/" + stem, EntryRef{a, i});
+                }
+        }
+    std::string folder, stem, ext;
+    splitName(modelName, folder, stem, ext);
+    std::string joined;
+    for (char c : stem)
+        if (c != '_')
+            joined += c;
+    const size_t u = stem.rfind('_');
+    for (const std::string& want : {stem, joined, u == std::string::npos ? stem : stem.substr(0, u)}) {
+        auto found = metamodels_.find(folder + "/" + want);
+        if (found == metamodels_.end())
+            continue;
+        CatArchive& cat = *archives_[found->second.archive];
+        std::vector<uint8_t> data;
+        hasMdl_ = !cat.read(cat.entries()[found->second.entry], data) && !parseMdl(data, mdl_);
+        if (hasMdl_)
+            return;
+    }
 }
 
 void ModelViewer::loadTextures(const std::string& modelName) {
@@ -204,6 +242,10 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'g': alphaMode_ = (alphaMode_ + 1) % 3; break;
     case 'l': outlines_ = (outlines_ + 1) % 3; break;
     case 'b': faces_ = (faces_ + 1) % 3; break;
+    case 'm': markers_ = !markers_; break;
+    case 'n':
+        selectedPoint_ = selectedPoint_ + 1 >= int(model_.attachments.size()) ? -1 : selectedPoint_ + 1;
+        break;
     case 'h': smooth_ = !smooth_; break;
     case 'p':
         if (!model_.parts.empty())
@@ -266,6 +308,25 @@ void ModelViewer::updateTitle() {
             title += " (off)";
     }
     title += ")";
+    if (hasMdl_) {
+        title += " [" + mdl_.title;
+        for (size_t i = 0; i < mdl_.states.size(); ++i)
+            title += (i ? "/" : ": ") + (mdl_.states[i].empty() ? std::string("(unnamed)") : mdl_.states[i]);
+        title += "; " + std::to_string(model_.attachments.size()) + " points";
+        if (selectedPoint_ >= 0 && size_t(selectedPoint_) < model_.attachments.size()) {
+            std::string name = "#" + std::to_string(selectedPoint_);
+            for (const auto& n : mdl_.points)
+                if (n.value == selectedPoint_)
+                    name = n.name;
+            const auto& a = model_.attachments[size_t(selectedPoint_)].position;
+            char where[64];
+            std::snprintf(where, sizeof where, " (%.0f, %.0f, %.0f)", a.x, a.y, a.z);
+            title += ", " + name + where;
+        }
+        title += "]";
+    } else if (!model_.attachments.empty()) {
+        title += " [" + std::to_string(model_.attachments.size()) + " points]";
+    }
     if (outlines_)
         title += std::string(" [") + kOutlineNames[outlines_] + "]";
     if (faces_)
@@ -411,9 +472,29 @@ void ModelViewer::render() {
     for (const auto& o : outlines)
         for (size_t i = 0; i < o.size(); ++i)
             drawLine(o[i].x, o[i].y, o[(i + 1) % o.size()].x, o[(i + 1) % o.size()].y);
+
+    // The model's points, as crosses over everything; the selected one larger.
+    if (markers_)
+        for (size_t i = 0; i < model_.attachments.size(); ++i) {
+            const auto& a = model_.attachments[i].position;
+            const ViewVertex v = cam.toView(Vec{a.x, a.y, a.z});
+            if (v.z < cam.nearZ)
+                continue;
+            const ScreenVertex sv = cam.project(v);
+            const bool selected = int(i) == selectedPoint_;
+            static const uint8_t kPoint[3] = {255, 210, 40}, kSelected[3] = {255, 60, 60};
+            const float r = selected ? 9.0f : 4.0f;
+            for (float d = -1; d <= 1; d += 1) { // three pixels thick
+                drawLine(sv.x - r, sv.y + d, sv.x + r, sv.y + d, selected ? kSelected : kPoint);
+                drawLine(sv.x + d, sv.y - r, sv.x + d, sv.y + r, selected ? kSelected : kPoint);
+            }
+        }
 }
 
-void ModelViewer::drawLine(float x0, float y0, float x1, float y1) {
+void ModelViewer::drawLine(float x0, float y0, float x1, float y1, const uint8_t* colour) {
+    static const uint8_t kOutline[3] = {240, 240, 200};
+    if (!colour)
+        colour = kOutline;
     const float dx = x1 - x0, dy = y1 - y0;
     const int steps = int(std::ceil(std::max(std::fabs(dx), std::fabs(dy))));
     if (steps > 4 * (screen_.w + screen_.h))
@@ -424,9 +505,9 @@ void ModelViewer::drawLine(float x0, float y0, float x1, float y1) {
         if (x < 0 || y < 0 || x >= screen_.w || y >= screen_.h)
             continue;
         uint8_t* p = screen_.row(y) + x * 4;
-        p[0] = 240;
-        p[1] = 240;
-        p[2] = 200;
+        p[0] = colour[0];
+        p[1] = colour[1];
+        p[2] = colour[2];
     }
 }
 

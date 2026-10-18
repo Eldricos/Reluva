@@ -91,23 +91,41 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
     out.radius = r.f32(p + 24);
     p += 28;
 
-    // Attachment data of unknown layout follows; find the part data, which
-    // starts u32 size, 1, part count, then the first part: 0, vertex count,
-    // the vertices and a list of unit normals. The attachment data can have
-    // an odd length, so search byte by byte.
-    size_t partData = 0;
-    for (size_t q = p; r.has(q, 20); ++q) {
+    // The attachment block: u32 node count, u32 named-place count, u32 ?,
+    // then 58 bytes per attachment (40 bytes, probably its orientation; a
+    // chunk: u16 0x1c, u32 12, the position). 58 isn't a multiple of 4, so
+    // what follows is often unaligned. The part data starts u32 size, 1, part
+    // count, then the first part: 0, vertex count, the vertices and a list of
+    // unit normals.
+    const uint32_t attachCount = r.u32(p - 16);
+    auto isPartData = [&](size_t q) {
+        if (!r.has(q, 20) || r.u32(q + 4) != 1 || r.u32(q + 8) != partCount || r.u32(q + 12) != 0)
+            return false;
         const uint32_t n = r.u32(q + 16);
-        if (r.u32(q + 4) != 1 || r.u32(q + 8) != partCount || r.u32(q + 12) != 0 || n == 0 || n > kMaxCount)
-            continue;
         const size_t after = q + 20 + size_t(n) * 12;
-        if (r.has(after, 20) && r.u32(after) == 1 && r.u32(after + 4) > 0 && isUnit(r.vec3(after + 8))) {
-            partData = q;
-            break;
+        return n > 0 && n <= kMaxCount && r.has(after, 20) && r.u32(after) == 1 && r.u32(after + 4) > 0 &&
+               isUnit(r.vec3(after + 8));
+    };
+    size_t partData = 0;
+    const size_t expected = p + 12 + size_t(attachCount) * 58;
+    if (attachCount <= kMaxCount && r.has(p, 12) && isPartData(expected)) {
+        out.nodeCount = r.u32(p);
+        out.placeCount = r.u32(p + 4);
+        for (uint32_t i = 0; i < attachCount; ++i) {
+            const size_t a = p + 12 + size_t(i) * 58;
+            GeoModel::Attachment at{};
+            for (int k = 0; k < 10; ++k)
+                at.frame[k] = r.f32(a + 4 * size_t(k));
+            at.position = r.vec3(a + 46);
+            out.attachments.push_back(at);
         }
+        partData = expected;
+    } else {
+        // Not the usual layout: search for the part data byte by byte.
+        for (size_t q = p; r.has(q, 20) && !partData; ++q)
+            if (isPartData(q))
+                partData = q;
     }
-    if (!partData)
-        return Error::fail("vertex block not found after " + hex(p));
     p = partData + 12;
 
     // Each part: u32 ? (0, or 1 in ptank_l's part 1), u32 vertex count, the

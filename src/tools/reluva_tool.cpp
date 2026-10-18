@@ -19,6 +19,8 @@
 //   reluva-tool geo-survey <file.cat>...           decode every model, group failures by reason
 //   reluva-tool geo-textures [-a] <file.cat>...    show which textures each model gets (by default
 //                                                  only models with too few, with similar names)
+//   reluva-tool mdl-info <file.mdl | file.cat>     show a metamodel's names and states, or survey every
+//                                                  one in an archive
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
@@ -34,6 +36,7 @@
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/ground_textures.h"
+#include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
 
 #include <map>
@@ -992,6 +995,75 @@ int cmdGeoFaces(int argc, char** argv) {
     return 0;
 }
 
+int cmdMdlInfo(int argc, char** argv) {
+    if (argc != 3) {
+        std::fprintf(stderr, "usage: reluva-tool mdl-info <file.mdl | file.cat>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    auto list = [](const char* what, const std::vector<nw::MdlModel::Name>& names) {
+        if (names.empty())
+            return;
+        std::printf("  %s:", what);
+        for (const auto& n : names)
+            std::printf(" %s=%d", n.name.c_str(), n.value);
+        std::printf("\n");
+    };
+    const std::string path = argv[2];
+    if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
+        nw::CatArchive cat;
+        if (reluva::Error err = cat.open(path)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        std::map<std::string, unsigned> states;
+        unsigned count = 0, failed = 0;
+        std::vector<uint8_t> data;
+        for (const auto& e : cat.entries()) {
+            if (e.tag != nw::cattag::Mdl)
+                continue;
+            ++count;
+            nw::MdlModel m;
+            reluva::Error err = cat.read(e, data);
+            if (!err)
+                err = nw::parseMdl(data, m);
+            if (err) {
+                std::printf("%s: %s\n", e.name.c_str(), err.message.c_str());
+                ++failed;
+                continue;
+            }
+            std::string key;
+            for (const auto& s : m.states)
+                key += (key.empty() ? "" : ", ") + (s.empty() ? std::string("(unnamed)") : s);
+            ++states[key.empty() ? "(none listed)" : key];
+        }
+        std::printf("%u metamodels, %u decode\nstates:\n", count, count - failed);
+        for (const auto& [k, n] : states)
+            std::printf("  %4u  %s\n", n, k.c_str());
+        return failed ? 1 : 0;
+    }
+    std::vector<uint8_t> data;
+    if (!readFile(path.c_str(), data)) {
+        std::fprintf(stderr, "cannot open %s\n", path.c_str());
+        return 1;
+    }
+    nw::MdlModel m;
+    if (reluva::Error err = nw::parseMdl(data, m)) {
+        std::printf("%s\n", err.message.c_str());
+        return 1;
+    }
+    std::printf("\"%s\"\n", m.title.c_str());
+    list("parts", m.parts);
+    list("points", m.points);
+    list("places", m.places);
+    list("animated", m.animated);
+    std::printf("  states:");
+    for (const auto& s : m.states)
+        std::printf(" \"%s\"", s.c_str());
+    std::printf("\n");
+    return 0;
+}
+
 int cmdGroundTextures(int argc, char** argv) {
     if (argc != 3) {
         std::fprintf(stderr, "usage: reluva-tool ground-textures <planet.cat>\n");
@@ -1369,6 +1441,8 @@ int main(int argc, char** argv) {
         return cmdGmfInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-textures") == 0)
         return cmdGeoTextures(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "mdl-info") == 0)
+        return cmdMdlInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
@@ -1388,6 +1462,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-info <file.geo> [out.obj]\n"
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
+                 "  reluva-tool mdl-info <file.mdl | file.cat>\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"
