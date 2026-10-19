@@ -25,19 +25,29 @@ repository). One page per mission:
 | [play-f2.md](play-f2.md) | F2 A Harsh Lesson | Federation (2nd) |
 | [play-f3.md](play-f3.md) | F3 A Piece of Paper | Federation (3rd) |
 | [play-j1f.md](play-j1f.md) | J1 Into the Arena | Federation (4th) |
+| [play-j2f.md](play-j2f.md) | J2 Absent Friends | Federation (5th) |
 | [play-j3f.md](play-j3f.md) | J3 The Mask Slips | Federation (6th) |
 | [play-j4f.md](play-j4f.md) | J4 Cry Havoc | Federation (7th) |
 | [play-f8.md](play-f8.md) | F8 All That Glisters | Federation (8th) |
 | [play-j6f.md](play-j6f.md) | J6 Keep Your Friends Close | Federation (9th) |
 | [play-j7f.md](play-j7f.md) | J7 The Jaws of Death | Federation (10th) |
 | [play-f12.md](play-f12.md) | F12 Death Rattle | Federation (11th) |
+| [play-j8f.md](play-j8f.md) | J8 Checkmate | Federation (12th) |
+| [play-f14.md](play-f14.md) | F14 The Finest Hour | Federation (13th) |
+| [play-j9f.md](play-j9f.md) | J9 The Lost Tribes | Federation (14th) |
+| [play-c9.md](play-c9.md) | C9 Slaver's Run (bonus) | Federation |
 
 ## What they established
 
-- **The Klingon campaign's order**: K1, K2, J1, J2, J3, K7, J4, K8, J6,
-  J7, K12, J8, K14, J9: level.dat's order, with the joint missions played
+- **The campaigns' order**: the Klingons' K1, K2, J1, J2, J3, K7, J4, K8,
+  J6, J7, K12, J8, K14, J9, and the Federation's F1, F2, F3, J1, J2, J3,
+  J4, F8, J6, J7, F12, J8, F14, J9 (its videos numbered 1-14, matched by
+  their voice clips): level.dat's order, with the joint missions played
   as the side's own and no J5 (the voice folders have none either). The
   loading screen names each "Klingon level NN".
+- **Federation briefings open with the transmission page** over the
+  emblem, silent, before the first clip (every Federation recording; of
+  the Klingon ones only J8 and J3).
 - **Briefings** play the mission's voice clips in number order, one per
   step (a lettered clip such as `K12009A` an extra step after its number),
   usually STELLAR CARTOGRAPHY and PLANETARY DATA first. Which page and view
