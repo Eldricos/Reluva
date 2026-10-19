@@ -8,6 +8,7 @@
 #include "common/fs.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cctype>
 #include <fstream>
 #include <iterator>
@@ -126,6 +127,7 @@ void MissionViewer::show(int index) {
 }
 
 void MissionViewer::loadSide() {
+    stopBriefing();
     stopClip();
     page_ = clip_ = 0;
     pages_.clear();
@@ -135,7 +137,8 @@ void MissionViewer::loadSide() {
     const char side = missionSides(level.shortName)[size_t(side_)];
     tableName_ = missionTableName(level.shortName, side);
 
-    StringTable table;
+    table_ = StringTable{};
+    StringTable& table = table_;
     if (tableName_.empty())
         status_ = "no briefing known for this mission";
     else {
@@ -160,11 +163,11 @@ void MissionViewer::loadSide() {
         if (close != std::string::npos) {
             std::string heading = s.text.substr(1, close - 1);
             std::replace(heading.begin(), heading.end(), '\t', ' ');
-            pages_.push_back({std::move(heading), s.text.substr(close + 1)});
+            pages_.push_back({std::move(heading), s.text.substr(close + 1), s.id});
             continue;
         }
         if (pages_.empty() || !pages_.back().heading.empty())
-            pages_.push_back({});
+            pages_.push_back({{}, {}, s.id});
         Page& page = pages_.back();
         page.text += (page.text.empty() ? "" : "\n") + s.text;
     }
@@ -172,6 +175,8 @@ void MissionViewer::loadSide() {
     for (const auto& [stem, path] : mediaFiles_)
         if (fs::toLower(path.extension().string()) == ".mp3" && isMissionClip(stem, level.shortName, side))
             clips_.push_back(stem);
+    std::sort(clips_.begin(), clips_.end(), clipBefore);
+    script_ = briefingScript(level.shortName, side, table_, clips_);
 }
 
 void MissionViewer::handleEvent(const Event& ev) {
@@ -198,6 +203,13 @@ void MissionViewer::handleEvent(const Event& ev) {
             --page_, briefing_ = true;
         break;
     case 'b': briefing_ = !briefing_; break;
+    case key::Return:
+        if (running_)
+            startStep(step_ + 1);
+        else
+            startBriefing();
+        break;
+    case key::Backspace: stopBriefing(); break;
     case 'j':
         if (sides < 2)
             return;
@@ -238,10 +250,17 @@ void MissionViewer::handleEvent(const Event& ev) {
 void MissionViewer::update(uint64_t nowMs) {
     if (missions_.empty())
         return;
-    if (hasMap_)
+    nowMs_ = nowMs;
+    // The briefing moves on when its step's clip ends, or its time is up.
+    if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying()))
+        startStep(step_ + 1);
+    if (mapInView())
         map_.update(nowMs);
     else if (dirty_) {
-        drawNoMap();
+        if (running_)
+            drawBackdrop(script_[size_t(step_)].view);
+        else
+            drawNoMap();
         drawBriefing();
         dirty_ = false;
     }
@@ -253,7 +272,7 @@ void MissionViewer::update(uint64_t nowMs) {
 }
 
 void MissionViewer::redraw() {
-    if (hasMap_)
+    if (mapInView())
         map_.redraw();
     else
         dirty_ = true;
@@ -313,7 +332,21 @@ void MissionViewer::drawBriefing() {
             start = end + 1;
         }
     };
-    if (!status_.empty())
+    if (running_) {
+        // The step's page, if it has one.
+        const uint32_t id = script_[size_t(step_)].page;
+        for (const Page& page : pages_)
+            if (id && page.id == id) {
+                if (!page.heading.empty())
+                    wrap(page.heading, kHeadingColor);
+                wrap(page.text, kTextColor);
+                break;
+            }
+        if (!lines.empty())
+            lines.push_back({"briefing " + std::to_string(step_ + 1) + "/" + std::to_string(script_.size()) +
+                                 " (Enter: next; Backspace: stop)",
+                             kNoteColor});
+    } else if (!status_.empty())
         wrap(status_, kNoteColor);
     else if (!pages_.empty()) {
         const Page& page = pages_[size_t(page_)];
@@ -367,6 +400,9 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
         t += "; voice " + std::to_string(clip_ + 1) + "/" + std::to_string(clips_.size()) + " " + clips_[size_t(clip_)];
         t += clipPlaying() ? " [playing]" : " (Space: play)";
     }
+    if (running_)
+        t += "; briefing step " + std::to_string(step_ + 1) + "/" + std::to_string(script_.size()) +
+             (hasRecordedBriefing(level.shortName, sides[size_t(side_)]) ? "" : " (by the general rule)");
     if (music_ && !musicName_.empty())
         t += " [music " + musicName_ + "]";
     if (!soundStatus_.empty())
@@ -396,6 +432,119 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
         return nullptr;
     }
     return sound;
+}
+
+void MissionViewer::startBriefing() {
+    if (script_.empty())
+        return;
+    savedColouring_ = map_.colouring();
+    running_ = true;
+    briefing_ = true;
+    startStep(0);
+}
+
+void MissionViewer::stopBriefing() {
+    if (!running_)
+        return;
+    running_ = false;
+    stopClip();
+    map_.setColouring(savedColouring_);
+    redraw();
+    updateTitle();
+}
+
+void MissionViewer::startStep(int step) {
+    stopClip();
+    if (step >= int(script_.size())) {
+        stopBriefing();
+        return;
+    }
+    step_ = step;
+    const BriefingStep& s = script_[size_t(step)];
+    stepOnMap_ = hasMap_ && (s.view == BriefingView::Ground || s.view == BriefingView::Relief);
+    if (stepOnMap_)
+        map_.setColouring(s.view == BriefingView::Relief ? 1 : 0);
+    // Its clip, if the game folder has it; else the step is shown a while.
+    stepEndMs_ = nowMs_ + 5000;
+    const auto it = std::find(clips_.begin(), clips_.end(), s.clip);
+    if (!s.clip.empty() && it != clips_.end()) {
+        playClip(int(it - clips_.begin()));
+        if (clipHandle_ != audio::kNoSound)
+            stepEndMs_ = 0;
+    }
+    redraw();
+    updateTitle();
+}
+
+bool MissionViewer::mapInView() const { return hasMap_ && (!running_ || stepOnMap_); }
+
+// Stand-ins for the briefing's other views, drawn by Reluva itself: the
+// game's galaxy, star system and emblem scenes aren't known from the data.
+void MissionViewer::drawBackdrop(BriefingView view) {
+    const int w = screen_.w, h = screen_.h;
+    for (int y = 0; y < h; ++y) {
+        uint8_t* row = screen_.row(y);
+        for (int x = 0; x < w; ++x, row += 4)
+            row[0] = row[1] = row[2] = 0, row[3] = 255;
+    }
+    auto plot = [&](int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+        if (x >= 0 && y >= 0 && x < w && y < h) {
+            uint8_t* p = screen_.row(y) + x * 4;
+            p[0] = r, p[1] = g, p[2] = b;
+        }
+    };
+    uint32_t seed = 12345;
+    auto rnd = [&] { return (seed = seed * 1664525u + 1013904223u) >> 8; };
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    switch (view) {
+    case BriefingView::Galaxy:
+        for (int i = 0; i < 900; ++i) {
+            // A flattened disc of stars with a red and a blue arm.
+            const float t = float(rnd() % 1000) / 1000.0f * 6.283f, rr = float(rnd() % 1000) / 1000.0f;
+            const int x = w / 2 + int(std::cos(t) * rr * float(w) * 0.32f);
+            const int y = h / 2 + int(std::sin(t) * rr * float(h) * 0.16f);
+            const uint8_t v = uint8_t(120 + rnd() % 136);
+            plot(x, y, v, v, v);
+        }
+        for (int i = 0; i < 300; ++i) {
+            const int x = int(rnd() % unsigned(w / 3)), d = int(rnd() % 9) - 4;
+            plot(w / 3 + x, h / 2 - 30 + x / 4 + d, 200, 40, 40);
+            plot(w / 3 + x, h / 2 + 20 - x / 5 + d, 60, 80, 220);
+        }
+        break;
+    case BriefingView::StarSystem:
+        for (int i = 0; i < 400; ++i)
+            plot(int(rnd() % unsigned(w)), int(rnd() % unsigned(h)), 90, 90, 110);
+        for (int i = 0; i < 7; ++i) {
+            const int cx = int(rnd() % unsigned(w)), cy = int(rnd() % unsigned(h)), r = 2 + int(rnd() % 5);
+            const uint8_t cr = uint8_t(rnd() % 256), cg = uint8_t(rnd() % 256), cb = uint8_t(rnd() % 256);
+            for (int y = -r; y <= r; ++y)
+                for (int x = -r; x <= r; ++x)
+                    if (x * x + y * y <= r * r)
+                        plot(cx + x, cy + y, cr, cg, cb);
+        }
+        break;
+    case BriefingView::Model:
+    case BriefingView::Ground:
+    case BriefingView::Relief:
+        // A dim red grid, as the model views have (and the map views when
+        // there's no map).
+        for (int y = 0; y < h; y += 24)
+            for (int x = 0; x < w; x += 4)
+                plot(x, y, 70, 14, 14);
+        for (int x = 0; x < w; x += 24)
+            for (int y = 0; y < h; y += 4)
+                plot(x, y, 70, 14, 14);
+        drawText(kPanelMargin, kPanelMargin, view == BriefingView::Model ? "(a model turning)" : mapNote_, kNoteColor);
+        break;
+    case BriefingView::Emblem: {
+        const char* name = side == 'K' ? "KLINGON EMPIRE" : side == 'R' ? "ROMULAN STAR EMPIRE" : "UNITED FEDERATION OF PLANETS";
+        const Color c = side == 'K' ? Color{200, 60, 40} : side == 'R' ? Color{60, 170, 90} : Color{90, 140, 230};
+        const int scale = 3, tw = int(font::length(name)) * font::kAdvance * scale;
+        font::drawText(screen_, (w - tw) / 2, h / 3, name, c, scale);
+        break;
+    }
+    }
 }
 
 bool MissionViewer::clipPlaying() const { return mixer_ && mixer_->isPlaying(clipHandle_); }

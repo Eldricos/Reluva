@@ -117,6 +117,12 @@ const char* sidePrefix(char side) {
 std::vector<char> missionSides(std::string_view shortName) {
     if (isJoint(shortName))
         return {'F', 'K', 'R'};
+    // The bonus missions: C9 the Federation's, C10 the Klingons', C11 the
+    // Romulans' (level.dat's titles say so).
+    if (sameName(shortName, "C10"))
+        return {'K'};
+    if (sameName(shortName, "C11"))
+        return {'R'};
     if (!shortName.empty() && (upper(shortName[0]) == 'K' || upper(shortName[0]) == 'R') &&
         !twoDigits(shortName).empty())
         return {upper(shortName[0])};

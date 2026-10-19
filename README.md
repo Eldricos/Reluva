@@ -53,7 +53,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   textures, maps, sounds, strings and fonts, **Left/Right** step through them and **F** cycles filters.
   Missions (level.dat's list) show their map with the briefing over it: **Up/Down** turn its
   pages, **B** hides it, **J** picks the side of a joint mission, **Space** plays the mission's
-  voice clip, **N/P** the next or previous one, **M** the planet's music; the map's keys work
+  voice clip, **N/P** the next or previous one, **M** the planet's music, **Enter** plays the
+  briefing step by step (**Enter** again skips a step, **Backspace** stops); the map's keys work
   too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**

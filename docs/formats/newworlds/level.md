@@ -143,6 +143,18 @@ and puts together what the short name ties to (`levels.h`:
   through the shared mixer, and the planet's music theme (**M**, looped,
   under the speech).
 
+**Enter** plays the briefing as the game does: a step at a time, each
+showing its page over its view and lasting as long as its voice clip (5 s
+without one). The steps are in `src/engines/newworlds/briefing.cpp`: the 16
+missions seen in recordings of play are scripted as they were shown
+([play.md](play.md)); the rest follow the rule those recordings showed
+(clips in number order over the table's heading pages, the first over the
+galaxy, the second over the star system, the rest over the map, leftover
+clips over the emblem), and the title says so. The map views use the
+mission's map (the relief grid drawn with the terrain colours); the galaxy,
+star system, model and emblem views are Reluva's own stand-ins, since the
+game's scenes for them aren't known from the data.
+
 There are no units, buildings or starting colonies to show: the maps don't
 hold them ([gmf.md](gmf.md)), and nothing found in the data files says
 where they start.

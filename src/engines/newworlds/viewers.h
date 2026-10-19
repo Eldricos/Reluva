@@ -8,6 +8,7 @@
 #include "common/audio/mixer.h"
 #include "common/audio/sound.h"
 #include "common/types.h"
+#include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/geo.h"
@@ -171,6 +172,12 @@ public:
     // Given the title this viewer would set, returns the one to set instead.
     void setTitleFilter(std::function<std::string(const std::string&)> filter) { titleFilter_ = std::move(filter); }
     void redraw() { dirty_ = true; }
+    // How the ground is coloured (0 textures, 1 terrain codes, 2 deposits).
+    int colouring() const { return colouring_; }
+    void setColouring(int colouring) {
+        colouring_ = colouring;
+        dirty_ = true;
+    }
 
 private:
     using Vec3 = GeoModel::Vec3;
@@ -361,6 +368,9 @@ private:
 //   B: briefing on/off   J: side (joint missions)
 //   Space: play/stop the voice clip   N/P: next/previous clip (and play it)
 //   M: the planet's music on/off   and the map viewer's keys
+//   Enter: play the briefing (its pages, views and clips in turn, as
+//   recordings of play showed them), or skip to its next step
+//   Backspace: stop the briefing
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -375,6 +385,7 @@ private:
     struct Page {
         std::string heading; // without the ~s; empty for the title page
         std::string text;
+        uint32_t id = 0; // the string's (the first one's, for plain strings run together)
     };
 
     void show(int index);
@@ -384,6 +395,13 @@ private:
     std::string title(const std::string& mapTitle) const;
     void updateTitle();
     void redraw();
+    // The briefing player: steps run one after another, each as long as its
+    // clip (a few seconds when it has none, or its clip is missing).
+    void startBriefing();
+    void stopBriefing();
+    void startStep(int step);
+    bool mapInView() const; // the map is drawn (not a briefing backdrop)
+    void drawBackdrop(BriefingView view);
     void playClip(int index);
     void stopClip();
     void startMusic(); // the shown map's planet theme, looped
@@ -412,6 +430,11 @@ private:
     std::string mapName_, mapNote_, mapTitle_, tableName_, status_, soundStatus_;
     std::vector<Page> pages_;
     std::vector<std::string> clips_; // stems, in order
+    StringTable table_;
+    std::vector<BriefingStep> script_;
+    bool running_ = false, stepOnMap_ = false;
+    int step_ = 0, savedColouring_ = 0;
+    uint64_t nowMs_ = 0, stepEndMs_ = 0; // stepEndMs_: when a step without a playing clip ends
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
     std::string musicName_;
 };

@@ -5,6 +5,7 @@
 // docs/formats/newworlds/cat.md, so no game data is needed.
 
 #include "engines/newworlds/arf.h"
+#include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
@@ -531,6 +532,50 @@ void testLevels() {
     CHECK(planetTheme("ICEWRLD.CAT") == "IceStart" && planetTheme("fedgui.cat").empty());
 }
 
+// A string table's bytes: u32 count, then u32 id and UTF-16LE text each.
+std::vector<uint8_t> makeTable(const std::vector<std::pair<uint32_t, std::string>>& strings) {
+    std::vector<uint8_t> b;
+    auto u32 = [&](uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            b.push_back(uint8_t(v >> (8 * i)));
+    };
+    u32(uint32_t(strings.size()));
+    for (const auto& [id, text] : strings) {
+        u32(id);
+        for (char c : text)
+            b.push_back(uint8_t(c)), b.push_back(0);
+        b.push_back(0), b.push_back(0);
+    }
+    return b;
+}
+
+void testBriefing() {
+    CHECK(clipBefore("K12009", "K12009A") && clipBefore("K12009A", "K12010") && !clipBefore("K12010", "K12009A"));
+    StringTable table;
+    CHECK(!table.parse(makeTable({{1, "'Test.'"},
+                                  {2, "~INCOMING TRANSMISSION~Test"},
+                                  {3, "~STELLAR CARTOGRAPHY~Systems"},
+                                  {4, "~PLANETARY DATA~A planet"},
+                                  {5, "~SPEECH~ "},
+                                  {6, "~OBJECTIVE~Do it"},
+                                  {7, "~MISSION PASS~Done"}})));
+    // No recording of R1: the general rule.
+    auto steps = briefingScript("R1", 'R', table, {"R1007", "R1005", "R1006", "R1008"});
+    CHECK(steps.size() == 4 && steps[0].clip == "R1005" && steps[0].page == 3 &&
+          steps[0].view == BriefingView::Galaxy);
+    CHECK(steps[1].page == 4 && steps[1].view == BriefingView::StarSystem);
+    CHECK(steps[2].clip == "R1007" && steps[2].page == 6 && steps[2].view == BriefingView::Ground);
+    CHECK(steps[3].clip == "R1008" && steps[3].page == 0 && steps[3].view == BriefingView::Emblem);
+    CHECK(!hasRecordedBriefing("R1", 'R') && hasRecordedBriefing("k12", 'K') && hasRecordedBriefing("J1", 'K'));
+    // A recorded one: K12's lettered clip as its own step; a joint mission's
+    // clips carry the side's letter; J8 opens with a silent step.
+    steps = briefingScript("K12", 'K', table, {});
+    CHECK(steps.size() == 10 && steps[5].clip == "K12009A" && steps[6].clip == "K12010");
+    steps = briefingScript("J8", 'K', table, {});
+    CHECK(steps[0].clip.empty() && steps[0].page == 7 && steps[1].clip == "J8K005");
+    CHECK(missionSides("C10") == std::vector<char>{'K'} && missionSides("C11") == std::vector<char>{'R'});
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -649,6 +694,7 @@ int main() {
     testArf();
     testFif();
     testLevels();
+    testBriefing();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);
