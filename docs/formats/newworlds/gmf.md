@@ -246,7 +246,9 @@ textures.
   confirmed: K1's mine position lies near no deposit either way
   ([play-k1.md](play-k1.md#positions)), and K2's two mines fit the stored
   orientation better ([play-k2.md](play-k2.md#positions)), J1's the flipped
-one and J2's neither: no consistent answer.
+one and J2's neither: no consistent answer. K7's two mines are 16-23
+blocks from any deposit either way, so the positions probably aren't 16
+per grid block at all (or mines don't need painted deposits).
 
 ## Not in the map
 
