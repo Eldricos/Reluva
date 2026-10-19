@@ -59,7 +59,7 @@ constexpr Site kJ3Colony{204, 172}, kJ4Colony{340, 180}, kK12Colony{84, 252}, kK
 // a step (a clip not heard), the step is a guess from its neighbours.
 const std::vector<Script>& recordedScripts() {
     static const std::vector<Script> scripts = {
-        {"F1", 'F', {{"005", 2, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 0, V::Ground, kF1Temple},
+        {"F1", 'F', {{"", 3, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 0, V::Ground, kF1Temple},
                      {"008", 0, V::Ground, kF1Colony}, {"009", 6, V::Ground, kF1Colony}, {"010", 7, V::Relief, kF1Temple},
                      {"011", 8, V::Model, {}, kTemple}, {"012", 9, V::Relief, kF1Colony}, {"013", 10, V::Ground, kF1Temple},
                      {"014", 11, V::Ground, kF1Temple}, {"015", 0, V::Emblem}}},

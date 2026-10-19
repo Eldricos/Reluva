@@ -49,6 +49,12 @@ So, for F1 at least:
 - The emblem screen is the briefing's end; the player waits there (about
   50 s in the recording) and starts with **MISSION**.
 
+A second recording of F1 (YouTube `hOa0Vd8gWOk`, with commentary), checked
+against all of `Media/FedVO`, finds nine of the ten clips at these steps
+(`F1006` hidden under commentary, its gap the right length) and shows one
+step this recording skipped: the INCOMING TRANSMISSION page (string 3) over
+the Federation emblem, silent, before `F1005`.
+
 ## In play
 
 - **Interface** (640×480 scaled up): a **NEW WORLDS** panel at top right
