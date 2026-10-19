@@ -42,7 +42,8 @@ recording of K1 ([play-k1.md](play-k1.md)) all nine of its clips were found,
 each starting with its page, and likewise in K2, J1 and J2
 ([play-k2.md](play-k2.md), [play-j1k.md](play-j1k.md),
 [play-j2k.md](play-j2k.md)). **One clip per briefing step, in number
-order, STELLAR CARTOGRAPHY and PLANETARY DATA first.** Which page each
+order**, usually opening with STELLAR CARTOGRAPHY and PLANETARY DATA (J3
+opens with its INCOMING TRANSMISSION page, [play-j3k.md](play-j3k.md)). Which page each
 step shows is the mission's own: usually the table's heading pages in
 order without the transmission ones, but J2 shows its pages out of the
 table's order, leaves some out and plays four clips over views with no
