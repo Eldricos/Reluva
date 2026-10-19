@@ -49,7 +49,8 @@ order without the transmission ones, but J2 shows its pages out of the
 table's order, leaves some out and plays four clips over views with no
 page, so the briefing is scripted per mission like the rest of it. In K7
 ([play-k7.md](play-k7.md)) six of the nine clips play over the emblem
-screen with no page at all.
+screen with no page at all. A lettered clip (`K12009A`) is an extra step
+between its number and the next ([play-k12.md](play-k12.md)).
 
 **Format:** MPEG-2 Layer III, 64 kbit/s, 22,050 Hz, mono, with an ID3v2
 tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).

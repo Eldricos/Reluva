@@ -59,7 +59,7 @@ row first**: the first number divided by 8 is the grid row (as the file
 stores rows), the second divided by 8 the column; so they run 0-511 on a
 64 × 64 block map. Found from the mines reported exhausted in nine
 recorded missions (F1, K1, K2, J1, J2, J3, J4, K7; see the play-*.md
-pages): read this way all 15 lie on or beside a deposit block (14 on one,
+pages): read this way all 15 lie on or beside a deposit block (all but one on one,
 mean distance 0.1 blocks, against about 10 for random points), and every
 mine position is 8n + 4, a block's centre. Read as 16 per block, or column
 first, they fall nowhere near deposits. Which compass direction row 0 faces
