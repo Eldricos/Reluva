@@ -133,7 +133,8 @@ and puts together what the short name ties to (`levels.h`:
 - the map, drawn as on the maps page (with its keys); mission 14 shows its
   side's mission 12 map. Test, E1-E3 and the C missions have no map in the
   planet archives. (The C missions' table is `cvr03`, and `alpwrld` holds
-  `coverd1`-`3`, so those may be theirs; not assumed.)
+  `coverd1`-`3`, so those may be theirs; not assumed. A recording of the
+  bonus mission C10 is most likely on `f2`'s map, [play-c10.md](play-c10.md).)
 - the briefing, a page at a time in the game's `fe8pt` font: the table's
   `~HEADING~` strings, each a page, and the plain strings between them run
   together (the title and stardate first; the in-game objectives and fail
