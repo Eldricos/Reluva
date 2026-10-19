@@ -22,6 +22,9 @@ repository). One page per mission:
 | [play-k14.md](play-k14.md) | K14 The Finest Hour | Klingon (13th) |
 | [play-j9k.md](play-j9k.md) | J9 The Lost Tribes | Klingon (14th) |
 | [play-c10.md](play-c10.md) | C10 The Archer of Heaven (bonus) | Klingon |
+| [play-f2.md](play-f2.md) | F2 A Harsh Lesson | Federation (2nd) |
+| [play-f3.md](play-f3.md) | F3 A Piece of Paper | Federation (3rd) |
+| [play-j1f.md](play-j1f.md) | J1 Into the Arena | Federation (4th) |
 
 ## What they established
 
