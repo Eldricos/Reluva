@@ -39,9 +39,12 @@ with the first page (STELLAR CARTOGRAPHY, string 2), `F1012` with the
 mining advisory (9), `F1013` with the next (10) and `F1015` on the closing
 emblem screen; the other clips' lengths fit the steps between. In a
 recording of K1 ([play-k1.md](play-k1.md)) all nine of its clips were found,
-each starting with its page: **a clip's number is its page's string id + 3**
-(`K1005` with string 2 … `K1013` with string 10), the pages playing in the
-table's order.
+each starting with its page, and in K2 ([play-k2.md](play-k2.md)) all
+eight. **One clip per briefing step, in number order, from STELLAR
+CARTOGRAPHY on**: the steps are the table's heading pages in order, without
+the transmission pages (INCOMING TRANSMISSION, RECEIVING), and in F1 and
+K2 a last clip plays on the emblem screen. (K1's clips are its pages' ids
++ 3 and K2's ids + 1, only because their tables differ.)
 
 **Format:** MPEG-2 Layer III, 64 kbit/s, 22,050 Hz, mono, with an ID3v2
 tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).
@@ -104,5 +107,5 @@ MP3s decode to within 1 of ffmpeg's samples.
 
 ## Open questions
 
-- Whether every mission's clips follow the id + 3 rule (checked on K1 fully, F1 in part).
+- Whether every mission follows the one-clip-per-step pattern (checked on K1 and K2 fully, F1 in part).
 - Which of the eight lines per side is what.

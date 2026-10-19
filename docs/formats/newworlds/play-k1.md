@@ -32,8 +32,10 @@ under a purple sky.
 | `K1012` (15.0 s) | 2:57 | ADDITIONAL (9) |
 | `K1013` (4.0 s) | 3:12 | ADDITIONAL (10), over the Klingon emblem |
 
-**Every clip goes with the page whose string id is the clip's number minus
-3**, without exception here: the pages are the table's strings 2-10 in
+Here every clip goes with the page whose string id is the clip's number
+minus 3. That's particular to K1's table, not a rule: K2's clips are id + 1,
+its table having two transmission pages first ([play-k2.md](play-k2.md)).
+In K1: the pages are the table's strings 2-10 in
 order, one clip each. Strings 11 (a last ADDITIONAL page) and 12 (INCOMING
 TRANSMISSION) have no clip and weren't shown. The player then starts from
 the emblem screen (3:20).
