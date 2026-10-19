@@ -30,13 +30,16 @@ reuses 12's map.
 to brief you in person but the…"; `F1012` (6 s) "This mineral field should
 supply complete resources…"; `F1013` (11 s) "While the Taubat government
 is desperate to involve the Federation…"; `F1015` (10 s) "The situation
-couldn't be much worse, you'll be caught between the greed…". String 12 of
-`fed01.stb` is the mission-pass page and 13 the fail page, so the numbers
-aren't string ids, though every file's number happens to be one: they're
-the mission's speech clips in order, from 005 (the opening briefing),
-played at points the mission's script decides (which isn't in the data
-files; presumably `STNW.exe`). That's why their sizes don't follow the
-strings' lengths.
+couldn't be much worse, you'll be caught between the greed…".
+
+**They're the briefing's narration, in number order.** In a recording of
+F1 being played ([play-f1.md](play-f1.md)) the briefing steps through the
+mission table's pages, each lasting as long as its clip: `F1005` starts
+with the first page (STELLAR CARTOGRAPHY, string 2), `F1012` with the
+mining advisory (9), `F1013` with the next (10) and `F1015` on the closing
+emblem screen; the other clips' lengths fit the steps between. For the
+pages shown, the clip number is the page's string id + 3. Whether the other
+missions follow the same pattern isn't checked.
 
 **Format:** MPEG-2 Layer III, 64 kbit/s, 22,050 Hz, mono, with an ID3v2
 tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).
@@ -99,5 +102,5 @@ MP3s decode to within 1 of ffmpeg's samples.
 
 ## Open questions
 
-- When each mission's speeches play (the scripts aren't in the data).
+- Whether every mission's clips go with its pages as F1's do (id + 3).
 - Which of the eight lines per side is what.

@@ -114,8 +114,9 @@ known; they may be the sides' player numbers in the missions.
 ## Not here
 
 level.dat names missions but says nothing about how they're set up: the
-planet, starting colonies, units, objectives' triggers and the voice-over
-slots are elsewhere (presumably `STNW.exe`).
+planet, starting colonies, units and objectives' triggers are elsewhere
+(presumably `STNW.exe`). How the briefing plays its pages and voice clips
+was seen in a recording of F1: [play-f1.md](play-f1.md).
 
 ## In Reluva
 

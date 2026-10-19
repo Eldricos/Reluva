@@ -55,9 +55,12 @@ at 1380). `kurt64`'s grid is a field of block 1 with scattered variants
 
 Bits 12-15 of a grid cell's second value mark a resource deposit, kinds 1
 to 6, and the third value's bits 12-15 always repeat it (every `icewrld`
-map). The game has six raw resources (dilithium, talgonite, silicon,
-kelbonite, magnesite, dolamide), so these are probably they; which kind is
-which isn't known. The deposits are hand-painted patches: `j1` (a
+map). The briefings name raw minerals (dilithium, silicon, magnesite,
+kelbonite, …: "rich in dilithium, magnesite & kelbonite"), and in play the
+colony counts six materials, Dilithium, Polycomp, Thermoconc, Transalumin,
+Nitrium and Duranium (seen in a recording, [play-f1.md](play-f1.md)), so
+the six kinds are probably the six materials' sources; which kind is which
+isn't known. The deposits are hand-painted patches: `j1` (a
 multiplayer arena) is covered in large ones of every kind, `f1` (the first
 Federation mission) has one cluster of all six plus two small patches, `r12`
 only kind 1, `k12` kinds 1-3, and `kurt64` none.
