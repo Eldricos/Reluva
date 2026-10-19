@@ -573,6 +573,9 @@ void testBriefing() {
     CHECK(steps.size() == 10 && steps[5].clip == "K12009A" && steps[6].clip == "K12010");
     steps = briefingScript("J8", 'K', table, {});
     CHECK(steps[0].clip.empty() && steps[0].page == 7 && steps[1].clip == "J8K005");
+    steps = briefingScript("F1", 'F', table, {});
+    CHECK(steps[4].clip == "F1009" && steps[4].siteA == 407 && steps[4].siteB == 209); // the colony site
+    CHECK(steps[0].siteA == -1 && steps[6].view == BriefingView::Model);
     CHECK(missionSides("C10") == std::vector<char>{'K'} && missionSides("C11") == std::vector<char>{'R'});
 }
 

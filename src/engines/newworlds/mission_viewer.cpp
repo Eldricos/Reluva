@@ -22,6 +22,7 @@ constexpr Color kTextColor{230, 230, 230};
 constexpr Color kNoteColor{150, 160, 190};
 constexpr int kPanelMargin = 12; // round the panel, and inside it
 constexpr int kMusicVolume = 160; // under the speech
+constexpr float kBriefingTurn = 0.05f / 1000; // radians per millisecond (about 3 degrees a second)
 
 std::string upperCase(std::string s) {
     for (char& c : s)
@@ -254,6 +255,11 @@ void MissionViewer::update(uint64_t nowMs) {
     // The briefing moves on when its step's clip ends, or its time is up.
     if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying()))
         startStep(step_ + 1);
+    // The briefing's map views turn slowly about their target.
+    if (running_ && stepOnMap_ && nowMs - lastTurnMs_ >= 100) {
+        map_.turn(float(nowMs - lastTurnMs_) * kBriefingTurn);
+        lastTurnMs_ = nowMs;
+    }
     if (mapInView())
         map_.update(nowMs);
     else if (dirty_) {
@@ -449,6 +455,7 @@ void MissionViewer::stopBriefing() {
     running_ = false;
     stopClip();
     map_.setColouring(savedColouring_);
+    map_.resetCamera();
     redraw();
     updateTitle();
 }
@@ -462,8 +469,11 @@ void MissionViewer::startStep(int step) {
     step_ = step;
     const BriefingStep& s = script_[size_t(step)];
     stepOnMap_ = hasMap_ && (s.view == BriefingView::Ground || s.view == BriefingView::Relief);
-    if (stepOnMap_)
+    if (stepOnMap_) {
         map_.setColouring(s.view == BriefingView::Relief ? 1 : 0);
+        map_.lookAt(s.siteA, s.siteB, s.view == BriefingView::Ground);
+        lastTurnMs_ = nowMs_;
+    }
     // Its clip, if the game folder has it; else the step is shown a while.
     stepEndMs_ = nowMs_ + 5000;
     const auto it = std::find(clips_.begin(), clips_.end(), s.clip);

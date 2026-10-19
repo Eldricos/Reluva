@@ -151,7 +151,14 @@ missions seen in recordings of play are scripted as they were shown
 (clips in number order over the table's heading pages, the first over the
 galaxy, the second over the star system, the rest over the map, leftover
 clips over the emblem), and the title says so. The map views use the
-mission's map (the relief grid drawn with the terrain colours); the galaxy,
+mission's map (the relief grid drawn with the terrain colours), turning
+slowly about the place the step is about: the colony or a site a message
+in the recording located (its temple, an allied base, an alien structure),
+close to the ground or from high above, else the whole map. The
+recordings' own camera positions can't be read (the position readout over
+the briefing follows the mouse pointer, and the ground views show only a
+compass), and the colonies' positions are taken from the mines they
+reported exhausted early, so the places are approximate; the galaxy,
 star system, model and emblem views are Reluva's own stand-ins, since the
 game's scenes for them aren't known from the data.
 

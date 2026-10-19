@@ -12,10 +12,15 @@ namespace {
 
 using V = BriefingView;
 
+struct Site {
+    int a = -1, b = -1; // a map position (eighths of a block, row first); -1 the whole map
+};
+
 struct Step {
     const char* clip; // the clip's number after the mission (and side) prefix; "" for none
     uint32_t page;
     V view;
+    Site site = {};
 };
 
 struct Script {
@@ -24,33 +29,48 @@ struct Script {
     std::vector<Step> steps;
 };
 
+// Places the recordings' messages give positions for (map positions,
+// eighths of a block, row first). The recordings' map views can't be
+// placed exactly (their position readout follows the mouse), so each map
+// step looks at the place its page or view is about: the colony (taken
+// from the mines it reported exhausted early, which lie beside it), or a
+// site a message named. Steps about places no message located, and the
+// turning overviews, show the whole map.
+constexpr Site kF1Colony{407, 209}, kF1Temple{332, 152};        // the start's readout; the energy source
+constexpr Site kK1Colony{244, 92}, kK1Temple{372, 107};         // mine; the Taubat temple
+constexpr Site kK2Colony{300, 284}, kK2Ally{279, 26};           // between the two mines; the allied base
+constexpr Site kJ1Colony{52, 148}, kJ2Colony{92, 404}, kJ2Alien{112, 260};
+constexpr Site kJ3Colony{204, 172}, kJ4Colony{340, 180}, kK12Colony{84, 252}, kK14Colony{100, 292};
+
 // The briefings as recorded play showed them (docs/formats/newworlds/play-*.md):
 // which page and view went with each clip. Where the recording didn't show
 // a step (a clip not heard), the step is a guess from its neighbours.
 const std::vector<Script>& recordedScripts() {
     static const std::vector<Script> scripts = {
-        {"F1", 'F', {{"005", 2, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 0, V::Ground}, {"008", 0, V::Ground},
-                     {"009", 6, V::Ground}, {"010", 7, V::Relief}, {"011", 8, V::Model}, {"012", 9, V::Relief},
-                     {"013", 10, V::Ground}, {"014", 11, V::Ground}, {"015", 0, V::Emblem}}},
-        {"K1", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Relief}, {"008", 5, V::Relief},
-                     {"009", 6, V::Ground}, {"010", 7, V::Ground}, {"011", 8, V::Ground}, {"012", 9, V::Ground},
+        {"F1", 'F', {{"005", 2, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 0, V::Ground, kF1Temple},
+                     {"008", 0, V::Ground, kF1Colony}, {"009", 6, V::Ground, kF1Colony}, {"010", 7, V::Relief, kF1Temple},
+                     {"011", 8, V::Model}, {"012", 9, V::Relief, kF1Colony}, {"013", 10, V::Ground, kF1Temple},
+                     {"014", 11, V::Ground, kF1Temple}, {"015", 0, V::Emblem}}},
+        {"K1", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Relief}, {"008", 5, V::Relief, kK1Colony},
+                     {"009", 6, V::Ground, kK1Colony}, {"010", 7, V::Ground, kK1Temple}, {"011", 8, V::Ground, kK1Colony},
+                     {"012", 9, V::Ground, kK1Temple},
                      {"013", 10, V::Emblem}}},
-        {"K2", 'K', {{"005", 4, V::Galaxy}, {"006", 5, V::StarSystem}, {"007", 6, V::Ground}, {"008", 7, V::Model},
-                     {"009", 8, V::Relief}, {"010", 9, V::Ground}, {"011", 10, V::Ground}, {"012", 0, V::Emblem}}},
+        {"K2", 'K', {{"005", 4, V::Galaxy}, {"006", 5, V::StarSystem}, {"007", 6, V::Ground, kK2Colony}, {"008", 7, V::Model},
+                     {"009", 8, V::Relief}, {"010", 9, V::Ground, kK2Ally}, {"011", 10, V::Ground, kK2Colony}, {"012", 0, V::Emblem}}},
         {"J1", 'K', {{"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Relief}, {"008", 6, V::Model},
-                     {"009", 7, V::Relief}, {"010", 8, V::Ground}, {"011", 9, V::Ground}, {"012", 10, V::Relief},
+                     {"009", 7, V::Relief}, {"010", 8, V::Ground, kJ1Colony}, {"011", 9, V::Ground}, {"012", 10, V::Relief},
                      {"013", 11, V::Relief}, {"014", 12, V::Emblem}}},
-        {"J2", 'K', {{"005", 7, V::Galaxy}, {"006", 8, V::StarSystem}, {"007", 5, V::Ground}, {"008", 0, V::Relief},
-                     {"009", 0, V::Ground}, {"010", 0, V::Emblem}, {"011", 0, V::Emblem}}},
+        {"J2", 'K', {{"005", 7, V::Galaxy}, {"006", 8, V::StarSystem}, {"007", 5, V::Ground, kJ2Colony}, {"008", 0, V::Relief, kJ2Alien},
+                     {"009", 0, V::Ground, kJ2Colony}, {"010", 0, V::Emblem}, {"011", 0, V::Emblem}}},
         {"J3", 'K', {{"005", 10, V::Galaxy}, {"006", 9, V::Galaxy}, {"007", 3, V::StarSystem}, {"008", 0, V::Model},
                      {"009", 0, V::Model}, {"010", 5, V::Ground}, {"011", 5, V::Ground}, {"012", 0, V::Relief},
-                     {"013", 6, V::Ground}, {"014", 7, V::Emblem}}},
+                     {"013", 6, V::Ground, kJ3Colony}, {"014", 7, V::Emblem}}},
         {"K7", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground}, {"008", 0, V::Emblem},
                      {"009", 0, V::Emblem}, {"010", 0, V::Emblem}, {"011", 0, V::Emblem}, {"012", 0, V::Emblem},
                      {"013", 0, V::Emblem}}},
-        {"J4", 'K', {{"005", 5, V::Galaxy}, {"006", 6, V::StarSystem}, {"007", 0, V::Model}, {"008", 0, V::Relief},
-                     {"009", 0, V::Ground}, {"010", 7, V::Ground}, {"011", 8, V::Ground}, {"012", 9, V::Ground},
-                     {"013", 10, V::Ground}, {"014", 11, V::Ground}, {"015", 12, V::Emblem}}},
+        {"J4", 'K', {{"005", 5, V::Galaxy}, {"006", 6, V::StarSystem}, {"007", 0, V::Model}, {"008", 0, V::Relief, kJ4Colony},
+                     {"009", 0, V::Ground, kJ4Colony}, {"010", 7, V::Ground, kJ4Colony}, {"011", 8, V::Ground, kJ4Colony},
+                     {"012", 9, V::Ground, kJ4Colony}, {"013", 10, V::Ground, kJ4Colony}, {"014", 11, V::Ground}, {"015", 12, V::Emblem}}},
         // 006-009 weren't heard in the recording (skipped); guessed.
         {"K8", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 0, V::StarSystem},
                      {"008", 0, V::StarSystem}, {"009", 0, V::StarSystem}, {"010", 4, V::Ground},
@@ -62,14 +82,15 @@ const std::vector<Script>& recordedScripts() {
         {"J7", 'K', {{"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground}, {"008", 6, V::Model},
                      {"009", 0, V::Emblem}, {"010", 0, V::Emblem}, {"011", 0, V::Emblem}, {"012", 0, V::Emblem},
                      {"013", 0, V::Emblem}, {"014", 0, V::Emblem}}},
-        {"K12", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::Galaxy}, {"007", 4, V::StarSystem}, {"008", 5, V::Ground},
-                      {"009", 6, V::Model}, {"009A", 0, V::Ground}, {"010", 0, V::Ground}, {"011", 0, V::Relief},
+        {"K12", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::Galaxy}, {"007", 4, V::StarSystem}, {"008", 5, V::Ground, kK12Colony},
+                      {"009", 6, V::Model}, {"009A", 0, V::Ground}, {"010", 0, V::Ground, kK12Colony},
+                      {"011", 0, V::Relief, kK12Colony},
                       {"012", 0, V::Emblem}, {"013", 0, V::Emblem}}},
         {"J8", 'K', {{"", 7, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Model},
                      {"008", 6, V::Ground}, {"009", 0, V::Model}, {"010", 0, V::Ground}, {"011", 0, V::Ground}}},
         // 007 and 009 weren't heard (commentary); their pages are guessed.
         {"K14", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground}, {"008", 5, V::Model},
-                      {"009", 6, V::Ground}, {"010", 0, V::Relief}, {"011", 0, V::Emblem}}},
+                      {"009", 6, V::Ground}, {"010", 0, V::Relief, kK14Colony}, {"011", 0, V::Emblem}}},
         {"J9", 'K', {{"005", 3, V::Galaxy}, {"006", 4, V::Relief}, {"007", 5, V::Relief}, {"008", 6, V::Relief},
                      {"009", 0, V::Relief}}},
         {"C10", 'K', {{"", 74, V::Emblem}}},
@@ -142,7 +163,7 @@ std::vector<BriefingStep> briefingScript(std::string_view shortName, char side, 
         c = char(std::toupper(static_cast<unsigned char>(c)));
     if (const Script* s = findScript(shortName, side)) {
         for (const Step& st : s->steps)
-            out.push_back({*st.clip ? prefix + st.clip : std::string(), st.page, st.view});
+            out.push_back({*st.clip ? prefix + st.clip : std::string(), st.page, st.view, st.site.a, st.site.b});
         return out;
     }
     std::vector<std::string> sorted = clips;

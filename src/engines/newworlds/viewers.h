@@ -174,6 +174,16 @@ public:
     void redraw() { dirty_ = true; }
     // How the ground is coloured (0 textures, 1 terrain codes, 2 deposits).
     int colouring() const { return colouring_; }
+    // Points the camera at a map position as the game gives them (eighths
+    // of a block, row first; see docs/formats/newworlds/gmf.md), close and
+    // low for a ground view or high above for an overview; a < 0 for the
+    // whole map. turn() turns it about its target.
+    void lookAt(int a, int b, bool ground);
+    void turn(float radians) {
+        yaw_ += radians;
+        dirty_ = true;
+    }
+    void resetCamera() { resetView(); }
     void setColouring(int colouring) {
         colouring_ = colouring;
         dirty_ = true;
@@ -434,7 +444,7 @@ private:
     std::vector<BriefingStep> script_;
     bool running_ = false, stepOnMap_ = false;
     int step_ = 0, savedColouring_ = 0;
-    uint64_t nowMs_ = 0, stepEndMs_ = 0; // stepEndMs_: when a step without a playing clip ends
+    uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
     std::string musicName_;
 };

@@ -109,6 +109,18 @@ bool MapViewer::showMap(std::string_view name) {
     return false;
 }
 
+void MapViewer::lookAt(int a, int b, bool ground) {
+    resetView();
+    if (a >= 0 && b >= 0) {
+        // Row first: the second number is the column, along x.
+        targetX_ = float(b) / 8 * kBlockSize;
+        targetY_ = float(a) / 8 * kBlockSize;
+        distance_ = (ground ? 3.0f : 16.0f) * kBlockSize;
+    }
+    pitch_ = (ground ? 22.0f : 60.0f) * kPi / 180.0f;
+    dirty_ = true;
+}
+
 std::string MapViewer::mapArchive() const {
     return maps_.empty() ? std::string() : archives_[maps_[size_t(current_)].archive]->path().filename().string();
 }
