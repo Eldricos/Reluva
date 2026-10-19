@@ -37,9 +37,11 @@ F1 being played ([play-f1.md](play-f1.md)) the briefing steps through the
 mission table's pages, each lasting as long as its clip: `F1005` starts
 with the first page (STELLAR CARTOGRAPHY, string 2), `F1012` with the
 mining advisory (9), `F1013` with the next (10) and `F1015` on the closing
-emblem screen; the other clips' lengths fit the steps between. For the
-pages shown, the clip number is the page's string id + 3. Whether the other
-missions follow the same pattern isn't checked.
+emblem screen; the other clips' lengths fit the steps between. In a
+recording of K1 ([play-k1.md](play-k1.md)) all nine of its clips were found,
+each starting with its page: **a clip's number is its page's string id + 3**
+(`K1005` with string 2 … `K1013` with string 10), the pages playing in the
+table's order.
 
 **Format:** MPEG-2 Layer III, 64 kbit/s, 22,050 Hz, mono, with an ID3v2
 tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).
@@ -102,5 +104,5 @@ MP3s decode to within 1 of ffmpeg's samples.
 
 ## Open questions
 
-- Whether every mission's clips go with its pages as F1's do (id + 3).
+- Whether every mission's clips follow the id + 3 rule (checked on K1 fully, F1 in part).
 - Which of the eight lines per side is what.

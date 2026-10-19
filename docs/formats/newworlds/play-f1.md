@@ -64,9 +64,8 @@ So, for F1 at least:
   500`, `POLYCOMP = 988`, `THERMOCONC = 2211`, `TRANSALUMIN = 495`,
   `NITRIUM = 3950`, `DURANIUM = 5000` (the start, or nearly), then `JUMP TO`
   and building icons.
-- **First message:** "INTELLIGENCE: Command advises caution: a Klingon
-  colony has been established to the south." A Klingon ground scout attacks
-  within the first minute (4:50).
+- **First message:** from Intelligence, warning of a Klingon colony to the
+  south. A Klingon ground scout attacks within the first minute (4:50).
 - **Tricorder coordinates** run to at least 407 and 209 on a 64 × 64 block
   map: presumably the 16 × 16 squares per block of the placed-object grid
   (1024 × 1024), see [gmf.md](gmf.md).
@@ -118,59 +117,61 @@ The COMMAND panel lists the mission's title and stardate (`fed01.stb` 1 and
 INCOMPLETE" or "- COMPLETE": at 13:28, strings 16-18, all incomplete; at
 21:04, 16 complete; by 29:27, 16-18 complete and **a fourth added**, 19
 ("Capture the Taubat temple."), incomplete. So objective 19 only appears
-once the engineering scan is done. All four complete at 31:19 ("All
-objectives complete. Well done."), and the mission report follows.
+once the engineering scan is done. All four complete at 31:19 (Command's
+last message), and the mission report follows.
 
 ### Messages
 
 Each has a sender (the section, with its officer's portrait), the text and
 the counter. Long ones end in `<MORE>` and continue in the next message.
+The game's wording isn't copied here: the table gives each message's gist,
+which is what an implementation needs (its own text can say the same).
 
-| Time | # | From | Message |
+| Time | # | From | What it says (paraphrased) |
 |---|---|---|---|
-| 4:12 | 1 | Intelligence | Command advises caution: a Klingon colony has been established to the south. |
-| 5:03 | 2 | Engineering | Construction yard complete |
-| 5:24 | 3 | Intelligence | Sir, incoming vehicle detected. It's Klingon... and it's targeting the colony! |
-| 5:49 | 4 | Engineering | Power generator complete, sir. |
-| 7:22 | 7 | Engineering | Vehicle yard complete |
-| 11:21 | 8 | Science | Scanners running now, sir. |
-| 11:49 | 9 | Science | Scan complete, but the results are ambiguous - I'd like a second opinion. |
-| 13:12 | 10 | Science (another officer) | Scanners running: using low-pass filters to improve the signal. |
-| 13:20 | 11 | Science | Scan complete: this appears to be a crude mining facility, but radiation levels are unusually high. |
-| 15:26 | 12 | Security | Reading disruptor discharges. It would seem the Klingons are attempting to take this world. |
-| 17:41 | 13 | Operations | Construction delayed: insufficient resources. Build mines to collect raw materials and build a resource processor to refine the minerals into resources. |
-| 18:13 | 15 | Operations | Vehicle manufacture delayed! Insufficient crew. Assign crew to this building. Build accommodations and a transporter pad to beam more crew down. |
-| 20:54 | 17 | Engineering | Accommodation block complete, sir. |
-| 21:00 | 18 | Command | Colony expansion complete. (objective 16) |
-| 25:20 | 19 | Medical | We have found the plague epicenter. Suggest running a medical scan on the central structures. |
-| 25:36 | 20 | Medical | Full diagnostics show nothing of interest here, sir. |
-| 25:50 | 21 | Medical (another officer) | Running a full diagnostic scan now. |
-| 25:52 | 22 | Medical | Scan lost: we'll need to try again if you want that diagnosis. |
-| 26:02 | 25 | Medical | Diagnostic scan complete: we know so little about Taubat biology that it's hard to be sure, but this looks like radiation sickness to me. <MORE> |
-| 26:00 | 26 | Medical | I'd like some research done on this back at the colony: the sickbay staff should be able to handle it. |
-| 26:51 | 27 | Medical | Research confirms the doc's hunch: the plague is a form of radiation sickness, aggravated by mutated forms of common Taubat pathogens. <MORE> |
-| 26:59 | 28 | Medical | Only an artifical radiation source could account for this level of contamination. We've got to find that source and shut it down while there's still time. |
-| 27:10 | 29 | Command | Medical research complete. (objective 17) |
-| 27:27 | 30 | Medical | The Taubat are dying: let's find the source of that radiation now. |
-| 28:19 | 31 | Engineering | Scanners show a strong energy source west of the Taubat colony, position <332:152>. Suggest we investigate. |
-| 28:41 | 32 | Engineering (another officer) | Running a full systems scan now. |
-| 29:06 | 33 | Engineering | Systems scan complete: it's a pretty sophisticated reactor, but the Taubat haven't been maintaining it properly. <MORE> |
-| 29:14 | 34 | Engineering | The primary containment field is out of alignment and leaking badly. It's a simple fix, but we'll need to get in there fast. |
-| 29:34 | 35 | Command | Engineering scan of temple complete. (objective 18; objective 19 appears) |
-| 29:38 | 36 | Security | We must be careful not to provoke the Taubat. A single APC should be used to take the temple. |
-| 29:42 | 37 | Intelligence | Sir, the Taubat are demanding that we leave this area. We have 5 minutes to withdraw. |
-| 30:14 | 38 | Engineering | Mining operation at 404, 220 reports mineral exhaustion. |
-| 31:03 | 39 | Engineering | Away team inside, sir. We'll start on the field realignment immediately. |
-| 31:11 | 40 | Engineering | The containment field is realigned, and radiation levels are falling off. Looks like we were just in time, sir. |
-| 31:19 | 41 | Command | All objectives complete. Well done. |
+| 4:12 | 1 | Intelligence | warns that a Klingon colony lies to the south |
+| 5:03 | 2 | Engineering | construction yard finished |
+| 5:24 | 3 | Intelligence | a Klingon vehicle is approaching the colony |
+| 5:49 | 4 | Engineering | power generator finished |
+| 7:22 | 7 | Engineering | vehicle yard finished |
+| 11:21 | 8 | Science | scan started |
+| 11:49 | 9 | Science | scan finished, results unclear, wants another try |
+| 13:12 | 10 | Science (another officer) | second scan started |
+| 13:20 | 11 | Science | second scan finished: a primitive mine with high radiation |
+| 15:26 | 12 | Security | weapons fire detected; the Klingons want this planet |
+| 17:41 | 13 | Operations | building held up by a lack of resources; tells the player to build mines and a resource processor |
+| 18:13 | 15 | Operations | vehicle production held up by a lack of crew; tells the player to assign crew, build accommodation and a transporter pad |
+| 20:54 | 17 | Engineering | accommodation block finished |
+| 21:00 | 18 | Command | colony objective met (objective 16) |
+| 25:20 | 19 | Medical | the epidemic's centre is found; suggests a medical scan of the central buildings |
+| 25:36 | 20 | Medical | scan of the wrong place: nothing found |
+| 25:50 | 21 | Medical (another officer) | medical scan started |
+| 25:52 | 22 | Medical | scan interrupted; needs repeating |
+| 26:02 | 25 | Medical | scan finished: probably radiation sickness (continued in the next message) |
+| 26:00 | 26 | Medical | asks for research at the colony's sickbay |
+| 26:51 | 27 | Medical | research confirms radiation sickness plus local infections (continued) |
+| 26:59 | 28 | Medical | the radiation must come from an artificial source, which has to be found and shut off |
+| 27:10 | 29 | Command | medical objective met (objective 17) |
+| 27:27 | 30 | Medical | urges finding the radiation source |
+| 28:19 | 31 | Engineering | an energy source west of the Taubat colony, at <332:152> |
+| 28:41 | 32 | Engineering (another officer) | systems scan started |
+| 29:06 | 33 | Engineering | scan finished: a neglected reactor (continued) |
+| 29:14 | 34 | Engineering | its containment field is misaligned and leaking; can be fixed from inside |
+| 29:34 | 35 | Command | engineering objective met (objective 18; objective 19 appears) |
+| 29:38 | 36 | Security | advises taking the temple with one APC so as not to provoke the Taubat |
+| 29:42 | 37 | Intelligence | the Taubat give the colony 5 minutes to leave the area |
+| 30:14 | 38 | Engineering | the mine at 404, 220 has run out of minerals |
+| 31:03 | 39 | Engineering | the away team is inside the temple and starting the repair |
+| 31:11 | 40 | Engineering | repair done; radiation falling |
+| 31:19 | 41 | Command | all objectives met |
 
 (The player browses back and forth through the messages at 25:39-27:24, so
 some counters there read like "19/20", "28/30".) Messages 5-6, 14, 16, 23
 and 24 arrived while the panel wasn't showing.
 
 So the mission's script reacts to: the start (1), buildings finishing
-(generic "<building> complete" messages from Engineering; `fed01.stb`'s own
-"Vehicle yard completed, Sir." isn't the one shown), an enemy unit
+(a generic "<building> finished" message from Engineering, not
+`fed01.stb`'s own string 14), an enemy unit
 approaching (3), combat (12), shortages (13, 15), the scans (a science
 vehicle with a doctor or engineer, each scan a "running" message and then
 its result, a scan of the wrong place giving "nothing of interest", a scan
