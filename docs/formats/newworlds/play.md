@@ -28,6 +28,9 @@ repository). One page per mission:
 | [play-j3f.md](play-j3f.md) | J3 The Mask Slips | Federation (6th) |
 | [play-j4f.md](play-j4f.md) | J4 Cry Havoc | Federation (7th) |
 | [play-f8.md](play-f8.md) | F8 All That Glisters | Federation (8th) |
+| [play-j6f.md](play-j6f.md) | J6 Keep Your Friends Close | Federation (9th) |
+| [play-j7f.md](play-j7f.md) | J7 The Jaws of Death | Federation (10th) |
+| [play-f12.md](play-f12.md) | F12 Death Rattle | Federation (11th) |
 
 ## What they established
 

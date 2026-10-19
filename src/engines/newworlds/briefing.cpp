@@ -87,6 +87,17 @@ const std::vector<Script>& recordedScripts() {
         {"F8", 'F', {{"", 10, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground},
                      {"008", 5, V::Model, {}, kMetarDevice}, {"009", 6, V::Relief}, {"010", 0, V::Emblem},
                      {"011", 0, V::Emblem}, {"012", 0, V::Emblem}, {"013", 0, V::Emblem}, {"014", 0, V::Emblem}}},
+        {"J6", 'F', {{"", 8, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground},
+                     {"008", 6, V::Relief}, {"009", 7, V::Model, {}, kMetarDevice}, {"010", 0, V::Emblem},
+                     {"011", 0, V::Emblem}, {"012", 0, V::Emblem}, {"013", 0, V::Emblem}, {"014", 0, V::Emblem}}},
+        // 005, 006, 009, 014 weren't heard (commentary).
+        {"J7", 'F', {{"", 7, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Relief},
+                     {"008", 6, V::Model, {}, kHubrinCraft}, {"009", 0, V::Model, {}, kHubrinCraft},
+                     {"010", 0, V::Ground}, {"011", 0, V::Ground}, {"012", 0, V::Emblem}, {"013", 0, V::Emblem},
+                     {"014", 0, V::Emblem}}},
+        // 005 and 009 weren't heard (commentary).
+        {"F12", 'F', {{"", 10, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground},
+                      {"008", 5, V::Model, {}, kPillar}, {"009", 6, V::Relief}, {"010", 0, V::Emblem}}},
         {"K1", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Relief}, {"008", 5, V::Relief, kK1Colony},
                      {"009", 6, V::Ground, kK1Colony}, {"010", 7, V::Ground, kK1Temple}, {"011", 8, V::Ground, kK1Colony},
                      {"012", 9, V::Ground, kK1Temple},
