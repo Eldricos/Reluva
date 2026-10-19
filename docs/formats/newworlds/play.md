@@ -36,8 +36,8 @@ repository). One page per mission:
   out, often several clips over the emblem screen with no page. See
   [media.md](media.md).
 - **Map positions** in the game (Tricorder readouts, message positions)
-  are eighths of a block, row first: all 21 exhausted mines across the
-  recordings lie on deposits read so. See [gmf.md](gmf.md#map-positions-in-the-game).
+  are eighths of a block, row first: the 19 exhausted mines of the recorded
+  missions with known maps lie on (one beside) deposits read so. See [gmf.md](gmf.md#map-positions-in-the-game).
 - **Mission 14 is played on mission 12's map** (K14's mine on `k12.gmf`).
 - **Messages** come in two kinds: generic ones shared by every mission and
   side (a building finished, short of power, short of resources or crew, a
