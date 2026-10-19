@@ -240,6 +240,9 @@ textures.
   entries' second value's low 12 bits; the placed objects' bits
   8-15 and the missing quarter.
 - Which deposit kind is which resource.
+- Which edge row 0 is: the game's Tricorder positions (16 per block) count
+  their second number from the other edge ([play-f1.md](play-f1.md#positions)),
+  so either the game counts from the north or row 0 is the north.
 
 ## Not in the map
 
