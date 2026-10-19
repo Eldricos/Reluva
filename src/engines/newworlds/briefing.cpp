@@ -75,6 +75,18 @@ const std::vector<Script>& recordedScripts() {
                      {"012", 6, V::Model, {}, "geo/fed/fch.geo"}, {"013", 7, V::Relief}, {"014", 8, V::Ground},
                      {"015", 9, V::Ground}, {"016", 10, V::Relief}, {"017", 11, V::Relief}, {"018", 12, V::Ground},
                      {"019", 13, V::Relief}, {"020", 14, V::Relief}, {"021", 15, V::Ground}}},
+        // Pages past PLANETARY DATA in table order (not read off the recording).
+        {"J3", 'F', {{"", 10, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::StarSystem},
+                     {"008", 6, V::Relief}, {"009", 7, V::Ground}, {"010", 8, V::Ground}, {"011", 9, V::Ground},
+                     {"012", 0, V::Ground}, {"013", 0, V::Emblem}}},
+        // 006 wasn't heard (commentary); the ship model isn't identified.
+        {"J4", 'F', {{"", 4, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 0, V::Galaxy}, {"007", 0, V::Model},
+                     {"008", 0, V::Model}, {"009", 5, V::StarSystem}, {"010", 0, V::Relief}, {"011", 7, V::Ground},
+                     {"012", 8, V::Ground}, {"013", 9, V::Model, {}, "geo/kln/kss_a.geo"}, {"014", 0, V::Emblem}}},
+        // 005 wasn't heard (commentary).
+        {"F8", 'F', {{"", 10, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground},
+                     {"008", 5, V::Model, {}, kMetarDevice}, {"009", 6, V::Relief}, {"010", 0, V::Emblem},
+                     {"011", 0, V::Emblem}, {"012", 0, V::Emblem}, {"013", 0, V::Emblem}, {"014", 0, V::Emblem}}},
         {"K1", 'K', {{"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Relief}, {"008", 5, V::Relief, kK1Colony},
                      {"009", 6, V::Ground, kK1Colony}, {"010", 7, V::Ground, kK1Temple}, {"011", 8, V::Ground, kK1Colony},
                      {"012", 9, V::Ground, kK1Temple},

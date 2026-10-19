@@ -25,6 +25,9 @@ repository). One page per mission:
 | [play-f2.md](play-f2.md) | F2 A Harsh Lesson | Federation (2nd) |
 | [play-f3.md](play-f3.md) | F3 A Piece of Paper | Federation (3rd) |
 | [play-j1f.md](play-j1f.md) | J1 Into the Arena | Federation (4th) |
+| [play-j3f.md](play-j3f.md) | J3 The Mask Slips | Federation (6th) |
+| [play-j4f.md](play-j4f.md) | J4 Cry Havoc | Federation (7th) |
+| [play-f8.md](play-f8.md) | F8 All That Glisters | Federation (8th) |
 
 ## What they established
 
