@@ -87,6 +87,42 @@ Compared with F1:
 - K1 adds an upgrade message ("first construction yard upgrade") and a
   power shortage, which F1's player didn't run into.
 
+## Buildings and their models
+
+The selection panel names what's selected, with a small portrait of it, so
+41 selections in the recording give names directly; shapes matched against
+`klibuild.cat` and `forbuild.cat` drawn in the data viewer.
+
+| Name in the panel | Model | How sure |
+|---|---|---|
+| Colony hub | `kch` (the stepped pyramid with a spire); later two wedge wings (`kch_b`) | sure (shape) |
+| Colony hub upgrade (selectable on its own) | `kch_b` | sure |
+| Vehicle yard | `kvy` | sure (portrait) |
+| Storage facility | `ksf` (the eight-armed rosette) | sure |
+| Resource processor | `krps` | likely |
+| Sickbay; "sickbay upgrade" | `ksb_a`; `ksb_b`/`ksb_c` | likely |
+| Construction yard | `kcy` | likely (its model is mostly a few marker faces) |
+| Science station | `kss_a` (the tall block) | sure (shape) |
+| Arsenal (complete 8:46) | `kab` (the flat square with the Klingon emblem, 12:15) | sure (shape) |
+| Adv. power generator | `kpgs2`; the plain power generators `kpgs` (striped towers) | likely |
+| Mining station | `kms` | likely |
+| Livestock farm | `klf` (34:10) | sure (shape) |
+| A low curved gun (12:15, 34:10) | `ksg` (static gun) | likely |
+| Hubrin fortress (owner HUBRIN, 16:43) | `hf` in `forbuild.cat` | sure (shape) |
+| Phaser defense turret (owner TAUBAT, 25:29) | `tsg` | likely (portrait) |
+| The Taubat temple, a tower with a glowing green top (30:35) | `tt` | sure (shape; F1's temple too) |
+| Flat triangular Taubat structures (25:55) | `tw` | sure (shape) |
+
+So an upgrade piece **is selectable and has its own name** ("Colony hub
+upgrade", "Sickbay upgrade"), as the Federation's `_b`/`_c` pieces
+presumably are. The panel also shows a building's state (OPERATIONAL,
+INCOMPLETE while built), shield cover (BASIC, later HIGH: after an
+upgrade, from about 9:59), efficiency (0 % while built, then 40-120 %),
+power (CONSUMER / SUPPLY / RESERVE) and its OFFICERS and CREW. Units show
+READY or EN ROUTE and shield cover; seen: armed transport, ground scout,
+science vehicle, disruptor battery. A STAFF panel lists officers by name,
+section, skill and post ("Operations, skilled, colony hub").
+
 ## Positions
 
 The mine at 244, 092 doesn't fall on or near a deposit in `k1.gmf` either
@@ -97,6 +133,5 @@ or the positions aren't 16 per block as assumed.
 
 ## Still to look at
 
-The buildings (to match against `klibuild.cat` as for F1), the COMMAND
-panel and mission report, and the messages missed (3-6, 8-9, 12, 15-17, 19,
-24, 27).
+The COMMAND panel and mission report, and the messages missed (3-6, 8-9,
+12, 15-17, 19, 24, 27).
