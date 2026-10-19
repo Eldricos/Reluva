@@ -218,6 +218,45 @@ on a kind-5 patch, and the colony right beside it, as the briefing's
   muzzle flashes, a thin blue phaser line. Selected units carry a row of
   small orange marks above them.
 
+### Buildings and their models
+
+Matched by comparing the recording with every model of `fedbuild.cat` (and
+`fedactor.cat`) drawn in the data viewer. The names come from the selection
+panel where a building was selected, or from the "complete" messages.
+
+| In the recording | Model | Sure? |
+|---|---|---|
+| Colony hub: the octagonal tower the mission starts with (selected 12:30, "COLONY HUB") | `fch`; three round pods (`fch_b`) by 9:48; a wide flat octagon (`fch_c`) by 14:28 | yes (selected; shapes) |
+| Vehicle yard (built 6:40-7:22, selected 9:27): an arched hangar marked "HBH" | `fvpy_a` (with its apron), then `fvpy_b`, `fvpy_c` beside it: one section at 7:22, two by 15:08, three by 24:28 | yes |
+| Resource processing station: a disc with a glowing cyan centre and arms with red and green lights | `frps_a` with `frps_b`/`frps_c` arms: four by 8:48, six by 22:37 | yes (shape) |
+| A hexagonal block with a ringed dome, a stepped base with round grilles, a box in front and an apron (6:28, 9:29) | `fss_a`; by 26:28 with four wings round it (`fss_b`, the wall pieces) | yes (shape); its name isn't known |
+| A tall chamfered box with a ringed dome, yellow-black corner stripes and painted numbers ("1", "4") | `prostor` (the model's own texture shows a "2") | yes (shape) |
+| Construction yard (complete 5:03): a low two-step box with an apron | `fcy` | likely |
+| Accommodation block (complete 20:54): a curved shell | `accom` | likely |
+| Security center (selected 21:40): a low flat building with a raised middle and an apron | `fsc` | likely |
+| A building with a wavy roof (about 24:08) | `fhf` (hydroponics farm) | likely |
+
+So the `_a`/`_b`/`_c` families and the extra pieces (`fch_b`, `fch_c`,
+`fss_b`) aren't separate buildings or damage states: **a building is
+upgraded by adding pieces round its first model**: sections to the vehicle
+yard, arms to the processing station, pods and then a wider base to the
+hub, wings to `fss_a`. The `_d` models look like their plain ones; the
+`_p` ones are hollow shells, perhaps the walls a building rises with while
+it's built (not confirmed).
+
+Textures seen: `fss_a`'s side panels, which the viewer can't place (its
+two unknown texture numbers, drawn red and olive), are grey with two blue
+bands in the game, like the panels of the `fss` texture. `prostor`'s
+corners carry different painted numbers per building.
+
+Not identified: the power generator (`fpgs`, complete 5:49), the mining
+stations (`fms`, only seen from afar on the hills), the defences (`fpdt`,
+`fpds`, `fsg`), `landpad`, `foodstor` and the sickbay (`fsb`), which must
+exist (research is done there at 26:00).
+
+The placement outline is a see-through box over the tiles, green where the
+building can go (17:09) and red where it can't (22:37).
+
 ### End
 
 31:19 the last Command message; the emblem with the MISSION REPORT over it
@@ -225,6 +264,6 @@ from 31:27; the recording ends at 32:21.
 
 ## Still to look at
 
-The units' speeds (the camera rarely holds still long enough), which model
-each finished building is (compare with the model viewer), the animation
-rates, and the messages missed (5-6, 14, 16, 23-24).
+The units' speeds (the camera rarely holds still long enough), the
+buildings not identified above, the animation rates, and the messages
+missed (5-6, 14, 16, 23-24).
