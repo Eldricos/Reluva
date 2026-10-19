@@ -161,7 +161,12 @@ planet textures (`solsys/ice`, `desert`, `alpine`, `red`, `volcanic`,
 `alien1`-`7`, `sun`, `stars1`-`4`). Several systems share one geometry
 (`karazin` and `fico` are identical: a star sphere, a small flat piece and
 four planets), so which textures each uses is the game's choice, not in the
-files; their metamodels name no parts.
+files; their metamodels name no parts. `tabras` is the galaxy of the
+briefings' STELLAR CARTOGRAPHY step: a flat slab (20 faces, texture 0) round
+three flat layers (textures 1-3), numbering `tabras01`-`04` in name order:
+a star field, a blue arm of stars, the red ribbon and a scatter of stars.
+Their alpha layers are their brightness; drawn adding their light on black
+and seen from above at an angle, they look like the recordings' galaxy.
 
 **Whose buildings:** `forbuild.cat` (folder `bad`) holds the native races'
 buildings, named by their metamodels in `misc.cat` (`mdl/bad/`): `h…` the

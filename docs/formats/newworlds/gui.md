@@ -41,3 +41,15 @@ yellow-and-black hazard-striped aprons, which identified the `pad` texture
 `fedgui` and `glblgui` also hold 21 test pictures under another build path,
 `game/stc/bin/rsc/res/kurtscou/` (`kscout1s`-`5l`, `ktank1s`-`5l`,
 `ksmile_b`, `ksmile_m`).
+
+## Emblem screens
+
+`glblgui.cat` holds each side's emblem as a full-screen picture cut into six
+tiles, `ufp001`-`006` (the Federation), `kliemp01`-`06` (the Klingon Empire)
+and `romemp01`-`06` (the Romulan Star Empire): three across and two down,
+256 + 256 + 128 by 256 + 224 pixels, so together the 640 × 480 screen. They
+are the emblem screen that ends a briefing (seen in recordings of play,
+[play.md](play.md)). The `f_win`, `k_win`, `r_win` and `f_lose`... sets
+beside them are likewise six tiles each, presumably the mission won and
+lost screens.
+

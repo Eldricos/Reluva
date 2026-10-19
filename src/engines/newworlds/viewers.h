@@ -412,6 +412,12 @@ private:
     void startStep(int step);
     bool mapInView() const; // the map is drawn (not a briefing backdrop)
     void drawBackdrop(BriefingView view);
+    // The game's own art for the briefing's scenes, when the archives have
+    // it (glblgui.cat, glblgame.cat): each side's emblem screen, and the
+    // Tabula Rasa galaxy model with its textures.
+    void loadBriefingArt();
+    bool drawEmblem(char side);
+    bool drawGalaxy();
     void playClip(int index);
     void stopClip();
     void startMusic(); // the shown map's planet theme, looped
@@ -442,6 +448,10 @@ private:
     std::vector<std::string> clips_; // stems, in order
     StringTable table_;
     std::vector<BriefingStep> script_;
+    std::map<char, Texture> emblems_; // 640 x 480, by side
+    GeoModel galaxy_;
+    std::vector<Texture> galaxyTextures_; // in the order its faces number them
+    Rasterizer raster_;
     bool running_ = false, stepOnMap_ = false;
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends

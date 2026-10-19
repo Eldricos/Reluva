@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
 #include "common/audio/decode.h"
@@ -51,6 +52,7 @@ MissionViewer::MissionViewer(System& sys, Surface& screen, const Archives& archi
         return title(mapTitle);
     });
     fonts_ = loadGameFonts(archives_);
+    loadBriefingArt();
     for (const GameFont& f : fonts_)
         if (f.name == "fnt/fe8pt")
             font_ = &f;
@@ -255,6 +257,11 @@ void MissionViewer::update(uint64_t nowMs) {
     // The briefing moves on when its step's clip ends, or its time is up.
     if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying()))
         startStep(step_ + 1);
+    // The galaxy turns slowly too.
+    if (running_ && !stepOnMap_ && script_[size_t(step_)].view == BriefingView::Galaxy && nowMs - lastTurnMs_ >= 100) {
+        lastTurnMs_ = nowMs;
+        dirty_ = true;
+    }
     // The briefing's map views turn slowly about their target.
     if (running_ && stepOnMap_ && nowMs - lastTurnMs_ >= 100) {
         map_.turn(float(nowMs - lastTurnMs_) * kBriefingTurn);
@@ -488,9 +495,132 @@ void MissionViewer::startStep(int step) {
 
 bool MissionViewer::mapInView() const { return hasMap_ && (!running_ || stepOnMap_); }
 
-// Stand-ins for the briefing's other views, drawn by Reluva itself: the
-// game's galaxy, star system and emblem scenes aren't known from the data.
+namespace {
+
+// A texture from whichever archive has it; false if none does or it doesn't decode.
+bool loadTexture(const Archives& archives, const std::string& name, Texture& out) {
+    for (const auto& a : archives)
+        if (const CatEntry* e = a->find(name)) {
+            std::vector<uint8_t> data;
+            return !a->read(*e, data) && !decodeTexture(data, out);
+        }
+    return false;
+}
+
+} // namespace
+
+void MissionViewer::loadBriefingArt() {
+    // The emblem screens are six tiles, three across and two down:
+    // 256 + 256 + 128 by 256 + 224, the 640 x 480 screen.
+    const std::pair<char, const char*> sets[] = {{'F', "lbp/gui/ufp00"}, {'K', "lbp/gui/kliemp0"}, {'R', "lbp/gui/romemp0"}};
+    for (const auto& [side, prefix] : sets) {
+        Texture screen;
+        screen.width = 640;
+        screen.height = 480;
+        screen.rgba.assign(size_t(640) * 480 * 4, 0);
+        bool ok = true;
+        for (int t = 0; t < 6 && ok; ++t) {
+            Texture tile;
+            ok = loadTexture(archives_, prefix + std::to_string(t + 1) + ".lbp", tile);
+            const int x0 = (t % 3) * 256, y0 = (t / 3) * 256;
+            for (int y = 0; ok && y < tile.height && y0 + y < 480; ++y)
+                for (int x = 0; x < tile.width && x0 + x < 640; ++x)
+                    std::copy_n(&tile.rgba[(size_t(y) * size_t(tile.width) + size_t(x)) * 4], 4,
+                                &screen.rgba[(size_t(y0 + y) * 640 + size_t(x0 + x)) * 4]);
+        }
+        if (ok)
+            emblems_[side] = std::move(screen);
+    }
+    // The galaxy: a slab of star field round three flat layers (blue arm,
+    // red ribbon, stars), numbering tabras01-04 in name order.
+    for (const auto& a : archives_)
+        if (const CatEntry* e = a->find("geo/solsys/tabras.geo")) {
+            std::vector<uint8_t> data;
+            if (a->read(*e, data) || parseGeo(data, galaxy_))
+                galaxy_ = GeoModel{};
+            break;
+        }
+    for (int t = 1; t <= 4 && !galaxy_.faces.empty(); ++t) {
+        Texture tex;
+        loadTexture(archives_, "lbp/txr/solsys/tabras0" + std::to_string(t) + ".mp0", tex);
+        galaxyTextures_.push_back(std::move(tex));
+    }
+}
+
+bool MissionViewer::drawEmblem(char side) {
+    const auto it = emblems_.find(side);
+    if (it == emblems_.end())
+        return false;
+    const Texture& e = it->second;
+    for (int y = 0; y < screen_.h; ++y) {
+        uint8_t* row = screen_.row(y);
+        const int sy = y * e.height / screen_.h;
+        for (int x = 0; x < screen_.w; ++x, row += 4) {
+            const uint8_t* p = &e.rgba[(size_t(sy) * size_t(e.width) + size_t(x * e.width / screen_.w)) * 4];
+            row[0] = p[0], row[1] = p[1], row[2] = p[2], row[3] = 255;
+        }
+    }
+    return true;
+}
+
+bool MissionViewer::drawGalaxy() {
+    if (galaxy_.faces.empty())
+        return false;
+    for (int y = 0; y < screen_.h; ++y) {
+        uint8_t* row = screen_.row(y);
+        for (int x = 0; x < screen_.w; ++x, row += 4)
+            row[0] = row[1] = row[2] = 0, row[3] = 255;
+    }
+    // Seen from above at an angle, turning; each layer adds its light (its
+    // alpha layer is its brightness), so there's no depth to sort.
+    const float yaw = float(nowMs_ % 120000) / 120000.0f * 6.2832f;
+    const OrbitCamera cam({0, 0, 0}, yaw, 0.45f, 16000.0f, screen_.w, screen_.h);
+    raster_.begin(screen_);
+    for (const GeoModel::Face& face : galaxy_.faces) {
+        if (face.corners.size() < 3 || face.part >= galaxy_.parts.size())
+            continue;
+        const uint32_t ti = face.corners.back().extra[4];
+        if (ti >= galaxyTextures_.size() || galaxyTextures_[ti].rgba.empty())
+            continue;
+        const Texture& tex = galaxyTextures_[ti];
+        const auto& verts = galaxy_.parts[face.part].vertices;
+        std::vector<ViewVertex> poly;
+        for (const GeoModel::Corner& c : face.corners) {
+            if (c.vertex >= verts.size())
+                break;
+            const GeoModel::Vec3& p = verts[c.vertex];
+            poly.push_back(cam.toView({p.x, p.y, p.z}, c.u, c.v));
+        }
+        if (poly.size() != face.corners.size())
+            continue;
+        poly = clipNear(poly, cam.nearZ);
+        if (poly.size() < 3)
+            continue;
+        std::vector<ScreenVertex> s;
+        for (const ViewVertex& v : poly)
+            s.push_back(cam.project(v));
+        auto shade = [&](float u, float v, uint8_t* out) {
+            const int tx = std::clamp(int(u * float(tex.width)), 0, tex.width - 1);
+            const int ty = std::clamp(int(v * float(tex.height)), 0, tex.height - 1);
+            const size_t i = size_t(ty) * size_t(tex.width) + size_t(tx);
+            const int a = tex.alpha.empty() ? 255 : tex.alpha[i];
+            for (int k = 0; k < 3; ++k)
+                out[k] = uint8_t(std::min(255, out[k] + tex.rgba[i * 4 + size_t(k)] * a / 255));
+            return false;
+        };
+        for (size_t i = 1; i + 1 < s.size(); ++i)
+            raster_.drawTriangle(s[0], s[i], s[i + 1], shade);
+    }
+    return true;
+}
+
+// The briefing's views without a map: the game's galaxy and emblem where
+// the archives have them; else (and for the star system and model views,
+// whose scenes aren't known) Reluva's own stand-ins.
 void MissionViewer::drawBackdrop(BriefingView view) {
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    if ((view == BriefingView::Galaxy && drawGalaxy()) || (view == BriefingView::Emblem && drawEmblem(side)))
+        return;
     const int w = screen_.w, h = screen_.h;
     for (int y = 0; y < h; ++y) {
         uint8_t* row = screen_.row(y);
@@ -505,7 +635,6 @@ void MissionViewer::drawBackdrop(BriefingView view) {
     };
     uint32_t seed = 12345;
     auto rnd = [&] { return (seed = seed * 1664525u + 1013904223u) >> 8; };
-    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
     switch (view) {
     case BriefingView::Galaxy:
         for (int i = 0; i < 900; ++i) {
