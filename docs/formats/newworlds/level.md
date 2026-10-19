@@ -63,8 +63,9 @@ world, and the kinds go with the archives:
 | `vlcwrld` | volcanic | K2, J6 (and `k4`, not in level.dat) |
 
 No map exists for F14, K14 or R14 ("The Finest Hour"): each side's briefing
-names the same world as its mission 12 ("Death Rattle"), so 14 presumably
-reuses 12's map. The joint missions (J) have one table per side
+names the same world as its mission 12 ("Death Rattle"), and K14 is played
+on `k12.gmf` (a mine position reported in a recording of it lies on that
+map's deposits, [play-k14.md](play-k14.md)), so 14 reuses 12's map. The joint missions (J) have one table per side
 (`jnt01fed`, `jnt01klg`, `jnt01rom`, …) with the same briefing world.
 `kurt64`, `demo1`, `demo3`, `volc1` and `coverd1`-`3` aren't in level.dat.
 
