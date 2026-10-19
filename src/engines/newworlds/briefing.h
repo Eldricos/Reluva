@@ -33,6 +33,8 @@ struct BriefingStep {
     // For a map view, the place it looks at: a map position as the game
     // gives them (eighths of a block, row first), or -1 for the whole map.
     int siteA = -1, siteB = -1;
+    // For a model view, the model shown ("geo/bad/tt.geo"); empty if unknown.
+    std::string model;
 };
 
 // The briefing of a mission played as a side ('F', 'K', 'R'): as seen in

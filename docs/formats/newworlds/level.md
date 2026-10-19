@@ -161,8 +161,15 @@ compass), and the colonies' positions are taken from the mines they
 reported exhausted early, so the places are approximate; the galaxy is
 the game's `tabras` model, turning, and the emblem the side's emblem screen
 from `glblgui.cat` ([gui.md](gui.md#emblem-screens), [geo.md](geo.md));
-the star system and model views are still Reluva's own stand-ins (which
-system model and planet textures each mission shows isn't known).
+a model view shows the
+model the recording showed (the Taubat temple `tt`, the Hubrin craft `h`,
+the Metar device `mad`, the containment pillar `hcp`, a Metar spire `mch`,
+the Federation shield generator `fsg`, a Klingon disruptor tank `kdt1`;
+matched by shape and colour, so a few are judgement calls, J4's ship most
+of all) turning on the red grid, with its own textures. The star system
+view is still Reluva's own stand-in (which system model and planet
+textures each mission shows isn't known), as are model views of the
+missions not recorded.
 
 There are no units, buildings or starting colonies to show: the maps don't
 hold them ([gmf.md](gmf.md)), and nothing found in the data files says

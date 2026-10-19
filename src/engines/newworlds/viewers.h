@@ -418,6 +418,15 @@ private:
     void loadBriefingArt();
     bool drawEmblem(char side);
     bool drawGalaxy();
+    // A model turning on the grid, with its textures (loaded once).
+    bool drawModel(const std::string& name);
+    struct BriefingModel {
+        GeoModel geo;
+        std::vector<Texture> textures;
+        bool ok = false;
+    };
+    std::map<std::string, BriefingModel> models_;
+    std::vector<TextureFile> textureFiles_;
     void playClip(int index);
     void stopClip();
     void startMusic(); // the shown map's planet theme, looped
