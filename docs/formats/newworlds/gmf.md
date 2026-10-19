@@ -51,6 +51,20 @@ The lists are stored column by column (cell (0, 1) starts at 47, cell (1, 0)
 at 1380). `kurt64`'s grid is a field of block 1 with scattered variants
 (blocks 2-5) and a patch of block 0, as a test map would be.
 
+### Map positions in the game
+
+The game gives map positions (the Tricorder's "TERRAIN AT <a:b>", and
+messages such as a mine running out "at a, b") as **eighths of a block,
+row first**: the first number divided by 8 is the grid row (as the file
+stores rows), the second divided by 8 the column; so they run 0-511 on a
+64 × 64 block map. Found from the mines reported exhausted in nine
+recorded missions (F1, K1, K2, J1, J2, J3, J4, K7; see the play-*.md
+pages): read this way all 15 lie on or beside a deposit block (14 on one,
+mean distance 0.1 blocks, against about 10 for random points), and every
+mine position is 8n + 4, a block's centre. Read as 16 per block, or column
+first, they fall nowhere near deposits. Which compass direction row 0 faces
+isn't known.
+
 ### Resource deposits
 
 Bits 12-15 of a grid cell's second value mark a resource deposit, kinds 1
@@ -240,15 +254,6 @@ textures.
   entries' second value's low 12 bits; the placed objects' bits
   8-15 and the missing quarter.
 - Which deposit kind is which resource.
-- Which edge row 0 is: the game's Tricorder positions (16 per block) count
-  their second number from the other edge ([play-f1.md](play-f1.md#positions)),
-  so either the game counts from the north or row 0 is the north. Not
-  confirmed: K1's mine position lies near no deposit either way
-  ([play-k1.md](play-k1.md#positions)), and K2's two mines fit the stored
-  orientation better ([play-k2.md](play-k2.md#positions)), J1's the flipped
-one and J2's neither: no consistent answer. K7's two mines are 16-23
-blocks from any deposit either way, so the positions probably aren't 16
-per grid block at all (or mines don't need painted deposits).
 
 ## Not in the map
 

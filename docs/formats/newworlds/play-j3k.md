@@ -62,8 +62,10 @@ of the next level at 73:00.
 
 ## Positions
 
-The mine at 204, 172 is 5.5 blocks from a deposit read as stored and 25.5
-flipped.
+The mine positions reported here lie on deposits of the map once read as
+eighths of a block, row first; see [gmf.md](gmf.md#map-positions-in-the-game),
+where all the recordings' mines are put together. (An earlier reading, 16
+per block, didn't fit.)
 
 ## Colony
 

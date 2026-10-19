@@ -66,9 +66,8 @@ So, for F1 at least:
   and building icons.
 - **First message:** from Intelligence, warning of a Klingon colony to the
   south. A Klingon ground scout attacks within the first minute (4:50).
-- **Tricorder coordinates** run to at least 407 and 209 on a 64 × 64 block
-  map: presumably the 16 × 16 squares per block of the placed-object grid
-  (1024 × 1024), see [gmf.md](gmf.md).
+- **Tricorder coordinates** are eighths of a block, row first (see
+  [gmf.md](gmf.md#map-positions-in-the-game)).
 - **Buildings** stand on concrete, each with a yellow-striped apron (the
   `pad` texture's stripes, see [geo.md](geo.md)) in front of its door.
 - **Objectives:** a COMMAND panel lists them; at the end a **MISSION
@@ -183,12 +182,11 @@ Command messages. None of this text is in the archives (see above).
 
 Messages give map positions in the Tricorder's units: the energy source
 at <332:152>, the mine at 404, 220, and the cursor's terrain readout near
-the colony at the start <407:209>. These fit 16 units per block (1024 across
-F1's 64 blocks), with the second number counted from the other edge than
-the grid's row 0 ([gmf.md](gmf.md)): the mine is then at block (25.25,
-50.25), inside F1's only large deposit cluster (blocks 16-35, rows 40-54),
-on a kind-5 patch, and the colony right beside it, as the briefing's
-"Place a Mining Station here" says.
+the colony at the start <407:209>. They are eighths of a block, row first
+([gmf.md](gmf.md#map-positions-in-the-game), worked out from the mines of
+nine recordings): the mine is at row 50, column 27 of `f1.gmf`, on a kind-5
+deposit in the map's large deposit cluster, as the briefing's "Place a
+Mining Station here" says, and the colony's readout beside it.
 
 ### Building and fighting
 

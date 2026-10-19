@@ -62,11 +62,10 @@ facility, each with its owner and its own portrait.
 
 ## Positions
 
-The mine at 092, 404 is 9.8 blocks from the nearest deposit read as stored
-and 15.6 flipped; J1's mine at 052, 148 is 0.4 blocks off flipped and 7.5
-stored. With F1 (flipped fits), K2 (stored fits) and K1 (neither), mine
-positions give no consistent answer: either mines don't need a painted
-deposit, or the coordinates aren't 16 per block.
+The mine positions reported here lie on deposits of the map once read as
+eighths of a block, row first; see [gmf.md](gmf.md#map-positions-in-the-game),
+where all the recordings' mines are put together. (An earlier reading, 16
+per block, didn't fit.)
 
 ## Colony
 

@@ -52,10 +52,10 @@ built.
 
 ## Positions
 
-Both mines lie 16-23 blocks from the nearest deposit either way, though
-they're 1.5 blocks apart: with K1's and J2's mines as far off, the mine
-positions **can't be 16 per block on the grid as assumed**, or mines don't
-need painted deposits.
+The mine positions reported here lie on deposits of the map once read as
+eighths of a block, row first; see [gmf.md](gmf.md#map-positions-in-the-game),
+where all the recordings' mines are put together. (An earlier reading, 16
+per block, didn't fit.)
 
 ## Colony
 

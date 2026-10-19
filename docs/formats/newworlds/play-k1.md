@@ -127,11 +127,10 @@ section, skill and post ("Operations, skilled, colony hub").
 
 ## Positions
 
-The mine at 244, 092 doesn't fall on or near a deposit in `k1.gmf` either
-way the second number is read (the nearest is 20 blocks off), so K1 doesn't
-settle the map's orientation that F1 suggested (see
-[gmf.md](gmf.md#open-questions)). Either mines don't need a painted deposit,
-or the positions aren't 16 per block as assumed.
+The mine positions reported here lie on deposits of the map once read as
+eighths of a block, row first; see [gmf.md](gmf.md#map-positions-in-the-game),
+where all the recordings' mines are put together. (An earlier reading, 16
+per block, didn't fit.)
 
 ## Still to look at
 

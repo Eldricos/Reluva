@@ -78,10 +78,10 @@ concrete as in the other missions.
 
 ## Positions
 
-Both mines lie near deposits in `k2.gmf` with the second number read as
-the grid stores rows (2.6 and 1.8 blocks off) and further off flipped (9.3
-and 6.3), the opposite of F1; K1's mine is near none. So mine positions
-don't settle the map's orientation (see [gmf.md](gmf.md#open-questions)).
+The mine positions reported here lie on deposits of the map once read as
+eighths of a block, row first; see [gmf.md](gmf.md#map-positions-in-the-game),
+where all the recordings' mines are put together. (An earlier reading, 16
+per block, didn't fit.)
 
 ## Colony
 
