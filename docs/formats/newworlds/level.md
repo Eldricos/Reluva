@@ -158,9 +158,11 @@ close to the ground or from high above, else the whole map. The
 recordings' own camera positions can't be read (the position readout over
 the briefing follows the mouse pointer, and the ground views show only a
 compass), and the colonies' positions are taken from the mines they
-reported exhausted early, so the places are approximate; the galaxy,
-star system, model and emblem views are Reluva's own stand-ins, since the
-game's scenes for them aren't known from the data.
+reported exhausted early, so the places are approximate; the galaxy is
+the game's `tabras` model, turning, and the emblem the side's emblem screen
+from `glblgui.cat` ([gui.md](gui.md#emblem-screens), [geo.md](geo.md));
+the star system and model views are still Reluva's own stand-ins (which
+system model and planet textures each mission shows isn't known).
 
 There are no units, buildings or starting colonies to show: the maps don't
 hold them ([gmf.md](gmf.md)), and nothing found in the data files says
