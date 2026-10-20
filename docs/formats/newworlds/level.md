@@ -167,9 +167,10 @@ the Metar device `mad`, the containment pillar `hcp`, a Metar spire `mch`,
 the Federation shield generator `fsg`, a Klingon disruptor tank `kdt1`;
 matched by shape and colour, so a few are judgement calls, J4's ship most
 of all) turning on the red grid, with its own textures. The star system
-view is still Reluva's own stand-in (which system model and planet
-textures each mission shows isn't known), as are model views of the
-missions not recorded.
+view shows the system the mission's table names, from near its planet,
+each body turned to face the camera ([geo.md](geo.md#star-systems); the
+planets' pictures are Reluva's choice). Model views of the missions not
+recorded are still Reluva's own stand-ins.
 
 There are no units, buildings or starting colonies to show: the maps don't
 hold them ([gmf.md](gmf.md)), and nothing found in the data files says

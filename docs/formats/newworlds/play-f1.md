@@ -24,7 +24,7 @@ right: **NEXT** and **MISSION**.
 | Time | Shown | Page (`fed01.stb` id) | Speech |
 |---|---|---|---|
 | 0:05 | the galaxy, a red and blue nebula | STELLAR CARTOGRAPHY: Tabula Rasa Systems (2) | `F1005` (34.3 s, 0:05.15) |
-| 0:40 | the star system, planets | PLANETARY DATA: Karazar System. Planet of Operations: Karazin (4) | (`F1006`, 19.9 s by size, would fill it exactly) |
+| 0:40 | the star system, planets | PLANETARY DATA, naming the system (Karazar) and the planet of operations (Karazin) (4) | (`F1006`, 19.9 s by size, would fill it exactly) |
 | 1:00 | flying over the F1 map behind a shuttle: trees, cliffs, ice caves, the Taubat pyramids | no panel | (`F1007` + `F1008`, 38 s by size, against 37.75 s) |
 | 1:38 | the colony site: a building on a concrete pad; a minimap inset | PRIMARY OBJECTIVE 1 (6) | (`F1009`, 14.7 s; next page 1:52.75) |
 | 1:53 | the map as a blue relief grid, the Taubat area marked in magenta, yellow, red | PRIMARY OBJECTIVE 2 (7) | (`F1010`, 18.2 s; next page 2:11.25) |

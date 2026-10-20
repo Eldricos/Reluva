@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/model_render.h"
+#include "engines/newworlds/star_system.h"
 #include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
@@ -183,6 +184,7 @@ void MissionViewer::loadSide() {
             clips_.push_back(stem);
     std::sort(clips_.begin(), clips_.end(), clipBefore);
     script_ = briefingScript(level.shortName, side, table_, clips_);
+    loadStarSystem();
     startColony();
 }
 
@@ -811,6 +813,116 @@ void MissionViewer::loadBriefingArt() {
         loadTexture(archives_, "lbp/txr/solsys/tabras0" + std::to_string(t) + ".mp0", tex);
         galaxyTextures_.push_back(std::move(tex));
     }
+    // The star systems' models, by name (the galaxy isn't one).
+    for (const auto& a : archives_)
+        for (const CatEntry& e : a->entries()) {
+            std::string folder, stem, ext;
+            splitName(e.name, folder, stem, ext);
+            if (folder == "solsys" && ext == "geo" && stem != "tabras" &&
+                std::find(systemNames_.begin(), systemNames_.end(), stem) == systemNames_.end())
+                systemNames_.push_back(stem);
+        }
+}
+
+// The star system the mission's table names, with its pictures.
+void MissionViewer::loadStarSystem() {
+    system_ = GeoModel{};
+    systemLayout_ = {};
+    systemTextures_.clear();
+    systemName_ = starSystemName(table_, systemNames_);
+    if (systemName_.empty())
+        return;
+    for (const auto& a : archives_)
+        if (const CatEntry* e = a->find("geo/solsys/" + systemName_ + ".geo")) {
+            std::vector<uint8_t> data;
+            if (a->read(*e, data) || parseGeo(data, system_))
+                system_ = GeoModel{};
+            break;
+        }
+    if (system_.faces.empty())
+        return;
+    systemLayout_ = readStarSystem(system_);
+    for (const std::string& stem : starSystemTextures(systemLayout_, hasMap_ ? planetPicture(map_.mapArchive()) : "")) {
+        Texture tex;
+        if (!stem.empty())
+            loadTexture(archives_, "lbp/txr/solsys/" + stem + ".mp0", tex);
+        systemTextures_.push_back(std::move(tex));
+    }
+}
+
+// The system from near the mission's planet, turning about it: the
+// starfield adding its light behind (its alpha layer is its brightness,
+// dimmed as in the recordings), the star and planets as stacks of round
+// pictures, each turned to face the camera (so its slices stand one behind
+// another, a ball from any side; seen edge-on they'd be a pile of discs).
+bool MissionViewer::drawStarSystem() {
+    if (system_.faces.empty())
+        return false;
+    for (int y = 0; y < screen_.h; ++y) {
+        uint8_t* row = screen_.row(y);
+        for (int x = 0; x < screen_.w; ++x, row += 4)
+            row[0] = row[1] = row[2] = 0, row[3] = 255;
+    }
+    const int body = missionBody(systemLayout_);
+    GeoModel::Vec3 target{0, 0, 0};
+    if (body >= 0)
+        target = systemLayout_.bodies[size_t(body)].centre;
+    const float yaw = float(nowMs_ % 120000) / 120000.0f * 6.2832f;
+    const OrbitCamera cam({target.x, target.y, target.z}, yaw, 0.25f, 2200.0f, screen_.w, screen_.h);
+    raster_.begin(screen_);
+    for (int pass = 0; pass < 2; ++pass) // the starfield first
+        for (size_t f = 0; f < system_.faces.size(); ++f) {
+            const GeoModel::Face& face = system_.faces[f];
+            const int slot = systemLayout_.faceSlot[f];
+            const bool backdrop = std::find(systemLayout_.backdropSlots.begin(), systemLayout_.backdropSlots.end(),
+                                            slot) != systemLayout_.backdropSlots.end();
+            if (slot < 0 || size_t(slot) >= systemTextures_.size() || systemTextures_[size_t(slot)].rgba.empty() ||
+                backdrop != (pass == 0) || face.corners.size() < 3 || face.part >= system_.parts.size())
+                continue;
+            const Texture& tex = systemTextures_[size_t(slot)];
+            const auto& verts = system_.parts[face.part].vertices;
+            const int body = systemLayout_.faceBody[f];
+            std::vector<ViewVertex> poly;
+            for (const GeoModel::Corner& c : face.corners) {
+                if (c.vertex >= verts.size())
+                    break;
+                const GeoModel::Vec3& p = verts[c.vertex];
+                Vec at{p.x, p.y, p.z};
+                if (body >= 0) {
+                    const GeoModel::Vec3& o = systemLayout_.bodies[size_t(body)].centre;
+                    const Vec d{p.x - o.x, p.y - o.y, p.z - o.z};
+                    at = Vec{o.x, o.y, o.z} + cam.right * d.x + cam.up * d.y - cam.forward * d.z;
+                }
+                poly.push_back(cam.toView(at, c.u, c.v));
+            }
+            if (poly.size() != face.corners.size())
+                continue;
+            poly = clipNear(poly, cam.nearZ);
+            if (poly.size() < 3)
+                continue;
+            std::vector<ScreenVertex> s;
+            for (const ViewVertex& v : poly)
+                s.push_back(cam.project(v));
+            auto shade = [&](float u, float v, uint8_t* out) {
+                const int tx = std::clamp(int(u * float(tex.width)), 0, tex.width - 1);
+                const int ty = std::clamp(int(v * float(tex.height)), 0, tex.height - 1);
+                const size_t i = size_t(ty) * size_t(tex.width) + size_t(tx);
+                const int a = tex.alpha.empty() ? 255 : tex.alpha[i];
+                if (backdrop) {
+                    for (int k = 0; k < 3; ++k)
+                        out[k] = uint8_t(std::min(255, out[k] + tex.rgba[i * 4 + size_t(k)] * a / 512));
+                    return false;
+                }
+                if (a < 128)
+                    return false; // outside the disc
+                for (int k = 0; k < 3; ++k)
+                    out[k] = tex.rgba[i * 4 + size_t(k)];
+                return true;
+            };
+            for (size_t i = 1; i + 1 < s.size(); ++i)
+                raster_.drawTriangle(s[0], s[i], s[i + 1], shade);
+        }
+    return true;
 }
 
 bool MissionViewer::drawEmblem(char side) {
@@ -908,12 +1020,13 @@ bool MissionViewer::drawModel(const std::string& name) {
                          briefingModelStyle(side));
 }
 
-// The briefing's views without a map: the game's galaxy and emblem where
-// the archives have them; else (and for the star system and model views,
-// whose scenes aren't known) Reluva's own stand-ins.
+// The briefing's views without a map: the game's galaxy, star system,
+// models and emblem where the archives have them; else Reluva's own
+// stand-ins.
 void MissionViewer::drawBackdrop(BriefingView view) {
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
     if ((view == BriefingView::Galaxy && drawGalaxy()) || (view == BriefingView::Emblem && drawEmblem(side)) ||
+        (view == BriefingView::StarSystem && drawStarSystem()) ||
         (view == BriefingView::Model && drawModel(script_[size_t(step_)].model)))
         return;
     const int w = screen_.w, h = screen_.h;

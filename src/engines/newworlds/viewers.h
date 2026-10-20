@@ -14,6 +14,7 @@
 #include "engines/newworlds/game_ui.h"
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/model_render.h"
+#include "engines/newworlds/star_system.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -478,6 +479,8 @@ private:
     void loadBriefingArt();
     bool drawEmblem(char side);
     bool drawGalaxy();
+    void loadStarSystem(); // the one the mission's table names
+    bool drawStarSystem();
     // A model turning on the grid, with its textures (loaded once).
     bool drawModel(const std::string& name);
     struct BriefingModel {
@@ -519,6 +522,11 @@ private:
     std::map<char, Texture> emblems_; // 640 x 480, by side
     GeoModel galaxy_;
     std::vector<Texture> galaxyTextures_; // in the order its faces number them
+    std::vector<std::string> systemNames_; // geo/solsys/'s systems
+    std::string systemName_;
+    GeoModel system_;
+    StarSystemLayout systemLayout_;
+    std::vector<Texture> systemTextures_; // per texture number
     Rasterizer raster_;
     bool running_ = false, stepOnMap_ = false;
     // The mission's script, being walked through.

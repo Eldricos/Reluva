@@ -894,9 +894,15 @@ bool writeObj(const reluva::newworlds::GeoModel& m, const std::string& path) {
     size_t vt = 1;
     for (size_t pi = 0; pi < m.parts.size(); ++pi) {
         f << "g part" << pi << '\n';
+        uint32_t slot = ~0u;
         for (const auto& face : m.faces) {
             if (face.part != pi)
                 continue;
+            // The face's texture number, as a material name.
+            if (face.corners.back().extra[4] != slot) {
+                slot = face.corners.back().extra[4];
+                f << "usemtl slot" << slot << '\n';
+            }
             for (const auto& c : face.corners)
                 f << "vt " << c.u << ' ' << 1.0f - c.v << '\n';
             f << 'f';

@@ -18,6 +18,7 @@
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
+#include "engines/newworlds/star_system.h"
 
 #include <algorithm>
 #include <cmath>
@@ -708,6 +709,63 @@ void testColony() {
     CHECK(!nowhere.start(36, 36) && !nowhere.add("vehicle-yard"));
 }
 
+void testStarSystem() {
+    // The system a table names most, by letters only.
+    StringTable table;
+    CHECK(!table.parse(makeTable({{1, "~STELLAR CARTOGRAPHY~Near Alpha and the F'Thorc system"},
+                                  {2, "~PLANETARY DATA~F'thorc III, past ALPHA's belt; fthorc"}})));
+    CHECK(starSystemName(table, {"alpha", "fthorc", "taal"}) == "fthorc");
+    CHECK(starSystemName(table, {"taal"}).empty());
+    CHECK(planetPicture("icewrld.cat") == "ice" && planetPicture("ALNWRLD.CAT") == "alien4" && planetPicture("x").empty());
+
+    // A model: a starfield wall (texture 2), a star at the middle (two
+    // slices numbered 0), a planet (two slices in 1, their backs in 0) and
+    // a ringed planet (a slice in 3, the ring in 4, backs in 0).
+    GeoModel m;
+    m.parts.resize(1);
+    auto quad = [&](float cx, float cy, float z, float r, uint32_t slot, bool back) {
+        auto& v = m.parts[0].vertices;
+        const uint32_t base = uint32_t(v.size());
+        for (const auto& [dx, dy] : {std::pair{-r, -r}, std::pair{r, -r}, std::pair{r, r}, std::pair{-r, r}})
+            v.push_back({cx + dx, cy + dy, z});
+        auto face = [&](std::initializer_list<uint32_t> corners, uint32_t number) {
+            GeoModel::Face f;
+            for (const uint32_t c : corners)
+                f.corners.push_back({base + c, 0, 0, {0, 0, 0, 0, 0}});
+            f.corners.back().extra[4] = number;
+            m.faces.push_back(f);
+        };
+        if (back)
+            face({1, 0, 2}, 0), face({2, 0, 3}, 0);
+        face({0, 1, 2, 3}, slot);
+    };
+    quad(0, 0, 0, 4000, 2, false);              // the wall
+    quad(0, 0, 30, 70, 0, false), quad(0, 0, -30, 70, 0, false); // the star
+    quad(2000, 0, 50, 80, 1, true), quad(2000, 0, -50, 80, 1, true);
+    quad(-2000, 0, 0, 140, 4, true), quad(-2000, 0, 40, 90, 3, true), quad(-2000, 0, -40, 90, 3, true);
+    const StarSystemLayout layout = readStarSystem(m);
+    CHECK(layout.backdropSlots == std::vector<int>{2});
+    CHECK(layout.bodies.size() == 3);
+    int stars = 0, ringed = 0;
+    for (const auto& b : layout.bodies) {
+        stars += b.star;
+        if (b.ringSlot >= 0) {
+            CHECK(b.ringSlot == 4 && b.slot == 3 && std::fabs(b.centre.x + 2000) < 1);
+            ++ringed;
+        }
+    }
+    CHECK(stars == 1 && ringed == 1);
+    // Backs take their slice's number; the ring's back the ring's.
+    CHECK(layout.faceSlot[0] == 2 && layout.faceSlot[3] == 1 && layout.faceSlot[4] == 1);
+    CHECK(layout.faceSlot[m.faces.size() - 9] == 4 && layout.faceSlot[m.faces.size() - 8] == 4);
+    CHECK(layout.faceBody[0] == -1 && layout.faceBody[1] >= 0);
+    const auto tex = starSystemTextures(layout, "ice");
+    CHECK(tex.size() == 5 && tex[0] == "sun" && tex[1] == "ice" && tex[2] == "stars1");
+    CHECK(tex[3] == "red" && tex[4] == "red_r");
+    const int look = missionBody(layout);
+    CHECK(look >= 0 && layout.bodies[size_t(look)].slot == 1);
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -829,6 +887,7 @@ int main() {
     testBriefing();
     testMissionScripts();
     testColony();
+    testStarSystem();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

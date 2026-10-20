@@ -155,13 +155,9 @@ muzzle flash the folder's muzzle texture with the same first letter
 shortened also match (`fapc2`: `fapc`; `fconbee`: `fconb`; `r_bop`:
 `r_bop5`-`7`), a low-detail model taking the `_l` one.
 
-**Star systems** (`glblgame.cat`, `geo/solsys/`: `karazin`, `jeddart`,
-`fico`, … one per mission's system, and `tabras`, Tabula Rasa) use generic
-planet textures (`solsys/ice`, `desert`, `alpine`, `red`, `volcanic`,
-`alien1`-`7`, `sun`, `stars1`-`4`). Several systems share one geometry
-(`karazin` and `fico` are identical: a star sphere, a small flat piece and
-four planets), so which textures each uses is the game's choice, not in the
-files; their metamodels name no parts. `tabras` is the galaxy of the
+**Star systems** (`glblgame.cat`, `geo/solsys/`) are one model per
+system, and `tabras` (Tabula Rasa) is the galaxy; see
+[Star systems](#star-systems). `tabras` is the galaxy of the
 briefings' STELLAR CARTOGRAPHY step: a flat slab (20 faces, texture 0) round
 three flat layers (textures 1-3), numbering `tabras01`-`04` in name order:
 a star field, a blue arm of stars, the red ribbon and a scatter of stars.
@@ -210,6 +206,58 @@ transparency. Not settled.
 planet archives hold terrain textures such as `lbp/txr/map/alp/green01` and
 `cliff01` (in `alpwrld.cat`, next to the `.gmf` maps), so the maps
 presumably assign them.
+
+## Star systems
+
+`glblgame.cat`'s `geo/solsys/` holds 23 systems (`alfadir`, `ap173`,
+`bezouk`, `bursai`, `cadimus`, `durac`, `fico`, `fthorc`, `gestas`,
+`hrimfrax`, `ixion`, `jeddart`, `jotunhei`, `karazin`, `lupercal`,
+`mazikaan`, `pellion`, `sakuntul`, `taal`, `tancred`, `taphet`, `tarikon`,
+`tybalt`), named after the system or a planet in it (`karazin` is F1's
+planet of operations; its system has another name). Each model is, in one part:
+
+- **A starfield:** a sixteen-sided cylinder round everything (about 7800
+  units across, 3100 high), its walls numbering four textures in order
+  (usually 2-5) and its ends 0. They're the four `solsys/stars1`-`4`
+  pictures, whose alpha layers are their stars' brightness.
+- **The star:** a stack of seven square slices, every face numbered 0
+  (`karazin`'s at the middle, about 150 units across).
+- **Planets:** stacks of seven square slices like the star, about 120-370
+  units across, each slice twice: a quad numbered with the planet's own
+  texture and two triangles over it, its back, numbered 0. A ringed planet
+  has six slices and a ring, a bigger slice numbered on its own.
+
+The pictures (`lbp/txr/solsys/`, 32 × 32, rings 64 × 64) are discs: their
+alpha layers are 0 outside a circle (rings: outside a ring), and most are
+light on one half and dark on the other, a planet's day and night. A
+stack of them turned to face the eye is a ball. The planets are `ice`,
+`desert`, `alpine`, `alpine2`, `red`, `volcanic`, `volcani1` and
+`alien1`-`7`, with rings `alien3_r`, `alien7_r` and `red_r`. The stars are
+`sun`, `sun2` and `sun3`.
+
+**Which system:** each mission's string table names its system's planets,
+most often the one whose model shows: F1 `karazin`, F2 `jeddart`, F3
+`fico`, F8 `durac`, F12 and F14 `tybalt`, K1 `taal`, K2 `ixion`, K7
+`bursai`, K8 `tancred`, K12 and K14 `fthorc` (spelt with an apostrophe),
+R1 `sakuntul`, R2 `taphet`, R8 `hrimfrax`, R9 `tarikon`, R12 and R14
+`bezouk`, and the joint missions J1 `mazikaan`, J2 `jotunhei`, J3 `ap173`,
+J6 `pellion`, J7 `lupercal`, J8 and J9 `cadimus`. J4's system has no model
+of its name (its recording shows a yellow haze), and `alfadir` and `gestas`
+no mission.
+
+**Which textures** isn't in the files: no texture is named after a system,
+the metamodels (`mdl/solsys/`) name no textures, and nothing else in the
+archives mentions the pictures; it's presumably in `STNW.exe`. The
+recordings' star system steps show, small: a yellow star in every one;
+F1 a cyan planet (Karazin is an ice world); J1 a cyan planet held in the
+middle (an ice world); J3 a green one (alpine); F12 and F14 a green one
+(alpine); F8 red, magenta and tan planets; J8 teal, cyan and green ones.
+So Reluva's choice: `sun` for the star, the mission's world for its first
+planet (by texture number: `ice`, `desert`, `alpine`, `red`, `volcanic`,
+`alien4` for the alien world), the matching planet and ring for a ringed
+one (`red`/`red_r`, `alien3`/`alien3_r`, `alien7`/`alien7_r`), and the
+rest from a fixed list starting with `red` and `alien2` (magenta), and
+`stars1`-`4` for the walls (`src/engines/newworlds/star_system.h`).
 
 ## Winding and file names
 
