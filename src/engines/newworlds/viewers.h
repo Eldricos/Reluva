@@ -13,6 +13,7 @@
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/game_ui.h"
 #include "engines/newworlds/colony.h"
+#include "engines/newworlds/model_render.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -480,8 +481,7 @@ private:
     // A model turning on the grid, with its textures (loaded once).
     bool drawModel(const std::string& name);
     struct BriefingModel {
-        GeoModel geo;
-        std::vector<Texture> textures;
+        TexturedModel model;
         bool ok = false;
     };
     std::map<std::string, BriefingModel> models_;

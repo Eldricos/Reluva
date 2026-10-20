@@ -72,5 +72,11 @@ colonies, and how the missions page lays one out: [colony.md](colony.md).
   models: [play-f1.md](play-f1.md#buildings-and-their-models),
   [play-k1.md](play-k1.md#buildings-and-their-models). Upgrades are pieces
   added round a building's first model, each selectable by name.
+- **Briefing model views** differ by side: the Federation's draw the
+  model see-through and lavender over a teal grid (F2's derelict, J4F's
+  Metar portal and nak, J8F's vehicle yard), the Klingons' solid under a
+  dark blue light over a red grid (K2's temple, its glow still green).
+  Every model a recorded briefing shows is now matched; see the mission
+  pages.
 - **Starting stock** (500, 1000, 2300, 500, 4000, 5000) and colony
   capacity (50, or 90 in later missions).

@@ -34,6 +34,10 @@ constexpr const char* kPillar = "geo/bad/hcp.geo";      // the containment pilla
 constexpr const char* kMetarCore = "geo/bad/mch.geo";   // a Metar spire
 constexpr const char* kShieldGen = "geo/fed/fsg.geo";   // the Federation shield generator
 constexpr const char* kDisruptorTank = "geo/kln/kdt1.geo";
+constexpr const char* kDerelict = "geo/bad/odv.geo";    // F2's derelict (its metamodel: an Orion disruptor tank)
+constexpr const char* kMetarPortal = "geo/bad/mport.geo"; // the Metar portal, a vehicle dock, all blue-streaked wings
+constexpr const char* kMetarNak = "geo/bad/mn_a.geo";     // a Metar nak: long-nosed, a four-pointed star head-on
+constexpr const char* kVehicleYard = "geo/fed/fvpy_a.geo";
 
 struct Script {
     const char* mission;
@@ -64,7 +68,7 @@ const std::vector<Script>& recordedScripts() {
                      {"011", 8, V::Model, {}, kTemple}, {"012", 9, V::Relief, kF1Colony}, {"013", 10, V::Ground, kF1Temple},
                      {"014", 11, V::Ground, kF1Temple}, {"015", 0, V::Emblem}}},
         {"F2", 'F', {{"", 3, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 6, V::Ground},
-                     {"008", 7, V::Relief}, {"009", 8, V::Relief}, {"010", 9, V::Model}, {"011", 10, V::Emblem},
+                     {"008", 7, V::Relief}, {"009", 8, V::Relief}, {"010", 9, V::Model, {}, kDerelict}, {"011", 10, V::Emblem},
                      {"012", 11, V::Emblem}}},
         {"F3", 'F', {{"", 10, V::Emblem}, {"005", 11, V::Galaxy}, {"006", 12, V::StarSystem}, {"007", 2, V::Ground},
                      {"008", 3, V::Ground}, {"009", 4, V::Ground}, {"010", 5, V::Relief}, {"011", 7, V::Relief},
@@ -80,8 +84,8 @@ const std::vector<Script>& recordedScripts() {
                      {"008", 6, V::Relief}, {"009", 7, V::Ground}, {"010", 8, V::Ground}, {"011", 9, V::Ground},
                      {"012", 0, V::Ground}, {"013", 0, V::Emblem}}},
         // 006 wasn't heard (commentary); the ship model isn't identified.
-        {"J4", 'F', {{"", 4, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 0, V::Galaxy}, {"007", 0, V::Model},
-                     {"008", 0, V::Model}, {"009", 5, V::StarSystem}, {"010", 0, V::Relief}, {"011", 7, V::Ground},
+        {"J4", 'F', {{"", 4, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 0, V::Galaxy}, {"007", 0, V::Model, {}, kMetarPortal},
+                     {"008", 0, V::Model, {}, kMetarNak}, {"009", 5, V::StarSystem}, {"010", 0, V::Relief}, {"011", 7, V::Ground},
                      {"012", 8, V::Ground}, {"013", 9, V::Model, {}, "geo/kln/kss_a.geo"}, {"014", 0, V::Emblem}}},
         // 005 wasn't heard (commentary).
         {"F8", 'F', {{"", 10, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Ground},
@@ -101,7 +105,7 @@ const std::vector<Script>& recordedScripts() {
         {"J2", 'F', {{"", 6, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground},
                      {"008", 0, V::Ground}, {"009", 0, V::Emblem}}},
         {"J8", 'F', {{"", 7, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem},
-                     {"007", 5, V::Model, {}, kMetarDevice}, {"008", 6, V::Ground}, {"009", 0, V::Model},
+                     {"007", 5, V::Model, {}, kMetarDevice}, {"008", 6, V::Ground}, {"009", 0, V::Model, {}, kVehicleYard},
                      {"010", 0, V::Relief}, {"011", 0, V::Emblem}, {"012", 0, V::Emblem}, {"013", 0, V::Emblem},
                      {"014", 0, V::Emblem}}},
         // 013 wasn't heard (commentary).

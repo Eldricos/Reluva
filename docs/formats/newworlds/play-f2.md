@@ -15,7 +15,7 @@ paraphrased. October 2026.
 | `F2007` | 1:15 | PRIMARY OBJECTIVE 1 (6) | the colony site on the desert, a shuttle |
 | `F2008` | 1:29 | PRIMARY OBJECTIVE 2 (7) | the relief map, the colony's area marked |
 | `F2009` | 1:45 | PRIMARY OBJECTIVE 3 (8) | the relief map |
-| `F2010` | 2:00 | ADDITIONAL (9) | a purple derelict starship turning on the grid |
+| `F2010` | 2:00 | ADDITIONAL (9) | a purple derelict starship turning on the grid: `odv` by shape (its central spine, side boxes and red fin; its metamodel calls it an Orion disruptor tank) |
 | `F2011` | 2:18 | MISSION RESTRICTIONS (10) | the emblem |
 | `F2012` | 2:35 | MISSION RESTRICTIONS (11) | the emblem |
 

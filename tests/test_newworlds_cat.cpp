@@ -644,7 +644,9 @@ void testColony() {
     CHECK(buildingModel("vehicle-yard", 'F', &matched) == "geo/fed/fvpy_a.geo" && matched);
     CHECK(buildingModel("power-generator", 'F', &matched) == "geo/fed/fpgs.geo" && !matched);
     CHECK(buildingModel("colony-hub", 'K') == "geo/kln/kch.geo");
-    CHECK(buildingModel("accommodation", 'K').empty() && buildingModel("disruptor-tank", 'K').empty());
+    CHECK(buildingModel("accommodation", 'K', &matched) == "geo/kln/kab.geo" && matched); // the Arsenal
+    CHECK(buildingModel("sickbay", 'R') == "geo/rom/ruh_a.geo");
+    CHECK(buildingModel("transporter-pad", 'F').empty() && buildingModel("disruptor-tank", 'K').empty());
 
     // A flat 8 x 8 block map, a deposit in block (6, 4), a cliff along
     // block row 2's west half, nothing beyond column 7; buildings one tile

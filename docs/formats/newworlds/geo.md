@@ -179,6 +179,11 @@ are the empires' building **portals** (`fedconyardportalmetamodel`) and the
 natives' **interiors** (`taubattempleinteriormetamodel`); which textures
 they use isn't known (the Romulans have a `portal1`).
 
+`reluva-tool geo-sheet [-l|-t] <out.ppm> <filter> <file.cat>...` draws every
+main model whose name holds the filter to a contact sheet, textured by the
+rule below, two views each (`-l` four, `-t` eight round it at the
+briefings' height): the way the recordings' models were matched.
+
 The viewer's rule: a model uses the textures named exactly after it or after
 it plus `_` and a suffix, in name order from 0, preferring its own folder
 (`kln`). A model without any, such as a `_l` version, uses those of its name

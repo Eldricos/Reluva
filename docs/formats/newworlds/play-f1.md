@@ -259,10 +259,15 @@ two unknown texture numbers, drawn red and olive), are grey with two blue
 bands in the game, like the panels of the `fss` texture. `prostor`'s
 corners carry different painted numbers per building.
 
+The sickbay (selected 26:40): `fsb`, five-sided with a yellow top, on a
+block of concrete beside the pad. Its walls' blue bands are shared
+textures the viewer can't place; its only own texture is `fsb_g`, the
+glowing top.
+
 Not identified: the power generator (`fpgs`, complete 5:49), the mining
 stations (`fms`, only seen from afar on the hills), the defences (`fpdt`,
-`fpds`, `fsg`), `landpad`, `foodstor` and the sickbay (`fsb`), which must
-exist (research is done there at 26:00).
+`fpds`, `fsg`), `landpad` and `foodstor`. Their metamodels name them all
+([colony.md](colony.md#the-games-names-for-the-buildings)).
 
 The placement outline is a see-through box over the tiles, green where the
 building can go (17:09) and red where it can't (22:37).

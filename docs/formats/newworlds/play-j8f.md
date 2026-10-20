@@ -10,6 +10,6 @@ behaviour; messages paraphrased. October 2026. Klingon side:
 
 The transmission page (7) over the emblem; `J8F005` the galaxy (3, 42 s);
 `J8F006` the star system (4); `J8F007` the anomaly device (`mad`) turning
-on the grid (5); `J8F008` the colony on the dust plain (6); `J8F009` a
-building on the grid; `J8F010` the relief map; `J8F011`-`J8F014` the
+on the grid (5); `J8F008` the colony on the dust plain (6); `J8F009` the
+vehicle yard (`fvpy_a`, the arched hangar with its apron) on the grid; `J8F010` the relief map; `J8F011`-`J8F014` the
 emblem (2:50-4:05). The recording ends minutes into play.

@@ -30,6 +30,8 @@
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
 //   reluva-tool gmf-dump <planet.cat> <out dir>    write each map's tiles, grid and objects as CSV
+//   reluva-tool geo-sheet [-l|-t] <out.ppm> <filter> <file.cat>...  draw models to a contact sheet, two
+//                                                  views each (-l: larger, four; -t: eight round it)
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
 //                                                  one record (or where the walk stops)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
@@ -49,6 +51,8 @@
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/model_textures.h"
+#include "engines/newworlds/model_render.h"
+#include "common/font.h"
 
 #include <map>
 #include <memory>
@@ -1924,6 +1928,87 @@ int cmdGmfDump(int argc, char** argv) {
     return 0;
 }
 
+// Renders models to a contact sheet (a PPM image), textured as the model
+// viewer shows them, two views each with its name: every main model (not
+// lod/ or a variant) whose name holds the filter, from the
+// archives given. Textures are found across all of them.
+int cmdGeoSheet(int argc, char** argv) {
+    // -l: larger cells, four views each, a model a row; -t: eight views
+    // round it at the briefings' height.
+    const bool turntable = argc >= 3 && std::strcmp(argv[2], "-t") == 0;
+    const bool large = turntable || (argc >= 3 && std::strcmp(argv[2], "-l") == 0);
+    if (large)
+        --argc, ++argv;
+    if (argc < 5) {
+        std::fprintf(stderr, "usage: reluva-tool geo-sheet [-l|-t] <out.ppm> <name filter> <file.cat>...\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    nw::Archives archives;
+    for (int i = 4; i < argc; ++i) {
+        auto cat = std::make_unique<nw::CatArchive>();
+        if (reluva::Error err = cat->open(argv[i])) {
+            std::fprintf(stderr, "%s: %s\n", argv[i], err.message.c_str());
+            return 1;
+        }
+        archives.push_back(std::move(cat));
+    }
+    const std::vector<nw::TextureFile> textures = nw::listTextureFiles(archives);
+    const std::string filter = argv[3];
+    std::vector<std::string> names;
+    for (const auto& a : archives)
+        for (const auto& e : a->entries()) {
+            std::string folder, stem, ext;
+            nw::splitName(e.name, folder, stem, ext);
+            // Variants: damaged (_d, _ad), low detail (_l), shadow (_s) and
+            // placement outline (_p).
+            const bool variant = stem.size() > 2 && (stem.ends_with("_d") || stem.ends_with("_l") || stem.ends_with("_s") ||
+                                                     stem.ends_with("_p") ||
+                                                     (stem.ends_with("d") && stem[stem.size() - 3] == '_'));
+            if (e.tag == nw::cattag::Geometry && e.name.find("/lod/") == std::string::npos && !variant &&
+                e.name.find(filter) != std::string::npos)
+                names.push_back(e.name);
+        }
+    if (names.empty()) {
+        std::fprintf(stderr, "no models match %s\n", filter.c_str());
+        return 1;
+    }
+    const int kCellW = large ? 320 : 200, kCellH = large ? 240 : 150, kPerRow = large ? 1 : 4, kViews = turntable ? 8 : large ? 4 : 2;
+    const int rows = int((names.size() + size_t(kPerRow) - 1) / size_t(kPerRow));
+    reluva::Surface sheet;
+    sheet.create(kPerRow * kViews * kCellW, rows * kCellH, reluva::PixelFormat::RGBA32);
+    reluva::Surface cell;
+    cell.create(kCellW, kCellH, reluva::PixelFormat::RGBA32);
+    nw::Rasterizer raster;
+    for (size_t i = 0; i < names.size(); ++i) {
+        nw::TexturedModel m;
+        const bool ok = nw::loadTexturedModel(archives, textures, names[i], m);
+        for (int view = 0; view < kViews; ++view) {
+            for (size_t p = 0; p < cell.pixels.size(); p += 4)
+                cell.pixels[p] = 0, cell.pixels[p + 1] = 0, cell.pixels[p + 2] = 24, cell.pixels[p + 3] = 255;
+            static constexpr float kYaw[4] = {0.6f, 2.7f, 1.6f, 4.2f}, kPitch[4] = {0.35f, 0.9f, 0.15f, 0.35f};
+            if (ok)
+                nw::drawModelView(cell, raster, m, turntable ? float(view) * 0.7854f : kYaw[view],
+                                  turntable ? 0.35f : kPitch[view]);
+            if (view == 0) {
+                std::string folder, stem, ext;
+                nw::splitName(names[i], folder, stem, ext);
+                reluva::font::drawText(cell, 3, 3, ok ? stem : stem + " ?", {255, 230, 80});
+            }
+            const int x0 = int(i % size_t(kPerRow)) * kViews * kCellW + view * kCellW, y0 = int(i / size_t(kPerRow)) * kCellH;
+            for (int y = 0; y < kCellH; ++y)
+                std::memcpy(sheet.row(y0 + y) + x0 * 4, cell.row(y), size_t(kCellW) * 4);
+        }
+    }
+    std::ofstream out(argv[2], std::ios::binary);
+    out << "P6\n" << sheet.w << ' ' << sheet.h << "\n255\n";
+    for (int y = 0; y < sheet.h; ++y)
+        for (int x = 0; x < sheet.w; ++x)
+            out.write(reinterpret_cast<const char*>(sheet.row(y) + x * 4), 3);
+    std::printf("%zu models drawn to %s\n", names.size(), argv[2]);
+    return out ? 0 : 1;
+}
+
 int cmdGroundTextures(int argc, char** argv) {
     if (argc != 3) {
         std::fprintf(stderr, "usage: reluva-tool ground-textures <planet.cat>\n");
@@ -2321,6 +2406,8 @@ int main(int argc, char** argv) {
         return cmdGroundTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "gmf-dump") == 0)
         return cmdGmfDump(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "geo-sheet") == 0)
+        return cmdGeoSheet(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
         return cmdGeoFaces(argc, argv);
     std::fprintf(stderr,
@@ -2347,6 +2434,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-slots <file.geo>...\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
                  "  reluva-tool gmf-dump <planet.cat> <output dir>\n"
+                 "  reluva-tool geo-sheet [-l|-t] <out.ppm> <name filter> <file.cat>...\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");

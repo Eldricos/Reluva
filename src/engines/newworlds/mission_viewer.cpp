@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/model_render.h"
 #include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
@@ -884,101 +885,27 @@ bool MissionViewer::drawModel(const std::string& name) {
         return false;
     auto [it, added] = models_.try_emplace(name);
     BriefingModel& m = it->second;
-    if (added) {
-        for (const auto& a : archives_)
-            if (const CatEntry* e = a->find(name)) {
-                std::vector<uint8_t> data;
-                m.ok = !a->read(*e, data) && !parseGeo(data, m.geo);
-                break;
-            }
-        if (m.ok) {
-            // Its textures as the model viewer finds them (model_textures.h).
-            size_t needed = 0;
-            for (const auto& face : m.geo.faces)
-                needed = std::max<size_t>(needed, face.corners.back().extra[4] + 1);
-            std::vector<const TextureFile*> slots = findModelTextures(name, textureFiles_, needed);
-            addDoorTextures(m.geo, name, textureFiles_, slots);
-            addPadTextures(m.geo, name, textureFiles_, slots);
-            for (const TextureFile* t : slots) {
-                Texture tex;
-                std::vector<uint8_t> data;
-                if (t) {
-                    CatArchive& cat = *archives_[t->ref.archive];
-                    if (cat.read(cat.entries()[t->ref.entry], data) || decodeTexture(data, tex))
-                        tex = Texture{};
-                }
-                m.textures.push_back(std::move(tex));
-            }
-        }
-    }
+    if (added)
+        m.ok = loadTexturedModel(archives_, textureFiles_, name, m.model);
     if (!m.ok)
         return false;
 
-    // The grid, as behind the recordings' model views.
+    // The grid, as behind the recordings' model views: teal for the
+    // Federation, dark red for the Klingons.
+    const Level& level = missions_[size_t(current_)];
+    const char side = missionSides(level.shortName)[size_t(side_)];
+    const uint8_t grid[3] = {uint8_t(side == 'F' ? 20 : 70), uint8_t(side == 'F' ? 45 : 14), uint8_t(side == 'F' ? 60 : 14)};
     const int w = screen_.w, h = screen_.h;
     for (int y = 0; y < h; ++y) {
         uint8_t* row = screen_.row(y);
         for (int x = 0; x < w; ++x, row += 4) {
             const bool line = (y % 24 == 0 && x % 4 == 0) || (x % 24 == 0 && y % 4 == 0);
-            row[0] = line ? 70 : 0, row[1] = line ? 14 : 0, row[2] = line ? 14 : 0, row[3] = 255;
+            row[0] = line ? grid[0] : 0, row[1] = line ? grid[1] : 0, row[2] = line ? grid[2] : 0, row[3] = 255;
         }
     }
-    // Framed by its size, turning once a minute, lit from above.
-    Vec lo{1e30f, 1e30f, 1e30f}, hi{-1e30f, -1e30f, -1e30f};
-    for (const auto& part : m.geo.parts)
-        for (const auto& v : part.vertices) {
-            lo = {std::min(lo.x, v.x), std::min(lo.y, v.y), std::min(lo.z, v.z)};
-            hi = {std::max(hi.x, v.x), std::max(hi.y, v.y), std::max(hi.z, v.z)};
-        }
-    if (lo.x > hi.x)
-        return false;
-    const Vec centre = (lo + hi) * 0.5f;
-    const float radius = std::max(1.0f, std::sqrt(dot(hi - lo, hi - lo)) * 0.5f);
-    const float yaw = float(nowMs_ % 60000) / 60000.0f * 6.2832f;
-    const OrbitCamera cam(centre, yaw, 0.35f, radius * 3.0f, w, h);
-    const Vec light = normalize({0.4f, -0.3f, 1.0f});
-    raster_.begin(screen_);
-    for (const GeoModel::Face& face : m.geo.faces) {
-        if (face.corners.size() < 3 || face.part >= m.geo.parts.size())
-            continue;
-        const auto& verts = m.geo.parts[face.part].vertices;
-        std::vector<Vec> world;
-        for (const GeoModel::Corner& c : face.corners)
-            if (c.vertex < verts.size())
-                world.push_back({verts[c.vertex].x, verts[c.vertex].y, verts[c.vertex].z});
-        if (world.size() != face.corners.size())
-            continue;
-        const Vec n = normalize(cross(world[1] - world[0], world[2] - world[0]));
-        const float lit = 0.45f + 0.55f * std::fabs(dot(n, light));
-        std::vector<ViewVertex> poly;
-        for (size_t i = 0; i < world.size(); ++i)
-            poly.push_back(cam.toView(world[i], face.corners[i].u, face.corners[i].v));
-        poly = clipNear(poly, cam.nearZ);
-        if (poly.size() < 3)
-            continue;
-        std::vector<ScreenVertex> s;
-        for (const ViewVertex& v : poly)
-            s.push_back(cam.project(v));
-        const uint32_t ti = face.corners.back().extra[4];
-        const Texture* tex = ti < m.textures.size() && !m.textures[ti].rgba.empty() ? &m.textures[ti] : nullptr;
-        auto shade = [&](float u, float v, uint8_t* out) {
-            uint8_t c[3] = {150, 150, 150};
-            if (tex) {
-                const int tx = std::clamp(int(u * float(tex->width)), 0, tex->width - 1);
-                const int ty = std::clamp(int(v * float(tex->height)), 0, tex->height - 1);
-                const uint8_t* p = &tex->rgba[(size_t(ty) * size_t(tex->width) + size_t(tx)) * 4];
-                if (p[3] == 0)
-                    return false; // colour-keyed: see-through
-                c[0] = p[0], c[1] = p[1], c[2] = p[2];
-            }
-            for (int k = 0; k < 3; ++k)
-                out[k] = uint8_t(float(c[k]) * lit);
-            return true;
-        };
-        for (size_t i = 1; i + 1 < s.size(); ++i)
-            raster_.drawTriangle(s[0], s[i], s[i + 1], shade);
-    }
-    return true;
+    // Turning once a minute, in the side's style.
+    return drawModelView(screen_, raster_, m.model, float(nowMs_ % 60000) / 60000.0f * 6.2832f, 0.35f,
+                         briefingModelStyle(side));
 }
 
 // The briefing's views without a map: the game's galaxy and emblem where

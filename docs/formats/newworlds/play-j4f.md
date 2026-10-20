@@ -13,8 +13,10 @@ The transmission page (4) over the emblem; `J4F005` the galaxy (3);
 purple-blue winged ship turning on the grid; `J4F009` PLANETARY DATA (5)
 over the system's yellow haze; `J4F010` the relief map; `J4F011`-`012`
 the dust plain with Metar ships and spires (7, 8); `J4F013` a Klingon
-science station on the grid (9); `J4F014` the emblem. The ship isn't
-matched to a model yet.
+science station on the grid (9); `J4F014` the emblem. The "ship" is the
+Metar portal (`mport`, a vehicle dock by its metamodel: the same
+folded wings and blue streaks), and `J4F008`'s, from 1:20, a different
+one: the Metar nak (`mn_a`), long-nosed, a four-pointed star seen head-on.
 
 ## Messages
 

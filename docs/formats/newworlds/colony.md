@@ -80,8 +80,9 @@ a block, on its deposit.
 
 The scripts' building names, and the models the recordings matched to
 them ([play-f1.md](play-f1.md), [play-k1.md](play-k1.md)). Those marked
-*name* are taken from the model's name alone and are guesses (`fpgs`,
-`kpgs`: power generator station).
+*name* aren't matched in a recording yet but are named so by the game's
+own metamodels (below); the turrets marked *guess* by their models' names
+alone.
 
 | Building | Federation | Klingon | Romulan |
 |---|---|---|---|
@@ -89,22 +90,51 @@ them ([play-f1.md](play-f1.md), [play-k1.md](play-k1.md)). Those marked
 | Colony hub upgrade | `fch_b` | `kch_b` | `rch_b` *name* |
 | Vehicle yard | `fvpy_a` | `kvy` | `rvy` *name* |
 | Construction yard | `fcy` | `kcy` | `rcy_a` *name* |
-| Resource processor | `frps_a` | `krps` | |
+| Resource processor | `frps_a` | `krps` | `rrpp_a` *name* |
 | Power generator | `fpgs` *name* | `kpgs` | `rps1` *name* |
 | Advanced generator | `fpgs2` *name* | `kpgs2` | `rps2` *name* |
 | Mining station | `fms` *name* | `kms` | `rms` *name* |
-| Accommodation | `accom` | | |
-| Sickbay | `fsb` *name* | `ksb_a` | |
-| Science station | `fss_a` *name* | `kss_a` | |
-| Science station upgrade | `fss_b` *name* | `kss_b` *name* | |
-| Security center | `fsc` | | |
-| Hydroponics / livestock farm | `fhf` | `klf` | |
-| Storage facility | | `ksf` | |
-| Arsenal | | `kab` | |
-| Transporter pad | `landpad` *name* | | |
-| Photon turret | `fpdt` *name* | | |
+| Accommodation (the Klingons' Arsenal) | `accom` | `kab` | `rab` *name* |
+| Sickbay | `fsb` | `ksb_a` | `ruh_a` *name* |
+| Science station | `fss_a` *name* | `kss_a` | `rsb_a` *name* |
+| Science station upgrade | `fss_b` *name* | `kss_b` *name* | `rsb_b` *name* |
+| Security center | `fsc` | `ksc` *name* | `risb` *name* |
+| Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
+| Storage facility | | `ksf` | `rsf` *name* |
+| Landing pad | `landpad` *name* | | |
+| Photon turret | `fpdt` *guess* | | |
 | Disruptor turret | | `ksg` | |
-| Static disruptor | | `kdws` *name* | |
+| Static disruptor | | `kdws` *guess* | |
+
+### The game's names for the buildings
+
+`misc.cat`'s metamodels (`mdl/fed/`, `mdl/kln/`, `mdl/rom/`) name each
+model, in the game's own words for internal use (`reluva-tool mdl-info`):
+
+- **Federation:** `fch` hub (`_b`, `_c` its upgrades), `fcy` construction
+  yard (upgrades `_b`, `_c`), `fvpy_a`-`_c` vehicle yard, `frps_a`
+  resource processing station (`_b`, `_c`), `fpgs`/`fpgs2` power
+  generator and advanced, `fms`/`fms2` mining station and advanced, `fsb`
+  sickbay (`_b`), `fss_a` science station (`_b`), `accom` accommodation
+  block, `fhf` hydroponics farm, `landpad` landing pad, `fpdt` defence
+  weapon, `fpds` defence artillery, `fmsg` mobile shield.
+- **Klingon:** `kch` colony hub (`_b`, `_c`), `kcy` construction yard,
+  `kvy` vehicle yard, `krps` storage processor (the panel's resource
+  processor; `krps_i` its interior), `kpgs`/`kpgs2`, `kms`/`kms2`, `ksb_a`
+  sickbay (`_b`, `_c`), `kss_a` science block (`_b`-`_d`), `kab`
+  accommodation block (the panel's Arsenal), `ksc` security centre, `klf`
+  livestock farm, `kief` import/export, `kdwsp` defence artillery, `kmdb`
+  disruptor battery. `ksf`, `ksg` and `kdws` have no metamodel.
+- **Romulan:** `rch` hub (`_b`, `_c`; `rch_i` interior), `rcy_a`
+  construction yard (`_b`), `rvy` vehicle yard (`_b`), `rrpp_a` storage
+  processor (`_b`), `rps1`/`rps2` power generator and advanced,
+  `rms`/`rms2` mining station and advanced, `ruh_a` sickbay (`_b`),
+  `rsb_a` science block (`_b`), `rab` accommodation block, `risb` security
+  centre, `rsf` storage facility, `rcbf` clone farm, `rbcs` border control
+  station, `rdds` defence weapon, `rpds` defence artillery. The `_i`
+  models are interiors.
+
+The names the panel shows can differ from these (the Klingons' Arsenal).
 
 Most Klingon buildings have a texture number the name rule can't fill
 ([geo.md](geo.md#textures)), so a face of each (often its top) shows

@@ -49,28 +49,30 @@ struct ModelEntry {
 };
 
 // Models by the scripts' building names. Upper case: matched in recordings
-// (play-f1.md and play-k1.md's tables); lower case: by the model's name
-// alone (fpgs, kpgs: power generator station), a guess. Upgrades stand on
-// the building they upgrade.
+// (play-f1.md and play-k1.md's tables); lower case: by the game's own names
+// for its models, the metamodels in misc.cat (fpgs "fedpowgen", ruh_a
+// "romsickbay"; colony.md). The Klingons' accommodation block (kab) is the
+// panel's Arsenal. Upgrades stand on the building they upgrade.
 constexpr ModelEntry kModels[] = {
     {"colony-hub", "FCH", "KCH", "rch"},
     {"colony-hub-upgrade", "FCH_B", "KCH_B", "rch_b"},
     {"vehicle-yard", "FVPY_A", "KVY", "rvy"},
     {"construction-yard", "FCY", "KCY", "rcy_a"},
-    {"resource-processor", "FRPS_A", "KRPS", ""},
+    {"resource-processor", "FRPS_A", "KRPS", "rrpp_a"},
     {"power-generator", "fpgs", "KPGS", "rps1"},
     {"advanced-generator", "fpgs2", "KPGS2", "rps2"},
     {"mining-station", "fms", "KMS", "rms"},
-    {"accommodation", "ACCOM", "", ""},
-    {"sickbay", "fsb", "KSB_A", ""},
-    {"science-station", "fss_a", "KSS_A", ""},
-    {"science-station-upgrade", "fss_b", "kss_b", ""},
-    {"security-center", "FSC", "", ""},
+    {"accommodation", "ACCOM", "KAB", "rab"},
+    {"arsenal", "", "KAB", ""},
+    {"sickbay", "FSB", "KSB_A", "ruh_a"},
+    {"science-station", "fss_a", "KSS_A", "rsb_a"},
+    {"science-station-upgrade", "fss_b", "kss_b", "rsb_b"},
+    {"security-center", "FSC", "ksc", "risb"},
     {"hydroponics-farm", "FHF", "", ""},
     {"livestock-farm", "", "KLF", ""},
-    {"storage-facility", "", "KSF", ""},
-    {"arsenal", "", "KAB", ""},
-    {"transporter-pad", "landpad", "", ""},
+    {"clone-farm", "", "", "rcbf"},
+    {"storage-facility", "", "KSF", "rsf"},
+    {"landing-pad", "landpad", "", ""},
     {"photon-turret", "fpdt", "", ""},
     {"disruptor-turret", "", "KSG", ""},
     {"static-disruptor", "", "kdws", ""},
