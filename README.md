@@ -56,8 +56,9 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   voice clip, **N/P** the next or previous one, **M** the planet's music, **Enter** plays the
   briefing step by step (**Enter** again skips a step, **Backspace** stops), **X** steps through
   the mission's script (its events, messages and objectives; **Z** stops), **I** shows the game's
-  interface over the map in the side's style (the script's messages and objectives in it); the
-  map's keys work too. For
+  interface over the map in the side's style (the script's messages and objectives in it), **C**
+  shows or hides the colony (its hub where the recordings put it, growing as the script builds)
+  and **V** looks at it; the map's keys work too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used (by default glow in `_g` textures, transparency in the others), **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations

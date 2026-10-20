@@ -38,7 +38,8 @@ repository). One page per mission:
 | [play-c9.md](play-c9.md) | C9 Slaver's Run (bonus) | Federation |
 
 Reluva's mission scripts are written from these pages:
-[mission-scripts.md](mission-scripts.md).
+[mission-scripts.md](mission-scripts.md). What they show of the starting
+colonies, and how the missions page lays one out: [colony.md](colony.md).
 
 ## What they established
 

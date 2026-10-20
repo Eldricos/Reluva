@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 namespace reluva::newworlds {
 
@@ -14,6 +15,7 @@ namespace {
 
 constexpr float kTileSize = 8192;          // ground models span -4096..4096 in x and y
 constexpr float kBlockSize = 2 * kTileSize;
+static_assert(kBlockSize == MapViewer::kBlockUnits);
 constexpr float kPi = 3.14159265f;
 constexpr float kMaxPitch = 89.0f * kPi / 180.0f;
 constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
@@ -93,6 +95,8 @@ void MapViewer::show(int index) {
     if (!status_.empty())
         map_ = GmfMap{};
     placeScenery();
+    buildings_.clear();
+    hidden_.clear();
     makeUnderlay();
     resetView();
     updateTitle();
@@ -115,6 +119,7 @@ void MapViewer::lookAt(int a, int b, bool ground) {
         // Row first: the second number is the column, along x.
         targetX_ = float(b) / 8 * kBlockSize;
         targetY_ = float(a) / 8 * kBlockSize;
+        targetZ_ = groundHeight(targetX_, targetY_); // the place, not the ground under a hill
         distance_ = (ground ? 3.0f : 16.0f) * kBlockSize;
     }
     pitch_ = (ground ? 22.0f : 60.0f) * kPi / 180.0f;
@@ -175,6 +180,7 @@ std::string MapViewer::mapArchive() const {
 void MapViewer::resetView() {
     targetX_ = float(map_.width) * kBlockSize / 2;
     targetY_ = float(map_.height) * kBlockSize / 2;
+    targetZ_ = 0;
     yaw_ = 0;
     pitch_ = 50.0f * kPi / 180.0f;
     distance_ = std::max(1.0f, float(std::max(map_.width, map_.height)) * kBlockSize * 0.9f);
@@ -205,7 +211,12 @@ void MapViewer::loadModel(size_t entryIndex, TileModel& m, bool ground) {
         m.error = err.message;
         return;
     }
-    if (Error err = parseGeo(data, m.geo)) {
+    prepareModel(data, m, ground, false);
+}
+
+void MapViewer::prepareModel(const std::vector<uint8_t>& geoData, TileModel& m, bool ground, bool building) {
+    std::vector<uint8_t> data;
+    if (Error err = parseGeo(geoData, m.geo)) {
         m.error = err.message;
         return;
     }
@@ -244,6 +255,10 @@ void MapViewer::loadModel(size_t entryIndex, TileModel& m, bool ground) {
         }
     } else {
         slots = findModelTextures(m.name, textureFiles_, needed);
+        if (building) {
+            addDoorTextures(m.geo, m.name, textureFiles_, slots);
+            addPadTextures(m.geo, m.name, textureFiles_, slots);
+        }
     }
     for (const TextureFile* t : slots) {
         Texture tex;
@@ -355,6 +370,92 @@ void MapViewer::placeScenery() {
         const float x = (float(o.bx * 16 + o.x) + 0.5f) * square, y = (float(o.by * 16 + o.y) + 0.5f) * square;
         placed_.push_back({{x, y, groundHeight(x, y)}, float(o.turn) * kPi / 8, &found->second});
     }
+}
+
+const MapViewer::TileModel& MapViewer::namedModel(const std::string& name) {
+    auto [it, added] = buildingModels_.try_emplace(name);
+    TileModel& m = it->second;
+    if (!added)
+        return m;
+    m.name = name;
+    m.error = "not in the archives";
+    for (const auto& a : archives_)
+        if (const CatEntry* e = a->find(name)) {
+            std::vector<uint8_t> data;
+            m.error.clear();
+            if (Error err = a->read(*e, data))
+                m.error = err.message;
+            else
+                prepareModel(data, m, false, true);
+            break;
+        }
+    return m;
+}
+
+// A model's extent across x and y, and the middle of it.
+static void modelBounds(const GeoModel& geo, float& w, float& h, float& cx, float& cy) {
+    float x0 = 0, x1 = 0, y0 = 0, y1 = 0;
+    bool any = false;
+    for (const auto& part : geo.parts)
+        for (const auto& v : part.vertices) {
+            if (!any)
+                x0 = x1 = v.x, y0 = y1 = v.y, any = true;
+            x0 = std::min(x0, v.x), x1 = std::max(x1, v.x), y0 = std::min(y0, v.y), y1 = std::max(y1, v.y);
+        }
+    w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+}
+
+std::pair<float, float> MapViewer::modelSize(const std::string& name) {
+    const TileModel& m = namedModel(name);
+    float w = 0, h = 0, cx = 0, cy = 0;
+    if (m.error.empty())
+        modelBounds(m.geo, w, h, cx, cy);
+    return {w, h};
+}
+
+void MapViewer::setBuildings(const std::vector<Building>& buildings) {
+    buildings_.clear();
+    hidden_.assign(placed_.size(), false);
+    // Upgrades stand where the building they upgrade does, in its frame:
+    // centred by the first model placed at that spot.
+    std::map<std::pair<int, int>, std::pair<float, float>> centres;
+    for (const Building& b : buildings) {
+        const TileModel& m = namedModel(b.model);
+        if (!m.error.empty())
+            continue;
+        float w = 0, h = 0, cx = 0, cy = 0;
+        modelBounds(m.geo, w, h, cx, cy);
+        const auto [c, first] = centres.try_emplace({b.a, b.b}, std::pair{cx, cy});
+        cx = c->second.first, cy = c->second.second;
+        // Row first, as lookAt; the model's middle there (some models' own
+        // origin is at a corner: rch, rms), standing on the ground.
+        const float angle = float(b.turn) * kPi / 2, cs = std::cos(angle), sn = std::sin(angle);
+        const float x = float(b.b) / 8 * kBlockSize - (cx * cs - cy * sn);
+        const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
+        const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
+        buildings_.push_back({{x, y, ground}, angle, &m});
+        // No trees or rocks inside it.
+        const float cx0 = float(b.b) / 8 * kBlockSize, cy0 = float(b.a) / 8 * kBlockSize;
+        const bool across = b.turn % 2 != 0;
+        const float hw = (across ? h : w) / 2 + 512, hh = (across ? w : h) / 2 + 512;
+        for (size_t i = 0; i < placed_.size(); ++i)
+            if (std::fabs(placed_[i].position.x - cx0) < hw && std::fabs(placed_[i].position.y - cy0) < hh)
+                hidden_[i] = true;
+    }
+    dirty_ = true;
+}
+
+float MapViewer::groundAt(int a, int b) {
+    const float x = float(b) / 8 * kBlockSize, y = float(a) / 8 * kBlockSize;
+    if (tileAt(int(std::floor(x / kTileSize)), int(std::floor(y / kTileSize))) < 0)
+        return std::numeric_limits<float>::quiet_NaN();
+    return groundHeight(x, y);
+}
+
+int MapViewer::depositAt(int bx, int by) const {
+    if (bx < 0 || by < 0 || bx >= map_.width || by >= map_.height)
+        return 0;
+    return map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].deposit();
 }
 
 int MapViewer::tileAt(int tx, int ty) const { return newworlds::tileAt(map_, tx, ty); }
@@ -496,7 +597,7 @@ void MapViewer::render() {
     if (!status_.empty())
         return;
 
-    const OrbitCamera cam(Vec{targetX_, targetY_, 0}, yaw_, pitch_, distance_, w, h);
+    const OrbitCamera cam(Vec{targetX_, targetY_, targetZ_}, yaw_, pitch_, distance_, w, h);
     const Vec light = normalize(Vec{-0.4f, 0.5f, -0.75f}); // towards the light, in view space
     const float tileRadius = kTileSize * 0.75f;
     raster_.begin(screen_);
@@ -639,7 +740,10 @@ void MapViewer::render() {
         }
     // Placed objects big enough on the screen to see.
     if (scenery_)
-        for (const Placed& o : placed_) {
+        for (size_t i = 0; i < placed_.size(); ++i) {
+            if (i < hidden_.size() && hidden_[i])
+                continue;
+            const Placed& o = placed_[i];
             const Vec at{o.position.x, o.position.y, o.position.z};
             const ViewVertex c = cam.toView(at);
             if (c.z < cam.nearZ)
@@ -651,6 +755,14 @@ void MapViewer::render() {
             ++drawnObjects_;
             drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
         }
+    // The buildings, whatever their size on the screen.
+    for (const Placed& o : buildings_) {
+        const Vec at{o.position.x, o.position.y, o.position.z};
+        if (cam.toView(at).z < cam.nearZ)
+            continue;
+        ++drawnObjects_;
+        drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
+    }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there
     // (cliff walls in screenshots); how isn't known, so this is the viewer's

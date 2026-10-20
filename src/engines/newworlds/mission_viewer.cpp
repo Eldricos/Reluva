@@ -182,6 +182,35 @@ void MissionViewer::loadSide() {
             clips_.push_back(stem);
     std::sort(clips_.begin(), clips_.end(), clipBefore);
     script_ = briefingScript(level.shortName, side, table_, clips_);
+    startColony();
+}
+
+void MissionViewer::startColony() {
+    colony_.reset();
+    colonySite_ = {};
+    if (hasMap_) {
+        const Level& level = missions_[size_t(current_)];
+        const char side = missionSides(level.shortName)[size_t(side_)];
+        colonySite_ = colonySite(level.shortName, side);
+        if (colonySite_.a >= 0) {
+            ColonyGround ground{map_.blocksWide(), map_.blocksHigh(),
+                                [this](int bx, int by) { return map_.depositAt(bx, by); },
+                                [this](int a, int b) { return map_.groundAt(a, b); },
+                                [this](const std::string& model) { return map_.modelSize(model); }};
+            colony_ = std::make_unique<ColonyLayout>(side, std::move(ground));
+            if (!colony_->start(colonySite_.a, colonySite_.b))
+                colony_.reset();
+        }
+    }
+    showColony();
+}
+
+void MissionViewer::showColony() {
+    std::vector<MapViewer::Building> buildings;
+    if (colony_ && colonyShown_)
+        for (const ColonyBuilding& c : colony_->buildings())
+            buildings.push_back({c.model, c.a, c.b});
+    map_.setBuildings(buildings);
 }
 
 void MissionViewer::handleEvent(const Event& ev) {
@@ -218,6 +247,14 @@ void MissionViewer::handleEvent(const Event& ev) {
     case 'x': stepScript(); break;
     case 'z': stopScript(); break;
     case 'i': interface_ = !interface_; break;
+    case 'c':
+        colonyShown_ = !colonyShown_;
+        showColony();
+        break;
+    case 'v':
+        if (colony_ && !colony_->buildings().empty())
+            map_.lookAt(colony_->buildings()[0].a, colony_->buildings()[0].b, true);
+        break;
     case 'j':
         if (sides < 2)
             return;
@@ -443,6 +480,12 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
         t += "; voice " + std::to_string(clip_ + 1) + "/" + std::to_string(clips_.size()) + " " + clips_[size_t(clip_)];
         t += clipPlaying() ? " [playing]" : " (Space: play)";
     }
+    if (colony_)
+        t += "; colony at " + std::to_string(colonySite_.a) + ":" + std::to_string(colonySite_.b) + " (" +
+             colonySite_.source + "), " + std::to_string(colony_->buildings().size()) + " building" +
+             (colony_->buildings().size() == 1 ? "" : "s") + (colonyShown_ ? "" : ", hidden (C)");
+    else if (hasMap_)
+        t += "; no colony site known";
     if (run_)
         t += "; script: " + walkNote_;
     if (running_)
@@ -631,6 +674,14 @@ void MissionViewer::stepScript() {
         for (const std::string& a : e.args)
             walkNote_ += " " + a;
         out = run_->fire(e);
+        // The colony grows as the script builds (on the missions page only:
+        // the game's own building is the player's).
+        if (e.kind == "built" && !e.args.empty() && colony_) {
+            if (colony_->add(e.args[0]))
+                showColony();
+            else
+                walkNote_ += " (not placed)";
+        }
     } else if (run_->nextTimer() >= 0) {
         walkNote_ = "time passes (" + std::to_string(int(run_->nextTimer())) + " s)";
         out = run_->advance(run_->nextTimer());
@@ -655,6 +706,7 @@ void MissionViewer::stopScript() {
     run_.reset();
     walk_.clear();
     log_.clear();
+    startColony();
     redraw();
     updateTitle();
 }

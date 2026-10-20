@@ -44,7 +44,7 @@ hid) are inferred from the objective and fail strings and marked
 "(inferred)".
 
 Not known, so not scripted: where the starting colonies, units and enemies
-are; the timing of attacks; how close "approach" is; the exact amounts
+are (the missions page approximates the colonies: [colony.md](colony.md)); the timing of attacks; how close "approach" is; the exact amounts
 (the dilithium targets come from the objective strings). Those need a
 running game to fill in. The Romulan campaign has no recordings yet.
 

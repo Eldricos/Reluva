@@ -7,6 +7,7 @@
 #include "engines/newworlds/arf.h"
 #include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/colony.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -635,6 +636,66 @@ void testMissionScripts() {
     CHECK(!out.empty() && out[0].text == "Vehicle yard finished.");
 }
 
+void testColony() {
+    CHECK(colonySite("F1", 'F').a == 407 && colonySite("F1", 'F').b == 209);
+    CHECK(colonySite("J2", 'K').a == 92 && colonySite("J2", 'F').a == 208);
+    CHECK(colonySite("F8", 'F').a < 0);
+    bool matched = false;
+    CHECK(buildingModel("vehicle-yard", 'F', &matched) == "geo/fed/fvpy_a.geo" && matched);
+    CHECK(buildingModel("power-generator", 'F', &matched) == "geo/fed/fpgs.geo" && !matched);
+    CHECK(buildingModel("colony-hub", 'K') == "geo/kln/kch.geo");
+    CHECK(buildingModel("accommodation", 'K').empty() && buildingModel("disruptor-tank", 'K').empty());
+
+    // A flat 8 x 8 block map, a deposit in block (6, 4), a cliff along
+    // block row 2's west half, nothing beyond column 7; buildings one tile
+    // square, the accommodation block two.
+    ColonyGround ground{8, 8, [](int bx, int by) { return bx == 6 && by == 4 ? 1 : 0; },
+                        [](int a, int b) {
+                            if (b >= 64)
+                                return std::nanf("");
+                            return a >= 16 && a < 24 && b < 32 ? 5000.0f : 0.0f;
+                        },
+                        [](const std::string& model) {
+                            return model.find("accom") != std::string::npos ? std::pair{12000.0f, 12000.0f}
+                                                                            : std::pair{6000.0f, 6000.0f};
+                        }};
+    ColonyLayout colony('F', ground);
+    CHECK(colony.start(36, 36));
+    CHECK(colony.buildings().size() == 1 && colony.buildings()[0].model == "geo/fed/fch.geo");
+    for (const char* b : {"construction-yard", "vehicle-yard", "power-generator", "accommodation", "mining-station",
+                          "colony-hub-upgrade", "resource-processor", "sickbay"})
+        CHECK(colony.add(b));
+    CHECK(!colony.add("colony-hub-upgrade")); // once
+    CHECK(!colony.add("disruptor-tank"));     // a unit
+    CHECK(!colony.add("science-station-upgrade"));
+    const auto& all = colony.buildings();
+    CHECK(all.size() == 9);
+    const ColonyBuilding& hub = all[0];
+    CHECK(std::abs(hub.a - 36) <= 24 && std::abs(hub.b - 36) <= 24);
+    for (const ColonyBuilding& c : all) {
+        CHECK(c.b < 64 && !(c.a >= 14 && c.a < 26 && c.b < 34)); // on the map, off the cliff
+        if (c.name == "colony-hub-upgrade")
+            CHECK(c.a == hub.a && c.b == hub.b);
+        else if (c.name == "mining-station")
+            CHECK(c.b / 8 == 6 && c.a / 8 == 4); // on the deposit
+        else
+            CHECK(!(c.b / 8 == 6 && c.a / 8 == 4));
+        CHECK(std::abs(c.a - hub.a) <= 32 && std::abs(c.b - hub.b) <= 32); // close by
+    }
+    // None overlap (one tile each, two for accommodation).
+    auto half = [](const ColonyBuilding& c) { return c.name == "accommodation" ? 4 : 2; };
+    for (size_t i = 0; i < all.size(); ++i)
+        for (size_t j = i + 1; j < all.size(); ++j)
+            if (all[j].name != "colony-hub-upgrade")
+                CHECK(std::abs(all[i].a - all[j].a) >= half(all[i]) + half(all[j]) ||
+                      std::abs(all[i].b - all[j].b) >= half(all[i]) + half(all[j]));
+    // No ground at all: no colony.
+    ColonyGround none = ground;
+    none.heightAt = [](int, int) { return std::nanf(""); };
+    ColonyLayout nowhere('K', none);
+    CHECK(!nowhere.start(36, 36) && !nowhere.add("vehicle-yard"));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -755,6 +816,7 @@ int main() {
     testLevels();
     testBriefing();
     testMissionScripts();
+    testColony();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

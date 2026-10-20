@@ -12,6 +12,7 @@
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/game_ui.h"
+#include "engines/newworlds/colony.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -197,6 +198,26 @@ public:
         colouring_ = colouring;
         dirty_ = true;
     }
+    // Buildings to stand on the shown map (the missions page's starting
+    // colony): a model by name ("geo/fed/fch.geo", in any archive) at a map
+    // position, turned anticlockwise by quarter turns. Cleared by showMap.
+    struct Building {
+        std::string model;
+        int a = 0, b = 0;
+        int turn = 0;
+    };
+    void setBuildings(const std::vector<Building>& buildings);
+    // The shown map's size in blocks, a block's resource deposit (0 for
+    // none), and the ground's height at a map position (NaN off the map
+    // or where no tile is).
+    int blocksWide() const { return map_.width; }
+    int blocksHigh() const { return map_.height; }
+    int depositAt(int bx, int by) const;
+    float groundAt(int a, int b);
+    // A building model's size across x and y (0 if it isn't there).
+    std::pair<float, float> modelSize(const std::string& name);
+    static constexpr float kBlockUnits = 16384; // a block's size in model units
+    size_t buildingsShown() const { return buildings_.size(); }
 
 private:
     using Vec3 = GeoModel::Vec3;
@@ -227,6 +248,10 @@ private:
     // An entry of the map's archive; ground tiles get textures by role, other
     // models those named after them.
     void loadModel(size_t entry, TileModel& m, bool ground);
+    // The rest of loading a model, once read; buildings get their doors'
+    // and aprons' textures too.
+    void prepareModel(const std::vector<uint8_t>& data, TileModel& m, bool ground, bool building);
+    const TileModel& namedModel(const std::string& name); // a building's, loaded once
     const TileModel& tileModel(uint32_t index);
     float groundHeight(float x, float y);
     void placeScenery();
@@ -253,9 +278,12 @@ private:
     Texture wallTexture_; // the map archive's last cliff texture, if any
     std::map<int, TileModel> sceneryModels_; // by object type
     std::vector<Placed> placed_;
+    std::map<std::string, TileModel> buildingModels_; // by name, across maps
+    std::vector<Placed> buildings_;
+    std::vector<bool> hidden_; // placed_ objects a building stands over
     Texture underlay_; // ground showing through tiles with GmfMap::Tile::underlay
 
-    float targetX_ = 0, targetY_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
+    float targetX_ = 0, targetY_ = 0, targetZ_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;
     bool textured_ = true, outlines_ = false, walls_ = true, scenery_ = true, smooth_ = true;
     int colouring_ = 0; // see kColouringNames
     bool dragging_ = false;
@@ -395,6 +423,8 @@ private:
 //   change); Z: stop it
 //   I: the game's interface over the map (its panels in the side's style,
 //   with the script's messages and objectives; not playable)
+//   C: the colony on/off (its hub where the recordings put it, and the
+//   buildings the script builds; see colony.h)   V: look at the colony
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -423,6 +453,8 @@ private:
     // clip (a few seconds when it has none, or its clip is missing).
     void drawInterface();
     void stepScript(); // the next scripted event (X)
+    void startColony(); // the hub alone, for the mission's side
+    void showColony();  // hands the colony's buildings to the map
     void stopScript();
     void startBriefing();
     void stopBriefing();
@@ -487,6 +519,9 @@ private:
     std::string walkNote_;
     GameUi ui_;
     char uiSide_ = 0;
+    std::unique_ptr<ColonyLayout> colony_;
+    ColonySite colonySite_;
+    bool colonyShown_ = true;
     bool interface_ = false;
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
