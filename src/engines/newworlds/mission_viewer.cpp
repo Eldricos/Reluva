@@ -106,6 +106,7 @@ void MissionViewer::deactivate() {
 }
 
 void MissionViewer::show(int index) {
+    stopPlay();
     stopClip();
     soundStatus_.clear();
     current_ = index;
@@ -135,6 +136,7 @@ void MissionViewer::show(int index) {
 }
 
 void MissionViewer::loadSide() {
+    stopPlay();
     stopScript();
     stopBriefing();
     stopClip();
@@ -219,9 +221,195 @@ void MissionViewer::showColony() {
     map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});
 }
 
+bool MissionViewer::hubPosition(float& x, float& y) const {
+    if (!colony_ || colony_->buildings().empty())
+        return false;
+    const ColonyBuilding& hub = colony_->buildings()[0];
+    x = float(hub.b) / 8 * MapViewer::kBlockUnits;
+    y = float(hub.a) / 8 * MapViewer::kBlockUnits;
+    return true;
+}
+
+// Play: the colony's starting units by the hub (four of the side's ground
+// scouts, as F1 and R1 start with four vehicles of one kind), the game's
+// camera over it, the interface up.
+void MissionViewer::startPlay() {
+    if (!hasMap_ || running_)
+        return;
+    const Level& level = missions_[size_t(current_)];
+    const char side = missionSides(level.shortName)[size_t(side_)];
+    world_ = std::make_unique<World>(map_.terrain());
+    float hx = map_.worldWidth() / 2, hy = map_.worldHeight() / 2;
+    hubPosition(hx, hy);
+    // In a row south of the hub, each on the nearest open tile.
+    for (int i = 0; i < 4; ++i) {
+        const float x = hx + (float(i) - 1.5f) * 2500, y = hy - 1.4f * kTile;
+        const auto path = world_->findPath(x, y, x, y);
+        const float px = path.empty() ? x : path.back().first, py = path.empty() ? y : path.back().second;
+        world_->addUnit(side, groundScout(side), px, py, 3.1416f / 2);
+    }
+    playing_ = true;
+    interface_ = true;
+    briefing_ = false;
+    boxing_ = tricorderFull_ = false;
+    lastTickMs_ = nowMs_;
+    map_.centreOn(hx, hy);
+    map_.setView(MapViewer::View::BirdsEye);
+    showUnits();
+    redraw();
+    updateTitle();
+}
+
+void MissionViewer::stopPlay() {
+    if (!playing_)
+        return;
+    playing_ = false;
+    world_.reset();
+    map_.setUnits({});
+    map_.unlock();
+    redraw();
+    updateTitle();
+}
+
+void MissionViewer::showUnits() {
+    std::vector<MapViewer::UnitDraw> draw;
+    if (world_)
+        for (const Unit& u : world_->units())
+            draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected});
+    map_.setUnits(std::move(draw));
+}
+
+bool MissionViewer::playEvent(const Event& ev) {
+    if (ev.type == EventType::MouseMove || ev.type == EventType::MouseDown || ev.type == EventType::MouseUp)
+        mouseX_ = ev.mouseX, mouseY_ = ev.mouseY;
+    const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0;
+    switch (ev.type) {
+    case EventType::KeyDown:
+        if (ev.key == key::Escape || ev.key == key::F1 + 2) {
+            stopPlay();
+            return true;
+        }
+        if (ev.key == key::Tab) {
+            tricorderFull_ = !tricorderFull_;
+            break;
+        }
+        if (ev.key == key::Home) {
+            float x = 0, y = 0;
+            if (hubPosition(x, y))
+                map_.centreOn(x, y);
+            break;
+        }
+        if (ev.key == 'v' && shift) {
+            // To the selected vehicles, or the first one.
+            float x = 0, y = 0;
+            if (world_->groupCentre(0, x, y))
+                map_.centreOn(x, y);
+            else if (!world_->units().empty())
+                map_.centreOn(world_->units()[0].x, world_->units()[0].y);
+            break;
+        }
+        if (ev.key >= '1' && ev.key <= '9') {
+            const int n = int(ev.key - '0');
+            float x = 0, y = 0;
+            if (ctrl)
+                world_->setGroup(n);
+            else if (shift && world_->groupCentre(n, x, y))
+                map_.centreOn(x, y);
+            else if (!shift)
+                world_->selectGroup(n);
+            showUnits();
+            break;
+        }
+        if (ev.key == 'i') {
+            interface_ = !interface_;
+            break;
+        }
+        if (map_.gameKey(ev.key, mouseX_, mouseY_))
+            break;
+        return true; // the data viewer's keys don't apply in play
+    case EventType::MouseDown:
+        if (ev.button == MouseButton::Left && ctrl) {
+            map_.zoomAt(ev.mouseX, ev.mouseY, true);
+        } else if (ev.button == MouseButton::Right && ctrl) {
+            map_.zoomAt(ev.mouseX, ev.mouseY, false);
+        } else if (ev.button == MouseButton::Right) {
+            // Right-click drops the selection, or the camera's lock.
+            if (map_.locked())
+                map_.unlock();
+            else
+                world_->clearSelection();
+            showUnits();
+        } else if (ev.button == MouseButton::Left) {
+            boxing_ = true;
+            boxX_ = ev.mouseX, boxY_ = ev.mouseY;
+            return true;
+        }
+        break;
+    case EventType::MouseMove:
+        if (!boxing_)
+            return true;
+        break;
+    case EventType::MouseUp: {
+        if (ev.button != MouseButton::Left || !boxing_)
+            return true;
+        boxing_ = false;
+        const Level& level = missions_[size_t(current_)];
+        const char side = missionSides(level.shortName)[size_t(side_)];
+        const int x0 = std::min(boxX_, ev.mouseX), x1 = std::max(boxX_, ev.mouseX);
+        const int y0 = std::min(boxY_, ev.mouseY), y1 = std::max(boxY_, ev.mouseY);
+        std::vector<int> picked;
+        if (x1 - x0 > 6 || y1 - y0 > 6) {
+            // A box: the side's units inside it.
+            for (const Unit& u : world_->units()) {
+                int sx = 0, sy = 0;
+                if (u.side == side && map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y), sx, sy) &&
+                    sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1)
+                    picked.push_back(u.id);
+            }
+            world_->select(picked);
+        } else {
+            // A click: the nearest unit to it, if close; else, with units
+            // selected, they go there; a double click on the ground locks
+            // the camera on it.
+            int best = -1, bestD = 18 * 18;
+            for (const Unit& u : world_->units()) {
+                int sx = 0, sy = 0;
+                if (!map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y) + 300, sx, sy))
+                    continue;
+                const int d = (sx - ev.mouseX) * (sx - ev.mouseX) + (sy - ev.mouseY) * (sy - ev.mouseY);
+                if (d < bestD && u.side == side)
+                    best = u.id, bestD = d;
+            }
+            float gx = 0, gy = 0;
+            if (best >= 0)
+                world_->select({best});
+            else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
+                if (!world_->selection().empty())
+                    world_->moveSelected(gx, gy);
+                else if (ev.clicks >= 2)
+                    map_.lockOn(gx, gy);
+            }
+        }
+        showUnits();
+        break;
+    }
+    case EventType::MouseWheel: map_.handleEvent(ev); return true;
+    default: return true;
+    }
+    redraw();
+    updateTitle();
+    return true;
+}
+
 void MissionViewer::handleEvent(const Event& ev) {
     if (missions_.empty())
         return;
+    if (playing_ && playEvent(ev))
+        return;
+    if (ev.type == EventType::KeyDown && ev.key == key::F1 + 2) {
+        startPlay();
+        return;
+    }
     if (ev.type != EventType::KeyDown) {
         if (hasMap_)
             map_.handleEvent(ev);
@@ -317,6 +505,12 @@ void MissionViewer::update(uint64_t nowMs) {
         map_.turn(float(nowMs - lastTurnMs_) * kBriefingTurn);
         lastTurnMs_ = nowMs;
     }
+    if (playing_ && world_) {
+        const double dt = double(nowMs - lastTickMs_) / 1000.0;
+        lastTickMs_ = nowMs;
+        if (world_->advance(std::min(dt, 0.25)))
+            showUnits();
+    }
     if (mapInView())
         map_.update(nowMs);
     else if (dirty_) {
@@ -364,6 +558,12 @@ void MissionViewer::drawNoMap() {
 }
 
 void MissionViewer::drawBriefing() {
+    if (playing_) {
+        if (interface_)
+            drawInterface();
+        drawPlay();
+        return;
+    }
     if (interface_ && !running_) {
         drawInterface();
         return;
@@ -492,6 +692,8 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
              (colony_->buildings().size() == 1 ? "" : "s") + (colonyShown_ ? "" : ", hidden (C)");
     else if (hasMap_)
         t += "; no colony site known";
+    if (playing_ && world_)
+        t += "; playing: " + std::to_string(world_->selection().size()) + " selected (F3 or Escape: stop)";
     if (run_)
         t += "; script: " + walkNote_;
     if (running_)
@@ -526,6 +728,46 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
         return nullptr;
     }
     return sound;
+}
+
+// What play adds over the map: the full-screen Tricorder (Tab), with the
+// units on it, and the box a left drag draws.
+void MissionViewer::drawPlay() {
+    if (tricorderFull_ && hasMap_) {
+        const int size = std::min(screen_.w, screen_.h) - 40;
+        const int x0 = (screen_.w - size) / 2, y0 = (screen_.h - size) / 2;
+        for (int y = 0; y < screen_.h; ++y) {
+            uint8_t* row = screen_.row(y);
+            for (int x = 0; x < screen_.w; ++x, row += 4)
+                row[0] = uint8_t(row[0] / 4), row[1] = uint8_t(row[1] / 4), row[2] = uint8_t(row[2] / 4);
+        }
+        map_.drawMinimap(screen_, x0, y0, size, size);
+        if (world_)
+            for (const Unit& u : world_->units()) {
+                int px = 0, py = 0;
+                map_.minimapPoint(u.x, u.y, x0, y0, size, size, px, py);
+                for (int dy = -2; dy <= 2; ++dy)
+                    for (int dx = -2; dx <= 2; ++dx)
+                        if (px + dx >= 0 && py + dy >= 0 && px + dx < screen_.w && py + dy < screen_.h) {
+                            uint8_t* p = screen_.row(py + dy) + (px + dx) * 4;
+                            p[0] = u.selected ? 255 : 120, p[1] = u.selected ? 150 : 255, p[2] = u.selected ? 30 : 120;
+                        }
+            }
+    }
+    if (boxing_ && (std::abs(mouseX_ - boxX_) > 6 || std::abs(mouseY_ - boxY_) > 6)) {
+        const int x0 = std::min(boxX_, mouseX_), x1 = std::max(boxX_, mouseX_);
+        const int y0 = std::min(boxY_, mouseY_), y1 = std::max(boxY_, mouseY_);
+        auto put = [&](int x, int y) {
+            if (x >= 0 && y >= 0 && x < screen_.w && y < screen_.h) {
+                uint8_t* p = screen_.row(y) + x * 4;
+                p[0] = 120, p[1] = 255, p[2] = 120;
+            }
+        };
+        for (int x = x0; x <= x1; ++x)
+            put(x, y0), put(x, y1);
+        for (int y = y0; y <= y1; ++y)
+            put(x0, y), put(x1, y);
+    }
 }
 
 // The in-game interface, laid out as the recordings show it on the 640 x
@@ -582,10 +824,22 @@ void MissionViewer::drawInterface() {
         for (int i = 0; i < 6; ++i)
             kStock[i] = {kNames[i], side == 'R' ? kRomulan[i] : kStart[i]};
         int ty = y + 16;
-        ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
-        for (const auto& [name, n] : kStock) {
-            ty += lh;
-            ui_.drawSmall(screen_, x + 10, ty, std::string(name) + " = " + std::to_string(n), text);
+        const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
+        if (sel.size() == 1) {
+            // One unit: its name and state, as the game's panel.
+            const Unit* u = world_->unit(sel[0]);
+            ui_.drawSmall(screen_, x + 10, ty, u->kind.name, bright);
+            ui_.drawSmall(screen_, x + 10, ty + lh, u->moving() ? "EN ROUTE" : "READY", text);
+        } else if (sel.size() > 1) {
+            ui_.drawSmall(screen_, x + 10, ty, "MULTISELECTION", bright);
+            for (size_t i = 0; i < sel.size() && i < 6; ++i)
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), world_->unit(sel[i])->kind.name, text);
+        } else {
+            ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
+            for (const auto& [name, n] : kStock) {
+                ty += lh;
+                ui_.drawSmall(screen_, x + 10, ty, std::string(name) + " = " + std::to_string(n), text);
+            }
         }
     }
 
@@ -595,6 +849,17 @@ void MissionViewer::drawInterface() {
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
         if (hasMap_) {
             map_.drawMinimap(screen_, x + 12, y + 14, w - 24, h - 30 - lh);
+            if (world_)
+                for (const Unit& u : world_->units()) {
+                    int px = 0, py = 0;
+                    map_.minimapPoint(u.x, u.y, x + 12, y + 14, w - 24, h - 30 - lh, px, py);
+                    for (int dy = 0; dy < 2; ++dy)
+                        for (int dx = 0; dx < 2; ++dx)
+                            if (px + dx >= 0 && py + dy >= 0 && px + dx < screen_.w && py + dy < screen_.h) {
+                                uint8_t* p = screen_.row(py + dy) + (px + dx) * 4;
+                                p[0] = 120, p[1] = 255, p[2] = 120;
+                            }
+                }
             int a = 0, b = 0;
             map_.cameraPosition(a, b);
             auto pad = [](int v) {

@@ -15,6 +15,7 @@
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
+#include "engines/newworlds/world.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -196,6 +197,8 @@ public:
     // position (eighths of a block, row first); the camera's heading in
     // degrees (0 when unturned, clockwise).
     void drawMinimap(Surface& s, int x, int y, int w, int h) const;
+    // A world point's pixel on a minimap drawn at x, y, w, h.
+    void minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py) const;
     void cameraPosition(int& a, int& b) const;
     float heading() const;
     void setColouring(int colouring) {
@@ -223,6 +226,49 @@ public:
     float groundAt(int a, int b);
     // A building model's size across x and y (0 if it isn't there).
     std::pair<float, float> modelSize(const std::string& name);
+
+    // For play (the missions page): units to draw this frame, by model, at
+    // world positions (x east, y north), standing on the ground; the
+    // selected ones with the recordings' row of orange marks above them.
+    struct UnitDraw {
+        std::string model;
+        float x = 0, y = 0, heading = 0; // heading: radians anticlockwise from east
+        bool selected = false;
+    };
+    void setUnits(std::vector<UnitDraw> units) {
+        units_ = std::move(units);
+        dirty_ = true;
+    }
+    // The ground's height at a world point (0 off the map); the map's size
+    // in world units.
+    float groundAtWorld(float x, float y) { return groundHeight(x, y); }
+    float worldWidth() const { return float(map_.width) * kBlockUnits; }
+    // The ground for units: each tile's movement class (its flags' bits
+    // 16-17) and the ground's height (gmf.md); empty with no map shown.
+    Terrain terrain();
+    float worldHeight() const { return float(map_.height) * kBlockUnits; }
+    // The world point under a screen pixel (false if the ray misses the
+    // map), and a world point's pixel (false if behind the camera).
+    bool screenToGround(int sx, int sy, float& x, float& y);
+    bool worldToScreen(float x, float y, float z, int& sx, int& sy) const;
+
+    // The game's camera (play-tutorials.md): the bird's-eye view, F2's sky
+    // view, F1's first-person view; arrows move, numpad 4/6 turn, 8/2 zoom
+    // towards the pointer, 7/1 raise and lower, 9/3 tilt. A key it doesn't
+    // use returns false. mouseX/Y: where the pointer is, for the zoom.
+    enum class View { BirdsEye, Sky, FirstPerson };
+    bool gameKey(uint32_t key, int mouseX, int mouseY);
+    void setView(View v);
+    View view() const { return view_; }
+    // Ctrl+click: zoom in on the pointed spot, or out.
+    void zoomAt(int sx, int sy, bool in);
+    // Centres the view on a world point, keeping the view's height.
+    void centreOn(float x, float y);
+    // Double-click on a building: the camera closes in and orbits it (4/6
+    // turn about it) until unlocked.
+    void lockOn(float x, float y);
+    void unlock() { locked_ = false; }
+    bool locked() const { return locked_; }
     static constexpr float kBlockUnits = 16384; // a block's size in model units
     size_t buildingsShown() const { return buildings_.size(); }
 
@@ -258,7 +304,9 @@ private:
     // The rest of loading a model, once read; buildings get their doors'
     // and aprons' textures too.
     void prepareModel(const std::vector<uint8_t>& data, TileModel& m, bool ground, bool building);
-    const TileModel& namedModel(const std::string& name); // a building's, loaded once
+    // A model by name, loaded once; buildings get their doors' and aprons'
+    // textures.
+    const TileModel& namedModel(const std::string& name, bool building = true);
     const TileModel& tileModel(uint32_t index);
     float groundHeight(float x, float y);
     void placeScenery();
@@ -288,6 +336,9 @@ private:
     std::map<std::string, TileModel> buildingModels_; // by name, across maps
     std::vector<Placed> buildings_;
     std::vector<bool> hidden_; // placed_ objects under a building or on paved_
+    std::vector<UnitDraw> units_;
+    View view_ = View::BirdsEye;
+    bool locked_ = false;
     std::vector<std::array<float, 4>> buildingAreas_; // middle x, y and half sizes, in model units
     void updateHidden();
     std::set<std::pair<int, int>> paved_;
@@ -437,6 +488,8 @@ private:
 //   with the script's messages and objectives; not playable)
 //   C: the colony on/off (its hub where the recordings put it, and the
 //   buildings the script builds; see colony.h)   V: look at the colony
+//   F3: play on the map (the game's camera and controls, the colony's
+//   starting units to select and move; world.h): Escape or F3 leaves
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -446,6 +499,8 @@ public:
     void deactivate(); // stops the sound when switching to another viewer
     void handleEvent(const Event& ev);
     void update(uint64_t nowMs);
+    // Playing: Tab and Escape are the game's, not the data viewer's.
+    bool playing() const { return playing_; }
 
 private:
     struct Page {
@@ -466,6 +521,13 @@ private:
     void drawInterface();
     void stepScript(); // the next scripted event (X)
     void startColony(); // the hub alone, for the mission's side
+    // Play: the game's controls over the map.
+    void startPlay();
+    void stopPlay();
+    bool playEvent(const Event& ev); // true if play used it
+    void showUnits();
+    void drawPlay(); // the selection box, the full-screen Tricorder
+    bool hubPosition(float& x, float& y) const;
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
     void startBriefing();
@@ -538,6 +600,10 @@ private:
     GameUi ui_;
     char uiSide_ = 0;
     std::unique_ptr<ColonyLayout> colony_;
+    std::unique_ptr<World> world_;
+    bool playing_ = false, boxing_ = false, tricorderFull_ = false;
+    int mouseX_ = 0, mouseY_ = 0, boxX_ = 0, boxY_ = 0;
+    uint64_t lastTickMs_ = 0;
     ColonySite colonySite_;
     bool colonyShown_ = true;
     bool interface_ = false;

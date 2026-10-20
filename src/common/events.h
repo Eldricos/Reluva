@@ -28,6 +28,9 @@ constexpr uint32_t End = 0x106;
 constexpr uint32_t PageUp = 0x107;
 constexpr uint32_t PageDown = 0x108;
 constexpr uint32_t F1 = 0x110; // F1..F12 are consecutive
+constexpr uint32_t Kp0 = 0x120; // the numeric keypad's 0..9 are consecutive, whatever NumLock says
+constexpr uint32_t KpPeriod = 0x12a;
+constexpr uint32_t KpEnter = 0x12b;
 
 constexpr uint32_t LShift = 0x130;
 constexpr uint32_t RShift = 0x131;
@@ -60,10 +63,11 @@ enum class MouseButton { None, Left, Right, Middle };
 struct Event {
     EventType type = EventType::None;
     uint32_t key = key::Unknown; // KeyDown/KeyUp
-    uint16_t mods = 0;           // KeyDown/KeyUp
+    uint16_t mods = 0;           // KeyDown/KeyUp, and the mouse events (keymod bits)
     bool repeat = false;         // KeyDown auto-repeat
     int mouseX = 0, mouseY = 0;  // mouse events, in game framebuffer pixels
     MouseButton button = MouseButton::None;
+    int clicks = 0;              // MouseDown/MouseUp: 1, or 2 for a double click, ...
     int wheelY = 0;
 };
 

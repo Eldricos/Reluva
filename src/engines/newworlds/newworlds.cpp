@@ -118,9 +118,12 @@ public:
             while (sys_.pollEvent(ev)) {
                 if (ev.type == EventType::Quit || ev.type == EventType::ReturnToLauncher)
                     return Error::success();
-                if (ev.type == EventType::KeyDown && ev.key == key::Escape)
+                // While the missions page is playing, Escape and Tab are
+                // the game's.
+                const bool game = viewer == 0 && missions.playing();
+                if (ev.type == EventType::KeyDown && ev.key == key::Escape && !game)
                     return Error::success();
-                if (ev.type == EventType::KeyDown && ev.key == key::Tab) {
+                if (ev.type == EventType::KeyDown && ev.key == key::Tab && !game) {
                     if (viewer == 0)
                         missions.deactivate();
                     else if (viewer == 4)

@@ -19,6 +19,7 @@
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/star_system.h"
+#include "engines/newworlds/world.h"
 
 #include <algorithm>
 #include <cmath>
@@ -776,6 +777,53 @@ void testStarSystem() {
     CHECK(look >= 0 && layout.bodies[size_t(look)].slot == 1);
 }
 
+void testWorld() {
+    // A 10 x 10 tile plain with a wall of closed tiles down column 5 (open
+    // only at row 9), and a cliff (a 3000-unit step) between columns 1 and 2
+    // in rows 0-2.
+    Terrain t;
+    t.width = t.height = 10;
+    t.moveClass.assign(100, 1);
+    for (int y = 0; y < 9; ++y)
+        t.moveClass[size_t(y) * 10 + 5] = 0;
+    t.heightAt = [](float x, float y) { return x >= 2 * kTile && y < 3 * kTile ? 3000.0f : 0.0f; };
+    World w(t);
+    CHECK(!w.passable(5, 0) && w.passable(5, 9) && !w.passable(-1, 0) && !w.passable(10, 0));
+    CHECK(!w.canStep(1, 0, 1, 0) && w.canStep(1, 5, 1, 0) && !w.canStep(4, 0, 1, 0));
+    CHECK(!w.canStep(4, 9, 1, -1)); // a diagonal past the wall's end
+    // Round the wall, through its gap at the top.
+    const auto path = w.findPath(3.5f * kTile, 4.5f * kTile, 7.5f * kTile, 4.5f * kTile);
+    CHECK(!path.empty() && std::fabs(path.back().first - 7.5f * kTile) < 1 && std::fabs(path.back().second - 4.5f * kTile) < 1);
+    bool viaGap = false;
+    for (const auto& [x, y] : path)
+        viaGap = viaGap || int(y / kTile) == 9;
+    CHECK(viaGap);
+    // A closed goal moves to an open tile beside it.
+    const auto toWall = w.findPath(3.5f * kTile, 4.5f * kTile, 5.5f * kTile, 4.5f * kTile);
+    CHECK(!toWall.empty() && int(toWall.back().first / kTile) != 5);
+
+    // Units: selection, orders, groups, arrival.
+    const int a = w.addUnit('F', groundScout('F'), 1.5f * kTile, 5.5f * kTile);
+    const int b = w.addUnit('F', groundScout('F'), 1.5f * kTile, 6.5f * kTile);
+    const int c = w.addUnit('K', groundScout('K'), 8.5f * kTile, 8.5f * kTile);
+    CHECK(groundScout('R').model == "geo/rom/rfgs.geo");
+    w.select({a, b});
+    CHECK(w.selection() == (std::vector<int>{a, b}));
+    w.setGroup(1);
+    w.clearSelection();
+    CHECK(w.selection().empty() && w.selectGroup(1) && w.selection().size() == 2 && !w.selectGroup(2));
+    w.moveSelected(3.5f * kTile, 5.5f * kTile);
+    CHECK(w.unit(a)->moving() && w.unit(b)->moving() && !w.unit(c)->moving());
+    for (int i = 0; i < 200 && w.advance(0.1); ++i) {
+    }
+    const Unit& ua = *w.unit(a);
+    const Unit& ub = *w.unit(b);
+    CHECK(!ua.moving() && !ub.moving());
+    CHECK(std::hypot(ua.x - 3.5f * kTile, ua.y - 5.5f * kTile) < 2000 && std::hypot(ua.x - ub.x, ua.y - ub.y) > 500);
+    float gx = 0, gy = 0;
+    CHECK(w.groupCentre(1, gx, gy) && std::fabs(gx - 3.5f * kTile) < 1500 && !w.groupCentre(3, gx, gy));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -898,6 +946,7 @@ int main() {
     testMissionScripts();
     testColony();
     testStarSystem();
+    testWorld();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

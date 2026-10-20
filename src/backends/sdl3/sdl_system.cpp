@@ -41,6 +41,16 @@ uint32_t translateKey(SDL_Keycode k) {
     }
     if (k >= SDLK_F1 && k <= SDLK_F12)
         return key::F1 + (k - SDLK_F1);
+    // The keypad's keys keep their own codes with NumLock off too (SDL3
+    // reports KP_8, not Up), so engines can use them as keys of their own.
+    if (k >= SDLK_KP_1 && k <= SDLK_KP_9)
+        return key::Kp0 + 1 + (k - SDLK_KP_1);
+    if (k == SDLK_KP_0)
+        return key::Kp0;
+    if (k == SDLK_KP_PERIOD)
+        return key::KpPeriod;
+    if (k == SDLK_KP_ENTER)
+        return key::KpEnter;
     return key::Unknown;
 }
 
@@ -190,6 +200,7 @@ bool SdlSystem::pollEvent(Event& out) {
             out.type = EventType::MouseMove;
             out.mouseX = static_cast<int>(ev.motion.x);
             out.mouseY = static_cast<int>(ev.motion.y);
+            out.mods = translateMods(SDL_GetModState());
             return true;
         case SDL_EVENT_MOUSE_BUTTON_DOWN:
         case SDL_EVENT_MOUSE_BUTTON_UP:
@@ -197,6 +208,8 @@ bool SdlSystem::pollEvent(Event& out) {
             out.button = translateButton(ev.button.button);
             out.mouseX = static_cast<int>(ev.button.x);
             out.mouseY = static_cast<int>(ev.button.y);
+            out.clicks = ev.button.clicks;
+            out.mods = translateMods(SDL_GetModState());
             return true;
         case SDL_EVENT_MOUSE_WHEEL:
             out.type = EventType::MouseWheel;

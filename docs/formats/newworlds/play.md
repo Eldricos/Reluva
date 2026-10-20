@@ -57,6 +57,7 @@ One page per mission:
 | [play-c11.md](play-c11.md) | C11 False Sanctuary (bonus) | Romulan |
 | [play-tutorials.md](play-tutorials.md) | C1, C4-C8, the training missions | Federation |
 
+Playing on the map, with the game's controls: [game.md](game.md).
 Reluva's mission scripts are written from these pages:
 [mission-scripts.md](mission-scripts.md). What they show of the starting
 colonies, and how the missions page lays one out: [colony.md](colony.md).

@@ -19,6 +19,7 @@ static_assert(kBlockSize == MapViewer::kBlockUnits);
 constexpr float kPi = 3.14159265f;
 constexpr float kMaxPitch = 89.0f * kPi / 180.0f;
 constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
+constexpr float kUnitScale = 4; // see render()
 // Where a block's four tiles go, in its record's order: round the square
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
@@ -99,6 +100,9 @@ void MapViewer::show(int index) {
     buildingAreas_.clear();
     hidden_.clear();
     paved_.clear();
+    units_.clear();
+    locked_ = false;
+    view_ = View::BirdsEye;
     pavedModels_.clear();
     makeUnderlay();
     resetView();
@@ -127,6 +131,11 @@ void MapViewer::lookAt(int a, int b, bool ground) {
     }
     pitch_ = (ground ? 22.0f : 60.0f) * kPi / 180.0f;
     dirty_ = true;
+}
+
+void MapViewer::minimapPoint(float wx, float wy, int x0, int y0, int w, int h, int& px, int& py) const {
+    px = x0 + int(wx / (float(map_.width) * kBlockSize) * float(w));
+    py = y0 + h - 1 - int(wy / (float(map_.height) * kBlockSize) * float(h));
 }
 
 void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h) const {
@@ -418,7 +427,7 @@ const MapViewer::TileModel& MapViewer::pavedModel(uint32_t index) {
     return it->second;
 }
 
-const MapViewer::TileModel& MapViewer::namedModel(const std::string& name) {
+const MapViewer::TileModel& MapViewer::namedModel(const std::string& name, bool building) {
     auto [it, added] = buildingModels_.try_emplace(name);
     TileModel& m = it->second;
     if (!added)
@@ -432,7 +441,7 @@ const MapViewer::TileModel& MapViewer::namedModel(const std::string& name) {
             if (Error err = a->read(*e, data))
                 m.error = err.message;
             else
-                prepareModel(data, m, false, true);
+                prepareModel(data, m, false, building);
             break;
         }
     return m;
@@ -513,6 +522,154 @@ const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
     if (m.error.empty())
         e = tileSides(m.geo, tile.rotation);
     return e;
+}
+
+// The game's views: how far and how steeply the camera looks at its
+// target. By eye from the recordings; the game's own figures aren't known.
+namespace {
+struct ViewShape {
+    float distance, pitch;
+};
+constexpr ViewShape kBirdsEye{3.5f * kBlockSize, 40.0f * kPi / 180.0f};
+constexpr ViewShape kSky{14.0f * kBlockSize, 65.0f * kPi / 180.0f};
+constexpr ViewShape kFirstPerson{0.6f * kBlockSize, 6.0f * kPi / 180.0f};
+} // namespace
+
+Terrain MapViewer::terrain() {
+    Terrain t;
+    if (map_.width <= 0)
+        return t;
+    t.width = map_.width * 2;
+    t.height = map_.height * 2;
+    t.moveClass.resize(size_t(t.width) * size_t(t.height));
+    for (int ty = 0; ty < t.height; ++ty)
+        for (int tx = 0; tx < t.width; ++tx) {
+            const int r = tileAt(tx, ty);
+            t.moveClass[size_t(ty) * size_t(t.width) + size_t(tx)] = r < 0 ? 0 : int((map_.tiles[size_t(r)].flags >> 16) & 3);
+        }
+    t.heightAt = [this](float x, float y) { return groundHeight(x, y); };
+    return t;
+}
+
+void MapViewer::setView(View v) {
+    view_ = v;
+    const ViewShape& s = v == View::Sky ? kSky : v == View::FirstPerson ? kFirstPerson : kBirdsEye;
+    distance_ = s.distance;
+    pitch_ = s.pitch;
+    targetZ_ = groundHeight(targetX_, targetY_);
+    dirty_ = true;
+}
+
+void MapViewer::centreOn(float x, float y) {
+    targetX_ = std::clamp(x, 0.0f, worldWidth());
+    targetY_ = std::clamp(y, 0.0f, worldHeight());
+    targetZ_ = groundHeight(targetX_, targetY_);
+    dirty_ = true;
+}
+
+void MapViewer::lockOn(float x, float y) {
+    centreOn(x, y);
+    distance_ = std::min(distance_, 1.5f * kBlockSize);
+    locked_ = true;
+    dirty_ = true;
+}
+
+void MapViewer::zoomAt(int sx, int sy, bool in) {
+    float x = 0, y = 0;
+    if (in && screenToGround(sx, sy, x, y))
+        centreOn(x, y);
+    distance_ = std::clamp(distance_ * (in ? 0.6f : 1.6f), kTileSize * 0.3f, 40.0f * kBlockSize);
+    dirty_ = true;
+}
+
+bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
+    const float step = std::max(distance_ * 0.12f, kTileSize * 0.25f);
+    const float fx = -std::sin(yaw_), fy = std::cos(yaw_); // forward along the ground
+    auto move = [&](float ax, float ay) {
+        locked_ = false;
+        centreOn(targetX_ + ax * step, targetY_ + ay * step);
+    };
+    switch (k) {
+    case key::Up: move(fx, fy); break;
+    case key::Down: move(-fx, -fy); break;
+    case key::Left: move(-fy, fx); break;
+    case key::Right: move(fy, -fx); break;
+    case key::Kp0 + 4: yaw_ -= kKeyTurn; break;
+    case key::Kp0 + 6: yaw_ += kKeyTurn; break;
+    case key::Kp0 + 8:
+    case key::Kp0 + 2: {
+        // Targeted zoom: towards the spot under the pointer.
+        const bool in = k == key::Kp0 + 8;
+        float x = 0, y = 0;
+        if (in && !locked_ && screenToGround(mouseX, mouseY, x, y))
+            centreOn(targetX_ + (x - targetX_) * 0.2f, targetY_ + (y - targetY_) * 0.2f);
+        distance_ = std::clamp(distance_ * (in ? 0.85f : 1.18f), kTileSize * 0.3f, 40.0f * kBlockSize);
+        break;
+    }
+    case key::Kp0 + 7:
+    case key::Kp0 + 1: {
+        // Raise or lower the eye, keeping where it stands over the ground.
+        const float ground = distance_ * std::cos(pitch_);
+        float height = distance_ * std::sin(pitch_) * (k == key::Kp0 + 7 ? 1.2f : 1 / 1.2f);
+        height = std::clamp(height, kTileSize * 0.05f, 40.0f * kBlockSize);
+        pitch_ = std::clamp(std::atan2(height, ground), 0.02f, kMaxPitch);
+        distance_ = std::hypot(height, ground);
+        break;
+    }
+    case key::Kp0 + 9: pitch_ = std::clamp(pitch_ + kKeyTurn / 2, 0.02f, kMaxPitch); break;
+    case key::Kp0 + 3: pitch_ = std::clamp(pitch_ - kKeyTurn / 2, 0.02f, kMaxPitch); break;
+    case key::F1: setView(view_ == View::FirstPerson ? View::BirdsEye : View::FirstPerson); break;
+    case key::F1 + 1: setView(view_ == View::Sky ? View::BirdsEye : View::Sky); break;
+    default: return false;
+    }
+    dirty_ = true;
+    return true;
+}
+
+bool MapViewer::worldToScreen(float x, float y, float z, int& sx, int& sy) const {
+    const OrbitCamera cam(Vec{targetX_, targetY_, targetZ_}, yaw_, pitch_, distance_, screen_.w, screen_.h);
+    const ViewVertex v = cam.toView(Vec{x, y, z});
+    if (v.z < cam.nearZ)
+        return false;
+    const ScreenVertex s = cam.project(v);
+    sx = int(s.x), sy = int(s.y);
+    return true;
+}
+
+bool MapViewer::screenToGround(int sx, int sy, float& x, float& y) {
+    if (map_.width <= 0)
+        return false;
+    const OrbitCamera cam(Vec{targetX_, targetY_, targetZ_}, yaw_, pitch_, distance_, screen_.w, screen_.h);
+    const Vec dir = normalize(cam.forward + cam.right * ((float(sx) - cam.halfW) / cam.focal) +
+                              cam.up * ((cam.halfH - float(sy)) / cam.focal));
+    // March along the ray until it's below the ground, then narrow it down.
+    const float stepLen = kTileSize * 0.25f, far = distance_ * 6 + worldWidth() + worldHeight();
+    auto below = [&](float t) {
+        const Vec p = cam.eye + dir * t;
+        return p.z <= groundHeight(p.x, p.y);
+    };
+    float t0 = 0;
+    for (float t = stepLen; t < far; t += stepLen) {
+        const Vec p = cam.eye + dir * t;
+        if (p.x < -kBlockSize || p.y < -kBlockSize || p.x > worldWidth() + kBlockSize || p.y > worldHeight() + kBlockSize) {
+            if (dir.z >= 0)
+                return false;
+            t0 = t;
+            continue;
+        }
+        if (below(t)) {
+            float lo = t0, hi = t;
+            for (int i = 0; i < 12; ++i) {
+                const float mid = (lo + hi) / 2;
+                (below(mid) ? hi : lo) = mid;
+            }
+            const Vec hit = cam.eye + dir * hi;
+            x = hit.x, y = hit.y;
+            return true;
+        }
+        t0 = t;
+    }
+    return false;
 }
 
 void MapViewer::handleEvent(const Event& ev) {
@@ -654,7 +811,7 @@ void MapViewer::render() {
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
-                         const uint8_t* tint = nullptr) {
+                         const uint8_t* tint = nullptr, float scale = 1) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
@@ -663,11 +820,11 @@ void MapViewer::render() {
             poly.clear();
             for (const auto& corner : face.corners) {
                 const auto& v = verts[corner.vertex];
-                const float x = c * v.x - s * v.y, y = s * v.x + c * v.y;
+                const float x = (c * v.x - s * v.y) * scale, y = (s * v.x + c * v.y) * scale;
                 // For terrain codes, (u, v) is the position across the
                 // tile, in map orientation.
                 const bool planar = ground && colouring_ == 1;
-                poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z},
+                poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z * scale},
                                           planar ? (x + kTileSize / 2) / kTileSize : corner.u,
                                           planar ? (y + kTileSize / 2) / kTileSize : corner.v));
                 // Smooth shading: the corner's own normal (its first extra
@@ -808,6 +965,21 @@ void MapViewer::render() {
         ++drawnObjects_;
         drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
     }
+    // The units, facing their heading (the models face along +y, so a
+    // quarter turn less), drawn kUnitScale times their models' size: in
+    // the tutorial's recording a ground scout is about a quarter as wide as
+    // the vehicle yard beside it, against a sixteenth for the models.
+    for (const UnitDraw& u : units_) {
+        const TileModel& m = namedModel(u.model, false);
+        if (!m.error.empty())
+            continue;
+        const Vec at{u.x, u.y, groundHeight(u.x, u.y)};
+        if (cam.toView(at).z < cam.nearZ)
+            continue;
+        ++drawnObjects_;
+        const float a = u.heading - kPi / 2;
+        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale);
+    }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there
     // (cliff walls in screenshots); how isn't known, so this is the viewer's
@@ -910,6 +1082,25 @@ void MapViewer::render() {
                 }
             }
         }
+    // Selected units: a row of small orange marks above each (as in the
+    // recordings).
+    for (const UnitDraw& u : units_) {
+        if (!u.selected)
+            continue;
+        const ViewVertex v = cam.toView(Vec{u.x, u.y, groundHeight(u.x, u.y) + 1400});
+        if (v.z < cam.nearZ)
+            continue;
+        const ScreenVertex p = cam.project(v);
+        for (int k = -1; k <= 1; ++k)
+            for (int dy = 0; dy < 3; ++dy)
+                for (int dx = 0; dx < 4; ++dx) {
+                    const int x = int(p.x) + k * 6 + dx - 2, y = int(p.y) + dy - 8;
+                    if (x >= 0 && y >= 0 && x < w && y < h) {
+                        uint8_t* px = screen_.row(y) + x * 4;
+                        px[0] = 255, px[1] = 150, px[2] = 30;
+                    }
+                }
+    }
 }
 
 } // namespace reluva::newworlds

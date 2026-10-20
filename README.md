@@ -58,7 +58,9 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   the mission's script (its events, messages and objectives; **Z** stops), **I** shows the game's
   interface over the map in the side's style (the script's messages and objectives in it), **C**
   shows or hides the colony (its hub where the recordings put it, growing as the script builds)
-  and **V** looks at it; the map's keys work too. For
+  and **V** looks at it, and **F3** plays on the map with the game's own camera and controls
+  (select and move the colony's starting units; see `docs/formats/newworlds/game.md`); the map's
+  keys work too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used (by default glow in `_g` textures, transparency in the others), **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations
