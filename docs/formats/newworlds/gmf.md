@@ -158,9 +158,17 @@ Checked on all 31 maps of the six planet archives (`icewrld`, `deswrld`,
   (a slope like `alpin_01` and a top-level plateau), 54 on `icewrld` (a
   middle-level plateau), each used by a few tiles.
 - **Rotation:** bits 14-15 of the fourth value turn the model anticlockwise
-  by that many quarter turns about the tile's centre. Bits 16-17 take three
-  values per model family (0-3, 4-7 or 8-11 for the whole code); they aren't
-  a mirror or a height offset (tested). Each model appears in groups of 4
+  by that many quarter turns about the tile's centre. Bits 16-17 are one
+  value per model number, the same on all 31 maps (`reluva-tool gmf-dump`
+  and a count): 2 for the shaped pieces 0-5, 9, 11, 12, 15, `crack_03`,
+  `05`, `06` and `brid_02`; 1 for the flat ones (6-8, 10, 13, 14, 18-20,
+  34-40), `crack_04`, `ramp`, `hole_02`, `concact`, water, balls, `needle_0`
+  and `icecave2`; 0 for `hole_01`, `concrete`, `hole_03`, `water_01`,
+  `mount_01`-`02`, `arche_01`, `icecave1`/`lavafall` and `finger_1`; 3 for
+  `crack_08` and `brid_01`. The 0s are the places nothing crosses (holes,
+  rock formations), so perhaps a movement class (the Tricorder reads
+  IMPASSABLE over some ground); not confirmed. They aren't a mirror or a
+  height offset (tested). Each model appears in groups of 4
   records per rotation (`f1`: most models 16 times), which differ in their
   terrain codes. A few `ramp` tiles with bits 16-17 = 1 would fit better
   turned a further half turn; not enough to be sure.
@@ -235,7 +243,12 @@ each texture number a texture by the shape of its faces (high, middle or
 low flat ground, or slope: `top`/`snow`, `med`/`rock`, `low`/`ice` or a
 plain variant, `cliff`), preferring one numbered like the tile; holes,
 cracks, ramps, bridges, water and concrete use their own
-(`reluva-tool ground-textures <planet.cat>` lists the choices).
+(`reluva-tool ground-textures <planet.cat>` lists the choices). Each
+planet's `concrete` texture (`lbp/txr/map/<planet>/concrete`; the ice
+world's is in `glblgame.cat`, not `icewrld.cat`) is square panels, blue-grey
+on ice and tan on desert: the colonies' pads in the recordings.
+`glblgame.cat`'s `conc_rng` model and texture (16 frames of a ring of
+flames) are something else, an effect.
 `cliff07`, which no model's name matches, may be the texture for the walls
 between levels.
 
@@ -250,7 +263,7 @@ textures.
 - What the terrain codes' values mean, beyond the layers giving heights.
 - The few unplaced numbers (see the table) and the flat models' exact places.
 - How the game builds and textures the walls between levels.
-- Bits 16-17 of the tile flags; the rest of the type-21 records; the grid
+- What bits 16-17 of the tile flags (one value per model) are for; the rest of the type-21 records; the grid
   entries' second value's low 12 bits; the placed objects' bits
   8-15 and the missing quarter.
 - Which deposit kind is which resource.
@@ -263,5 +276,11 @@ table. The only parts not understood are per tile model (the type-21 links)
 or per cell (the low bits above), so units, buildings and starting colonies
 can't be stored here: they presumably come from the missions, which
 [`level.dat`](level.md) names by a "parser short name" (`F1`, the map's
-name) but whose scripts aren't in any archive (probably inside `STNW.exe`). The concrete tiles in
-`f1` are a few scattered groups of 1-3 tiles, not a colony's pad.
+name) but whose scripts aren't in any archive (probably inside `STNW.exe`). The tiles numbered
+`concrete` (30) aren't colony pads either: on every map they're single tiles or pairs, 24-105 per
+map, and 68 % of them sit where another map has one too (cracks: about 50 %, ramps 22 %), so they
+come with the maps' shared terrain. The pads under starting colonies come with the colony (see
+[colony.md](colony.md#concrete)).
+
+`reluva-tool gmf-dump <planet.cat> <dir>` writes each map's tiles (position, model number and
+name, flags), grid and placed objects as CSV files, for this kind of study.

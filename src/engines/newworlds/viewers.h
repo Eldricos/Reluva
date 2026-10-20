@@ -25,7 +25,9 @@
 
 #include <filesystem>
 #include <functional>
+#include <array>
 #include <map>
+#include <set>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -207,6 +209,9 @@ public:
         int turn = 0;
     };
     void setBuildings(const std::vector<Building>& buildings);
+    // Tiles (x east, y north) drawn with the planet's concrete texture
+    // instead of their own, as under a starting colony. Cleared by showMap.
+    void setPaved(const std::vector<std::pair<int, int>>& tiles);
     // The shown map's size in blocks, a block's resource deposit (0 for
     // none), and the ground's height at a map position (NaN off the map
     // or where no tile is).
@@ -280,7 +285,12 @@ private:
     std::vector<Placed> placed_;
     std::map<std::string, TileModel> buildingModels_; // by name, across maps
     std::vector<Placed> buildings_;
-    std::vector<bool> hidden_; // placed_ objects a building stands over
+    std::vector<bool> hidden_; // placed_ objects under a building or on paved_
+    std::vector<std::array<float, 4>> buildingAreas_; // middle x, y and half sizes, in model units
+    void updateHidden();
+    std::set<std::pair<int, int>> paved_;
+    std::map<uint32_t, TileModel> pavedModels_; // tile models with the concrete texture throughout
+    const TileModel& pavedModel(uint32_t index);
     Texture underlay_; // ground showing through tiles with GmfMap::Tile::underlay
 
     float targetX_ = 0, targetY_ = 0, targetZ_ = 0, yaw_ = 0, pitch_ = 0, distance_ = 1;

@@ -96,7 +96,10 @@ void MapViewer::show(int index) {
         map_ = GmfMap{};
     placeScenery();
     buildings_.clear();
+    buildingAreas_.clear();
     hidden_.clear();
+    paved_.clear();
+    pavedModels_.clear();
     makeUnderlay();
     resetView();
     updateTitle();
@@ -372,6 +375,49 @@ void MapViewer::placeScenery() {
     }
 }
 
+void MapViewer::setPaved(const std::vector<std::pair<int, int>>& tiles) {
+    paved_ = {tiles.begin(), tiles.end()};
+    updateHidden();
+    dirty_ = true;
+}
+
+// No trees or rocks under a building or on its colony's concrete.
+void MapViewer::updateHidden() {
+    hidden_.assign(placed_.size(), false);
+    for (size_t i = 0; i < placed_.size(); ++i) {
+        const Vec3& p = placed_[i].position;
+        if (paved_.count({int(std::floor(p.x / kTileSize)), int(std::floor(p.y / kTileSize))}))
+            hidden_[i] = true;
+        for (const auto& [x, y, hw, hh] : buildingAreas_)
+            if (std::fabs(p.x - x) < hw && std::fabs(p.y - y) < hh)
+                hidden_[i] = true;
+    }
+}
+
+// The planet's concrete texture (lbp/txr/map/<planet>/concrete; the ice
+// world's is in glblgame) on every face: the recordings' colony pads.
+const MapViewer::TileModel& MapViewer::pavedModel(uint32_t index) {
+    auto [it, added] = pavedModels_.try_emplace(index);
+    if (added) {
+        it->second = tileModel(index);
+        std::string folder, stem, ext;
+        splitName(it->second.name, folder, stem, ext);
+        Texture concrete;
+        std::vector<uint8_t> data;
+        for (const TextureFile& t : textureFiles_)
+            if (t.folder == folder && t.stem == "concrete") {
+                CatArchive& cat = *archives_[t.ref.archive];
+                if (cat.read(cat.entries()[t.ref.entry], data) || decodeTexture(data, concrete))
+                    concrete = Texture{};
+                break;
+            }
+        if (!concrete.rgba.empty())
+            for (Texture& t : it->second.textures)
+                t = concrete;
+    }
+    return it->second;
+}
+
 const MapViewer::TileModel& MapViewer::namedModel(const std::string& name) {
     auto [it, added] = buildingModels_.try_emplace(name);
     TileModel& m = it->second;
@@ -415,7 +461,7 @@ std::pair<float, float> MapViewer::modelSize(const std::string& name) {
 
 void MapViewer::setBuildings(const std::vector<Building>& buildings) {
     buildings_.clear();
-    hidden_.assign(placed_.size(), false);
+    buildingAreas_.clear();
     // Upgrades stand where the building they upgrade does, in its frame:
     // centred by the first model placed at that spot.
     std::map<std::pair<int, int>, std::pair<float, float>> centres;
@@ -434,14 +480,11 @@ void MapViewer::setBuildings(const std::vector<Building>& buildings) {
         const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
         const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
         buildings_.push_back({{x, y, ground}, angle, &m});
-        // No trees or rocks inside it.
-        const float cx0 = float(b.b) / 8 * kBlockSize, cy0 = float(b.a) / 8 * kBlockSize;
         const bool across = b.turn % 2 != 0;
-        const float hw = (across ? h : w) / 2 + 512, hh = (across ? w : h) / 2 + 512;
-        for (size_t i = 0; i < placed_.size(); ++i)
-            if (std::fabs(placed_[i].position.x - cx0) < hw && std::fabs(placed_[i].position.y - cy0) < hh)
-                hidden_[i] = true;
+        buildingAreas_.push_back({float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize,
+                                  (across ? h : w) / 2 + 512, (across ? w : h) / 2 + 512});
     }
+    updateHidden();
     dirty_ = true;
 }
 
@@ -727,7 +770,9 @@ void MapViewer::render() {
                     if (s.x < -margin || s.x > float(w) + margin || s.y < -margin || s.y > float(h) + margin)
                         continue;
                 }
-                const TileModel& m = tileModel(tile.model);
+                const bool paved = colouring_ == 0 && !paved_.empty() &&
+                                   paved_.count({bx * 2 + kSlotX[slot], by * 2 + kSlotY[slot]}) != 0;
+                const TileModel& m = paved ? pavedModel(tile.model) : tileModel(tile.model);
                 if (!m.error.empty())
                     continue;
                 ++drawnTiles_;

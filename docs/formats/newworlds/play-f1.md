@@ -204,12 +204,17 @@ Mining Station here" says, and the colony's readout beside it.
   the placement outline. The construction yard took until 5:03, the power
   generator 5:49, the accommodation block 20:54.
 - **Concrete:** the colony stands on a patchwork of concrete squares a
-  tile each, from the start. F1's map has the plain flat ground model
-  (number 6, the most common on the map) there and only scattered concrete
-  tiles (C below), so the concrete isn't the map's own: either the colony
-  paves the tiles it's built on, or flat tiles there are drawn with a
-  concrete texture. Not known which. The map round the colony (blocks
-  23-27, rows 48-52, four tiles each, model numbers mod 10):
+  tile each, from the start (4:10, the hub on it with ice squares cut out
+  of its edges). F1's map has ordinary ground tiles there, and only
+  scattered `concrete` tiles (C below), so the pad isn't the map's. It
+  belongs to the starting colony: the vehicle yard (placed 6:40) goes down
+  on concrete already there, while the accommodation block, placed on the
+  ice beyond the pad at 19:08, is finished on bare ice at 20:54. The game
+  doesn't pave under new buildings. The sickbay (selected 26:40) stands on
+  a block-sized square of concrete jutting from the pad. The natives'
+  structures stand on bare ice. See [colony.md](colony.md#concrete). The map
+  round the colony (blocks 23-27, rows 48-52, four tiles each, model
+  numbers mod 10):
 
   ```
   52  37h7 3300 7777 3303 0664

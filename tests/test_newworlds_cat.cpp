@@ -662,6 +662,16 @@ void testColony() {
     ColonyLayout colony('F', ground);
     CHECK(colony.start(36, 36));
     CHECK(colony.buildings().size() == 1 && colony.buildings()[0].model == "geo/fed/fch.geo");
+    // The pad: round the hub, off the cliff and the deposit, on the map.
+    const ColonyBuilding start = colony.buildings()[0];
+    CHECK(!colony.pad().empty());
+    bool underHub = false;
+    for (const auto& [tx, ty] : colony.pad()) {
+        underHub = underHub || (tx == start.b / 4 && ty == start.a / 4) || (tx == (start.b - 1) / 4 && ty == (start.a - 1) / 4);
+        CHECK(tx < 16 && !(ty >= 4 && ty < 6 && tx < 8) && !(tx / 2 == 6 && ty / 2 == 4));
+        CHECK(std::abs(tx * 4 + 2 - start.b) <= 16 && std::abs(ty * 4 + 2 - start.a) <= 16);
+    }
+    CHECK(underHub);
     for (const char* b : {"construction-yard", "vehicle-yard", "power-generator", "accommodation", "mining-station",
                           "colony-hub-upgrade", "resource-processor", "sickbay"})
         CHECK(colony.add(b));

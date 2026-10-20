@@ -29,6 +29,7 @@
 //   reluva-tool geo-slots <file.geo>...             per texture number: faces, area, facing, texture coordinates
 //   reluva-tool ground-textures <planet.cat>      show the textures the map viewer gives each ground
 //                                                  tile model's slots, with each slot's face count
+//   reluva-tool gmf-dump <planet.cat> <out dir>    write each map's tiles, grid and objects as CSV
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
 //                                                  one record (or where the walk stops)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
@@ -1857,6 +1858,72 @@ int cmdWavDecode(int argc, char** argv) {
     return 0;
 }
 
+// Every map in a planet archive as CSV files for study: <map>_tiles.csv
+// (each tile position's model number and name, flags), <map>_cells.csv
+// (each block's grid entry) and <map>_objects.csv (placed objects).
+int cmdGmfDump(int argc, char** argv) {
+    if (argc != 4) {
+        std::fprintf(stderr, "usage: reluva-tool gmf-dump <planet.cat> <output dir>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    nw::CatArchive cat;
+    if (reluva::Error err = cat.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::vector<std::string> geoNames;
+    for (const auto& e : cat.entries())
+        if (e.tag == nw::cattag::Geometry)
+            geoNames.push_back(e.name);
+    const std::vector<size_t> order = nw::tileModelOrder(geoNames);
+    const std::filesystem::path out = argv[3];
+    std::filesystem::create_directories(out);
+    std::vector<uint8_t> data;
+    int maps = 0;
+    for (const auto& e : cat.entries()) {
+        std::string folder, stem, ext;
+        nw::splitName(e.name, folder, stem, ext);
+        if (ext != "gmf")
+            continue;
+        nw::GmfMap map;
+        if (cat.read(e, data) || nw::parseGmf(data, map)) {
+            std::fprintf(stderr, "%s doesn't decode\n", e.name.c_str());
+            continue;
+        }
+        ++maps;
+        std::ofstream tiles(out / (stem + "_tiles.csv")), cells(out / (stem + "_cells.csv")),
+            objects(out / (stem + "_objects.csv"));
+        tiles << "tx,ty,record,model,name,flags\n";
+        for (int ty = 0; ty < map.height * 2; ++ty)
+            for (int tx = 0; tx < map.width * 2; ++tx) {
+                const int t = nw::tileAt(map, tx, ty);
+                if (t < 0)
+                    continue;
+                const auto& tile = map.tiles[size_t(t)];
+                std::string name = "?";
+                if (tile.model < order.size() && order[tile.model] != nw::kNoModel) {
+                    std::string f, st, ex;
+                    nw::splitName(geoNames[order[tile.model]], f, st, ex);
+                    name = st;
+                }
+                tiles << tx << ',' << ty << ',' << t << ',' << tile.model << ',' << name << ',' << tile.flags << '\n';
+            }
+        cells << "bx,by,block,value\n";
+        for (int by = 0; by < map.height; ++by)
+            for (int bx = 0; bx < map.width; ++bx) {
+                const auto& c = map.cells[size_t(by) * size_t(map.width) + size_t(bx)];
+                cells << bx << ',' << by << ',' << c.block << ',' << c.value << '\n';
+            }
+        objects << "bx,by,x,y,type,turn,variant,extra\n";
+        for (const auto& o : map.scenery)
+            objects << o.bx << ',' << o.by << ',' << int(o.x) << ',' << int(o.y) << ',' << int(o.type) << ','
+                    << int(o.turn) << ',' << int(o.variant) << ',' << int(o.extra) << '\n';
+    }
+    std::printf("%d maps written to %s\n", maps, argv[3]);
+    return 0;
+}
+
 int cmdGroundTextures(int argc, char** argv) {
     if (argc != 3) {
         std::fprintf(stderr, "usage: reluva-tool ground-textures <planet.cat>\n");
@@ -2252,6 +2319,8 @@ int main(int argc, char** argv) {
         return cmdGeoSlots(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "ground-textures") == 0)
         return cmdGroundTextures(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "gmf-dump") == 0)
+        return cmdGmfDump(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-faces") == 0)
         return cmdGeoFaces(argc, argv);
     std::fprintf(stderr,
@@ -2277,6 +2346,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool gmf-fit [-m|-h|-l|-r|-j|-t|-a|-o file] <planet.cat> [map]\n"
                  "  reluva-tool geo-slots <file.geo>...\n"
                  "  reluva-tool ground-textures <planet.cat>\n"
+                 "  reluva-tool gmf-dump <planet.cat> <output dir>\n"
                  "  reluva-tool gmf-info <file.gmf> [record number]\n"
                  "  reluva-tool geo-faces <file.geo>\n"
                  "  reluva-tool lbp-info <file> [output prefix]\n");

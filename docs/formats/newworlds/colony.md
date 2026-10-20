@@ -20,6 +20,30 @@ approximate colony from it (`src/engines/newworlds/colony.h`).
 
 None of the recordings shows which way a colony faces.
 
+## Concrete
+
+The starting colonies stand on concrete (F1, K1, K2's notes), the planet's
+`concrete` ground texture of square panels ([gmf.md](gmf.md#textures)).
+From F1's recording, the only one rechecked for this:
+
+- **It's there from the start.** At 4:10 the hub stands on a large pad,
+  its edges straight along tile edges, with whole tiles of ice cut out of
+  it: a patchwork of tiles, concrete or not.
+- **It isn't paved under new buildings.** The vehicle yard (placed 6:40)
+  goes down on concrete already there. The accommodation block's outline
+  goes down on the ice beyond the pad at 19:08, and the block is finished
+  there at 20:54 on bare ice, the pad's edge beside it.
+- The sickbay (selected 26:40) stands on a block-sized square of concrete
+  jutting from the pad, so the pad follows the starting buildings in
+  places. The natives' structures stand on bare ice.
+- **It isn't in the map.** The map has ordinary ground tiles under the
+  pad. Its `concrete` tiles (model 30) are single tiles or pairs on every
+  map, mostly at positions other maps share, never near a colony in a
+  group ([gmf.md](gmf.md#not-in-the-map)).
+
+So the pad comes with the starting colony, from the mission (in
+`STNW.exe`), as its buildings do. Its exact extent per mission isn't known.
+
 ## Where the colonies are
 
 Only F1's position is read directly (the start's Tricorder readout). For
@@ -103,7 +127,12 @@ layout:
   steps through them) goes on the free place nearest the hub; a mining
   station goes on the nearest deposit instead, and an upgrade on the
   building it upgrades.
-- Trees and rocks under a building aren't drawn.
+- The starting colony stands on a pad: the level, deposit-free tiles
+  within two tiles of the hub, drawn with the planet's concrete texture.
+  Buildings the script adds get none (as in F1's recording). On rolling
+  ground (K1's site) there may be no level tiles, so no pad.
+- Trees and rocks under a building or on the pad aren't drawn.
 
-What would settle the real layout: a starting colony seen from above in
-the running game, for any mission.
+What would settle the real layout and pads: a starting colony seen from
+above in the running game, for any mission, with the Tricorder's readout
+at the pad's corners.

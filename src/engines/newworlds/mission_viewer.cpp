@@ -211,6 +211,7 @@ void MissionViewer::showColony() {
         for (const ColonyBuilding& c : colony_->buildings())
             buildings.push_back({c.model, c.a, c.b});
     map_.setBuildings(buildings);
+    map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});
 }
 
 void MissionViewer::handleEvent(const Event& ev) {

@@ -61,12 +61,19 @@ public:
     // unit), it upgrades a building that isn't there, or there's no room.
     bool add(std::string_view building);
     const std::vector<ColonyBuilding>& buildings() const { return buildings_; }
+    // The concrete the colony starts on, as tile positions (x east, y
+    // north): its ground within two tiles of the hub. Recordings show the
+    // starting colony on concrete tiles and buildings added later on the
+    // bare ground (colony.md); how far the game's pads reach isn't known.
+    const std::vector<std::pair<int, int>>& pad() const { return pad_; }
 
 private:
     struct Rect {
         int x, y, w, h; // in tiles
     };
-    bool tileFree(int tx, int ty, bool mine) const;
+    bool tileFree(int tx, int ty, bool mine) const;   // groundFits, and nothing stands there
+    // On the map, flat (within flatness), near the hub's height.
+    bool groundFits(int tx, int ty, bool mine, float flatness) const;
     bool fits(const Rect& r, bool mine) const;
     Rect footprint(const std::string& model, int tx, int ty) const;
     void place(std::string_view name, const std::string& model, const Rect& r);
@@ -75,6 +82,7 @@ private:
     ColonyGround ground_;
     std::vector<ColonyBuilding> buildings_;
     std::vector<Rect> taken_;
+    std::vector<std::pair<int, int>> pad_;
     float hubHeight_ = 0;
     bool heightSet_ = false; // tiles must be near hubHeight_
 };

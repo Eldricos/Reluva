@@ -81,12 +81,16 @@ constexpr std::pair<const char*, const char*> kUpgrades[] = {
     {"science-station-upgrade", "science-station"},
 };
 
-// The ground counts as flat if it rises less than this across a block's
-// middle, and near the hub's height if within this of it.
+// The ground counts as flat for a building if it rises less than this
+// across a tile, and near the hub's height if within this of it.
 constexpr float kFlat = 1024, kNear = 2048;
 // How many tiles from the site the hub may move, and how far around it
 // counts as its room.
 constexpr int kSearch = 6, kRoom = 3;
+// How far the starting pad reaches beyond the hub, in tiles.
+constexpr int kPad = 2;
+// Pads are level in the recordings: flatter ground than a building needs.
+constexpr float kPadFlat = 256;
 
 } // namespace
 
@@ -127,14 +131,18 @@ int ceilDiv(float v, float d) { return std::max(1, int(std::ceil(v / d))); }
 } // namespace
 
 bool ColonyLayout::tileFree(int tx, int ty, bool mine) const {
-    if (tx < 0 || ty < 0 || tx >= ground_.width * 2 || ty >= ground_.height * 2)
-        return false;
     for (const Rect& r : taken_)
         if (tx >= r.x && tx < r.x + r.w && ty >= r.y && ty < r.y + r.h)
             return false;
+    return groundFits(tx, ty, mine, kFlat);
+}
+
+bool ColonyLayout::groundFits(int tx, int ty, bool mine, float flatness) const {
+    if (tx < 0 || ty < 0 || tx >= ground_.width * 2 || ty >= ground_.height * 2)
+        return false;
     if ((ground_.deposit(tx / 2, ty / 2) != 0) != mine)
         return false;
-    // Flat: its middle and four points near its corners within kFlat.
+    // Flat: its middle and four points near its corners within flatness.
     const int a = ty * kTile + 2, b = tx * kTile + 2;
     float lo = ground_.heightAt(a, b), hi = lo;
     if (std::isnan(lo))
@@ -145,7 +153,7 @@ bool ColonyLayout::tileFree(int tx, int ty, bool mine) const {
             return false;
         lo = std::min(lo, h), hi = std::max(hi, h);
     }
-    return hi - lo < kFlat && (!heightSet_ || std::fabs(lo - hubHeight_) < kNear);
+    return hi - lo < flatness && (!heightSet_ || std::fabs(lo - hubHeight_) < kNear);
 }
 
 bool ColonyLayout::fits(const Rect& r, bool mine) const {
@@ -178,6 +186,7 @@ void ColonyLayout::place(std::string_view name, const std::string& model, const 
 bool ColonyLayout::start(int a, int b) {
     buildings_.clear();
     taken_.clear();
+    pad_.clear();
     heightSet_ = false;
     const std::string model = buildingModel("colony-hub", side_);
     if (model.empty() || ground_.width <= 0)
@@ -213,6 +222,11 @@ bool ColonyLayout::start(int a, int b) {
     hubHeight_ = ground_.heightAt(bestRect.y * kTile + 2, bestRect.x * kTile + 2);
     heightSet_ = true;
     place("colony-hub", model, bestRect);
+    // The starting colony's concrete: the ground it can use round the hub.
+    for (int y = bestRect.y - kPad; y < bestRect.y + bestRect.h + kPad; ++y)
+        for (int x = bestRect.x - kPad; x < bestRect.x + bestRect.w + kPad; ++x)
+            if (groundFits(x, y, false, kPadFlat))
+                pad_.push_back({x, y});
     return true;
 }
 
