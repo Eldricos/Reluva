@@ -38,6 +38,10 @@ constexpr const char* kDerelict = "geo/bad/odv.geo";    // F2's derelict (its me
 constexpr const char* kMetarPortal = "geo/bad/mport.geo"; // the Metar portal, a vehicle dock, all blue-streaked wings
 constexpr const char* kMetarNak = "geo/bad/mn_a.geo";     // a Metar nak: long-nosed, a four-pointed star head-on
 constexpr const char* kVehicleYard = "geo/fed/fvpy_a.geo";
+constexpr const char* kTaubatHangar = "geo/bad/tw.geo";     // the Taubat triangle ("Taubat hangar" in the panel)
+constexpr const char* kRomScience = "geo/rom/rsb_a.geo";    // a low faceted dome: the Romulan science block (a guess)
+constexpr const char* kRomShield = "geo/rom/rcss.geo";      // a four-winged pyramid (a guess)
+constexpr const char* kRomVehicleYard = "geo/rom/rvy.geo";
 
 struct Script {
     const char* mission;
@@ -57,6 +61,11 @@ constexpr Site kK1Colony{244, 92}, kK1Temple{372, 107};         // mine; the Tau
 constexpr Site kK2Colony{300, 284}, kK2Ally{279, 26};           // between the two mines; the allied base
 constexpr Site kJ1Colony{52, 148}, kJ2Colony{92, 404}, kJ2Alien{112, 260};
 constexpr Site kJ3Colony{204, 172}, kJ4Colony{340, 180}, kK12Colony{84, 252}, kK14Colony{100, 292};
+// The Romulans' (play-r*.md, play-j*r.md): J1's from the start's readout,
+// J2's from the readout it kept returning to, the rest from mines.
+constexpr Site kR1Rival{165, 323}, kR2Colony{260, 356}, kJ1RColony{111, 442}, kJ2RColony{166, 184};
+constexpr Site kJ3RColony{103, 311}, kJ4RColony{276, 380}, kR9Colony{308, 428}, kJ6RColony{92, 196};
+constexpr Site kJ7RColony{200, 324}, kR12Colony{260, 264}, kR14Colony{260, 272};
 
 // The briefings as recorded play showed them (docs/formats/newworlds/play-*.md):
 // which page and view went with each clip. Where the recording didn't show
@@ -161,6 +170,55 @@ const std::vector<Script>& recordedScripts() {
         {"J9", 'K', {{"005", 3, V::Galaxy}, {"006", 4, V::Relief}, {"007", 5, V::Relief}, {"008", 6, V::Relief},
                      {"009", 0, V::Relief}}},
         {"C10", 'K', {{"", 74, V::Emblem}}},
+        // The Romulans' (play-r1.md ...): the transmission page silent over
+        // the emblem first, as the Federation's.
+        {"R1", 'R', {{"", 10, V::Emblem}, {"005", 22, V::Galaxy}, {"006", 2, V::StarSystem}, {"007", 0, V::Ground},
+                     {"008", 4, V::Model, {}, kMetarPortal}, {"009", 5, V::Model, {}, kRomShield}, {"010", 6, V::Relief},
+                     {"011", 7, V::Ground}, {"012", 8, V::Relief, kR1Rival}, {"013", 9, V::Emblem}}},
+        {"R2", 'R', {{"", 3, V::Emblem}, {"005", 5, V::Galaxy}, {"006", 6, V::StarSystem}, {"007", 7, V::Ground},
+                     {"008", 8, V::Ground}, {"009", 0, V::Ground, kR2Colony}, {"010", 0, V::Ground, kR2Colony},
+                     {"011", 9, V::Model, {}, kDerelict}, {"013", 0, V::Model, {}, kTaubatHangar},
+                     {"014", 10, V::Model, {}, kTemple}, {"015", 0, V::Emblem}, {"016", 0, V::Emblem}}},
+        {"J1", 'R', {{"", 18, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground, kJ1RColony},
+                     {"008", 6, V::Ground}, {"009", 7, V::Ground}, {"010", 8, V::Relief}, {"011", 9, V::Emblem}}},
+        {"J2", 'R', {{"", 6, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground, kJ2RColony},
+                     {"008", 0, V::Relief}, {"009", 0, V::Model, {}, kRomScience}, {"010", 0, V::Ground, kJ2RColony},
+                     {"011", 0, V::Emblem}}},
+        // 005 wasn't heard (commentary).
+        {"J3", 'R', {{"", 10, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem}, {"007", 5, V::Ground},
+                     {"008", 6, V::Ground}, {"009", 7, V::Ground}, {"010", 0, V::Ground, kJ3RColony},
+                     {"011", 8, V::Relief}, {"012", 0, V::Ground, kJ3RColony}, {"013", 0, V::Emblem}}},
+        // 011 was heard twice and 014 not at all; the star system step has
+        // no model of its own (a yellow haze in the recording).
+        {"J4", 'R', {{"", 3, V::Emblem}, {"005", 5, V::Galaxy}, {"006", 6, V::StarSystem}, {"007", 0, V::Relief},
+                     {"008", 0, V::Ground}, {"009", 0, V::Ground}, {"010", 0, V::Ground}, {"011", 0, V::Relief},
+                     {"012", 7, V::Ground}, {"013", 0, V::Ground, kJ4RColony}, {"014", 0, V::Relief},
+                     {"015", 0, V::Emblem}}},
+        {"R9", 'R', {{"", 8, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem}, {"007", 4, V::Relief},
+                     {"008", 5, V::Ground, kR9Colony}, {"009", 6, V::Model, {}, kMetarDevice}, {"010", 7, V::Relief},
+                     {"011", 0, V::Ground, kR9Colony}, {"012", 0, V::Relief}, {"013", 0, V::Emblem},
+                     {"014", 0, V::Emblem}}},
+        // The recording's views ran a step behind the pages (005 over the
+        // emblem), as J7's.
+        {"J6", 'R', {{"", 8, V::Emblem}, {"005", 0, V::Emblem}, {"006", 4, V::Galaxy}, {"007", 5, V::StarSystem},
+                     {"008", 6, V::Ground}, {"009", 7, V::Relief}, {"010", 0, V::Model, {}, kMetarDevice},
+                     {"011", 0, V::Ground}, {"012", 0, V::Relief}, {"013", 0, V::Emblem}}},
+        {"J7", 'R', {{"", 7, V::Emblem}, {"005", 3, V::Emblem}, {"006", 4, V::Emblem}, {"007", 5, V::Galaxy},
+                     {"008", 6, V::Galaxy}, {"009", 0, V::Galaxy}, {"010", 0, V::StarSystem},
+                     {"011", 0, V::Relief, kJ7RColony}, {"012", 0, V::Ground}, {"013", 0, V::Emblem}}},
+        // 005 wasn't heard (commentary).
+        {"R12", 'R', {{"", 7, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem},
+                      {"007", 4, V::Ground, kR12Colony}, {"008", 5, V::Model, {}, kPillar},
+                      {"009", 6, V::Relief, kR12Colony}}},
+        {"J8", 'R', {{"", 7, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::StarSystem},
+                     {"007", 5, V::Model, {}, kMetarDevice}, {"008", 6, V::Model, {}, kRomVehicleYard},
+                     {"009", 0, V::Emblem}}},
+        {"R14", 'R', {{"", 7, V::Emblem}, {"005", 2, V::Galaxy}, {"006", 3, V::StarSystem},
+                      {"007", 4, V::Model, {}, kPillar}, {"008", 5, V::Relief}, {"009", 6, V::Ground, kR14Colony},
+                      {"010", 0, V::Emblem}}},
+        {"C11", 'R', {{"", 80, V::Emblem}}},
+        {"J9", 'R', {{"", 7, V::Emblem}, {"005", 3, V::Galaxy}, {"006", 4, V::Ground}, {"007", 5, V::Model, {}, kMetarDevice},
+                     {"008", 6, V::Model, {}, kMetarCore}, {"009", 0, V::Emblem}}},
     };
     return scripts;
 }

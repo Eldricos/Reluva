@@ -252,7 +252,14 @@ recordings' star system steps show, small: a yellow star in every one;
 F1 a cyan planet (Karazin is an ice world); J1 a cyan planet held in the
 middle (an ice world); J3 a green one (alpine); F12 and F14 a green one
 (alpine); F8 red, magenta and tan planets; J8 teal, cyan and green ones.
-So Reluva's choice: `sun` for the star, the mission's world for its first
+The Romulan recordings add: R1 (Sakuntul) a dull red star with yellow,
+teal, green and two magenta planets; R12 and R14 (Bezouk) a red star with
+a red ring and a banded orange planet; J1 a yellow body and a cyan planet;
+J2 a yellow-green banded body with magenta and cyan ones; J3 an orange-cream
+one; R9 and J7 a big mottled orange body; J4 only a yellow haze (its system
+has no model); J9 shows no system at all (a ground view instead).
+So Reluva's choice: `sun` for the star (`sun3`, the reddest, for Bezouk's
+and Sakuntul's), the mission's world for its first
 planet (by texture number: `ice`, `desert`, `alpine`, `red`, `volcanic`,
 `alien4` for the alien world), the matching planet and ring for a ringed
 one (`red`/`red_r`, `alien3`/`alien3_r`, `alien7`/`alien7_r`), and the

@@ -38,8 +38,9 @@ public:
     // A picture, scaled to w x h, see-through where colour-keyed.
     void drawPicture(Surface& s, const Texture& t, int x, int y, int w, int h) const;
 
-    // A message sender's portrait: a crew member for each section (which
-    // one isn't known: the side's first portraits in turn), the natives'
+    // A message sender's portrait: a crew member for each section (the
+    // Romulans' as their recordings show; the others' isn't known: the
+    // side's first portraits in turn), the natives'
     // for an incoming message, the side's emblem otherwise.
     const Texture* portraitFor(std::string_view sender, std::string_view natives) const;
     const Texture* icon(std::string_view name) const; // "logo32", "shldicon", ...
@@ -56,6 +57,7 @@ private:
     Texture corner_, border_, wallpaper_;
     std::map<std::string, Texture> icons_;
     std::vector<Texture> crew_;
+    std::map<std::string, Texture> faces_; // by section, where known
     std::map<std::string, Texture> natives_;
     std::vector<GameFont> fonts_;
     const GameFont* small_ = nullptr;

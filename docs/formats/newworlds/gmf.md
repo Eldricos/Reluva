@@ -69,12 +69,24 @@ isn't known.
 
 Bits 12-15 of a grid cell's second value mark a resource deposit, kinds 1
 to 6, and the third value's bits 12-15 always repeat it (every `icewrld`
-map). The briefings name raw minerals (dilithium, silicon, magnesite,
-kelbonite, …: "rich in dilithium, magnesite & kelbonite"), and in play the
-colony counts six materials, Dilithium, Polycomp, Thermoconc, Transalumin,
-Nitrium and Duranium (seen in a recording, [play-f1.md](play-f1.md)), so
-the six kinds are probably the six materials' sources; which kind is which
-isn't known. The deposits are hand-painted patches: `j1` (a
+map). They're the six raw ores the colony mines: the Tricorder names the
+ore under the cursor ("<ore> AT <a:b>") when the cursor is over its relief
+inset (over the main view it reads TERRAIN), and every such reading in the
+Romulan recordings lies on a block of one kind:
+
+| Kind | Ore | Readings |
+|---|---|---|
+| 1 | dilithium | R1, R12, J9R ([play-r12.md](play-r12.md), [play-j9r.md](play-j9r.md)) |
+| 2 | talgonite | ten in J3R ([play-j3r.md](play-j3r.md)) |
+| 3 | silicon | six in J4R ([play-j4r.md](play-j4r.md)) |
+| 4 | kelbonite | R1, J4R, R9 |
+| 5 | magnesite | two in C11, the column cut off by the box but only kind 5 fits ([play-c11.md](play-c11.md)) |
+| 6 | dolamide | R9 ([play-r9.md](play-r9.md)) |
+
+The tutorials name the six raw ores ([play-tutorials.md](play-tutorials.md)).
+The colony's six materials (Dilithium, Polycomp, Thermoconc, Transalumin,
+Nitrium, Duranium; [play-f1.md](play-f1.md)) are what a resource processor
+makes of them; which ore makes which isn't known. The deposits are hand-painted patches: `j1` (a
 multiplayer arena) is covered in large ones of every kind, `f1` (the first
 Federation mission) has one cluster of all six plus two small patches, `r12`
 only kind 1, `k12` kinds 1-3, and `kurt64` none.
@@ -266,7 +278,7 @@ textures.
 - What bits 16-17 of the tile flags (one value per model) are for; the rest of the type-21 records; the grid
   entries' second value's low 12 bits; the placed objects' bits
   8-15 and the missing quarter.
-- Which deposit kind is which resource.
+- A full magnesite reading (kind 5); which ores make which of the six materials.
 
 ## Not in the map
 

@@ -21,6 +21,13 @@ bool loadPicture(const Archives& archives, const std::string& name, Texture& out
     return false;
 }
 
+// The Romulan recordings' faces by section, matched to the portraits
+// (gui.md#the-in-game-interface): a section's officer, usually this one.
+constexpr std::pair<const char*, const char*> kRomulanFaces[] = {
+    {"Operations", "r_c17"}, {"Engineering", "r_c19"}, {"Intelligence", "r_c18"},
+    {"Science", "r_c21"},    {"Security", "r_c20"},
+};
+
 // Sections in the order the side's crew portraits are handed out.
 constexpr const char* kSections[] = {"Command",      "Operations",   "Engineering",   "Science",
                                      "Medical",      "Security",     "Intelligence",  "Communications"};
@@ -58,6 +65,12 @@ bool GameUi::load(const Archives& archives, char side) {
         if (loadPicture(archives, base + "ptrt/crew/lg/" + prefix + "_c" + std::to_string(i) + ".lbp", t))
             crew_.push_back(std::move(t));
     }
+    if (side == 'R')
+        for (const auto& [section, stem] : kRomulanFaces) {
+            Texture t;
+            if (loadPicture(archives, base + "ptrt/crew/lg/" + stem + ".lbp", t))
+                faces_[section] = std::move(t);
+        }
     for (const char* n : {"taubat", "metar", "hubrin", "orion"}) {
         Texture t;
         if (loadPicture(archives, base + "ptrt/crew/lg/" + n + ".lbp", t))
@@ -188,6 +201,9 @@ std::vector<std::string> GameUi::wrapSmall(std::string_view text, int width) con
 }
 
 const Texture* GameUi::portraitFor(std::string_view sender, std::string_view natives) const {
+    for (const auto& [section, face] : faces_)
+        if (sender.rfind(section, 0) == 0)
+            return &face;
     for (size_t i = 0; i < std::size(kSections); ++i)
         if (sender.rfind(kSections[i], 0) == 0)
             return i < crew_.size() ? &crew_[i] : nullptr;

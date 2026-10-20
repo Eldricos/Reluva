@@ -40,7 +40,8 @@ std::vector<char> missionSides(std::string_view shortName);
 // missions, "tst.stb" for Test; empty if none is known (E1-E3).
 std::string missionTableName(std::string_view shortName, char side);
 // The maps to try, best first: "map/f1.gmf"; mission 14 then 12's map, whose
-// world its briefing names.
+// world its briefing names; the bonus missions the maps their recordings
+// fit (C11 f1, C10 f2, C9 f3 or j3).
 std::vector<std::string> missionMapNames(std::string_view shortName);
 // Its voice clips (Media/FedVO/F1005.mp3, .../KlingVO/J1K005.mp3): the stem
 // starts with the short name, a joint mission's then the side's letter, and

@@ -34,7 +34,8 @@ struct ModelViewStyle {
 
 // The briefings' model views per side, from recordings: the Federation's
 // see-through and lavender, the Klingons' solid and dark blue (the Taubat
-// temple's grey under a blue light); others plain.
+// temple's grey under a blue light), the Romulans' see-through and
+// blue-violet; others plain.
 ModelViewStyle briefingModelStyle(char side);
 
 // Draws a model over what's in the target, framed by its size, turned by

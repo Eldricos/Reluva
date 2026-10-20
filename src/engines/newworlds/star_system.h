@@ -49,7 +49,10 @@ StarSystemLayout readStarSystem(const GeoModel& model);
 // alien7_r, red_r) with their planets, and others from a fixed list. Which
 // the game gives each system is in STNW.exe; this is Reluva's choice, from
 // the colours recordings show (geo.md#star-systems).
-std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std::string_view planetWorld);
+// system: the model's name, for the stars the recordings show red
+// (bezouk, sakuntul: sun3, the reddest).
+std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std::string_view planetWorld,
+                                            std::string_view system = {});
 
 // The solsys picture for a planet archive's world ("icewrld.cat" -> "ice");
 // empty if unknown.

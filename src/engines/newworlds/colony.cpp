@@ -24,7 +24,7 @@ struct SiteEntry {
 // middle of them.
 constexpr SiteEntry kSites[] = {
     {"F1", 'F', 407, 209, "the start's Tricorder readout"},
-    {"J2", 'F', 208, 424, "between two early mines"},
+    {"J2", 'F', 220, 412, "a mine (the other reading, 196, 436, lies on no deposit)"},
     {"F12", 'F', 212, 196, "a mine"},
     {"J9", 'F', 312, 392, "between two early mines"},
     {"C9", 'F', 260, 300, "a mine"},
@@ -39,6 +39,16 @@ constexpr SiteEntry kSites[] = {
     {"K14", 'K', 100, 292, "a mine"},
     {"J9", 'K', 308, 368, "between two early mines"},
     {"C10", 'K', 292, 364, "the first mine"},
+    {"R2", 'R', 260, 356, "between two early mines"},
+    {"J1", 'R', 111, 442, "the start's Tricorder readout"},
+    {"J2", 'R', 166, 184, "the Tricorder readout it kept returning to"},
+    {"J3", 'R', 103, 311, "between three early mines"},
+    {"J4", 'R', 276, 380, "a mine"},
+    {"R9", 'R', 308, 428, "the first mine"},
+    {"J6", 'R', 92, 196, "a mine"},
+    {"J7", 'R', 200, 324, "between two early mines"},
+    {"R12", 'R', 260, 264, "between two early mines"},
+    {"R14", 'R', 260, 272, "between two early mines"},
 };
 
 struct ModelEntry {

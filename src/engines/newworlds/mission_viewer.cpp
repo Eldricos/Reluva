@@ -120,7 +120,9 @@ void MissionViewer::show(int index) {
         if (map_.showMap(names[i])) {
             hasMap_ = true;
             mapName_ = names[i];
-            if (i > 0)
+            if (!level.shortName.empty() && (level.shortName[0] == 'C' || level.shortName[0] == 'c'))
+                mapNote_ = "the map its recording fits";
+            else if (i > 0)
                 mapNote_ = "mission 12's map, whose world the briefing names";
         }
     if (!hasMap_)
@@ -573,9 +575,12 @@ void MissionViewer::drawInterface() {
     {
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + 7 * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
-        static const std::pair<const char*, int> kStock[] = {{"DILITHIUM", 500},   {"POLYCOMP", 1000},
-                                                             {"THERMOCONC", 2300}, {"TRANSALUMIN", 500},
-                                                             {"NITRIUM", 4000},    {"DURANIUM", 5000}};
+        // The Romulans start with a little less (most of their recordings).
+        static const char* const kNames[] = {"DILITHIUM", "POLYCOMP", "THERMOCONC", "TRANSALUMIN", "NITRIUM", "DURANIUM"};
+        static constexpr int kStart[] = {500, 1000, 2300, 500, 4000, 5000}, kRomulan[] = {500, 988, 2211, 497, 3500, 5000};
+        std::pair<const char*, int> kStock[6];
+        for (int i = 0; i < 6; ++i)
+            kStock[i] = {kNames[i], side == 'R' ? kRomulan[i] : kStart[i]};
         int ty = y + 16;
         ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
         for (const auto& [name, n] : kStock) {
@@ -853,7 +858,8 @@ void MissionViewer::loadStarSystem() {
     if (system_.faces.empty())
         return;
     systemLayout_ = readStarSystem(system_);
-    for (const std::string& stem : starSystemTextures(systemLayout_, hasMap_ ? planetPicture(map_.mapArchive()) : "")) {
+    for (const std::string& stem : starSystemTextures(systemLayout_, hasMap_ ? planetPicture(map_.mapArchive()) : "",
+                                                          systemName_)) {
         Texture tex;
         if (!stem.empty())
             loadTexture(archives_, "lbp/txr/solsys/" + stem + ".mp0", tex);
@@ -1013,16 +1019,19 @@ bool MissionViewer::drawModel(const std::string& name) {
     if (!m.ok)
         return false;
 
-    // The grid, as behind the recordings' model views: teal for the
-    // Federation, dark red for the Klingons.
+    // The grid, as behind the recordings' model views: teal lines for the
+    // Federation, dark red for the Klingons, green crosses for the Romulans.
     const Level& level = missions_[size_t(current_)];
     const char side = missionSides(level.shortName)[size_t(side_)];
-    const uint8_t grid[3] = {uint8_t(side == 'F' ? 20 : 70), uint8_t(side == 'F' ? 45 : 14), uint8_t(side == 'F' ? 60 : 14)};
+    const uint8_t grid[3] = {uint8_t(side == 'F' ? 20 : side == 'R' ? 20 : 70),
+                             uint8_t(side == 'F' ? 45 : side == 'R' ? 80 : 14),
+                             uint8_t(side == 'F' ? 60 : side == 'R' ? 25 : 14)};
     const int w = screen_.w, h = screen_.h;
     for (int y = 0; y < h; ++y) {
         uint8_t* row = screen_.row(y);
         for (int x = 0; x < w; ++x, row += 4) {
-            const bool line = (y % 24 == 0 && x % 4 == 0) || (x % 24 == 0 && y % 4 == 0);
+            const bool line = side == 'R' ? (y % 24 == 0 && (x + 2) % 24 < 5) || (x % 24 == 0 && (y + 2) % 24 < 5)
+                                          : (y % 24 == 0 && x % 4 == 0) || (x % 24 == 0 && y % 4 == 0);
             row[0] = line ? grid[0] : 0, row[1] = line ? grid[1] : 0, row[2] = line ? grid[2] : 0, row[3] = 255;
         }
     }

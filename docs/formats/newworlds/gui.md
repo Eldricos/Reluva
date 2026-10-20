@@ -95,4 +95,19 @@ wide enough for their text in the 5 pt font, a little wider than the
 recordings' 100 pixels. Which crew portrait goes with which section isn't
 known: Reluva hands the side's first portraits to Command, Operations,
 Engineering, Science, Medical, Security, Intelligence and Communications in
-that order.
+that order, except the Romulans' (below).
+
+The Romulan recordings ([play.md](play.md)) show the same panels in grey
+with green and teal: teal text, a green Tricorder relief map, the
+Romulan emblem behind the briefings. Matching each message's face to
+`ptrt/crew/lg/r_c*` (a sliding comparison of the recordings' 64 × 64
+portrait against each picture) gives: Operations `r_c17`, Engineering
+`r_c19`, Science `r_c21`, Intelligence `r_c18` or `r_c13` (the two pale
+faces match equally), Security `r_c20` in R2 but `r_c19` in J1. So a face
+belongs to an officer, and a section's messages usually but not always
+come from the same one; presumably the officer posted there (the STAFF
+panel lists each officer's section and post). Reluva uses these for the
+Romulans. The others: `r_narok`, `r_plyr`, `jathek`, and the natives'
+`hubrin`, `metar`, `orion`, `taubat`; the Hubrin's messages show their
+emblem, not a face (C11).
+

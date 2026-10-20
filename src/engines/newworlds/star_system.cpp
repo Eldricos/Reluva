@@ -157,7 +157,8 @@ StarSystemLayout readStarSystem(const GeoModel& model) {
     return out;
 }
 
-std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std::string_view planetWorld) {
+std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std::string_view planetWorld,
+                                            std::string_view system) {
     int slots = 0;
     for (const int s : layout.faceSlot)
         slots = std::max(slots, s + 1);
@@ -166,7 +167,7 @@ std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std:
         if (size_t(layout.backdropSlots[i]) < out.size())
             out[size_t(layout.backdropSlots[i])] = "stars" + std::to_string(std::min<size_t>(i, 3) + 1);
     if (!out.empty())
-        out[0] = "sun"; // every star the recordings show is yellow
+        out[0] = system == "bezouk" || system == "sakuntul" ? "sun3" : "sun"; // yellow, but red in R1, R12, R14
     // Planets in texture-number order: the mission's world first.
     std::vector<const StarSystemLayout::Body*> planets;
     for (const StarSystemLayout::Body& b : layout.bodies)

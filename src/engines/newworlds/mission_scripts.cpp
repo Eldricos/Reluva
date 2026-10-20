@@ -719,6 +719,398 @@ on destroyed taubat-colony
   complete 75
 on all-completed
   win
+
+# --- Romulan ---------------------------------------------------------------
+mission R1 R
+site rival-base 165 323
+site alien-building 143 260
+objective 13
+objective 16
+objective 17
+objective 18 optional
+objective 19 optional
+objective 20 optional
+lose 21 destroyed colony-hub
+on start
+  say operations "Welcome, commander. The staff are entirely at your service."
+on destroyed rival-cloaked-tanks
+  say intelligence "The three rival cloaked tanks are destroyed."
+  complete 16
+on built-all construction-yard vehicle-yard resource-processor power-generator|advanced-generator accommodation
+  say engineering "Every building we were asked for is finished."
+  complete 13
+on approach * rival-base
+  say intelligence "The rival base is at {site:rival-base}."
+on destroyed rival-power-generator
+  say intelligence "One of the rivals' power generators is down."
+on destroyed rival-base
+  say intelligence "The rival base is destroyed. We should find out who was behind it."
+  complete 19
+  research rivals
+on destroyed rival-tanks
+  say intelligence "None of the rival tanks are left."
+on researched rivals
+  say science "The work at the site looks like Admiral Narok's."
+  complete 20
+on approach * alien-building
+  say intelligence "An alien building at {site:alien-building}. We should find out what it's for."
+on scanned science alien-building   # (inferred: the scan before the research wasn't shown)
+  research temple
+on researched temple
+  say science "The Taubat temple seems to feed a stasis field under four groups of ruins to the north."
+  complete 17
+on all-completed
+  say operations "Mission complete."
+  win
+
+mission R2 R
+site taubat-hangar 268 154
+site taubat-temple 268 156
+objective 13
+objective 14
+objective 15
+objective 16 optional
+objective 17 optional   # not in the COMMAND panel's list, though the prisoners were freed
+lose 18 destroyed colony-hub
+on start
+  say operations "Welcome to Taphet. All is in order."
+on approach enemy colony
+  say intelligence "Enemy units are closing on the colony."
+on built-all construction-yard vehicle-yard science-station sickbay
+  say engineering "Every building we were asked for is finished."
+  complete 13
+on approach * taubat-hangar
+  say intelligence "A Taubat vehicle factory at {site:taubat-hangar}."
+on approach * taubat-temple
+  say intelligence "A Taubat temple at {site:taubat-temple}."
+on captured taubat-temple
+  say security "The temple is ours. It can transport minerals; switching it on."
+  say engineering "The minerals are on their way to the colony. We could pull out and destroy the temple."
+  complete 16
+on captured taubat-hangar
+  say security "The vehicle factory is ours. Searching for the Taubat prisoners."
+  say security "The prisoners are safe in the colony. We could pull out and destroy the factory."
+  complete 17
+on stock dilithium 50
+  say communications "Beaming 50 units of dilithium up to the starship."
+  complete 15
+on destroyed taubat-temple
+  say intelligence "The Taubat temple is destroyed."
+on destroyed orion-hangar
+  say intelligence "One of the Orions' vehicle factories is destroyed."
+  timer orion-threat 240   # (inferred: the taunt came about four minutes later; its cause wasn't seen)
+on timer orion-threat
+  say "Incoming message" "You Romulans will pay for meddling in our affairs!"
+  say communications "The Orions. An empty threat."
+on destroyed orion-houses
+  say intelligence "The Orions' houses are destroyed."
+on destroyed orions
+  say intelligence "No Orion or Taubat units are left."
+  complete 14
+on all-completed
+  say operations "Mission complete."
+  win
+
+mission J1 R
+objective 21
+objective 23
+objective 25
+lose 22 destroyed colony-hub
+lose 24 captured-by-rival temple
+lose 26 destroyed temple
+on start   # (the recording showed it some minutes in; what set it off isn't known)
+  say intelligence "The Federation is building up a large force on the planet."
+on hub-destroyed klingon
+on side-failed klingons
+on hub-destroyed federation
+on side-failed federation
+on approach science-vehicle temple
+  say intelligence "This building is the radiation source. Its containment field is out of line and has to be fixed from inside."
+  complete 23
+on captured taubat-settlement
+  say security "The raid on the Taubat base worked."
+  complete 21
+on captured temple
+  say engineering "The Taubat temple is ours."
+  timer reactor 80   # the repair, approximated as a wait (80 s in the recording)
+on timer reactor
+  say engineering "The alien power source is under our control."
+  complete 25
+on all-completed
+  say intelligence "The Romulans have completed their mission."
+  win
+
+mission J2 R
+site alien-structure 112 280
+objective 7
+objective 8
+lose 9 destroyed colony-hub
+lose 10 destroyed alien-structure
+on start
+  say intelligence "Something is disturbing the colony's shield buffer. Perhaps the magnetic storm."
+  say intelligence "Two staff are missing. Their transporter trace leads to an alien structure at {site:alien-structure}. Get them back."
+  say security "Guard the colony with our best technology. Anything this strong explains why the Taubat left."
+  say security "Photon tanks and turrets on the heights may match the Hubrin's reach."
+  say intelligence "Build remote mining sites, guarded by shield generators and turrets."
+on hub-destroyed klingon
+on hub-destroyed federation
+on entered alien-structure
+  say intelligence "Searching the building for our people."
+on captured alien-structure
+  say intelligence "They aren't here. Faint traces say they were moved some time ago."
+  complete 8   # (inferred: the recording ends here)
+  say communications "New orders: the colony staff go to a new outpost, and another team will look for the missing."
+
+mission J3 R
+objective 11
+objective 12
+objective 13 optional   # not in the mission report
+lose 14 destroyed colony-hub
+lose 15 captured-by-rival taubat-workshops
+lose 16 destroyed weapon-target
+on start
+  say operations "Taubat activity is rising. Many units are coming in from the north."
+every entered taubat-workshop
+  say operations "Infiltration teams are going in. Stand by."
+every captured taubat-workshop
+  say operations "Our forces hold a Taubat workshop."
+on captured taubat-workshops
+  complete 11
+  say engineering "The harmonic generators are cut off, but a cascade discharge has started and can't be stopped."
+on scan-started science weapon-target
+  say science "Scanners running."
+on scanned science weapon-target
+  say science "Confirmed: this is the harmonic field's focal point. Now the energy is off the scale, and fissures are opening."
+  complete 12
+  say "Incoming message" "The Metar sleep no longer. They will see you."
+  say "Message from the Senate" "Fall back to the colony and hold it. A starship is coming for the alien data, and for you."
+  say operations "Unknown life forms everywhere, and energy readings off the scale."
+  say operations "Other outposts report the aliens coming up all over the planet."
+  timer rescue-signal 486
+  timer pick-up 1015
+on timer rescue-signal
+  say communications "The Senate's rescue craft is calling: interference stops it beaming us up yet. Stand by."
+on destroyed alien-building
+  say operations "An alien building is down, and a power surge runs through the planet's core."
+on timer pick-up
+  say "Incoming message" "Send us all the alien data now. We'll collect you once it's in."
+  win
+
+mission J4 R
+objective 12
+lose 13 destroyed klingon-security-center
+lose 14 destroyed colony-hub
+on entered klingon-arsenal
+  say intelligence "The team is in, searching the building."
+on captured klingon-arsenal
+  say intelligence "The arsenal is ours. Setting up the anti-matter fields."
+  timer anti-matter 76   # holding it until they're set up (76 s in the recording)
+on hub-destroyed federation
+on side-failed federation
+on timer anti-matter
+  complete 12
+on all-completed
+  say intelligence "The Romulans have completed their mission."
+  win
+
+mission R9 R
+objective 12
+objective 14
+objective 16
+lose 13 destroyed federation-science-block   # (inferred: "not held", approximated as lost to destruction)
+lose 15 destroyed alien-device
+lose 17 destroyed colony-hub
+on entered federation-science-block
+  say intelligence "The team is in, searching the building."
+on captured federation-science-block
+  say intelligence "We have the device data. Sending it now."
+  complete 12
+  research alien-device
+on researched alien-device
+  say engineering "The study is finished. Construction of the device is under way."
+  complete 14
+on arrived alien-device klingon-colony
+  say security "The device is inside the Klingon colony. Stand by for activation."
+on destroyed klingon-colony   # (inferred: the blast that followed)
+  complete 16
+on all-completed
+  say intelligence "The Romulans have completed their mission."
+  win
+
+mission J6 R
+objective 13
+objective 15
+objective 17
+lose 14 destroyed klingon-hub
+lose 19 destroyed colony-hub
+on scan-started science metar-core
+  say science "Running a thorough scan."
+on scanned science metar-core
+  say science "It worked. The creatures are adapting themselves. Medical should study the data."
+  complete 17
+on hub-destroyed federation
+on side-failed federation   # (inferred: a message the panel hid)
+on scan-started engineering klingon-hub
+  say engineering "Starting the survey. Looking for a likely target."
+on scanned engineering klingon-hub
+  say engineering "Their council chamber should suit the test nicely. Waiting for their shields to drop."
+  complete 13
+on destroyed klingon-shield-generator
+  say engineering "The Klingon shields have collapsed. Transporting."
+  complete 15
+# The device's test then takes out the Klingon hub (the generic rule
+# reports it); the recording's end came after it, here with the last
+# objective.
+on all-completed
+  say intelligence "The Romulans have completed their mission."
+  win
+
+mission J7 R
+objective 13
+objective 15
+lose 14 destroyed colony-hub
+lose 16 destroyed hubrin-guide
+on side-failed klingons
+on stock dilithium 100
+  say engineering "The dilithium quota is met."
+on hub-destroyed federation
+on side-failed federation
+on stock transalumin 50   # (inferred: a message the panel hid; both quotas are needed, met here in the recording's order)
+  complete 13
+on arrived hubrin-guide destination   # (inferred)
+  complete 15
+on all-completed
+  say intelligence "The Romulans have completed their mission."
+  win
+
+mission R12 R
+objective 12
+objective 14
+lose 13 destroyed colony-hub
+lose 15 destroyed containment-device
+on destroyed hubrin-observer
+  say intelligence "The Hubrin observer has been killed."
+on built-all vehicle-yard*4 power-generator*5|advanced-generator*3
+  say engineering "The colony can now support the containment device. It needs one last round of research."
+  complete 12
+  research containment-device
+on researched containment-device
+  say engineering "The device is built. Taking it to the site the Hubrin marked, to the south."
+  say engineering "Transport done: the field device is in place."
+  say intelligence "Another Hubrin by the device says a building error has unbalanced its field."
+  say engineering "A remote scan agrees. A science vehicle has to get close to isolate the fault."
+on scan-started science containment-device
+  say science "Trying to isolate the imbalance. Stand by."
+on scanned science containment-device
+  say engineering "Found the error. Recalibrating the device."
+  complete 14
+on all-completed
+  timer settled 465   # the end came about eight minutes after the fix; why wasn't seen
+on timer settled
+  say engineering "A close call: set up as it was, it would have overloaded the whole system."
+  win
+
+mission J8 R
+objective 13
+objective 15
+objective 17
+lose 14 destroyed colony-hub
+lose 16 destroyed vehicle-yard
+lose 18 destroyed anomaly-device
+on researched anomaly-device
+  say science "Our researchers have found how to make the device."
+  complete 13
+  say engineering "The device is built and launched. Protect it whatever the cost."
+  complete 15
+on arrived anomaly-device target
+  say engineering "The device has reached its target and is activating. Mission complete."
+  complete 17
+on all-completed
+  win
+
+mission R14 R
+objective 12
+objective 14
+lose 13 destroyed colony-hub
+lose 15 destroyed containment-device
+on scanned science metar-core
+  say science "The readings point one way: the Metar are building an anomaly generator."
+  complete 12
+  complete 14
+on all-completed
+  say intelligence "Mission complete."
+  win
+
+mission J9 R
+objective 13
+objective 15
+lose 14 destroyed colony-hub
+lose 16 destroyed metar-cores
+lose 17 destroyed metar-temple   # (inferred)
+on scan-started engineering metar-temple
+  say engineering "Scanning for the anomaly device's technology."
+on scanned engineering metar-temple
+  say engineering "The technology we need is beamed back to the colony hub for study."
+  research anomaly-device
+on researched anomaly-device
+  say science "Our researchers have found how to use the device's technology."
+  complete 13
+on captured metar-starship
+  say engineering "The starship is under our control."
+  complete 15
+on all-completed
+  win
+
+mission C11 R
+objective 81
+objective 82
+objective 83
+objective 84
+objective 85
+lose 86 destroyed colony-hub
+lose 87 arrived rival-starships   # (inferred: no countdown was seen)
+on start
+  say "Message from Narok" "Be quick: Federation and Klingon ships will soon come looking for their missing people."
+on approach * first-pod
+  say operations "We've found a pod. A science scan should tell us more."
+on scanned science first-pod
+  say science "The Klingon ambassador isn't here, but the area is full of Orion and Taubat energy traces."
+  timer narok-warning 50
+on scanned-nothing science
+  say science "The scan failed. We'll have to try again."
+on timer narok-warning
+  say "Message from Narok" "Find the man, or you'll never leave Junil IV."
+on approach * second-pod
+  say operations "Another of the Babarakka's escape pods. A medical scan will show who was in it."
+on scanned medical second-pod
+  say medical "It's empty, but a human was aboard. There are strong bi-phasic traces too, like the Hubrin's."
+  complete 81
+  say "Message from Narok" "The Hubrin got there first. Find their fortress and bargain for the ambassador. Quickly."
+on approach * temple
+  say operations "A medical scan of the temple would give us a transporter lock on the ambassador."
+  complete 82   # (inferred: when he counts as located wasn't seen)
+on scan-started medical temple
+  say operations "Locking on. Stand by."
+on scanned medical temple
+  say operations "We have the ambassador."
+  complete 84
+  say "Message from Narok" "Now crush them with the Empire's might."
+on destroyed orion-taubat-structures   # (inferred: the message the panel hid)
+  complete 85
+  say "Message from Narok" "Well done. Have the ambassador ready; his ship is on its way, and you'll be reassigned."
+on approach * hubrin-fortress
+  say communications "We've found the Hubrin, their fortress built on the ruins of a Metar hive. They're hailing us."
+  say "Transmission from the Hubrin" "Why does the stranger come near?"
+  say "Message from Narok" "Hand over the Federation man. He is a criminal of the Empire."
+  say "Transmission from the Hubrin" "We don't believe you. The human goes home under our protection."
+  say communications "The Hubrin have stopped answering."
+  say "Message from Narok" "Then kill the ambassador, wipe out the Hubrin and level their fortress!"
+on destroyed hubrin-fortress   # the Federation man died with it: the objective is approximated as met
+  say "Message from Narok" "Good. The Federation man is dead, and the fortress with him."
+  complete 83
+on all-completed
+  say command "All objectives complete."
+  win
 )";
 
 } // namespace

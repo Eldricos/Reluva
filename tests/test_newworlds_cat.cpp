@@ -563,14 +563,14 @@ void testBriefing() {
                                   {5, "~SPEECH~ "},
                                   {6, "~OBJECTIVE~Do it"},
                                   {7, "~MISSION PASS~Done"}})));
-    // No recording of R1: the general rule.
-    auto steps = briefingScript("R1", 'R', table, {"R1007", "R1005", "R1006", "R1008"});
-    CHECK(steps.size() == 4 && steps[0].clip == "R1005" && steps[0].page == 3 &&
+    // No recording of R8: the general rule.
+    auto steps = briefingScript("R8", 'R', table, {"R8007", "R8005", "R8006", "R8008"});
+    CHECK(steps.size() == 4 && steps[0].clip == "R8005" && steps[0].page == 3 &&
           steps[0].view == BriefingView::Galaxy);
     CHECK(steps[1].page == 4 && steps[1].view == BriefingView::StarSystem);
-    CHECK(steps[2].clip == "R1007" && steps[2].page == 6 && steps[2].view == BriefingView::Ground);
-    CHECK(steps[3].clip == "R1008" && steps[3].page == 0 && steps[3].view == BriefingView::Emblem);
-    CHECK(!hasRecordedBriefing("R1", 'R') && hasRecordedBriefing("k12", 'K') && hasRecordedBriefing("J1", 'K'));
+    CHECK(steps[2].clip == "R8007" && steps[2].page == 6 && steps[2].view == BriefingView::Ground);
+    CHECK(steps[3].clip == "R8008" && steps[3].page == 0 && steps[3].view == BriefingView::Emblem);
+    CHECK(!hasRecordedBriefing("R8", 'R') && hasRecordedBriefing("R1", 'R') && hasRecordedBriefing("k12", 'K') && hasRecordedBriefing("J1", 'K'));
     // A recorded one: K12's lettered clip as its own step; a joint mission's
     // clips carry the side's letter; J8 opens with a silent step.
     steps = briefingScript("K12", 'K', table, {});
@@ -648,7 +648,7 @@ void testMissionScripts() {
 
 void testColony() {
     CHECK(colonySite("F1", 'F').a == 407 && colonySite("F1", 'F').b == 209);
-    CHECK(colonySite("J2", 'K').a == 92 && colonySite("J2", 'F').a == 208);
+    CHECK(colonySite("J2", 'K').a == 92 && colonySite("J2", 'F').a == 220 && colonySite("J1", 'R').b == 442);
     CHECK(colonySite("F8", 'F').a < 0);
     bool matched = false;
     CHECK(buildingModel("vehicle-yard", 'F', &matched) == "geo/fed/fvpy_a.geo" && matched);
@@ -768,6 +768,7 @@ void testStarSystem() {
     CHECK(layout.faceSlot[0] == 2 && layout.faceSlot[3] == 1 && layout.faceSlot[4] == 1);
     CHECK(layout.faceSlot[m.faces.size() - 9] == 4 && layout.faceSlot[m.faces.size() - 8] == 4);
     CHECK(layout.faceBody[0] == -1 && layout.faceBody[1] >= 0);
+    CHECK(starSystemTextures(layout, "ice", "bezouk")[0] == "sun3");
     const auto tex = starSystemTextures(layout, "ice");
     CHECK(tex.size() == 5 && tex[0] == "sun" && tex[1] == "ice" && tex[2] == "stars1");
     CHECK(tex[3] == "red" && tex[4] == "red_r");

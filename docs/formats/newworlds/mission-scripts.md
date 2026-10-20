@@ -34,9 +34,10 @@ The format is described at the top of `mission_script.h`.
 
 ## How far they go
 
-Scripted: the 33 missions with recordings, F1-F14 and the Klingon
-campaign with the joint missions from each of those sides, and the bonus
-missions C9 and C10. Each one's blocks are in the order the recording
+Scripted: the 44 missions with recordings, F1-F14 and the Klingon
+campaign with the joint missions from each of those sides, the Romulan
+recordings (R1, R2, R9, R12, R14 and J1-J4, J6-J9 as the Romulans), and the
+bonus missions C9, C10 and C11. Each one's blocks are in the order the recording
 showed them, and a test plays every script through in that order (the
 walkthrough) and checks it ends in a win where the recording did. Blocks
 the recordings didn't show (a fail never reached, a message the panel
@@ -46,7 +47,10 @@ hid) are inferred from the objective and fail strings and marked
 Not known, so not scripted: where the starting colonies, units and enemies
 are (the missions page approximates the colonies: [colony.md](colony.md)); the timing of attacks; how close "approach" is; the exact amounts
 (the dilithium targets come from the objective strings). Those need a
-running game to fill in. The Romulan campaign has no recordings yet.
+running game to fill in. Of the Romulan campaign only R8 has no recording,
+so no script. Where a Romulan recording's beat had no event of its own (a
+repair or a hold before the end, a taunt minutes after a fight) the script
+approximates it with a timer, and says so.
 
 ## In Reluva
 

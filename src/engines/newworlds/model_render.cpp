@@ -47,6 +47,8 @@ ModelViewStyle briefingModelStyle(char side) {
         return {{170, 160, 255}, 0.6f};
     if (side == 'K')
         return {{90, 100, 190}, 1};
+    if (side == 'R')
+        return {{150, 140, 255}, 0.6f};
     return {};
 }
 

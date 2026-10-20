@@ -12,6 +12,10 @@ approximate colony from it (`src/engines/newworlds/colony.h`).
   camera over it, the Tricorder reading 407:209, and four vehicles.
 - **K1** starts with the colony hub (`kch`) on a concrete pad and three
   other buildings, which the recording doesn't name.
+- The Romulan recordings start on a concrete pad with the hub (`rch`), and
+  in later missions more: R9 the hub, a low building and four cloaked
+  tanks; R14 hub, construction yard, science station, vehicle yard,
+  resource processor and two more; C11 a colony already built.
 - **J4K** starts beside an old Klingon colony of four buildings to
   recapture. **J8K** starts with about a dozen buildings, and **C10**
   with its colony already built (52/50).
@@ -53,7 +57,7 @@ lie beside the colony. Where two did, the middle of them is used.
 | Mission | Side | Position | From |
 |---|---|---|---|
 | F1 | Federation | 407:209 | the start's Tricorder readout |
-| J2 | Federation | 208:424 | between mines 196:436 and 220:412 |
+| J2 | Federation | 220:412 | a mine (the other, 196:436, lies on no deposit and was probably misread) |
 | F12 | Federation | 212:196 | a mine (reported late, at 31:28) |
 | J9 | Federation | 312:392 | between mines 316:404 and 308:380 |
 | C9 | Federation | 260:300 | a mine |
@@ -68,9 +72,20 @@ lie beside the colony. Where two did, the middle of them is used.
 | K14 | Klingon | 100:292 | a mine (on K12's map) |
 | J9 | Klingon | 308:368 | between mines 316:380 and 300:356 |
 | C10 | Klingon | 292:364 | the first mine (the second, 276:444, is ten blocks away) |
+| R2 | Romulan | 260:356 | between mines 220:380 and 300:332 |
+| J1 | Romulan | 111:442 | the start's Tricorder readout |
+| J2 | Romulan | 166:184 | the readout the player kept returning to |
+| J3 | Romulan | 103:311 | between mines 124:300, 76:284 and 108:348 |
+| J4 | Romulan | 276:380 | a mine |
+| R9 | Romulan | 308:428 | the first of five mines |
+| J6 | Romulan | 92:196 | a mine |
+| J7 | Romulan | 200:324 | between mines 188:324 and 212:324 |
+| R12 | Romulan | 260:264 | between the first mines, 244:252 and 276:276 |
+| R14 | Romulan | 260:272 | between mines 244:260 and 276:284 (on R12's map) |
 
 The other missions (F2, F3, F8, F14, J1, J3, J4, J6 to J8 as the
-Federation, and K8, J6 to J8 as the Klingons) have no position yet.
+Federation, K8, J6 to J8 as the Klingons, and R1, R8, J8, J9 and C11 as
+the Romulans) have no position yet.
 
 Every mine position the recordings give is a block's middle (8 × n + 4 in
 both numbers: 404:220, 244:92, 300:284), so mining stations stand one to
