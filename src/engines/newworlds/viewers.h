@@ -13,6 +13,7 @@
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/game_ui.h"
 #include "engines/newworlds/colony.h"
+#include "engines/newworlds/economy.h"
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
 #include "engines/newworlds/world.h"
@@ -32,6 +33,7 @@
 #include <map>
 #include <set>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -212,8 +214,16 @@ public:
         std::string model;
         int a = 0, b = 0;
         int turn = 0;
+        float progress = 1; // under construction: 0 just begun, 1 built
     };
     void setBuildings(const std::vector<Building>& buildings);
+    // A building's construction moved on (by its index in setBuildings').
+    // The recordings show an apron first, then the building rising out of
+    // it (play-tutorials.md): here its model flat, then growing upwards.
+    void setBuildingProgress(size_t i, float progress);
+    // The hologram of a building being placed (play): its model, tinted
+    // green where it can go and red where it can't; model empty for none.
+    void setGhost(const std::string& model, int a, int b, bool valid);
     // Tiles (x east, y north) drawn with the planet's concrete texture
     // instead of their own, as under a starting colony. Cleared by showMap.
     void setPaved(const std::vector<std::pair<int, int>>& tiles);
@@ -223,6 +233,9 @@ public:
     int blocksWide() const { return map_.width; }
     int blocksHigh() const { return map_.height; }
     int depositAt(int bx, int by) const;
+    // The cell value's low 12 bits at a block (50-300; how much a deposit
+    // holds, presumably; gmf.md).
+    int depositAmount(int bx, int by) const;
     float groundAt(int a, int b);
     // A building model's size across x and y (0 if it isn't there).
     std::pair<float, float> modelSize(const std::string& name);
@@ -292,6 +305,7 @@ private:
         Vec3 position;
         float angle; // anticlockwise, in radians
         const TileModel* model;
+        float progress = 1;
     };
 
     void show(int index);
@@ -337,6 +351,8 @@ private:
     std::vector<Placed> buildings_;
     std::vector<bool> hidden_; // placed_ objects under a building or on paved_
     std::vector<UnitDraw> units_;
+    std::optional<Placed> ghost_;
+    bool ghostValid_ = false;
     View view_ = View::BirdsEye;
     bool locked_ = false;
     std::vector<std::array<float, 4>> buildingAreas_; // middle x, y and half sizes, in model units
@@ -528,6 +544,14 @@ private:
     void showUnits();
     void drawPlay(); // the selection box, the full-screen Tricorder
     bool hubPosition(float& x, float& y) const;
+    // Building in play (B): the menu's types for the side, the hologram
+    // under the pointer, placing it, and its construction drawn.
+    std::vector<const BuildingType*> buildMenu() const;
+    void choose(const BuildingType& t);
+    void updateGhost();
+    void placeBuilding();
+    void showProgress();
+    void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
     void startBriefing();
@@ -601,6 +625,11 @@ private:
     char uiSide_ = 0;
     std::unique_ptr<ColonyLayout> colony_;
     std::unique_ptr<World> world_;
+    std::unique_ptr<Economy> economy_;
+    std::vector<int> structureIds_; // per colony building, its economy structure
+    bool buildMenu_ = false, ghostOk_ = false;
+    std::string placing_;            // the type being placed, or empty
+    int ghostA_ = -1, ghostB_ = -1; // where its hologram stands
     bool playing_ = false, boxing_ = false, tricorderFull_ = false;
     int mouseX_ = 0, mouseY_ = 0, boxX_ = 0, boxY_ = 0;
     uint64_t lastTickMs_ = 0;

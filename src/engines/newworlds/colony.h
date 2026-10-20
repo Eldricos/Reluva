@@ -60,6 +60,14 @@ public:
     // Adds a building; false if the side has no model for it (or it's a
     // unit), it upgrades a building that isn't there, or there's no room.
     bool add(std::string_view building);
+    // For the player placing a building (not an upgrade): its footprint
+    // centred as near a map position as the tile grid allows, its middle
+    // there (a, b), and whether it fits (free, flat ground near the hub's
+    // height; a mine's middle on a deposit). False if the side has no
+    // model for it.
+    bool spotAt(std::string_view building, int a, int b, int& ma, int& mb, bool& fits) const;
+    // Adds it there if it fits.
+    bool addAt(std::string_view building, int a, int b);
     const std::vector<ColonyBuilding>& buildings() const { return buildings_; }
     // The concrete the colony starts on, as tile positions (x east, y
     // north): its ground within two tiles of the hub. Recordings show the
@@ -75,6 +83,7 @@ private:
     // On the map, flat (within flatness), near the hub's height.
     bool groundFits(int tx, int ty, bool mine, float flatness) const;
     bool fits(const Rect& r, bool mine) const;
+    bool spotRect(std::string_view building, int a, int b, std::string& model, Rect& r) const;
     Rect footprint(const std::string& model, int tx, int ty) const;
     void place(std::string_view name, const std::string& model, const Rect& r);
 

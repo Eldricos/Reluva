@@ -59,7 +59,8 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   interface over the map in the side's style (the script's messages and objectives in it), **C**
   shows or hides the colony (its hub where the recordings put it, growing as the script builds)
   and **V** looks at it, and **F3** plays on the map with the game's own camera and controls
-  (select and move the colony's starting units; see `docs/formats/newworlds/game.md`); the map's
+  (select and move the colony's starting units, **B** to build, the mission's script running;
+  see `docs/formats/newworlds/game.md`); the map's
   keys work too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**

@@ -8,6 +8,7 @@
 #include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/colony.h"
+#include "engines/newworlds/economy.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -777,6 +778,66 @@ void testStarSystem() {
     CHECK(look >= 0 && layout.bodies[size_t(look)].slot == 1);
 }
 
+void testEconomy() {
+    auto count = [](const std::vector<ScriptEvent>& ev, const char* kind) {
+        return std::count_if(ev.begin(), ev.end(), [&](const ScriptEvent& e) { return e.kind == kind; });
+    };
+    // Dilithium (kind 1) under tile 4,6's block, 50 units of it.
+    ColonyMap map;
+    map.depositKind = [](int tx, int ty) { return tx / 2 == 2 && ty / 2 == 3 ? 1 : 0; };
+    map.depositAmount = [](int, int) { return 50; };
+    Economy e('F', {500, 988, 2211, 497, 3500, 5000}, 20, 50, map);
+    e.addBuilt("colony-hub", 0, 0);
+    const BuildingType* yard = buildingType("construction-yard");
+    const BuildingType* mine = buildingType("mining-station");
+    CHECK(yard && mine && e.available(*yard) && !e.available(*mine) && !e.available(*buildingType("colony-hub")));
+    CHECK(e.order("mining-station", 0, 0, 4, 6) == 0); // no processor yet
+    const int id = e.order("construction-yard", 1000, 1000, 0, 0);
+    CHECK(id != 0 && e.stock()[Thermoconc] == 2211);
+    auto ev = e.advance(1);
+    CHECK(e.stock()[Thermoconc] == 2211 - 89 && e.stock()[Nitrium] == 3450 && count(ev, "built") == 0);
+    for (int i = 0; i < 40 && count(ev, "built") == 0; ++i)
+        ev = e.advance(1);
+    CHECK(count(ev, "built") == 1 && ev[0].args.size() == 1 && ev[0].args[0] == "construction-yard");
+    CHECK(e.capacity() == 55 && e.stock()[Thermoconc] == 2211 - 89); // paid once
+    // Six more yards: demand 70 over the hub's 60.
+    for (int i = 0; i < 6; ++i)
+        e.addBuilt("vehicle-yard", 0, 0);
+    CHECK(e.demandMet() < 1);
+    ev = e.advance(1);
+    CHECK(count(ev, "power-low") == 1 && count(e.advance(1), "power-low") == 0); // not again at once
+    e.addBuilt("power-generator", 0, 0);
+    CHECK(e.demandMet() == 1);
+    // An order it can't pay for waits and says so.
+    Economy poor('F', {}, 20, 50, map);
+    poor.addBuilt("colony-hub", 0, 0);
+    poor.addBuilt("construction-yard", 0, 0);
+    CHECK(poor.order("sickbay", 0, 0, 0, 0) != 0);
+    ev = poor.advance(1);
+    CHECK(count(ev, "short-resources") == 1 && poor.structures().back().progress == 0);
+    // A mine on the deposit digs it dry; the processor refines its ore.
+    e.addBuilt("resource-processor", 0, 0);
+    CHECK(e.order("mining-station", 0, 0, 0, 0) == 0); // no deposit there
+    CHECK(e.order("mining-station", 5 * kTile, 7 * kTile, 5, 7) != 0);
+    const int dilithium = e.stock()[Dilithium];
+    bool dry = false;
+    int at = -1, bt = -1;
+    for (int i = 0; i < 2000 && !dry; ++i)
+        for (const ScriptEvent& x : e.advance(1))
+            if (x.kind == "mine-exhausted")
+                dry = true, at = x.a, bt = x.b;
+    CHECK(dry && at == 3 * 8 + 4 && bt == 2 * 8 + 4);
+    for (int i = 0; i < 200; ++i)
+        e.advance(1);
+    CHECK(e.stock()[Dilithium] >= dilithium + 199 && e.stock()[Dilithium] <= dilithium + 200 && e.oreStock()[0] < 1);
+    // The crew grows, one every 30 s, up to the capacity.
+    const int crew = e.crew();
+    e.advance(30);
+    CHECK(crew > 20 && e.crew() == crew + 1);
+    e.advance(3600);
+    CHECK(e.crew() == e.capacity());
+}
+
 void testWorld() {
     // A 10 x 10 tile plain with a wall of closed tiles down column 5 (open
     // only at row 9), and a cliff (a 3000-unit step) between columns 1 and 2
@@ -946,6 +1007,7 @@ int main() {
     testMissionScripts();
     testColony();
     testStarSystem();
+    testEconomy();
     testWorld();
     testModelTextures();
     testRasterizer();

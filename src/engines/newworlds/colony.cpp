@@ -288,4 +288,37 @@ bool ColonyLayout::add(std::string_view building) {
     return false;
 }
 
+bool ColonyLayout::spotRect(std::string_view building, int a, int b, std::string& model, Rect& r) const {
+    model = buildingModel(building, side_);
+    for (const auto& [upgrade, base] : kUpgrades)
+        if (building == upgrade)
+            return false;
+    if (model.empty() || buildings_.empty())
+        return false;
+    // The footprint's corner such that its middle is nearest the point.
+    r = footprint(model, 0, 0);
+    r.x = int(std::lround(float(b) / kTile - float(r.w) / 2));
+    r.y = int(std::lround(float(a) / kTile - float(r.h) / 2));
+    return true;
+}
+
+bool ColonyLayout::spotAt(std::string_view building, int a, int b, int& ma, int& mb, bool& fit) const {
+    std::string model;
+    Rect r{};
+    if (!spotRect(building, a, b, model, r))
+        return false;
+    ma = r.y * kTile + r.h * kTile / 2, mb = r.x * kTile + r.w * kTile / 2;
+    fit = fits(r, building == "mining-station");
+    return true;
+}
+
+bool ColonyLayout::addAt(std::string_view building, int a, int b) {
+    std::string model;
+    Rect r{};
+    if (!spotRect(building, a, b, model, r) || !fits(r, building == "mining-station"))
+        return false;
+    place(building, model, r);
+    return true;
+}
+
 } // namespace reluva::newworlds

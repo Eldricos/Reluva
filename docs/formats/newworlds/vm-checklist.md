@@ -51,6 +51,10 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 - **Build times** [rec]: note order and finish times for each building,
   upgrade and vehicle on one side (ideally all three); include R9's device.
   ([play-r9.md](play-r9.md))
+- **Building on deposits** [shot]: pick a power generator and hold its
+  hologram over a deposit block (one the Tricorder names an ore on), then
+  over bare ground beside it; is it red on the deposit? Reluva keeps
+  deposits for mines only. ([game.md](game.md#the-colony))
 - **Build costs** [shot]: hover every build icon on each side and screenshot
   its cost; missing even for the Federation: phaser tank, photon artillery,
   science block, phaser coil lab. ([play-tutorials.md](play-tutorials.md#build-costs-shown-structures-from-a-construction-yard))

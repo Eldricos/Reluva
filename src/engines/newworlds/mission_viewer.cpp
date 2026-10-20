@@ -218,6 +218,7 @@ void MissionViewer::showColony() {
         for (const ColonyBuilding& c : colony_->buildings())
             buildings.push_back({c.model, c.a, c.b});
     map_.setBuildings(buildings);
+    showProgress();
     map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});
 }
 
@@ -239,6 +240,31 @@ void MissionViewer::startPlay() {
     const Level& level = missions_[size_t(current_)];
     const char side = missionSides(level.shortName)[size_t(side_)];
     world_ = std::make_unique<World>(map_.terrain());
+    // The colony as it starts: the hub alone, and the stock every
+    // recording started with (the Romulans a little less).
+    colonyShown_ = true;
+    startColony();
+    static constexpr Stock kStart{500, 1000, 2300, 500, 4000, 5000}, kRomulan{500, 988, 2211, 497, 3500, 5000};
+    ColonyMap ground{[this](int tx, int ty) { return map_.depositAt(tx / 2, ty / 2); },
+                     [this](int tx, int ty) { return map_.depositAmount(tx / 2, ty / 2); }};
+    economy_ = std::make_unique<Economy>(side, side == 'R' ? kRomulan : kStart, 20, 50, std::move(ground));
+    structureIds_.clear();
+    if (colony_)
+        for (const ColonyBuilding& c : colony_->buildings())
+            structureIds_.push_back(economy_->addBuilt(c.name, float(c.b) / 8 * MapViewer::kBlockUnits,
+                                                       float(c.a) / 8 * MapViewer::kBlockUnits));
+    // The mission's script, from its start, if Reluva has one.
+    run_.reset();
+    walk_.clear();
+    log_.clear();
+    walkNote_.clear();
+    if (const MissionScript* script = findMissionScript(level.shortName, side)) {
+        run_ = std::make_unique<MissionRun>(*script, findMissionScript("generic", 'F'));
+        const ScriptEvent start{"start", {}};
+        deliver(start, run_->fire(start));
+    }
+    buildMenu_ = false;
+    placing_.clear();
     float hx = map_.worldWidth() / 2, hy = map_.worldHeight() / 2;
     hubPosition(hx, hy);
     // In a row south of the hub, each on the nearest open tile.
@@ -265,6 +291,14 @@ void MissionViewer::stopPlay() {
         return;
     playing_ = false;
     world_.reset();
+    economy_.reset();
+    structureIds_.clear();
+    run_.reset();
+    log_.clear();
+    walkNote_.clear();
+    buildMenu_ = false;
+    placing_.clear();
+    map_.setGhost({}, 0, 0, false);
     map_.setUnits({});
     map_.unlock();
     redraw();
@@ -279,15 +313,98 @@ void MissionViewer::showUnits() {
     map_.setUnits(std::move(draw));
 }
 
+std::vector<const BuildingType*> MissionViewer::buildMenu() const {
+    std::vector<const BuildingType*> out;
+    if (!economy_)
+        return out;
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    for (const BuildingType& t : buildingTypes())
+        if (t.needs != "-" && !buildingModel(t.id, side).empty())
+            out.push_back(&t);
+    return out;
+}
+
+void MissionViewer::choose(const BuildingType& t) {
+    if (!economy_ || !economy_->available(t))
+        return;
+    placing_ = t.id;
+    buildMenu_ = false;
+    ghostA_ = ghostB_ = -1;
+    updateGhost();
+}
+
+// The hologram follows the pointer, on the tile grid, green where the
+// building can go.
+void MissionViewer::updateGhost() {
+    if (placing_.empty() || !colony_)
+        return;
+    float x = 0, y = 0;
+    int a = -1, b = -1;
+    bool ok = false;
+    if (map_.screenToGround(mouseX_, mouseY_, x, y)) {
+        const int pa = int(y / MapViewer::kBlockUnits * 8), pb = int(x / MapViewer::kBlockUnits * 8);
+        if (!colony_->spotAt(placing_, pa, pb, a, b, ok))
+            a = b = -1;
+    }
+    if (a == ghostA_ && b == ghostB_ && ok == ghostOk_)
+        return;
+    ghostA_ = a, ghostB_ = b, ghostOk_ = ok;
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    map_.setGhost(a < 0 ? std::string() : buildingModel(placing_, side), a, b, ok);
+}
+
+void MissionViewer::placeBuilding() {
+    if (placing_.empty() || !colony_ || !economy_ || !ghostOk_ || ghostA_ < 0)
+        return;
+    const float x = float(ghostB_) / 8 * MapViewer::kBlockUnits, y = float(ghostA_) / 8 * MapViewer::kBlockUnits;
+    const int id = economy_->order(placing_, x, y, int(x / kTile), int(y / kTile));
+    if (id == 0 || !colony_->addAt(placing_, ghostA_, ghostB_))
+        return;
+    structureIds_.push_back(id);
+    placing_.clear();
+    map_.setGhost({}, 0, 0, false);
+    showColony();
+}
+
+void MissionViewer::showProgress() {
+    if (!economy_)
+        return;
+    const auto& all = economy_->structures();
+    for (size_t i = 0; i < structureIds_.size(); ++i)
+        for (const ColonyStructure& c : all)
+            if (c.id == structureIds_[i])
+                map_.setBuildingProgress(i, c.progress);
+}
+
 bool MissionViewer::playEvent(const Event& ev) {
     if (ev.type == EventType::MouseMove || ev.type == EventType::MouseDown || ev.type == EventType::MouseUp)
         mouseX_ = ev.mouseX, mouseY_ = ev.mouseY;
     const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0;
     switch (ev.type) {
     case EventType::KeyDown:
+        if (ev.key == key::Escape && (buildMenu_ || !placing_.empty())) {
+            buildMenu_ = false;
+            placing_.clear();
+            map_.setGhost({}, 0, 0, false);
+            break;
+        }
         if (ev.key == key::Escape || ev.key == key::F1 + 2) {
             stopPlay();
             return true;
+        }
+        if (ev.key == 'b') {
+            buildMenu_ = !buildMenu_;
+            placing_.clear();
+            map_.setGhost({}, 0, 0, false);
+            break;
+        }
+        if (buildMenu_ && ev.key >= '0' && ev.key <= '9') {
+            // 1-9, then 0 for the tenth.
+            const size_t n = ev.key == '0' ? 9 : size_t(ev.key - '1');
+            const auto menu = buildMenu();
+            if (n < menu.size())
+                choose(*menu[n]);
+            break;
         }
         if (ev.key == key::Tab) {
             tricorderFull_ = !tricorderFull_;
@@ -328,6 +445,17 @@ bool MissionViewer::playEvent(const Event& ev) {
             break;
         return true; // the data viewer's keys don't apply in play
     case EventType::MouseDown:
+        if (!placing_.empty() && !ctrl) {
+            // Left click builds where the hologram is green; right click
+            // puts it away.
+            if (ev.button == MouseButton::Left)
+                placeBuilding();
+            else if (ev.button == MouseButton::Right) {
+                placing_.clear();
+                map_.setGhost({}, 0, 0, false);
+            }
+            break;
+        }
         if (ev.button == MouseButton::Left && ctrl) {
             map_.zoomAt(ev.mouseX, ev.mouseY, true);
         } else if (ev.button == MouseButton::Right && ctrl) {
@@ -346,6 +474,10 @@ bool MissionViewer::playEvent(const Event& ev) {
         }
         break;
     case EventType::MouseMove:
+        if (!placing_.empty()) {
+            updateGhost();
+            return true;
+        }
         if (!boxing_)
             return true;
         break;
@@ -510,6 +642,21 @@ void MissionViewer::update(uint64_t nowMs) {
         lastTickMs_ = nowMs;
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
+        std::vector<ScriptEvent> happened;
+        if (economy_) {
+            happened = economy_->advance(std::min(dt, 0.25));
+            showProgress();
+        }
+        // The script hears what happened, and its timers run.
+        if (run_ && !run_->finished()) {
+            for (const ScriptEvent& e : happened)
+                deliver(e, run_->fire(e));
+            const ScriptEvent tick{"timer", {}};
+            deliver(tick, run_->advance(std::min(dt, 0.25)));
+        }
+        updateGhost(); // the camera may have moved under the pointer
+        if (economy_ && nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
+            redraw(); // the panels' figures, once a second
     }
     if (mapInView())
         map_.update(nowMs);
@@ -694,6 +841,9 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
         t += "; no colony site known";
     if (playing_ && world_)
         t += "; playing: " + std::to_string(world_->selection().size()) + " selected (F3 or Escape: stop)";
+    if (playing_ && economy_)
+        t += "; power " + std::to_string(int(economy_->powerSupply())) + "/" +
+             std::to_string(int(economy_->powerDemand())) + " (B: build)";
     if (run_)
         t += "; script: " + walkNote_;
     if (running_)
@@ -812,10 +962,13 @@ void MissionViewer::drawInterface() {
         }
     }
 
-    // NEW WORLDS: the colony panel, with the stock every recording started
-    // with (the economy isn't simulated).
+    // NEW WORLDS: the colony panel: the colony's size and stock (in play
+    // the economy's; else what every recording started with), the
+    // selection, or the build menu.
     {
-        const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + 7 * lh + 8;
+        const auto menu = buildMenu_ ? buildMenu() : std::vector<const BuildingType*>{};
+        const int lines = buildMenu_ ? int(menu.size()) + 1 : 7;
+        const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
         static const char* const kNames[] = {"DILITHIUM", "POLYCOMP", "THERMOCONC", "TRANSALUMIN", "NITRIUM", "DURANIUM"};
@@ -825,7 +978,27 @@ void MissionViewer::drawInterface() {
             kStock[i] = {kNames[i], side == 'R' ? kRomulan[i] : kStart[i]};
         int ty = y + 16;
         const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
-        if (sel.size() == 1) {
+        const BuildingType* placing = placing_.empty() ? nullptr : buildingType(placing_);
+        if (buildMenu_) {
+            // The menu: each type with its key; dim if what it needs
+            // doesn't stand yet, plain if the stock can't pay for it.
+            ui_.drawSmall(screen_, x + 10, ty, "BUILD", bright);
+            const Color dim{uint8_t(text.r / 2), uint8_t(text.g / 2), uint8_t(text.b / 2)};
+            for (size_t i = 0; i < menu.size(); ++i) {
+                const BuildingType& t = *menu[i];
+                const Color c = !economy_->available(t) ? dim : economy_->affordable(t) ? bright : text;
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), std::to_string((i + 1) % 10) + " " + t.panel, c);
+            }
+        } else if (placing) {
+            // Placing: the building and what it costs.
+            ui_.drawSmall(screen_, x + 10, ty, placing->panel, bright);
+            int line = 1;
+            for (int m = 0; m < kMaterials; ++m)
+                if (placing->cost[size_t(m)] > 0)
+                    ui_.drawSmall(screen_, x + 10, ty + lh * line++,
+                                  std::string(materialName(m)) + " = " + std::to_string(placing->cost[size_t(m)]),
+                                  economy_->stock()[size_t(m)] >= placing->cost[size_t(m)] ? text : Color{255, 80, 60});
+        } else if (sel.size() == 1) {
             // One unit: its name and state, as the game's panel.
             const Unit* u = world_->unit(sel[0]);
             ui_.drawSmall(screen_, x + 10, ty, u->kind.name, bright);
@@ -835,7 +1008,16 @@ void MissionViewer::drawInterface() {
             for (size_t i = 0; i < sel.size() && i < 6; ++i)
                 ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), world_->unit(sel[i])->kind.name, text);
         } else {
-            ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
+            if (economy_) {
+                for (int i = 0; i < 6; ++i)
+                    kStock[i].second = economy_->stock()[size_t(i)];
+                ui_.drawSmall(screen_, x + 10, ty,
+                              "COLONY SIZE = " + std::to_string(economy_->crew()) + "/" +
+                                  std::to_string(economy_->capacity()),
+                              bright);
+            } else {
+                ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
+            }
             for (const auto& [name, n] : kStock) {
                 ty += lh;
                 ui_.drawSmall(screen_, x + 10, ty, std::string(name) + " = " + std::to_string(n), text);
@@ -964,7 +1146,17 @@ void MissionViewer::stepScript() {
     } else {
         walkNote_ = "nothing more scripted";
     }
-    // The game's own spoken announcement for it (Media/Misc), if any.
+    deliver(fired, out);
+    redraw();
+    updateTitle();
+}
+
+// What the script said: its messages to the log, the game's spoken
+// announcement for it (Media/Misc), if any, and the outcome in the note.
+void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out) {
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    if (playing_ && !out.empty())
+        walkNote_ = fired.kind; // in play, the latest that said anything
     if (const std::string voice = announcementFor(fired, out, side); !voice.empty() && mixer_) {
         stopClip();
         if (auto sound = loadSound(voice))
@@ -981,8 +1173,8 @@ void MissionViewer::stepScript() {
         else if (o.kind == MissionRun::Output::Lost)
             walkNote_ += "; mission lost";
     }
-    redraw();
-    updateTitle();
+    if (!out.empty())
+        redraw();
 }
 
 void MissionViewer::stopScript() {

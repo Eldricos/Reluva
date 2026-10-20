@@ -101,6 +101,7 @@ void MapViewer::show(int index) {
     hidden_.clear();
     paved_.clear();
     units_.clear();
+    ghost_.reset();
     locked_ = false;
     view_ = View::BirdsEye;
     pavedModels_.clear();
@@ -488,12 +489,35 @@ void MapViewer::setBuildings(const std::vector<Building>& buildings) {
         const float x = float(b.b) / 8 * kBlockSize - (cx * cs - cy * sn);
         const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
         const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
-        buildings_.push_back({{x, y, ground}, angle, &m});
+        buildings_.push_back({{x, y, ground}, angle, &m, b.progress});
         const bool across = b.turn % 2 != 0;
         buildingAreas_.push_back({float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize,
                                   (across ? h : w) / 2 + 512, (across ? w : h) / 2 + 512});
     }
     updateHidden();
+    dirty_ = true;
+}
+
+void MapViewer::setBuildingProgress(size_t i, float progress) {
+    if (i < buildings_.size() && buildings_[i].progress != progress) {
+        buildings_[i].progress = progress;
+        dirty_ = true;
+    }
+}
+
+void MapViewer::setGhost(const std::string& model, int a, int b, bool valid) {
+    const TileModel* m = model.empty() ? nullptr : &namedModel(model);
+    if (!m || !m->error.empty()) {
+        if (ghost_)
+            dirty_ = true;
+        ghost_.reset();
+        return;
+    }
+    float w = 0, h = 0, cx = 0, cy = 0;
+    modelBounds(m->geo, w, h, cx, cy);
+    const float x = float(b) / 8 * kBlockSize, y = float(a) / 8 * kBlockSize;
+    ghost_ = Placed{{x - cx, y - cy, groundHeight(x, y)}, 0, m};
+    ghostValid_ = valid;
     dirty_ = true;
 }
 
@@ -508,6 +532,12 @@ int MapViewer::depositAt(int bx, int by) const {
     if (bx < 0 || by < 0 || bx >= map_.width || by >= map_.height)
         return 0;
     return map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].deposit();
+}
+
+int MapViewer::depositAmount(int bx, int by) const {
+    if (bx < 0 || by < 0 || bx >= map_.width || by >= map_.height)
+        return 0;
+    return map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].value & 0xfff;
 }
 
 int MapViewer::tileAt(int tx, int ty) const { return newworlds::tileAt(map_, tx, ty); }
@@ -811,7 +841,7 @@ void MapViewer::render() {
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
-                         const uint8_t* tint = nullptr, float scale = 1) {
+                         const uint8_t* tint = nullptr, float scale = 1, float rise = 1) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
@@ -824,7 +854,7 @@ void MapViewer::render() {
                 // For terrain codes, (u, v) is the position across the
                 // tile, in map orientation.
                 const bool planar = ground && colouring_ == 1;
-                poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z * scale},
+                poly.push_back(cam.toView(Vec{origin.x + x, origin.y + y, origin.z + v.z * scale * rise},
                                           planar ? (x + kTileSize / 2) / kTileSize : corner.u,
                                           planar ? (y + kTileSize / 2) / kTileSize : corner.v));
                 // Smooth shading: the corner's own normal (its first extra
@@ -958,12 +988,22 @@ void MapViewer::render() {
             drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
         }
     // The buildings, whatever their size on the screen.
+    // Under construction: the apron (the model pressed flat) for the
+    // first part of the time, then the building rising.
+    constexpr float kApron = 0.15f;
     for (const Placed& o : buildings_) {
         const Vec at{o.position.x, o.position.y, o.position.z};
         if (cam.toView(at).z < cam.nearZ)
             continue;
         ++drawnObjects_;
-        drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr);
+        const float rise = o.progress >= 1 ? 1 : std::max(0.02f, (o.progress - kApron) / (1 - kApron));
+        drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr, nullptr, 1, rise);
+    }
+    if (ghost_) {
+        static const uint8_t kGreen[3] = {40, 255, 60}, kRed[3] = {255, 40, 40};
+        const Vec at{ghost_->position.x, ghost_->position.y, ghost_->position.z};
+        if (cam.toView(at).z >= cam.nearZ)
+            drawModel(*ghost_->model, at, 1, 0, nullptr, ghostValid_ ? kGreen : kRed);
     }
     // The units, facing their heading (the models face along +y, so a
     // quarter turn less), drawn kUnitScale times their models' size: in
