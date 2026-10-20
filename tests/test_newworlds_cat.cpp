@@ -14,9 +14,11 @@
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
+#include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -580,6 +582,59 @@ void testBriefing() {
     CHECK(missionSides("C10") == std::vector<char>{'K'} && missionSides("C11") == std::vector<char>{'R'});
 }
 
+void testMissionScripts() {
+    std::vector<MissionScript> s;
+    CHECK(!parseMissionScripts("mission T F\nsite base 8 16\nobjective 5\nobjective 6 hidden\nlose 9 destroyed hub\n"
+                               "on built-all yard*2 gen|adv\n  say command \"Built at {site:base}.\"\n  complete 5\n"
+                               "  reveal 6\n  timer t 10\non timer t\n  complete 6\non all-completed\n  win\n",
+                               s));
+    CHECK(s.size() == 1 && s[0].sites.at("base") == std::make_pair(8, 16) && s[0].objectives.size() == 2);
+    MissionRun run(s[0], nullptr);
+    CHECK(run.objectiveState(6) == MissionRun::State::Hidden);
+    CHECK(run.fire({"built", {"yard"}}).empty() && run.fire({"built", {"adv"}}).empty());
+    auto out = run.fire({"built", {"yard"}}); // the second yard: all built
+    CHECK(out.size() == 3 && out[0].text == "Built at <008:016>." && out[0].sender == "Command");
+    CHECK(out[1].kind == MissionRun::Output::Completed && out[2].kind == MissionRun::Output::Revealed);
+    CHECK(!run.finished() && run.nextTimer() == 10);
+    out = run.advance(10);
+    CHECK(run.won() && out.back().kind == MissionRun::Output::Won);
+    MissionRun lost(s[0], nullptr);
+    CHECK(lost.fire({"destroyed", {"hub"}}).back().kind == MissionRun::Output::Lost && lost.finished());
+    CHECK(bool(parseMissionScripts("mission T F\non start\n  frobnicate\n", s)));
+    CHECK(bool(parseMissionScripts("  say command \"x\"\n", s)));
+
+    // Reluva's scripts all read, and each recorded mission's walkthrough
+    // plays through without losing; those whose recordings reached the end
+    // win.
+    CHECK(missionScripts().size() >= 31);
+    const MissionScript* generic = findMissionScript("generic", 'F');
+    CHECK(generic != nullptr);
+    for (const MissionScript& m : missionScripts()) {
+        if (&m == generic)
+            continue;
+        MissionRun r(m, generic);
+        for (const ScriptEvent& e : r.walkthrough())
+            r.fire(e);
+        while (!r.finished() && r.nextTimer() >= 0)
+            r.advance(r.nextTimer());
+        const bool endsInWin = std::any_of(m.handlers.begin(), m.handlers.end(), [](const auto& h) {
+            return std::any_of(h.actions.begin(), h.actions.end(), [](const auto& a) { return a.verb == "win"; });
+        });
+        if (r.finished() && !r.won())
+            std::fprintf(stderr, "%s (%c) lost in its walkthrough\n", m.mission.c_str(), m.side);
+        if (endsInWin && !r.won())
+            std::fprintf(stderr, "%s (%c) didn't win its walkthrough\n", m.mission.c_str(), m.side);
+        CHECK(!(r.finished() && !r.won()));
+        CHECK(!endsInWin || r.won());
+    }
+    // The generic rules speak for any mission.
+    MissionRun f1(*findMissionScript("F1", 'F'), generic);
+    out = f1.fire({"mine-exhausted", {}, 404, 220});
+    CHECK(out.size() == 1 && out[0].text == "The mine at 404, 220 has run out of minerals.");
+    out = f1.fire({"built", {"vehicle-yard"}});
+    CHECK(!out.empty() && out[0].text == "Vehicle yard finished.");
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -699,6 +754,7 @@ int main() {
     testFif();
     testLevels();
     testBriefing();
+    testMissionScripts();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

@@ -15,6 +15,7 @@
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
+#include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/string_table.h"
@@ -381,6 +382,9 @@ private:
 //   Enter: play the briefing (its pages, views and clips in turn, as
 //   recordings of play showed them), or skip to its next step
 //   Backspace: stop the briefing
+//   X: play the mission's script a step at a time, in the order the
+//   recording showed its events (the messages and objectives as they
+//   change); Z: stop it
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -407,6 +411,8 @@ private:
     void redraw();
     // The briefing player: steps run one after another, each as long as its
     // clip (a few seconds when it has none, or its clip is missing).
+    void stepScript(); // the next scripted event (X)
+    void stopScript();
     void startBriefing();
     void stopBriefing();
     void startStep(int step);
@@ -462,6 +468,12 @@ private:
     std::vector<Texture> galaxyTextures_; // in the order its faces number them
     Rasterizer raster_;
     bool running_ = false, stepOnMap_ = false;
+    // The mission's script, being walked through.
+    std::unique_ptr<MissionRun> run_;
+    std::vector<ScriptEvent> walk_;
+    size_t walkPos_ = 0;
+    std::vector<std::pair<std::string, std::string>> log_; // sender, text
+    std::string walkNote_;
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;

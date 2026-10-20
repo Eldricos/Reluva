@@ -131,6 +131,7 @@ void MissionViewer::show(int index) {
 }
 
 void MissionViewer::loadSide() {
+    stopScript();
     stopBriefing();
     stopClip();
     page_ = clip_ = 0;
@@ -214,6 +215,8 @@ void MissionViewer::handleEvent(const Event& ev) {
             startBriefing();
         break;
     case key::Backspace: stopBriefing(); break;
+    case 'x': stepScript(); break;
+    case 'z': stopScript(); break;
     case 'j':
         if (sides < 2)
             return;
@@ -348,7 +351,26 @@ void MissionViewer::drawBriefing() {
             start = end + 1;
         }
     };
-    if (running_) {
+    if (run_ && !running_) {
+        // The mission's objectives, then its latest messages.
+        wrap("OBJECTIVES", kHeadingColor);
+        const MissionScript* script = findMissionScript(
+            missions_[size_t(current_)].shortName, missionSides(missions_[size_t(current_)].shortName)[size_t(side_)]);
+        for (const MissionScript::Objective& o : script->objectives) {
+            const MissionRun::State st = run_->objectiveState(o.id);
+            if (st == MissionRun::State::Hidden)
+                continue;
+            const std::string* text = table_.find(o.id);
+            wrap(std::string(st == MissionRun::State::Complete ? "[done] " : "[    ] ") +
+                     (text ? *text : "objective " + std::to_string(o.id)),
+                 st == MissionRun::State::Complete ? kNoteColor : kTextColor);
+        }
+        if (!log_.empty())
+            wrap("COMMUNICATIONS " + std::to_string(log_.size()), kHeadingColor);
+        for (size_t i = log_.size() > 4 ? log_.size() - 4 : 0; i < log_.size(); ++i)
+            wrap(log_[i].first + ": " + log_[i].second, kTextColor);
+        lines.push_back({walkNote_ + " (X: next; Z: stop)", kNoteColor});
+    } else if (running_) {
         // The step's page, if it has one.
         const uint32_t id = script_[size_t(step_)].page;
         for (const Page& page : pages_)
@@ -416,6 +438,8 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
         t += "; voice " + std::to_string(clip_ + 1) + "/" + std::to_string(clips_.size()) + " " + clips_[size_t(clip_)];
         t += clipPlaying() ? " [playing]" : " (Space: play)";
     }
+    if (run_)
+        t += "; script: " + walkNote_;
     if (running_)
         t += "; briefing step " + std::to_string(step_ + 1) + "/" + std::to_string(script_.size()) +
              (hasRecordedBriefing(level.shortName, sides[size_t(side_)]) ? "" : " (by the general rule)");
@@ -448,6 +472,64 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
         return nullptr;
     }
     return sound;
+}
+
+void MissionViewer::stepScript() {
+    const Level& level = missions_[size_t(current_)];
+    const char side = missionSides(level.shortName)[size_t(side_)];
+    if (!run_) {
+        const MissionScript* script = findMissionScript(level.shortName, side);
+        if (!script) {
+            soundStatus_ = "no script for this mission yet";
+            updateTitle();
+            return;
+        }
+        stopBriefing();
+        run_ = std::make_unique<MissionRun>(*script, findMissionScript("generic", 'F'));
+        walk_ = run_->walkthrough();
+        walkPos_ = 0;
+        log_.clear();
+        walkNote_ = "script loaded";
+        briefing_ = true;
+        redraw();
+        updateTitle();
+        return;
+    }
+    if (run_->finished())
+        return;
+    std::vector<MissionRun::Output> out;
+    if (walkPos_ < walk_.size()) {
+        const ScriptEvent& e = walk_[walkPos_++];
+        walkNote_ = "event " + std::to_string(walkPos_) + "/" + std::to_string(walk_.size()) + ": " + e.kind;
+        for (const std::string& a : e.args)
+            walkNote_ += " " + a;
+        out = run_->fire(e);
+    } else if (run_->nextTimer() >= 0) {
+        walkNote_ = "time passes (" + std::to_string(int(run_->nextTimer())) + " s)";
+        out = run_->advance(run_->nextTimer());
+    } else {
+        walkNote_ = "nothing more scripted";
+    }
+    for (const MissionRun::Output& o : out) {
+        if (o.kind == MissionRun::Output::Message)
+            log_.push_back({o.sender, o.text});
+        else if (o.kind == MissionRun::Output::Won)
+            walkNote_ += "; mission won";
+        else if (o.kind == MissionRun::Output::Lost)
+            walkNote_ += "; mission lost";
+    }
+    redraw();
+    updateTitle();
+}
+
+void MissionViewer::stopScript() {
+    if (!run_)
+        return;
+    run_.reset();
+    walk_.clear();
+    log_.clear();
+    redraw();
+    updateTitle();
 }
 
 void MissionViewer::startBriefing() {

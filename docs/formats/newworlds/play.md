@@ -37,6 +37,9 @@ repository). One page per mission:
 | [play-j9f.md](play-j9f.md) | J9 The Lost Tribes | Federation (14th) |
 | [play-c9.md](play-c9.md) | C9 Slaver's Run (bonus) | Federation |
 
+Reluva's mission scripts are written from these pages:
+[mission-scripts.md](mission-scripts.md).
+
 ## What they established
 
 - **The campaigns' order**: the Klingons' K1, K2, J1, J2, J3, K7, J4, K8,
