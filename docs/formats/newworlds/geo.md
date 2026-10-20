@@ -37,7 +37,7 @@ bounds         u32 last face's part, u32 ?, u32 part count,
                f32 centre x, f32 centre y, f32 radius
 attachments    u32 node count, u32 place count (the .mdl's first and third
                name lists), u32 ? (1 when there are attachments), then per
-               attachment 58 bytes: 40 bytes (probably its orientation), u16
+               attachment 58 bytes: 9 x f32 orientation and f32 scale, u16
                0x1c, u32 12, 3 x f32 position (see mdl.md). 58 isn't a
                multiple of 4, so what follows is often not 4-byte aligned
 part data      u32 size (reaches the end of the file in mn_s), u32 1,
@@ -316,7 +316,7 @@ would flip both the picture and the winding) isn't confirmed yet.
   the last part.
 - The file header's first value, face header values, and the 20 bytes after
   each corner's texture coordinates (sometimes a 1 in the last word).
-- The 40 bytes before each attachment's position; the terrain grid's exact layout; the second texture set in
+- The terrain grid's exact layout; the second texture set in
   terrain tiles; the trailer.
 - The first normal list: one entry per distinct face direction, probably
   face normals (`hole_01`: 13 for 16 faces), but no face field is known to

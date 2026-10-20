@@ -214,9 +214,16 @@ void MissionViewer::startColony() {
 
 void MissionViewer::showColony() {
     std::vector<MapViewer::Building> buildings;
+    // In play, each has the side's construction bee to work on it while
+    // it goes up.
+    std::string bee;
+    if (economy_) {
+        const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+        bee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
+    }
     if (colony_ && colonyShown_)
         for (const ColonyBuilding& c : colony_->buildings())
-            buildings.push_back({c.model, c.a, c.b});
+            buildings.push_back({c.model, c.a, c.b, 0, 1, bee});
     map_.setBuildings(buildings);
     showProgress();
     map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});

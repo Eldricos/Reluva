@@ -44,7 +44,12 @@ of name fields hold other leftovers ("ariantary", "ice07geo").
 | 3 animated | parts that animations move | none | none | the same 13 parts |
 
 The node numbers in list 0 aren't `.geo` part numbers (`k_bop.geo` has 3
-parts, its list 0 numbers up to 6); how nodes map to parts isn't known.
+parts, its list 0 numbers up to 6): each `.geo` part says which node it
+belongs to (its node number, [geo.md](geo.md)), and several parts can
+share one. `ptank.geo`'s two parts are nodes 0 (`main`) and 1 (`turret`);
+`kmdb.geo`'s seven are five of `main`, one `turret` and one `gun`. A node
+with no part (`k_bop`'s turrets, `ptank`'s gun) doesn't move anything. A
+`muzzle_flash` entry carries the number of the node it sits on.
 `conbee` (construction vehicle) has parts `main`, `arm`, `boom`, `grabber`,
 point `polygon_grab`, and animated `arm`, `boom`, `grabber`.
 
@@ -100,8 +105,9 @@ The points' positions are in the geometry, in what
 u32 node count       the number of entries in list 0 (k_bop 10, crewman 13)
 u32 place count      the number of entries in list 2 (k_bop 3)
 u32 ?                1 when there are attachments
-attachment count × 58 bytes:
-    40 bytes         probably the point's orientation (layout not known)
+attachment count × 58 bytes, the record .arf frames use (arf.md):
+    9 × f32          the point's orientation, row by row
+    f32              scale (1)
     u16 0x1c, u32 12, 3 × f32 position
 ```
 
@@ -110,9 +116,39 @@ files checked), and the attachment count is list 1's. In `k_bop` the wing
 guns' points are at (±4022, −3180, −3327) and the nose gun's at (0, −4206,
 −401); each gun's axis, elevation and muzzle points share one position.
 
+## Moving parts
+
+Across `misc.cat` only three kinds of part move:
+
+- **Turrets and guns** (40 metamodels: tanks, artillery, defences, the
+  natives' guns, the birds of prey): parts `turret` and `gun`, or
+  `turret_1`/`gun_1` … `turret_5`/`gun_5`, with points `turret_axis[_n]`
+  and `gun_elevate[_n]` (looked up by name: `kln/photart` lists them in
+  another order). A turret turns about the upright through its axis
+  point; its gun turns with it and is raised about the line across it
+  through its elevation point. At rest every gun points along −y, and so
+  do the models: −y is the front (the bird of prey's nose gun is at −y,
+  and the tutorial's ground scout drives with its tall end, at −y,
+  first).
+- **Animated parts** (the crewmen and the construction vehicles): the
+  `.arf` frames ([arf.md](arf.md)).
+- **Rotors** (`demo/plheli`, a demo helicopter): `rotor`, `tail_rotor`
+  with axis points.
+
+Other names in list 0 (`garage`, `entry`, `pad`, `dummy`, `left_plate`,
+`right_plate`, `planet`) all have node 0, the body: nothing moves them.
+
+The `_d` models next to the buildings (`fcy_d`, `fms_d`, `accom_d`) are
+probably their `deconstructed` state: the same bounds, the faces cut up
+and no edges. Not the construction pad (they stand full height); perhaps
+the building wrecked.
+
+`reluva-tool geo-info` lists a model's attachments; the model viewer's K
+sweeps a turret (round once in 12 s, the gun rising and falling 25°).
+The code: `src/engines/newworlds/model_pose.h`.
+
 ## Open questions
 
-- How list 0's nodes map to the geometry's parts, and the turrets' pivots.
-- The 40 bytes before each attachment's position.
+- How fast turrets turn and guns rise in the game, and their limits.
 - The records after each state's geometry; the values before the first.
 - The numbers before the reference pose and the transforms after it.

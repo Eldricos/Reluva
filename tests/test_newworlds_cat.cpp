@@ -17,6 +17,7 @@
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/model_pose.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/star_system.h"
@@ -778,6 +779,45 @@ void testStarSystem() {
     CHECK(look >= 0 && layout.bodies[size_t(look)].slot == 1);
 }
 
+void testModelPose() {
+    // A made-up tank: hull (node 0), turret (node 1) and gun (node 2), the
+    // turret's axis at (0, 0, 10) and the gun's elevation point at
+    // (0, -5, 12); the gun along -y.
+    GeoModel g;
+    g.parts.resize(3);
+    for (uint32_t i = 0; i < 3; ++i)
+        g.parts[i].node = i;
+    g.attachments.resize(2);
+    g.attachments[0].position = {0, 0, 10};
+    g.attachments[1].position = {0, -5, 12};
+    MdlModel m;
+    m.parts = {{"main", 0}, {"turret", 1}, {"gun", 2}, {"muzzle_flash", 2}};
+    m.points = {{"turret_axis", 0}, {"gun_elevate", 1}};
+    CHECK(hasTurret(m) && !hasTurret(MdlModel{}));
+    auto near = [](GeoModel::Vec3 a, float x, float y, float z) {
+        return std::fabs(a.x - x) < 1e-3f && std::fabs(a.y - y) < 1e-3f && std::fabs(a.z - z) < 1e-3f;
+    };
+    const float q = 3.14159265f / 2;
+    Pose p = turretPose(g, m, q, 0);
+    CHECK(!p[0].moved && near(p[1].apply({1, 0, 10}), 0, 1, 10));
+    CHECK(near(p[2].apply({0, -15, 12}), 15, 0, 12)); // the gun turns with the turret
+    p = turretPose(g, m, 0, q);
+    CHECK(!p[1].moved || near(p[1].apply({1, 0, 10}), 1, 0, 10));
+    CHECK(near(p[2].apply({0, -15, 12}), 0, -5, 22)); // raised straight up
+    // An animation frame: the arm, stored at the origin, turned a quarter
+    // turn and moved to (1, 0, 0).
+    m.parts = {{"main", 0}, {"arm", 1}};
+    m.animated = {{"arm", 0}};
+    m.reference.resize(1);
+    std::vector<PartTransform> frame(1);
+    const float r[9] = {0, -1, 0, 1, 0, 0, 0, 0, 1};
+    std::copy(r, r + 9, frame[0].rotation);
+    frame[0].position = {1, 0, 0};
+    g.parts.resize(2);
+    p = framePose(g, m, frame);
+    CHECK(!p[0].moved && p[1].moved && near(p[1].apply({1, 0, 0}), 1, 1, 0));
+}
+
 void testEconomy() {
     auto count = [](const std::vector<ScriptEvent>& ev, const char* kind) {
         return std::count_if(ev.begin(), ev.end(), [&](const ScriptEvent& e) { return e.kind == kind; });
@@ -1007,6 +1047,7 @@ int main() {
     testMissionScripts();
     testColony();
     testStarSystem();
+    testModelPose();
     testEconomy();
     testWorld();
     testModelTextures();

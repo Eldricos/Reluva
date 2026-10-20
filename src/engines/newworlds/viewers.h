@@ -14,6 +14,7 @@
 #include "engines/newworlds/game_ui.h"
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
+#include "engines/newworlds/model_pose.h"
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
 #include "engines/newworlds/world.h"
@@ -107,8 +108,6 @@ private:
     void drawLine(float x0, float y0, float x1, float y1, const uint8_t* colour = nullptr);
     void loadTextures(const std::string& modelName);
     void loadMetamodel(const std::string& modelName);
-    void loadAnimations(const std::string& stem, const std::string& modelFolder);
-    int channelOfNode(uint32_t node) const;
 
     System& sys_;
     Surface& screen_;
@@ -126,17 +125,12 @@ private:
 
     GeoModel model_;
     std::string status_; // decode error, if any
-    std::map<std::string, EntryRef> metamodels_; // .mdl files by "folder/stem"
+    Metamodels metamodels_;
     MdlModel mdl_;
-    bool hasMdl_ = false, markers_ = true;
+    bool hasMdl_ = false, markers_ = true, turret_ = false;
     int selectedPoint_ = -1; // -1: none
-    struct Animation {
-        std::string name;                              // conbee, fcmwalk
-        std::string state;                             // the .mdl state it plays: walk, manipulate
-        std::vector<std::vector<PartTransform>> frames; // per frame, per animated part
-    };
     std::vector<Animation> animations_;
-    int animation_ = -1, animFrame_ = 0; // -1: the stored pose
+    int animation_ = -1, animFrame_ = 0; // -1: the stored pose; animations_.size(): the turret sweep
     uint64_t animMs_ = 0;
     static constexpr uint64_t kFrameMs = 100;
     float centre_[3] = {0, 0, 0};
@@ -215,6 +209,7 @@ public:
         int a = 0, b = 0;
         int turn = 0;
         float progress = 1; // under construction: 0 just begun, 1 built
+        std::string builder; // the construction bee working on it ("geo/fed/fconbee.geo"), or none
     };
     void setBuildings(const std::vector<Building>& buildings);
     // A building's construction moved on (by its index in setBuildings').
@@ -247,6 +242,9 @@ public:
         std::string model;
         float x = 0, y = 0, heading = 0; // heading: radians anticlockwise from east
         bool selected = false;
+        // Its turret turned from straight ahead (anticlockwise) and its gun
+        // raised, in radians, for a model with one.
+        float turretYaw = 0, gunPitch = 0;
     };
     void setUnits(std::vector<UnitDraw> units) {
         units_ = std::move(units);
@@ -306,7 +304,15 @@ private:
         float angle; // anticlockwise, in radians
         const TileModel* model;
         float progress = 1;
+        std::string builder;
     };
+    // A model's moving parts: its metamodel, animations and turret.
+    struct Motion {
+        MdlModel mdl;
+        std::vector<Animation> animations;
+        bool turret = false;
+    };
+    const Motion& motionOf(const std::string& model);
 
     void show(int index);
     void resetView();
@@ -351,6 +357,9 @@ private:
     std::vector<Placed> buildings_;
     std::vector<bool> hidden_; // placed_ objects under a building or on paved_
     std::vector<UnitDraw> units_;
+    Metamodels metamodels_;
+    std::map<std::string, Motion> motions_;
+    uint64_t animClockMs_ = 0;
     std::optional<Placed> ghost_;
     bool ghostValid_ = false;
     View view_ = View::BirdsEye;

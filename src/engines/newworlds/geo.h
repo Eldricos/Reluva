@@ -44,7 +44,7 @@ struct GeoModel {
     // A named point (a turret's axis, a gun's muzzle, a docking point); the
     // .mdl names them in order (see docs/formats/newworlds/mdl.md).
     struct Attachment {
-        float frame[10];  // 40 bytes before the position: probably its orientation (layout unknown)
+        float frame[10];  // its orientation (9 floats, row by row) and a scale (1), as in .arf frames
         Vec3 position;
     };
 

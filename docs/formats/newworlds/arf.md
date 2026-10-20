@@ -56,6 +56,9 @@ list's numbers are each part's position in the frames: `conbee` lists
 `arm=0 boom=2 grabber=1`, `fconbee` and `rcb` `arm=0 boom=1 grabber=2`, and
 both play correctly that way.
 
+In play, two construction bees of the side play their `manipulate` set
+on each construction pad while the building goes up (game.md#the-colony).
+
 ## Open questions
 
 - At what speed the frames play (the viewer plays 10 a second), and whether

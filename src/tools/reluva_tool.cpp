@@ -954,6 +954,14 @@ int cmdGeoInfo(int argc, char** argv) {
                     double(hi[0]), double(lo[1]), double(hi[1]), double(lo[2]), double(hi[2]));
     }
     std::printf("centre %g, %g; radius %g\n", double(m.centreX), double(m.centreY), double(m.radius));
+    for (size_t i = 0; i < m.attachments.size(); ++i) {
+        const auto& a = m.attachments[i];
+        std::printf("  attachment %zu at (%g, %g, %g); frame", i, double(a.position.x), double(a.position.y),
+                    double(a.position.z));
+        for (float f : a.frame)
+            std::printf(" %.3g", double(f));
+        std::printf("\n");
+    }
     // How often each value of the faces' second header word occurs (face 0's
     // header is the file header, so it's left out).
     std::map<uint32_t, unsigned> seconds;

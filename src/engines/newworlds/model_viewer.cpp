@@ -39,7 +39,7 @@ constexpr uint8_t kPartColours[8][3] = {
 } // namespace
 
 ModelViewer::ModelViewer(System& sys, Surface& screen, const Archives& archives)
-    : sys_(sys), screen_(screen), archives_(archives) {
+    : sys_(sys), screen_(screen), archives_(archives), metamodels_(archives) {
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
@@ -134,117 +134,12 @@ void ModelViewer::show(int index) {
     updateTitle();
 }
 
-// The model's .mdl: the same folder and name under mdl/ (geo/kln/k_bop.geo:
-// mdl/kln/k_bop.mdl), or without the underscore (geo/map/ice/ice_07.geo:
-// mdl/ice/ice07.mdl), or without a suffix (k_bop_l: k_bop).
 void ModelViewer::loadMetamodel(const std::string& modelName) {
-    hasMdl_ = false;
-    mdl_ = MdlModel{};
-    if (metamodels_.empty())
-        for (size_t a = 0; a < archives_.size(); ++a) {
-            const auto& entries = archives_[a]->entries();
-            for (size_t i = 0; i < entries.size(); ++i)
-                if (entries[i].tag == cattag::Mdl) {
-                    std::string folder, stem, ext;
-                    splitName(entries[i].name, folder, stem, ext);
-                    metamodels_.emplace(folder + "/" + stem, EntryRef{a, i});
-                }
-        }
-    std::string folder, stem, ext;
-    splitName(modelName, folder, stem, ext);
-    std::string joined;
-    for (char c : stem)
-        if (c != '_')
-            joined += c;
-    const size_t u = stem.rfind('_');
-    for (const std::string& want : {stem, joined, u == std::string::npos ? stem : stem.substr(0, u)}) {
-        auto found = metamodels_.find(folder + "/" + want);
-        if (found == metamodels_.end())
-            continue;
-        CatArchive& cat = *archives_[found->second.archive];
-        std::vector<uint8_t> data;
-        hasMdl_ = !cat.read(cat.entries()[found->second.entry], data) && !parseMdl(data, mdl_);
-        if (hasMdl_)
-            break;
-    }
-    loadAnimations(stem, folder);
-}
-
-// The animation channel (.mdl animated list) a geometry node is moved by:
-// the node's name in the parts list, then that name's animated entry.
-int ModelViewer::channelOfNode(uint32_t node) const {
-    for (const auto& p : mdl_.parts)
-        if (p.value == int32_t(node))
-            for (const auto& a : mdl_.animated)
-                if (a.name == p.name)
-                    return a.value;
-    return -1;
-}
-
-// The .arf frames that fit the model: one transform per animated part,
-// grouped by name without the frame number (conbee00 ... conbee15: conbee;
-// fcmwalk0 ... fcmwalk9: fcmwalk). A set plays the state it's named after
-// (fcmstand: stand, fcmwalk: walk), or the model's only state other than
-// "reference" (the construction vehicles' conbee, fconb, rcb: manipulate).
-// Sets named like the model come first (fconb for fconbee), then those in
-// its folder, then the rest (every side's crewmen use the fed/ sets). The
-// actor archives repeat some sets (fcmwalk in each), so each frame counts once.
-void ModelViewer::loadAnimations(const std::string& stem, const std::string& modelFolder) {
-    animations_.clear();
+    hasMdl_ = metamodels_.find(modelName, mdl_);
+    animations_ = hasMdl_ ? metamodels_.animations(modelName, mdl_) : std::vector<Animation>{};
+    turret_ = hasMdl_ && hasTurret(mdl_);
     animation_ = -1;
     animFrame_ = 0;
-    if (!hasMdl_ || mdl_.animated.empty() || mdl_.reference.size() != mdl_.animated.size())
-        return;
-    struct Set {
-        std::string folder;
-        std::map<std::string, EntryRef> frames; // by frame name, sorted
-    };
-    std::map<std::string, Set> sets;
-    for (size_t a = 0; a < archives_.size(); ++a) {
-        const auto& entries = archives_[a]->entries();
-        for (size_t i = 0; i < entries.size(); ++i) {
-            if (entries[i].tag != cattag::Arf)
-                continue;
-            std::string folder, frame, ext;
-            splitName(entries[i].name, folder, frame, ext);
-            std::string name = frame;
-            while (!name.empty() && std::isdigit(static_cast<unsigned char>(name.back())))
-                name.pop_back();
-            Set& set = sets[name];
-            set.folder = folder;
-            set.frames.emplace(frame, EntryRef{a, i}); // the first copy wins
-        }
-    }
-    std::vector<std::string> otherStates;
-    for (const auto& st : mdl_.states)
-        if (!st.empty() && st != "reference")
-            otherStates.push_back(st);
-    std::vector<std::pair<int, Animation>> found;
-    std::vector<uint8_t> data;
-    for (auto& [name, set] : sets) {
-        Animation anim{name, {}, {}};
-        for (const auto& [frame, ref] : set.frames) {
-            CatArchive& cat = *archives_[ref.archive];
-            std::vector<PartTransform> t;
-            if (cat.read(cat.entries()[ref.entry], data) || parseArf(data, t) || t.size() != mdl_.animated.size()) {
-                anim.frames.clear();
-                break;
-            }
-            anim.frames.push_back(std::move(t));
-        }
-        if (anim.frames.empty())
-            continue;
-        for (const auto& st : otherStates)
-            if (name.size() > st.size() && name.compare(name.size() - st.size(), st.size(), st) == 0)
-                anim.state = st;
-        if (anim.state.empty() && otherStates.size() == 1)
-            anim.state = otherStates[0];
-        const bool named = name.rfind(stem, 0) == 0 || (name.size() >= 4 && stem.rfind(name, 0) == 0);
-        found.push_back({named ? 0 : set.folder == modelFolder ? 1 : 2, std::move(anim)});
-    }
-    std::stable_sort(found.begin(), found.end(), [](const auto& x, const auto& y) { return x.first < y.first; });
-    for (auto& f : found)
-        animations_.push_back(std::move(f.second));
 }
 
 void ModelViewer::loadTextures(const std::string& modelName) {
@@ -328,7 +223,9 @@ void ModelViewer::handleEvent(const Event& ev) {
     case 'b': faces_ = (faces_ + 1) % 3; break;
     case 'm': markers_ = !markers_; break;
     case 'k':
-        animation_ = animation_ + 1 >= int(animations_.size()) ? -1 : animation_ + 1;
+        // The animations in turn, then the turret sweep for a model with
+        // a turret, then still again.
+        animation_ = animation_ + 1 >= int(animations_.size()) + (turret_ ? 1 : 0) ? -1 : animation_ + 1;
         animFrame_ = 0;
         break;
     case 'n':
@@ -407,12 +304,14 @@ void ModelViewer::updateTitle() {
         for (size_t i = 0; i < mdl_.states.size(); ++i)
             title += (i ? "/" : ": ") + (mdl_.states[i].empty() ? std::string("(unnamed)") : mdl_.states[i]);
         title += "; " + std::to_string(model_.attachments.size()) + " points";
-        if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
+        if (turret_ && animation_ == int(animations_.size())) {
+            title += "; turret sweep";
+        } else if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
             const auto& a = animations_[size_t(animation_)];
             title += "; animation " + a.name + (a.state.empty() ? "" : " (" + a.state + ")") + " frame " + std::to_string(animFrame_ % int(a.frames.size()) + 1) + "/" +
                      std::to_string(a.frames.size());
-        } else if (!animations_.empty()) {
-            title += "; " + std::to_string(animations_.size()) + " animations (K)";
+        } else if (!animations_.empty() || turret_) {
+            title += "; " + std::to_string(animations_.size()) + " animations" + (turret_ ? " and a turret" : "") + " (K)";
         }
         if (selectedPoint_ >= 0 && size_t(selectedPoint_) < model_.attachments.size()) {
             std::string name = "#" + std::to_string(selectedPoint_);
@@ -468,45 +367,18 @@ void ModelViewer::render() {
     const OrbitCamera cam(Vec{centre_[0], centre_[1], centre_[2]}, yaw_, pitch_, size_ * 2.6f * zoom_, w, h);
     const Vec light = normalize(Vec{-0.4f, 0.5f, -0.75f}); // towards the light, in view space
 
-    // The animation's current frame, per part: v' = frame position +
-    // frame rotation * reference rotation^T * (v - reference position).
-    struct Pose {
-        bool moved = false;
-        float m[9];
-        Vec from, to;
-    };
-    std::vector<Pose> poses(model_.parts.size());
+    // The animation's current frame, or the turret sweep: the turret round
+    // once in 12 s, the gun rising and falling by 25 degrees.
+    Pose poses(model_.parts.size());
     if (animation_ >= 0 && size_t(animation_) < animations_.size()) {
         const auto& frames = animations_[size_t(animation_)].frames;
-        const auto& frame = frames[size_t(animFrame_) % frames.size()];
-        for (size_t pi = 0; pi < model_.parts.size(); ++pi) {
-            const int channel = channelOfNode(model_.parts[pi].node);
-            if (channel < 0 || size_t(channel) >= frame.size() || size_t(channel) >= mdl_.reference.size())
-                continue;
-            const PartTransform& f = frame[size_t(channel)];
-            const PartTransform& r = mdl_.reference[size_t(channel)];
-            Pose& pose = poses[pi];
-            pose.moved = true;
-            for (int i = 0; i < 3; ++i)
-                for (int j = 0; j < 3; ++j) {
-                    float sum = 0;
-                    for (int k = 0; k < 3; ++k)
-                        sum += f.rotation[i * 3 + k] * r.rotation[j * 3 + k];
-                    pose.m[i * 3 + j] = sum;
-                }
-            pose.from = Vec{r.position.x, r.position.y, r.position.z};
-            pose.to = Vec{f.position.x, f.position.y, f.position.z};
-        }
+        poses = framePose(model_, mdl_, frames[size_t(animFrame_) % frames.size()]);
+    } else if (turret_ && animation_ == int(animations_.size())) {
+        const float t = float(animFrame_) * float(kFrameMs) / 1000;
+        poses = turretPose(model_, mdl_, t * 2 * kPi / 12, 0.436f * (0.5f - 0.5f * std::cos(t * 2 * kPi / 6)));
     }
-    auto turn = [](const Pose& p, Vec v) {
-        return Vec{p.m[0] * v.x + p.m[1] * v.y + p.m[2] * v.z, p.m[3] * v.x + p.m[4] * v.y + p.m[5] * v.z,
-                   p.m[6] * v.x + p.m[7] * v.y + p.m[8] * v.z};
-    };
-    auto posed = [&](uint32_t part, const GeoModel::Vec3& v) {
-        const Pose& p = poses[part];
-        const Vec at{v.x, v.y, v.z};
-        return p.moved ? p.to + turn(p, at - p.from) : at;
-    };
+    auto toVec = [](const GeoModel::Vec3& v) { return Vec{v.x, v.y, v.z}; };
+    auto posed = [&](uint32_t part, const GeoModel::Vec3& v) { return toVec(poses[part].apply(v)); };
 
     raster_.begin(screen_);
     std::vector<std::vector<ScreenVertex>> outlines;
@@ -554,7 +426,7 @@ void ModelViewer::render() {
             if (smooth_ && normalLists.size() > 1 && k < normalLists[1].size()) {
                 n = Vec{normalLists[1][k].x, normalLists[1][k].y, normalLists[1][k].z};
                 if (poses[face.part].moved)
-                    n = turn(poses[face.part], n);
+                    n = toVec(poses[face.part].turn({n.x, n.y, n.z}));
             }
             const float d = std::fabs(dot(cam.directionToView(n), light));
             poly[i].s = tex ? 0.45f + 0.55f * d : 0.3f + 0.7f * d;

@@ -20,6 +20,7 @@ constexpr float kPi = 3.14159265f;
 constexpr float kMaxPitch = 89.0f * kPi / 180.0f;
 constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
 constexpr float kUnitScale = 4; // see render()
+constexpr uint64_t kFrameMs = 100; // animation frames: 10 a second (arf.md#open-questions)
 // Where a block's four tiles go, in its record's order: round the square
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
@@ -37,7 +38,7 @@ constexpr uint8_t kDepositColours[6][3] = {{255, 60, 60}, {255, 230, 40}, {60, 2
 } // namespace
 
 MapViewer::MapViewer(System& sys, Surface& screen, const Archives& archives)
-    : sys_(sys), screen_(screen), archives_(archives) {
+    : sys_(sys), screen_(screen), archives_(archives), metamodels_(archives) {
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
@@ -381,7 +382,7 @@ void MapViewer::placeScenery() {
         if (found == sceneryModels_.end() || !found->second.error.empty())
             continue;
         const float x = (float(o.bx * 16 + o.x) + 0.5f) * square, y = (float(o.by * 16 + o.y) + 0.5f) * square;
-        placed_.push_back({{x, y, groundHeight(x, y)}, float(o.turn) * kPi / 8, &found->second});
+        placed_.push_back({{x, y, groundHeight(x, y)}, float(o.turn) * kPi / 8, &found->second, 1, {}});
     }
 }
 
@@ -489,13 +490,22 @@ void MapViewer::setBuildings(const std::vector<Building>& buildings) {
         const float x = float(b.b) / 8 * kBlockSize - (cx * cs - cy * sn);
         const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
         const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
-        buildings_.push_back({{x, y, ground}, angle, &m, b.progress});
+        buildings_.push_back({{x, y, ground}, angle, &m, b.progress, b.builder});
         const bool across = b.turn % 2 != 0;
         buildingAreas_.push_back({float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize,
                                   (across ? h : w) / 2 + 512, (across ? w : h) / 2 + 512});
     }
     updateHidden();
     dirty_ = true;
+}
+
+const MapViewer::Motion& MapViewer::motionOf(const std::string& model) {
+    auto [it, added] = motions_.try_emplace(model);
+    if (added && metamodels_.find(model, it->second.mdl)) {
+        it->second.animations = metamodels_.animations(model, it->second.mdl);
+        it->second.turret = hasTurret(it->second.mdl);
+    }
+    return it->second;
 }
 
 void MapViewer::setBuildingProgress(size_t i, float progress) {
@@ -516,7 +526,7 @@ void MapViewer::setGhost(const std::string& model, int a, int b, bool valid) {
     float w = 0, h = 0, cx = 0, cy = 0;
     modelBounds(m->geo, w, h, cx, cy);
     const float x = float(b) / 8 * kBlockSize, y = float(a) / 8 * kBlockSize;
-    ghost_ = Placed{{x - cx, y - cy, groundHeight(x, y)}, 0, m};
+    ghost_ = Placed{{x - cx, y - cy, groundHeight(x, y)}, 0, m, 1, {}};
     ghostValid_ = valid;
     dirty_ = true;
 }
@@ -760,7 +770,12 @@ void MapViewer::handleEvent(const Event& ev) {
     dirty_ = true;
 }
 
-void MapViewer::update(uint64_t) {
+void MapViewer::update(uint64_t nowMs) {
+    // Construction bees at work: their animation moves on.
+    if (nowMs / kFrameMs != animClockMs_ / kFrameMs &&
+        std::any_of(buildings_.begin(), buildings_.end(), [](const Placed& o) { return o.progress < 1 && !o.builder.empty(); }))
+        dirty_ = true;
+    animClockMs_ = nowMs;
     if (dirty_) {
         render();
         if (overlay_)
@@ -841,15 +856,17 @@ void MapViewer::render() {
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
-                         const uint8_t* tint = nullptr, float scale = 1, float rise = 1) {
+                         const uint8_t* tint = nullptr, float scale = 1, float rise = 1, const Pose* pose = nullptr) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
             const auto& normalLists = m.geo.parts[face.part].normalLists;
-            const auto& fn = m.faceNormals[fi];
+            // A moving part (a turret, an animated arm) where its pose puts it.
+            const PartPose* pp = pose && face.part < pose->size() && (*pose)[face.part].moved ? &(*pose)[face.part] : nullptr;
+            const Vec3 fn = pp ? pp->turn(m.faceNormals[fi]) : m.faceNormals[fi];
             poly.clear();
             for (const auto& corner : face.corners) {
-                const auto& v = verts[corner.vertex];
+                const Vec3 v = pp ? pp->apply(verts[corner.vertex]) : verts[corner.vertex];
                 const float x = (c * v.x - s * v.y) * scale, y = (s * v.x + c * v.y) * scale;
                 // For terrain codes, (u, v) is the position across the
                 // tile, in map orientation.
@@ -860,7 +877,7 @@ void MapViewer::render() {
                 // Smooth shading: the corner's own normal (its first extra
                 // value numbers the part's second normal list), else the face's.
                 const bool own = smooth_ && normalLists.size() > 1 && corner.extra[0] < normalLists[1].size();
-                const GeoModel::Vec3 n = own ? normalLists[1][corner.extra[0]] : fn;
+                const GeoModel::Vec3 n = own ? (pp ? pp->turn(normalLists[1][corner.extra[0]]) : normalLists[1][corner.extra[0]]) : fn;
                 poly.back().s = lightLevel(c * n.x - s * n.y, s * n.x + c * n.y, n.z);
             }
             poly = clipNear(poly, cam.nearZ);
@@ -999,14 +1016,47 @@ void MapViewer::render() {
         const float rise = o.progress >= 1 ? 1 : std::max(0.02f, (o.progress - kApron) / (1 - kApron));
         drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr, nullptr, 1, rise);
     }
+    // While it goes up, construction bees work on the pad (play-tutorials.md:
+    // "a dark rectangular pad ... with construction bees on it"): two, at
+    // opposite corners facing its middle, each playing its manipulate
+    // animation, half a cycle apart. How many the game sends isn't known.
+    for (size_t i = 0; i < buildings_.size() && i < buildingAreas_.size(); ++i) {
+        const Placed& o = buildings_[i];
+        if (o.progress >= 1 || o.builder.empty())
+            continue;
+        const TileModel& bee = namedModel(o.builder, false);
+        const Motion& motion = motionOf(o.builder);
+        if (!bee.error.empty())
+            continue;
+        const auto& [bx, by, hw, hh] = buildingAreas_[i];
+        for (int k = 0; k < 2; ++k) {
+            const float sx = k == 0 ? -1.0f : 1.0f;
+            const float x = bx + sx * (hw - 512) * 0.8f, y = by - sx * (hh - 512) * 0.8f;
+            const Vec at{x, y, groundHeight(x, y)};
+            if (cam.toView(at).z < cam.nearZ)
+                continue;
+            Pose pose;
+            if (!motion.animations.empty()) {
+                const auto& frames = motion.animations[0].frames;
+                const size_t f = size_t(animClockMs_ / kFrameMs) + size_t(k) * frames.size() / 2;
+                pose = framePose(bee.geo, motion.mdl, frames[f % frames.size()]);
+            }
+            // Facing the middle (the models face along −y; see the units).
+            const float a = std::atan2(by - y, bx - x) + kPi / 2;
+            ++drawnObjects_;
+            drawModel(bee, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose);
+        }
+    }
     if (ghost_) {
         static const uint8_t kGreen[3] = {40, 255, 60}, kRed[3] = {255, 40, 40};
         const Vec at{ghost_->position.x, ghost_->position.y, ghost_->position.z};
         if (cam.toView(at).z >= cam.nearZ)
             drawModel(*ghost_->model, at, 1, 0, nullptr, ghostValid_ ? kGreen : kRed);
     }
-    // The units, facing their heading (the models face along +y, so a
-    // quarter turn less), drawn kUnitScale times their models' size: in
+    // The units, facing their heading (the models face along −y, so a
+    // quarter turn more: the guns of every turret rest pointing that way,
+    // the bird of prey's nose gun is there, and in the tutorial a ground
+    // scout drives tall end first), drawn kUnitScale times their models' size: in
     // the tutorial's recording a ground scout is about a quarter as wide as
     // the vehicle yard beside it, against a sixteenth for the models.
     for (const UnitDraw& u : units_) {
@@ -1017,8 +1067,12 @@ void MapViewer::render() {
         if (cam.toView(at).z < cam.nearZ)
             continue;
         ++drawnObjects_;
-        const float a = u.heading - kPi / 2;
-        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale);
+        const float a = u.heading + kPi / 2;
+        Pose pose;
+        if (u.turretYaw != 0 || u.gunPitch != 0)
+            if (const Motion& motion = motionOf(u.model); motion.turret)
+                pose = turretPose(m.geo, motion.mdl, u.turretYaw, u.gunPitch);
+        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose);
     }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there

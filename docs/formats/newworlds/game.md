@@ -48,6 +48,8 @@ goes up by itself once placed).
 
 ## What's modelled
 
+- **Which way models face:** −y is a model's front ([mdl.md](mdl.md#moving-parts)),
+  so a unit is drawn turned to put −y along its heading.
 - **Starting units:** four of the side's ground scouts (`ffs`, `gscout`,
   `rfgs`) in a row south of the hub. Every recorded colony starts with four
   vehicles of one kind selected (F1, R1); which kind isn't known.
@@ -83,7 +85,10 @@ goes up by itself once placed).
   order the stock can't pay waits, and the colony is told "short
   resources" once a minute). It is drawn as the recordings show it: an
   apron (the model pressed flat) for the first 15 % of the time, then the
-  building rising out of it. When it's done, the script hears `built
+  building rising out of it, with two of the side's construction bees
+  (`fconbee`, `conbee`, `rcb`) at its corners playing their `manipulate`
+  animation. How many bees the game sends, and whether they come from the
+  construction yard, isn't known. When it's done, the script hears `built
   <type>` (Engineering's message, the game's spoken announcement) and the
   colony's capacity grows.
 - **Power:** the hub and each generator supply 60, other buildings use
@@ -106,6 +111,7 @@ goes up by itself once placed).
 | What | Value | From |
 |---|---|---|
 | Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
+| Animation speed | 10 frames a second | Reluva's (arf.md) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
 | Bird's-eye view | 3.5 blocks away, 40° down | by eye |
 | Sky view | 14 blocks, 65° | by eye |
