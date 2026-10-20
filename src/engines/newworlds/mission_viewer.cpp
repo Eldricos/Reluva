@@ -217,6 +217,7 @@ void MissionViewer::handleEvent(const Event& ev) {
     case key::Backspace: stopBriefing(); break;
     case 'x': stepScript(); break;
     case 'z': stopScript(); break;
+    case 'i': interface_ = !interface_; break;
     case 'j':
         if (sides < 2)
             return;
@@ -320,6 +321,10 @@ void MissionViewer::drawNoMap() {
 }
 
 void MissionViewer::drawBriefing() {
+    if (interface_ && !running_) {
+        drawInterface();
+        return;
+    }
     if (!briefing_)
         return;
     // Lay the page out in lines, word-wrapped to the panel.
@@ -472,6 +477,128 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
         return nullptr;
     }
     return sound;
+}
+
+// The in-game interface, laid out as the recordings show it on the 640 x
+// 480 screen; see docs/formats/newworlds/gui.md#the-in-game-interface.
+void MissionViewer::drawInterface() {
+    const Level& level = missions_[size_t(current_)];
+    const char side = missionSides(level.shortName)[size_t(side_)];
+    if (uiSide_ != side) {
+        uiSide_ = side;
+        ui_ = GameUi{};
+        ui_.load(archives_, side);
+    }
+    if (!ui_.loaded()) {
+        drawText(kPanelMargin, kPanelMargin, "no GUI archive for this side", kNoteColor);
+        return;
+    }
+    const int lh = ui_.smallHeight();
+    const Color text = ui_.textColor(), bright = ui_.brightColor();
+    // The right-hand panels are about 100 pixels wide in the recordings;
+    // wide enough here for their longest lines in the font we have.
+    const int sideW = std::max({100, ui_.smallWidth("COLONY SIZE = 20/50"), ui_.smallWidth("TRANSALUMIN = 5000"),
+                                ui_.smallWidth("TERRAIN AT <000:000>")}) +
+                      22;
+
+    // The compass strip along the top: a tick every 5 degrees, a label
+    // every 10, N E S W at the quarters, centred on the camera's heading.
+    if (hasMap_) {
+        const float heading = map_.heading();
+        const int cx = screen_.w / 2, span = 120, pxPerDeg = 2;
+        for (int d = -span / 2; d <= span / 2; ++d) {
+            int deg = int(std::lround(heading)) + d;
+            deg = ((deg % 360) + 360) % 360;
+            const int x = cx + d * pxPerDeg;
+            if (deg % 10 == 0) {
+                static const char* kPoints[] = {"N", "E", "S", "W"};
+                const std::string label = deg % 90 == 0 ? kPoints[deg / 90]
+                                                        : (deg < 100 ? "0" : "") + std::to_string(deg);
+                ui_.drawSmall(screen_, x - ui_.smallWidth(label) / 2, 2, label, deg % 90 == 0 ? bright : text);
+            } else if (deg % 5 == 0) {
+                ui_.drawSmall(screen_, x - 1, 2, "+", text);
+            }
+        }
+    }
+
+    // NEW WORLDS: the colony panel, with the stock every recording started
+    // with (the economy isn't simulated).
+    {
+        const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + 7 * lh + 8;
+        ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
+        static const std::pair<const char*, int> kStock[] = {{"DILITHIUM", 500},   {"POLYCOMP", 1000},
+                                                             {"THERMOCONC", 2300}, {"TRANSALUMIN", 500},
+                                                             {"NITRIUM", 4000},    {"DURANIUM", 5000}};
+        int ty = y + 16;
+        ui_.drawSmall(screen_, x + 10, ty, "COLONY SIZE = 20/50", bright);
+        for (const auto& [name, n] : kStock) {
+            ty += lh;
+            ui_.drawSmall(screen_, x + 10, ty, std::string(name) + " = " + std::to_string(n), text);
+        }
+    }
+
+    // TRICORDER: the map small, and the camera's position.
+    {
+        const int x = screen_.w - sideW, w = sideW, h = 102, y = screen_.h - h;
+        ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
+        if (hasMap_) {
+            map_.drawMinimap(screen_, x + 12, y + 14, w - 24, h - 30 - lh);
+            int a = 0, b = 0;
+            map_.cameraPosition(a, b);
+            auto pad = [](int v) {
+                std::string s = std::to_string(v);
+                return std::string(s.size() < 3 ? 3 - s.size() : 0, '0') + s;
+            };
+            ui_.drawSmall(screen_, x + 10, y + h - 12 - lh, "TERRAIN AT <" + pad(a) + ":" + pad(b) + ">", text);
+        }
+    }
+
+    // COMMUNICATIONS: the script's latest message, with its sender's portrait.
+    {
+        const int w = 220, h = 70, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
+        ui_.drawPanel(screen_, x, y, w, h, "COMMUNICATIONS");
+        if (log_.empty()) {
+            ui_.drawSmall(screen_, x + 60, y + 16, "NO MESSAGES ON FILE.", text);
+        } else {
+            const auto& [sender, message] = log_.back();
+            const std::string natives = level.shortName == "C9" ? "orion" : "taubat";
+            if (const Texture* p = ui_.portraitFor(sender, natives))
+                ui_.drawPicture(screen_, *p, x + 10, y + 13, 44, 41);
+            std::string up = sender + ":";
+            std::transform(up.begin(), up.end(), up.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+            int ty = y + 14;
+            ui_.drawSmall(screen_, x + 58, ty, up, text);
+            for (const std::string& l : ui_.wrapSmall(message, w - 70)) {
+                ty += lh;
+                if (ty > y + h - 12 - lh)
+                    break;
+                ui_.drawSmall(screen_, x + 58, ty, l, text);
+            }
+            const std::string counter = std::to_string(log_.size()) + "/" + std::to_string(log_.size());
+            ui_.drawSmall(screen_, x + w - 12 - ui_.smallWidth(counter), y + h - 11 - lh, counter, text);
+        }
+    }
+
+    // COMMAND: the objectives, as the recordings' panel lists them.
+    if (run_) {
+        const MissionScript* script = findMissionScript(level.shortName, side);
+        std::vector<std::pair<std::string, Color>> lines;
+        const int w = 260;
+        for (const MissionScript::Objective& o : script->objectives) {
+            const MissionRun::State st = run_->objectiveState(o.id);
+            if (st == MissionRun::State::Hidden)
+                continue;
+            const std::string* t = table_.find(o.id);
+            const std::string s = "MISSION OBJECTIVE: " + (t ? *t : std::to_string(o.id)) +
+                                  (st == MissionRun::State::Complete ? " - COMPLETE" : " - INCOMPLETE");
+            for (const std::string& l : ui_.wrapSmall(s, w - 24))
+                lines.push_back({l, st == MissionRun::State::Complete ? bright : text});
+        }
+        const int h = 30 + int(lines.size()) * lh;
+        ui_.drawPanel(screen_, 0, 0, w, h, "COMMAND");
+        for (size_t i = 0; i < lines.size(); ++i)
+            ui_.drawSmall(screen_, 12, 15 + int(i) * lh, lines[i].first, lines[i].second);
+    }
 }
 
 void MissionViewer::stepScript() {

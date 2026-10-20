@@ -11,6 +11,7 @@
 #include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
+#include "engines/newworlds/game_ui.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -185,6 +186,13 @@ public:
         dirty_ = true;
     }
     void resetCamera() { resetView(); }
+    // For the game interface: the map drawn small by its terrain codes'
+    // colours, with the camera's target marked; the target as a map
+    // position (eighths of a block, row first); the camera's heading in
+    // degrees (0 when unturned, clockwise).
+    void drawMinimap(Surface& s, int x, int y, int w, int h) const;
+    void cameraPosition(int& a, int& b) const;
+    float heading() const;
     void setColouring(int colouring) {
         colouring_ = colouring;
         dirty_ = true;
@@ -385,6 +393,8 @@ private:
 //   X: play the mission's script a step at a time, in the order the
 //   recording showed its events (the messages and objectives as they
 //   change); Z: stop it
+//   I: the game's interface over the map (its panels in the side's style,
+//   with the script's messages and objectives; not playable)
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -411,6 +421,7 @@ private:
     void redraw();
     // The briefing player: steps run one after another, each as long as its
     // clip (a few seconds when it has none, or its clip is missing).
+    void drawInterface();
     void stepScript(); // the next scripted event (X)
     void stopScript();
     void startBriefing();
@@ -474,6 +485,9 @@ private:
     size_t walkPos_ = 0;
     std::vector<std::pair<std::string, std::string>> log_; // sender, text
     std::string walkNote_;
+    GameUi ui_;
+    char uiSide_ = 0;
+    bool interface_ = false;
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;

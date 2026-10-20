@@ -53,3 +53,46 @@ are the emblem screen that ends a briefing (seen in recordings of play,
 beside them are likewise six tiles each, presumably the mission won and
 lost screens.
 
+
+## The in-game interface
+
+Each side's GUI archive (`fedgui`, `kligui`, `romgui`) holds the pieces its
+in-game panels are built from, under `lbp/gui/fed/`, `kln/` and `rom/`:
+
+| Piece | Size | What it is |
+|---|---|---|
+| `corner` | 12 × 12 | a panel's top-left corner, flipped for the other three |
+| `border` | 16 × 12 | the top edge, tiled; flipped for the bottom, turned for the sides |
+| `wallpapr` | 64 × 64 | the dark grid tiled inside a panel |
+| `sqre_asy*` | | square panel pieces (not used yet) |
+| `logo32`, `shldicon`, `pwricon`, `popnicon`, `closebut`, `vcr`, `basebut`, `opacbutt` | | the emblem, icons and buttons |
+| `ptrt/crew/lg/f_c1`... (`k_c`, `r_c`) | 64 × 60 | crew portraits |
+| `ptrt/crew/lg/taubat`, `metar`, `hubrin`, `orion` | 64 × 60 | the natives' portraits |
+
+The pieces are format 6 pictures (palette indices and an alpha layer), and
+the alpha layer smooths their edges: the Federation's corner is rounded,
+the Klingons' cut across. Federation pieces are purple, Klingon ones
+copper. Each side has its own fonts: `fepnttle`, `fe8pt` and `fe5pt`
+(`kl...`, `rm...` for the others).
+
+Where the panels sit, from recordings of play ([play.md](play.md)), on the
+640 × 480 screen:
+
+- **NEW WORLDS**, top right, about 100 pixels wide: the colony size (20/50
+  at the start) and the six resources' stock (every recording started with
+  500, 1000, 2300, 500, 4000 and 5000).
+- A compass strip along the top centre, ticks every 5 degrees.
+- **COMMUNICATIONS**, bottom centre, about 200 × 62: the sender's portrait,
+  the sender's section, the message, and which message of how many.
+- **TRICORDER**, bottom right: the map small, with "TERRAIN AT <a:b>" under
+  it.
+- **COMMAND**, a list of the mission's objectives, each marked complete or
+  incomplete.
+
+The titles are gold and the text blue. The missions page draws these (key
+**I**) with the side's own pieces and fonts. The right-hand panels are made
+wide enough for their text in the 5 pt font, a little wider than the
+recordings' 100 pixels. Which crew portrait goes with which section isn't
+known: Reluva hands the side's first portraits to Command, Operations,
+Engineering, Science, Medical, Security, Intelligence and Communications in
+that order.

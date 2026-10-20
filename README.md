@@ -55,8 +55,9 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
   pages, **B** hides it, **J** picks the side of a joint mission, **Space** plays the mission's
   voice clip, **N/P** the next or previous one, **M** the planet's music, **Enter** plays the
   briefing step by step (**Enter** again skips a step, **Backspace** stops), **X** steps through
-  the mission's script (its events, messages and objectives; **Z** stops); the map's keys work
-  too. For
+  the mission's script (its events, messages and objectives; **Z** stops), **I** shows the game's
+  interface over the map in the side's style (the script's messages and objectives in it); the
+  map's keys work too. For
   models, drag with the mouse (or **W/A/S/D**) to rotate, use the wheel (or
   **+/-**) to zoom, **Space** to spin, **P** to show one part at a time, **L**
   for outlines, **U** for texture-coordinate checks, **T** to turn textures off, **G** to change how alpha layers are used (by default glow in `_g` textures, transparency in the others), **H** for smooth or flat shading, **M** for the model's points (from its .mdl), **N** to select the next one and **K** to play its animations

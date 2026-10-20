@@ -121,6 +121,53 @@ void MapViewer::lookAt(int a, int b, bool ground) {
     dirty_ = true;
 }
 
+void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h) const {
+    if (map_.width <= 0 || map_.height <= 0)
+        return;
+    const int tilesW = map_.width * 2, tilesH = map_.height * 2;
+    for (int y = 0; y < h; ++y) {
+        if (y0 + y < 0 || y0 + y >= s.h)
+            continue;
+        // Row 0 of the grid at the bottom, as the map is drawn.
+        const float fy = (float(h - 1 - y) + 0.5f) / float(h) * float(tilesH);
+        uint8_t* row = s.row(y0 + y);
+        for (int x = 0; x < w; ++x) {
+            if (x0 + x < 0 || x0 + x >= s.w)
+                continue;
+            const float fx = (float(x) + 0.5f) / float(w) * float(tilesW);
+            const int t = tileAt(int(fx), int(fy));
+            unsigned code = 0;
+            if (t >= 0 && size_t(t) < map_.tiles.size())
+                code = terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
+                                   std::clamp(int((fy - std::floor(fy)) * 8), 0, 7));
+            uint8_t* p = row + (x0 + x) * 4;
+            if (code && code < map_.palette.size())
+                p[0] = map_.palette[code][0], p[1] = map_.palette[code][1], p[2] = map_.palette[code][2];
+            else
+                p[0] = p[1] = p[2] = 20;
+        }
+    }
+    // The camera's target, a small cross.
+    const int cx = x0 + int(targetX_ / (float(map_.width) * kBlockSize) * float(w));
+    const int cy = y0 + h - 1 - int(targetY_ / (float(map_.height) * kBlockSize) * float(h));
+    for (int d = -3; d <= 3; ++d)
+        for (const auto& [px, py] : {std::pair{cx + d, cy}, std::pair{cx, cy + d}})
+            if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
+                uint8_t* p = s.row(py) + px * 4;
+                p[0] = 255, p[1] = 255, p[2] = 255;
+            }
+}
+
+void MapViewer::cameraPosition(int& a, int& b) const {
+    a = std::clamp(int(targetY_ / kBlockSize * 8), 0, std::max(0, map_.height * 8 - 1));
+    b = std::clamp(int(targetX_ / kBlockSize * 8), 0, std::max(0, map_.width * 8 - 1));
+}
+
+float MapViewer::heading() const {
+    float d = std::fmod(yaw_ * 180.0f / kPi, 360.0f);
+    return d < 0 ? d + 360.0f : d;
+}
+
 std::string MapViewer::mapArchive() const {
     return maps_.empty() ? std::string() : archives_[maps_[size_t(current_)].archive]->path().filename().string();
 }
