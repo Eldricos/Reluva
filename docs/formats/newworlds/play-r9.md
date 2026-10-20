@@ -31,7 +31,7 @@ All ten clips matched, back to back:
 | `R9006` (20.2 s, 0.42) | 0:37.8 | PLANETARY DATA (3), top right | the star system: a large mottled yellow-orange body low left (the star? guess), small red, teal, tan, magenta/pink and dark red bodies, one red with a ring |
 | `R9007` (7.4 s, 0.90) | 0:58.6 | BACKGROUND DATA (4), top right | the relief/grid map turning, colony blocks (light cyan grid) near one edge; ground-view inset top left |
 | `R9008` (12.0 s, 0.94) | 1:08.2 | OBJECTIVE (5) (raid the science facility), panel left middle | ground flyover of the colony pad: the Romulan hub arch (`rch`) on concrete between rust-red hills, a rock arch, dark red stalk plants; RELIEF X2 inset right |
-| `R9009` (18.2 s, 0.95) | 1:20.9 | ADDITIONAL (6) (device built after evaluating the Federation's findings), left | a model on the green grid: a tall pointed crystalline shape, translucent blue-violet above, red at the base - the alien device (sure it is the device; which model not known); relief inset right |
+| `R9009` (18.2 s, 0.95) | 1:20.9 | ADDITIONAL (6) (device built after evaluating the Federation's findings), left | a model on the green grid: a tall pointed crystalline shape, translucent blue-violet above, red at the base - the alien device (sure it is the device; likely `mad`, the Metar "anomaly device" by its metamodel, a tall blue-violet shard with blades); relief inset right |
 | `R9010` (31.3 s, 0.86) | 1:39.8 | OBJECTIVE (7) (escort the device to the Klingon colony for detonation), top right | the relief/grid map turning, colony blocks visible, a cross marker; ground-view inset top left |
 | `R9011` (11.5 s, 0.95) | 2:11.8 | (no panel) | ground flyover: the hub arch and the red stalks, compass strip at the top |
 | `R9012` (21.9 s, 0.85) | 2:23.4 | (no panel) | the relief map turning, "RELIEF X2" as heading |
@@ -97,16 +97,16 @@ Selection panel (65 samples). Romulan (owner ROMULAN), matched to
 | Name in panel | Model | How sure |
 |---|---|---|
 | colony hub | `rch` (the arch) | sure |
-| colony hub upgrade (5:03, efficiency 100 %) | `rch_b` (tall column)? | guess |
+| colony hub upgrade (5:03, efficiency 100 %) | `rch_b` (tall column; its panel offers the "improved hub", `rch_c`) | fairly ([colony.md](colony.md#romulan-matches)) |
 | construction yard | `rcy_a` (X-shaped) | fairly |
 | science station | `rsb_a` (low octagonal dome; INCOMPLETE 0 % at 7:39) | fairly |
 | vehicle yard | `rvy` (octagonal ring) | sure |
-| vehicle yard upgrade (12:49) | `rvy_b`? | guess |
+| vehicle yard upgrade (12:49) | `rvy_b` (the wedge joined to the yard, as in R1) | fairly |
 | resource processor | `rrpp_a` (ribbed block with fins) | fairly |
 | adv. power generator | `rps2` (tower on splayed legs; 120 % at 16:05) | fairly |
 | mining station | `rms` (flat four-armed) | fairly |
-| shield generator (48:43) | `rab`? (green-lit pyramid) | guess |
-| photon defense (build panel, 40:00: three model views, a pale pillar, a tree-like base, an X base; cost thermoconc 93T, trans al 11T, nitrium 250 kg, duranium 500 kg) | `rpds`? | guess |
+| shield generator (48:43) | `rcss` (portrait `rsg`: a four-legged pyramid with a green-lit base, not `rab`) | fairly |
+| photon defense (build panel, 40:00: three model views, a pale pillar, a tree-like base, an X base; cost thermoconc 93T, trans al 11T, nitrium 250 kg, duranium 500 kg) | `rpds` (portrait `rddt`, the pale slab, in R2 and J6R) | fairly |
 
 Units: cloaked tank (four at the start), ground scout, photon artillery,
 **cloaked assault vehicl** (truncated; selected at 30:55 and 33:14, just before
@@ -238,14 +238,17 @@ costs. Portraits:
 - R8 is not recorded (no "Mission 7" on the Drive).
 - Why two clips play on the emblem (`R9013`, `R9014`): are they two steps, or
   one long closing step split in the table? Listen for the change at 3:11.
-- Which model is the briefing's device (blue-violet crystal, red base) and the
-  red-white vehicle at 56:16; are they the same?
+- The briefing's device is likely `mad` (shape and metamodel name; the red
+  core is not in Reluva's render). Is the red-white vehicle at 56:16 the
+  same device, or a Metar craft?
 - Kind 4 = kelbonite, kind 6 = dolamide from four readings; magnesite (named
   in string 18, kind 5 by [play-c11.md](play-c11.md)) not seen here.
 - Positions of the colony, the Federation base and the Klingon base (the
   readings put all three within about 10 blocks; check).
-- Models of the hub upgrade, vehicle yard upgrade, shield generator, photon
-  defense; the cloaked assault vehicle and cloaked tank in `romactor`.
+- (Answered since, [colony.md](colony.md#romulan-matches): hub upgrade
+  `rch_b`, vehicle yard upgrade `rvy_b`, shield generator `rcss`, photon
+  defense `rpds`, cloaked tank `rct`. The cloaked assault vehicle shows a
+  see-through `rapc` shape; whether it has a model of its own is open.)
 - How long the device takes to build; whether the comms panel's top position
   is the player's doing.
 - Match the Security, Intelligence and Engineering faces to

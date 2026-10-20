@@ -61,31 +61,34 @@ struct ModelEntry {
 // Models by the scripts' building names. Upper case: matched in recordings
 // (play-f1.md and play-k1.md's tables); lower case: by the game's own names
 // for its models, the metamodels in misc.cat (fpgs "fedpowgen", ruh_a
-// "romsickbay"; colony.md). The Klingons' accommodation block (kab) is the
-// panel's Arsenal. Upgrades stand on the building they upgrade.
+// "romsickbay"; colony.md). The Romulan upper-case ones were matched by the
+// selection panel's portrait as well as the model's shape (colony.md). The
+// Klingons' accommodation block (kab) is the panel's Arsenal. Upgrades stand
+// on the building they upgrade.
 constexpr ModelEntry kModels[] = {
-    {"colony-hub", "FCH", "KCH", "rch"},
-    {"colony-hub-upgrade", "FCH_B", "KCH_B", "rch_b"},
-    {"vehicle-yard", "FVPY_A", "KVY", "rvy"},
-    {"construction-yard", "FCY", "KCY", "rcy_a"},
-    {"resource-processor", "FRPS_A", "KRPS", "rrpp_a"},
-    {"power-generator", "fpgs", "KPGS", "rps1"},
-    {"advanced-generator", "fpgs2", "KPGS2", "rps2"},
-    {"mining-station", "fms", "KMS", "rms"},
+    {"colony-hub", "FCH", "KCH", "RCH"},
+    {"colony-hub-upgrade", "FCH_B", "KCH_B", "RCH_B"},
+    {"vehicle-yard", "FVPY_A", "KVY", "RVY"},
+    {"construction-yard", "FCY", "KCY", "RCY_A"},
+    {"resource-processor", "FRPS_A", "KRPS", "RRPP_A"},
+    {"power-generator", "fpgs", "KPGS", "RPS1"},
+    {"advanced-generator", "fpgs2", "KPGS2", "RPS2"},
+    {"mining-station", "fms", "KMS", "RMS"},
     {"accommodation", "ACCOM", "KAB", "rab"},
     {"arsenal", "", "KAB", ""},
-    {"sickbay", "FSB", "KSB_A", "ruh_a"},
-    {"science-station", "fss_a", "KSS_A", "rsb_a"},
-    {"science-station-upgrade", "fss_b", "kss_b", "rsb_b"},
+    {"sickbay", "FSB", "KSB_A", "RUH_A"},
+    {"science-station", "fss_a", "KSS_A", "RSB_A"},
+    {"science-station-upgrade", "fss_b", "kss_b", "RSB_B"},
     {"security-center", "FSC", "ksc", "risb"},
     {"hydroponics-farm", "FHF", "", ""},
     {"livestock-farm", "", "KLF", ""},
     {"clone-farm", "", "", "rcbf"},
-    {"storage-facility", "", "KSF", "rsf"},
+    {"storage-facility", "", "KSF", "RSF"},
     {"landing-pad", "landpad", "", ""},
+    {"transporter-pad", "", "", "RBCS"},
     {"photon-turret", "fpdt", "", ""},
     {"disruptor-turret", "", "KSG", ""},
-    {"static-disruptor", "", "kdws", ""},
+    {"static-disruptor", "", "kdws", "RDDS"},
 };
 
 constexpr std::pair<const char*, const char*> kUpgrades[] = {

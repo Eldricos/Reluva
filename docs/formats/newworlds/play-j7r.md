@@ -36,7 +36,7 @@ All nine clips matched, back to back:
 | `J7R009` (17.8 s, 0.43) | 1:47 | (page 6 until about 1:50, then none) | the galaxy |
 | `J7R010` (22.7 s, 0.82) | 2:05 | (none) | the star system: a large mottled orange-tan body (passing low right and top left), small tan and brown bodies, blue-white star clusters behind; which one is the star not clear |
 | `J7R011` (34.7 s, 0.28) | 2:28 | (none) | the relief/grid map turning, heading "RELIEF ORBIT X2": dark green land, the colony area in light green with black building blocks, a white cross marker and a **magenta marker** beside it (the guide? guess) |
-| `J7R012` (29.2 s, 0.60) | 3:02 | (none) | ground flyover of the desert: rust-red hills and mesas, dark red stalk plants, a tall dark spire with violet-blue tips (Hubrin? guess), rows of small pale units, a pale arch-shaped rock, a violet-blue faceted craft close by at 3:10 (the Hubrin craft `h`? guess) |
+| `J7R012` (29.2 s, 0.60) | 3:02 | (none) | ground flyover of the desert: rust-red hills and mesas, dark red stalk plants, a tall dark spire with violet-blue tips (`mch`, the Metar colony hub: its two leaning prongs and violet-blue tips, as the Metar colony core in R12; fairly), rows of small pale units, a pale arch-shaped rock, a violet-blue faceted craft close by at 3:10 (dark grey with blue-violet streaks: `mport`, the Metar portal craft seen in J9R; likely, not `h`, which is pale with red) |
 | `J7R013` (31.8 s, 0.45) | 3:31 | (none) | the Romulan emblem |
 
 So the **pages** follow the usual rule (one clip per step in id order,
@@ -105,16 +105,18 @@ Selection panel (28 samples). Romulan (owner ROMULAN), matched to
 | Name in panel | Model | How sure |
 |---|---|---|
 | colony hub (efficiency 120 %) | `rch` (the arch) | sure |
-| shield generator (8:22, 80 %) | `rcss` (triangular pyramid with a green-lit base) | fairly ([play-r9.md](play-r9.md) guesses `rab`) |
-| science station (10:48 on, 80 %) | splayed, crab-like tan shape; `rsb_a`? | guess |
+| shield generator (8:22, 80 %) | `rcss` (triangular pyramid with a green-lit base; portrait `rsg`) | fairly (R9's `rab` guess was wrong) |
+| science station (10:48 on, 80 %) | splayed, crab-like tan shape: `rsb_a`; at 23:15 the dome has ribbed `rsb_b` slabs in its bays | sure |
 | vehicle yard (14:17, 80 %) | `rvy` (octagonal ring) | fairly |
-| vehicle yard upgrade (16:04) | same portrait as the yard; `rvy_b`? | guess |
+| vehicle yard upgrade (16:04) | same portrait as the yard; `rvy_b` (matched in R1) | fairly |
 | resource processor (14:26, 80 %) | `rrpp_a` (ribbed block with fins) | sure |
 | **static disruptor** (18:43, 92 %; 22:33, 112 %; health bar part red) | grey column with fins, pale base: `rdds` | fairly; new name, not in R9's list |
 
 On the pad also: three tan towers on splayed green-lit legs (`rps2`, the
 adv. power generator in R9; 23:30), a tall finned tower by the hub at 24:04
-(`rch_b` hub upgrade? guess), long ribbed blocks (`rsf`/`rcy_b`? guess) and a
+(probably the security centre `risb`, a ribbed tower with a grey middle
+strip as on the R2 and J9R pads: tentative; not the hub upgrade, which
+stands inside the arch), long ribbed blocks (`rsf`/`rcy_b`? guess) and a
 red ghost of a building being placed at 13:07 (placement not allowed).
 
 Units: ground scout (READY / EN ROUTE, shield BASIC then HIGH), photon
@@ -225,16 +227,17 @@ artillery). Portraits:
   system only after the last page) - the Romulan script, or slow scene
   loading? Compare a second Romulan J7 recording or the briefing script.
 - What the magenta marker on the relief map is (the guide's position?), and
-  which model is the Hubrin guide; the violet-blue craft and the tall spire
-  in the ground step.
+  which model is the Hubrin guide (`h`, by its metamodel name only). The
+  ground step's spire and craft look Metar (`mch`, `mport`; table above).
 - Message 5 (24:14-24:32) was never shown: the transalumin quota, or
   something else?
 - The first mine's position: 188, 324 (more likely: two closed loops, and
   block 23,40 has the lower value 150) or 180, 324.
 - Who destroyed the Federation hub at 23:54; whose are the grey-blue crystal
   units and the red-and-white fliers.
-- Models of the science station, vehicle yard upgrade, static disruptor
-  (`rdds`?) and the tall finned tower by the hub.
+- (Answered since: science station `rsb_a`, vehicle yard upgrade `rvy_b`,
+  static disruptor `rdds`; [colony.md](colony.md#romulan-matches).) The tall
+  finned tower by the hub: select it (security centre `risb`?).
 - No mineral readings (kind-1/4 blocks again read TERRAIN, as expected off
   the relief inset); the kinds are named elsewhere, 6 as dolamide in
   [play-r9.md](play-r9.md).

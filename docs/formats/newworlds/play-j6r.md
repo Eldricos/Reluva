@@ -113,15 +113,15 @@ Romulan selections:
 
 | Name in panel | Model | How sure |
 |---|---|---|
-| colony hub upgrade (4:00) / colony hub (4:06-4:19; shield HIGH, 110 %) | `rch` arch (portrait a tan arrow-like arch) | sure |
+| colony hub upgrade (4:00) / colony hub (4:06-4:19; shield HIGH, 110 %) | `rch` arch (portrait a tan arrow-like arch; the upgrade shows its base's portrait and is `rch_b`, [colony.md](colony.md#romulan-matches)) | sure |
 | construction yard (4:38, 80 %) | `rcy_a` cross shape | fairly |
-| resource processor (10:05), "resource processor upg" (9:56, 10:13) | `rrpp`? ribbed box portrait | guess |
-| science station (10:22 80 %, 16:52 110 %) | `rsb_a`? | guess |
-| photon defense (25:26 INCOMPLETE 0 %; 30:18, 32:39, 33:48 at 120 %) | a tall pale slab portrait | new name for Romulans; model not matched |
-| surveillance squad (3:54) | grey-blue wedge portrait | unit; model not matched |
-| ground scout (8:43 onward, many) | `rs` | fairly |
+| resource processor (10:05), "resource processor upg" (9:56, 10:13) | `rrpp_a` / `rrpp_b` (portrait `rrpp`) | fairly |
+| science station (10:22 80 %, 16:52 110 %) | `rsb_a` (splayed portrait `rsb`) | sure |
+| photon defense (25:26 INCOMPLETE 0 %; 30:18, 32:39, 33:48 at 120 %) | a tall pale slab portrait: `rddt`, the model `rpds` | fairly |
+| surveillance squad (3:54) | the ground scout's portrait (`rfgs`), so probably the same craft | tentative |
+| ground scout (8:43 onward, many) | `rfgs` (portrait file `rfgs`; `rs` is the shuttle) | fairly |
 | cloaked assault vehicl (17:19 shield HIGH, 17:45 BASIC) | ghost-like translucent | as in J4 |
-| photon artillery (24:00, 33:15, 33:23; often damaged) | grey hover craft portrait; a group of six on the ground at 33:23 | new unit name; model not matched |
+| photon artillery (24:00, 33:15, 33:23; often damaged) | grey hover craft portrait (`rptl`); a group of six on the ground at 33:23, pale with green lights on top: `rpa` | fairly |
 
 The selection panel also shows:
 - MULTISELECTION from 30:36 to 36:16 (groups of the same grey units,
@@ -315,9 +315,11 @@ Portraits:
   panel closed. 9 arrived 37:33-37:41, or the 37:32 counter reads 9/9.
 - Is the same Engineering face A really J4's Operations face, so one of
   the two labels is wrong or the portrait is shared?
-- Models for photon defense, photon artillery and the surveillance squad
-  (new Romulan names); science station and resource processor (+upg) are
-  guesses.
+- (Answered since, [colony.md](colony.md#romulan-matches): photon defense
+  `rpds`, photon artillery `rpa`, science station `rsb_a`, resource
+  processor `rrpp_a` (+ `rrpp_b`).) The surveillance squad shows the ground
+  scout's portrait: is it a ground scout carrying a squad, or a craft of
+  its own?
 - The capacity step 60 -> 80 -> 90: which building gives which step?
 - The ground views at 1:38 and 2:38: are they the Klingon colony (dark
   pyramid = Klingon hub) or the "council chamber"? Which building is the

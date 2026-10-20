@@ -94,32 +94,36 @@ a block, on its deposit.
 ## Buildings and models
 
 The scripts' building names, and the models the recordings matched to
-them ([play-f1.md](play-f1.md), [play-k1.md](play-k1.md)). Those marked
-*name* aren't matched in a recording yet but are named so by the game's
-own metamodels (below); the turrets marked *guess* by their models' names
-alone.
+them ([play-f1.md](play-f1.md), [play-k1.md](play-k1.md); the Romulan
+column from the Romulan recordings, see [Romulan matches](#romulan-matches)
+below). Those marked *name* aren't matched in a recording yet but are named
+so by the game's own metamodels (below); the turrets marked *guess* by their
+models' names alone.
 
 | Building | Federation | Klingon | Romulan |
 |---|---|---|---|
-| Colony hub | `fch` | `kch` | `rch` *name* |
-| Colony hub upgrade | `fch_b` | `kch_b` | `rch_b` *name* |
-| Vehicle yard | `fvpy_a` | `kvy` | `rvy` *name* |
-| Construction yard | `fcy` | `kcy` | `rcy_a` *name* |
-| Resource processor | `frps_a` | `krps` | `rrpp_a` *name* |
-| Power generator | `fpgs` *name* | `kpgs` | `rps1` *name* |
-| Advanced generator | `fpgs2` *name* | `kpgs2` | `rps2` *name* |
-| Mining station | `fms` *name* | `kms` | `rms` *name* |
+| Colony hub | `fch` | `kch` | `rch` |
+| Colony hub upgrade | `fch_b` | `kch_b` | `rch_b` (the tower; `rch_c` the next stage) |
+| Vehicle yard | `fvpy_a` | `kvy` | `rvy` (upgrade `rvy_b`) |
+| Construction yard | `fcy` | `kcy` | `rcy_a` (upgrade `rcy_b`) |
+| Resource processor | `frps_a` | `krps` | `rrpp_a` (upgrades `rrpp_b`) |
+| Power generator | `fpgs` *name* | `kpgs` | `rps1` |
+| Advanced generator | `fpgs2` *name* | `kpgs2` | `rps2` |
+| Mining station | `fms` *name* | `kms` | `rms` |
 | Accommodation (the Klingons' Arsenal) | `accom` | `kab` | `rab` *name* |
-| Sickbay | `fsb` | `ksb_a` | `ruh_a` *name* |
-| Science station | `fss_a` *name* | `kss_a` | `rsb_a` *name* |
-| Science station upgrade | `fss_b` *name* | `kss_b` *name* | `rsb_b` *name* |
+| Sickbay (the Romulans' utility hospital) | `fsb` | `ksb_a` | `ruh_a` (upgrade `ruh_b`, likely) |
+| Science station | `fss_a` *name* | `kss_a` | `rsb_a` |
+| Science station upgrade | `fss_b` *name* | `kss_b` *name* | `rsb_b` |
 | Security center | `fsc` | `ksc` *name* | `risb` *name* |
 | Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
-| Storage facility | | `ksf` | `rsf` *name* |
+| Storage facility (the Romulans' material storage) | | `ksf` | `rsf` |
 | Landing pad | `landpad` *name* | | |
+| Transporter pad | | | `rbcs` |
 | Photon turret | `fpdt` *guess* | | |
 | Disruptor turret | | `ksg` | |
-| Static disruptor | | `kdws` *guess* | |
+| Static disruptor | | `kdws` *guess* | `rdds` |
+| Photon defense (not a script name) | | | `rpds` |
+| Shield generator (not a script name) | | | `rcss` |
 
 ### The game's names for the buildings
 
@@ -150,6 +154,57 @@ model, in the game's own words for internal use (`reluva-tool mdl-info`):
   models are interiors.
 
 The names the panel shows can differ from these (the Klingons' Arsenal).
+
+### Romulan matches
+
+The Romulan GUI archive (`romgui.cat`, `lbp/gui/rom/ptrt/`) holds the
+selection panel's portraits, large and small, as pictures named after the
+building or craft (`build/`, `craft/`, and `upgde/` for upgrades). They are
+pre-rendered views of the models, so a portrait seen in a recording names
+the portrait file, and the file's picture shows which model it is. Most
+portrait names are the model names or close to them; the ones that are not:
+`rchub` the hub, `rms1` the mining station, `rrpp`/`rsb`/`ruh` the bases
+drawn with their upgrade bays as see-through outlines, `rlp` the transporter
+pad (`rbcs`), `rsg` the shield generator (`rcss`), `rddt` the photon defense
+(`rpds`), `rdsb` the static disruptor (`rdds`), `rf` the clone farm
+(`rcbf`), `r_hcp` the Hubrin containment pillar; crafts `rshut` the shuttle
+(`rs`), `rconb`/`rcrgb` the construction and cargo bees, `rptl` the photon
+artillery (`rpa`), `rcapc` the cloaked assault vehicle, `rt` and `rct` the
+tank uncloaked and cloaked, `rctp` the unarmed APC (`rapcnt`). These were
+checked against the recordings (October 2026; frames in the scratchpad
+only):
+
+| Panel name | Model | Evidence | How sure |
+|---|---|---|---|
+| Colony hub | `rch` | the four-legged arch in every Romulan start; portrait | sure |
+| Colony hub upgrade | `rch_b` | a tall column standing inside the arch (J9R 13:08); the metamodel calls it the first upgrade; the panel then offers "improved hub" | fairly |
+| (improved hub) | `rch_c` | the spiked grey plate at the arch's foot, seen only after the first upgrade (J9R 13:08, not at 4:06); the second upgrade by its metamodel | fairly |
+| Construction yard / upgrade | `rcy_a` / `rcy_b` | the flat cross with raised green-lit corners; the ramp-shaped block joined to its side (R1 12:45, R2) | sure / likely |
+| Vehicle yard / upgrade | `rvy` / `rvy_b` | octagonal ring; the upgrade is the pointed grey-faced wedge joined to it, selected on its own (R1 12:45) | sure / fairly |
+| Science station / upgrade | `rsb_a` / `rsb_b` | the low six-bayed dome (J9R 7:08); upgrades are ribbed slanted slabs standing in its bays (R2 14:51, J9R 13:05, J7R 23:15) | sure / fairly |
+| Resource processor / upgrade | `rrpp_a` / `rrpp_b` | portrait is `rrpp_a` (three fins over a grey front); its five upgrades (the panel lists one plant per material) have one model | sure / likely |
+| Power generator, adv. | `rps1`, `rps2` | tower on a flat base (R12 40:44, selected) and tower on splayed legs; portraits | sure |
+| Mining station | `rms` | flat X; portrait `rms1` | sure |
+| Utility hospital (sickbay) / upgrade | `ruh_a` / `ruh_b` | the low block with pyramid ends and green panels, selected (R2 15:01); its portrait shows a tall slab in its bay, the shape of `ruh_b` | sure / likely |
+| Material storage | `rsf` | the slatted block beside the hub in every start (R1, R2, J8R, J9R, C11), selected in C11 at 0:40; portrait `rsf` | sure |
+| Transporter pad | `rbcs` | the rounded block with a raised lip, a transporter glow beside it while selected (R2 16:30); portrait `rlp` | fairly |
+| Static disruptor | `rdds` | portrait `rdsb` (grey finned column on a dark base); small dark posts round the colony | fairly |
+| Photon defense | `rpds` | portrait `rddt`, the tall pale slab (R2, J6R) | fairly |
+| Shield generator | `rcss` | portrait `rsg`, a four-legged pyramid with a green-lit base (R9 48:43); small green-based pyramids on the J7R pad | fairly |
+| Security centre | `risb` | not selected; a tall ribbed tower with a grey middle strip stands on several pads (R2, J9R), probably the "tall finned tower" of J7R | tentative |
+
+The upgrades are separate models that stand in the base's bays (the base
+metamodels list `BAY_0`-`BAY_5` places), which is why an upgrade can be
+selected on its own. Reluva still draws an upgrade on its base's spot.
+
+Units, by portrait: ground scout `rfgs` (the surveillance squad shows the
+same portrait, so probably the same craft), science vehicle `rsv`, APC
+`rapc`, cloaked assault vehicle the see-through `rapc` shape (no model of
+its own found; tentative), photon artillery `rpa` (a hover craft, not a
+building: six of them at J6R 33:23, pale with green lights), cloaked tank
+`rct` (the forked hull; the disruptor tank shows the same hull uncloaked).
+J4R's six starting units have small forked icons, so probably tanks
+(tentative).
 
 Most Klingon buildings have a texture number the name rule can't fill
 ([geo.md](geo.md#textures)), so a face of each (often its top) shows

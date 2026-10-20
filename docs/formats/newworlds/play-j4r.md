@@ -95,17 +95,18 @@ the panel portrait and ground views:
 | colony hub (5:24, 7:55; shield HIGH, 100 %) | `rch` (the arch) | sure |
 | construction yard (6:17, 14:27) | `rcy_a` (cross-shaped) | fairly |
 | vehicle yard (8:05 ... 22:42; 120 %) | `rvy` | fairly |
-| science station (7:48, 12:17, 16:03, 18:26) | `rsb_a`? | guess |
-| utility hospital / "utility hospital upgrade" (9:14, 11:00) | `ruh_a` / `ruh_b`? (portrait a box with a tall block) | guess |
-| resource processor / "resource processor upg" (11:30, 11:39) | `rrpp_a` / `rrpp_b`? (ribbed block portrait) | guess |
+| science station (7:48, 12:17, 16:03, 18:26) | `rsb_a` | sure (portrait; [colony.md](colony.md#romulan-matches)) |
+| utility hospital / "utility hospital upgrade" (9:14, 11:00) | `ruh_a` / `ruh_b` (portrait a box with a tall block: the base with its upgrade) | fairly |
+| resource processor / "resource processor upg" (11:30, 11:39) | `rrpp_a` / `rrpp_b` (ribbed block portrait) | fairly |
 | adv. power generator (13:56, 25:57) | `rps2` (tower on splayed legs) | fairly |
 | mining station (22:13, damaged) | `rms` (low four-armed cross, seen on the ground beside it) | fairly |
 
 Upgrades again have their own panel names, truncated to fit ("resource
-processor upg"). Units: ground scout (`rs`, portrait matches), "cloaked
+processor upg"). Units: ground scout (`rfgs` by the portrait file; `rs` is the shuttle), "cloaked
 assault vehicl" (truncated; ghost-like portrait; "en route"), and a
 MULTISELECTION of six identical units at 4:03 (claw-like icons; which unit
-is unclear). An ENGINEERING build panel at 4:05 (construction-type
+is unclear; the icons are forked, like the tank portraits `rt`/`rct`,
+so probably tanks: tentative). An ENGINEERING build panel at 4:05 (construction-type
 vehicles).
 
 Others: a **Taubat tank** (owner TAUBAT, damaged, 11:58), HOSTILE UNIT
@@ -227,7 +228,8 @@ right during the briefing. Portraits:
   the emblem step after the recording's frame crop? Check in play.
 - The grey craft in `J4R010` and the winged vehicles in `J4R013`: which
   Romulan models (`rwb`/`rcb`, `rpa`/`rapc`?).
-- The six-unit MULTISELECTION at 4:03 (which unit; the starting units).
+- The six-unit MULTISELECTION at 4:03: the forked icons suggest tanks
+  (`rct`); select one to be sure.
 - Where exactly the Klingon arsenal is (no Tricorder reading on it), and
   whether the red-and-white emblem over it is the capture-target marker.
 - Messages before 21:03: none, or deleted with the panel closed?

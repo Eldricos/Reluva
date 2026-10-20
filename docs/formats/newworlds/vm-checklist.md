@@ -88,22 +88,26 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 - **Federation** [shot]: power generator, advanced generator, mining
   station (close), photon turret, defence artillery, shield generator,
   landing pad, food storage. ([play-f1.md](play-f1.md#buildings-and-their-models))
-- **Romulan buildings** [shot]: hub upgrades (which of the two stages has
-  the tower and which the spiked roof), vehicle yard upgrade, construction
-  yard, science station (+upgrade), resource processor (+upgrade), mining
-  station, utility hospital (+upgrade), transporter pad, static disruptor,
-  photon defense, photon artillery, shield generator, the slatted building
-  in R2's start, the ramp building and tower icons (J8R, J9R), the tall
-  finned tower (J7R). ([play-r1.md](play-r1.md), [play-r2.md](play-r2.md),
-  [play-j4r.md](play-j4r.md), [play-r9.md](play-r9.md))
-- **Romulan units** [shot]: ground scout, cloaked tank, cloaked assault
-  vehicle (full name), surveillance squad, the six starting units (J4R).
-  ([play-r1.md](play-r1.md), [play-j6r.md](play-j6r.md), [play-r14.md](play-r14.md))
-- **Natives** [shot]: Metar colony core, active portal, temple, spires and
-  starship; Taubat structures, phaser turret and hangar; the grey pods with
-  coloured slashes (R14); Hubrin guide and the magenta map marker (J7R);
-  the black many-legged unit (R2 36:30); Orion units (C11).
-  ([play-r12.md](play-r12.md), [play-r14.md](play-r14.md), [play-j7r.md](play-j7r.md), [play-c11.md](play-c11.md))
+- **Romulan buildings** [shot]: most are matched now by their panel
+  portraits ([colony.md](colony.md#romulan-matches)); still to confirm close
+  up: the order of the two hub upgrades (`rch_b` tower first, `rch_c`
+  spiked plate second?), the utility hospital upgrade (`ruh_b`?), the
+  transporter pad (`rbcs`), shield generator (`rcss`), static disruptor
+  (`rdds`) and photon defense (`rpds`) on the ground rather than by portrait,
+  and the security centre (`risb`, never selected; is it J7R's tall finned
+  tower?). ([play-r1.md](play-r1.md), [play-r2.md](play-r2.md),
+  [play-j7r.md](play-j7r.md))
+- **Romulan units** [shot]: the cloaked assault vehicle (full name, and
+  whether it is `rapc` drawn cloaked), the surveillance squad (same portrait
+  as the ground scout: the same craft?), the six starting units of J4R
+  (forked icons: tanks?). ([play-j6r.md](play-j6r.md), [play-j4r.md](play-j4r.md))
+- **Natives** [shot]: Metar temple and starship (`mss`); the Taubat phaser
+  turret (`tsg`?); the Hubrin guide (`h`?) and the magenta map marker
+  (J7R); Orion units (C11; `odv`?); what R2's black many-legged unit at
+  36:30 is (only pale `ta` artillery craft and their dark shadows found).
+  Settled: Metar colony core and spires `mch`, active portal `mport`, the
+  grey slashed pods `th`, Taubat hangar `tw`, Taubat temple `tt`, R9's
+  device `mad` (likely). ([play-r12.md](play-r12.md), [play-r14.md](play-r14.md), [play-j7r.md](play-j7r.md), [play-c11.md](play-c11.md))
 
 ## 3. Interface
 

@@ -94,16 +94,16 @@ Selection panel (90 samples). Romulan (owner ROMULAN):
 | Name in panel | Model | How sure |
 |---|---|---|
 | colony hub (120 %) | `rch` (the arch) | sure |
-| colony hub upgrade (3:30, builder help "improved hub") | `rch_b`? | guess |
-| construction yard (4:47, 80 %) | splayed tan shape with dark centre; `rcy`? | fairly |
-| science station (6:32, 80 %); science station upgrade (18:06) | crab-like tan shape (as in J7) | fairly |
+| colony hub upgrade (3:30, builder help "improved hub") | `rch_b` (the next stage, "improved hub", is `rch_c`) | fairly ([colony.md](colony.md#romulan-matches)) |
+| construction yard (4:47, 80 %) | splayed tan shape with dark centre; `rcy_a` | sure (portrait) |
+| science station (6:32, 80 %); science station upgrade (18:06) | crab-like tan shape (as in J7): `rsb_a`; upgrade `rsb_b` | sure; fairly |
 | vehicle yard (14:34 on, several; 80 %) | tan shell-like portrait; `rvy` | fairly |
 | resource processor; resource processor upg (15:46) | `rrpp_a` ribbed block | sure |
 | adv. power generator (16:39, INCOMPLETE 0 %) | splayed tower (`rps2`) | fairly |
-| power generator (40:44, 120 %) | tan column, green-lit top (`rps`?) | fairly |
-| mining station (48:51, 80 %) | tan crossed shape | guess |
-| photon defense (30:15 INCOMPLETE 0 %; 45:59, 56:29 120 %) | grey column | fairly |
-| static disruptor (52:26, 56:42; 120 %) | grey finned column (`rdds`? as in J7) | fairly |
+| power generator (40:44, 120 %) | tan column, green-lit top: `rps1`, selected on the ground | sure |
+| mining station (48:51, 80 %) | tan crossed shape: `rms` (portrait `rms1`) | fairly |
+| photon defense (30:15 INCOMPLETE 0 %; 45:59, 56:29 120 %) | grey column (`rpds`) | fairly |
+| static disruptor (52:26, 56:42; 120 %) | grey finned column (`rdds`, portrait `rdsb`) | fairly |
 | **containment pillar** (57:52, 58:45, 66:27; 100 %) | purple spire with green slashes (`hcp`, owner shown ROMULAN) | sure |
 
 Units: ground scout, photon artillery (often damaged: health part red),
@@ -111,12 +111,17 @@ science vehicle (24:15 on; used for the imbalance at 58:03), **cloaked
 tank** (51:07, new name), MULTISELECTION (15 at start, 14 alike + 1). Shield
 cover BASIC early, HIGH later.
 
-Natives / others: **Metar** "active portal" (33:39, health part red) and
-**"Metar colony core"** (49:49, pink-violet portrait, damaged) - K12 had a
+Natives / others: **Metar** "active portal" (33:39, health part red; the
+dark swept structure with blue-violet streaks, `mport`: fairly) and
+**"Metar colony core"** (49:49, pink-violet portrait, damaged; the black
+spire with two violet-blue prongs, `mch`, the Metar colony hub by its
+metamodel: fairly) - K12 had a
 "Metar temple" instead; tall dark-green-slashed black pyramids/spires in
 groups (30:00-50:00) are probably Metar buildings. **Taubat** "phaser defense
-turret" (38:28) and "Taubat hangar" (45:52, 47:09), both owner TAUBAT and
-damaged - the Taubat, as in R2 and J1 ([play-r2.md](play-r2.md),
+turret" (38:28; not on screen when selected) and "Taubat hangar" (45:52,
+47:09; the flat triangle with a green centre, `tw`: sure), both owner
+TAUBAT and damaged. Beside the portal at 33:39 stand grey pointed pods with
+red-and-green slashes: `th` (the Taubat house) by shape and texture - the Taubat, as in R2 and J1 ([play-r2.md](play-r2.md),
 [play-j1r.md](play-j1r.md)). Dark
 blue-violet fliers with red rings (29:27, 49:49) attack the units (Metar?
 guess). The fighting at 30:00-55:00 is in the north (Tricorder rows 5-16).
@@ -238,9 +243,10 @@ and Taubat buildings). Portraits:
   relief inset, as [play-j9r.md](play-j9r.md) would suggest.
 - The Hubrin observer killed at 12:37: who killed it, and does it matter
   (no failure followed)?
-- The Taubat (phaser defense turret, hangar): a native race here; their
-  models, and the Metar active portal / colony core models.
-- Models of the construction yard, mining station, cloaked tank, hub upgrade.
+- The Taubat phaser defense turret's model (`tsg`, the Taubat static gun?).
+  (Hangar `tw`, portal `mport`, colony core `mch`: see above.)
+- (Answered since: construction yard `rcy_a`, mining station `rms`, cloaked
+  tank `rct`, hub upgrade `rch_b`; [colony.md](colony.md#romulan-matches).)
 - Science vs Intelligence portraits (same face?); Operations vs Engineering
   faces: match to `ptrt/crew/lg/r_c1..`.
 - Starting stock (nitrium 23880, duranium 24000) and colony 50/90: the R12

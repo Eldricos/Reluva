@@ -29,7 +29,7 @@ All nine R1 clips were found in the audio (`RomVO`, back to back):
 | `R1006` (22.3 s) | 1:16.5 | PLANETARY DATA (2) | the star system: a small dull red body at the centre (the star, presumably), planets yellow (banded), teal, small green, and two purple/magenta |
 | `R1007` (17.4 s) | 1:39.4 | OBJECTIVE (3)? **no page panel seen** | ground view at the colony site: the camera flies low over concrete, past the colony hub's legs (`rch`), a dark blue-grey Romulan vehicle with green lights on the pad; RELIEF X2 inset top right |
 | `R1008` (23.1 s) | 1:57.5 | ADDITIONAL (4) | a model on the green grid: a swept, dark blue/purple streaked shape, very likely `mport` (the Taubat "inactive portal" of 23:00); relief inset |
-| `R1009` (11.7 s) | 2:21.2 | ADDITIONAL (5) | a model on the grid drawn translucent green: a low four-winged pyramid with a doorway, guess `rcss` (science station; the page is about the science block); relief inset |
+| `R1009` (11.7 s) | 2:21.2 | ADDITIONAL (5) | a model on the grid drawn translucent green: a low four-winged pyramid with a doorway: `rcss`, which the panel portraits show is the shield generator ([colony.md](colony.md#romulan-matches)), though the page is about the science block; relief inset |
 | `R1010` (23.0 s) | 2:33.5 | BACKGROUND DATA (6) | the relief/grid map, turning, colony marked; ground-view inset |
 | `R1011` (33.0 s) | 2:57.2 | ADDITIONAL (7) | ground view: the colony site from the red plain (hub arch, a low building, two grey-blue Romulan vehicles) |
 | `R1012` (11.5 s) | 3:30.9 | OBJECTIVE (8) | the relief map again |
@@ -96,17 +96,17 @@ natives' `bad` models.
 | Name in the panel (owner) | Model | How sure |
 |---|---|---|
 | Colony hub (Romulan) | `rch`, the tall pointed arch on three legs | sure (shape, many views) |
-| Colony hub upgrade (5:52; selectable on its own) | `rch_b` or `rch_c` | unsure which (same icon as the hub) |
+| Colony hub upgrade (5:52; selectable on its own) | `rch_b`, the column inside the arch; its panel offers the next stage, "improved hub" (`rch_c`) | fairly ([colony.md](colony.md#romulan-matches)) |
 | Construction yard (7:19) | `rcy_a` (flat cross with raised wings) | likely (icon) |
-| Vehicle yard (10:24); Vehicle yard upgrade (12:45) | `rvy`; `rvy_b` | likely; upgrade a guess |
-| Science station (8:43, 11:55, 13:05, 14:36, 22:54) | `rcss` (four-legged pyramid) | likely (icon) |
+| Vehicle yard (10:24); Vehicle yard upgrade (12:45) | `rvy`; `rvy_b`, the pointed wedge with a grey face joined to the yard's ring, selected on its own | sure; fairly |
+| Science station (8:43, 11:55, 13:05, 14:36, 22:54) | `rsb_a` (low six-bayed dome; the four-legged pyramid `rcss` is the shield generator) | sure (portrait) |
 | Resource processor (11:49) | `rrpp_a` | likely (icon) |
 | Adv. power generator (12:39; 22:05 INCOMPLETE 0 %) | `rps2` (tower on splayed legs) | likely (icon) |
 | Mining station (16:52) | `rms` (flat X) | likely (icon) |
-| Ground scout (13:19 EN ROUTE, 21:32, 22:37, 22:44) | `rs` (or `rfgs`) | unsure |
+| Ground scout (13:19 EN ROUTE, 21:32, 22:37, 22:44) | `rfgs` (`rs` is the shuttle) | fairly (portrait, metamodel name) |
 | Colony hub (owner RIVAL, 19:37, damaged health bar) | `rch` under a blue shield dome | sure (shape) |
 | Inactive portal (owner TAUBAT, 23:12; pink icon) | `mport` (the swept blue-black structure on the ground at 23:00) | likely (shape, colour) |
-| Transporter pad (message 7 only) | `rpds`? | guess |
+| Transporter pad (message 7 only) | `rbcs` (selected in R2) | fairly |
 | Starting low slatted building beside the hub (not selected) | `rsf` | likely (shape) |
 
 The panel shows owner, state (OPERATIONAL / INCOMPLETE; units READY / EN
@@ -219,10 +219,11 @@ ends at 23:36. The MISSION PASS page (string 11) wasn't seen.
 3. The COMMAND panel's objective list (strings 13-21): which ones are
    listed, and are 14/15 (construction yard, first power generator) shown as
    separate steps? Does the report go past the four lines seen (18, 20)?
-4. Which upgrade the "Colony hub upgrade" is (`rch_b` tower or `rch_c`
-   spiked roof), and the vehicle yard upgrade's model.
-5. Which ground-scout model (`rs` or `rfgs`); which model the rival cloaked
-   tanks use (`rct`?); the transporter pad's model.
+4. (Mostly answered since: the "Colony hub upgrade" is the `rch_b` tower
+   and the vehicle yard upgrade `rvy_b`, [colony.md](colony.md#romulan-matches).
+   Still to see: the spiked `rch_c` going up as the second stage.)
+5. (Answered since: ground scout `rfgs`, cloaked tank `rct`, transporter
+   pad `rbcs`, by the panel portraits; [colony.md](colony.md#romulan-matches).)
 6. The colony hub's exact map position (hover over open ground beside it);
    whether <161:184> is right.
 7. (Answered since: the other kinds have been named in other recordings,

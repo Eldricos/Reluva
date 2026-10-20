@@ -111,22 +111,23 @@ The selection panel (51 samples) names, all owner "ROMULAN":
 | Panel name | Model (by the icon's shape) | Sure? |
 |---|---|---|
 | Colony hub | `rch` (the arch) | sure |
-| Colony hub upgrade | `rch` again in the icon (`rch_b`/`_c` piece?) | icon unclear |
-| Construction yard upgr (the game's abbreviation) | `rcy_b`? | fairly |
+| Colony hub upgrade | `rch_b` (the upgrade shows its base's portrait) | fairly ([colony.md](colony.md#romulan-matches)) |
+| Construction yard upgr (the game's abbreviation) | `rcy_b`, the ramp-shaped block joined to the yard | likely |
 | Vehicle yard | `rvy` | fairly |
 | Science station | `rsb_a` | fairly |
-| Science station upgrade | `rsb_b`? | guess |
-| Utility hospital | `ruh_b` (tall slab)? or `ruh_a` | guess; the Romulans' sickbay ("utility hospital" in objective 7) |
+| Science station upgrade | `rsb_b`: one ribbed slab standing in a bay of the `rsb_a` dome (14:51); its panel lists three more upgrades | fairly |
+| Utility hospital | `ruh_a`: the selected building at 15:01 is the low block with pyramid ends and green panels; the tall slab in its portrait is the upgrade `ruh_b` | sure; the Romulans' sickbay ("utility hospital" in objective 7) |
 | Resource processor | `rrpp_a` | fairly |
 | Mining station | `rms` (four arms) | fairly |
 | Adv. power generator | `rps2` (legs round a drum) | fairly; shield HIGH, efficiency 120% |
-| Transporter pad | a rounded tan block: `rbcs`? | guess; new name, not in colony.md |
-| Photon defense | `rpds` (tall grey pillar) | fairly |
-| Static disruptor | `rdds` (grey with legs) | fairly |
+| Transporter pad | `rbcs`, the rounded block with a raised lip (16:30, a transporter glow beside it); portrait `rlp` | fairly |
+| Photon defense | `rpds` (tall grey pillar; portrait `rddt`) | fairly |
+| Static disruptor | `rdds` (grey with legs; portrait `rdsb`) | fairly |
 
-Units: Science vehicle (`rsv` by icon, fairly), Ground scout (`rs` or
-`rfgs`), Disruptor tank (`rct`?), Cloaked assault vehicle (a flat wedge:
-`rapc`?). Unit states READY / EN ROUTE, buildings OPERATIONAL /
+Units: Science vehicle (`rsv` by icon, fairly), Ground scout (`rfgs`,
+by portrait), Disruptor tank (the forked `rct` hull uncloaked, portrait
+`rt`; fairly), Cloaked assault vehicle (a see-through `rapc`-shaped
+portrait, `rcapc`; tentative). Unit states READY / EN ROUTE, buildings OPERATIONAL /
 INCOMPLETE with an efficiency %, and "shield cover BASIC/HIGH".
 
 Enemy: **"Taubat hangar"** owned by **ORION** (34:21), icon the `tw`
@@ -134,7 +135,8 @@ triangle: so `tw` is the Taubat vehicle production facility/hangar here.
 The Taubat temple `tt` (seen 25:00-29:50), the triangles `tw` (33:30) and
 a green-lit pyramid `th` (house, 35:30) are the enemy base, held by
 Orions. A black many-legged unit (36:30) may be an Orion vehicle (not
-matched). The Romulan Bird of Prey (`r_bop`) appears in play over the
+matched; frames at 36:00-36:40 show three pale Taubat artillery craft, `ta`
+by shape, with dark shadows under them, and nothing else dark). The Romulan Bird of Prey (`r_bop`) appears in play over the
 colony at 22:59 and again at the end (43:20-43:30), low over the ground:
 the starship that collects the dilithium (guess from objective 15).
 
@@ -160,7 +162,8 @@ building model (like the Klingons' ENGINEERING panel; not read).
 The game opens on the colony hub (`rch`) standing on a **concrete pad**,
 four units selected (MULTISELECTION, science vehicles by icon) and the
 welcome message. The compass bar at the top reads "250 N 010". A low tan
-building with a slatted top stands beside the pad (`rsf`? guess). The
+building with a slatted top stands beside the pad (`rsf`, the material
+storage, selected so in C11: sure). The
 NEW WORLDS panel's JUMP TO list at 4:01 shows hub, mining station, static
 disruptor, photon defense and a vehicle, so the start probably has those.
 The player builds the construction yard first (done 5:09).
@@ -216,14 +219,14 @@ of recording). String 11 (MISSION PASS) wasn't seen.
 - Messages 3, 7, 8, 13 and 23 (deleted unread): what are they? Probably
   generic (utility hospital complete, a building complete, power) but not
   seen.
-- The opening colony: exactly which buildings, and the slatted building's
-  name (click it at the start).
+- The opening colony: exactly which buildings (the slatted one is the
+  material storage, `rsf`, as in C11).
 - Which star-system body is Taphet, and is the teal ringed body the star?
 - The 1:05 foreground object and the 1:30 slatted building in the
   briefing: which models?
-- Panel icons for Colony hub upgrade, Science station upgrade, Utility
-  hospital, Transporter pad: which models (`rch_b`/`_c`, `rsb_b`,
-  `ruh_a`/`_b`, `rbcs`?).
+- (Answered since: Colony hub upgrade `rch_b`, Science station upgrade
+  `rsb_b`, Utility hospital `ruh_a`, Transporter pad `rbcs`;
+  [colony.md](colony.md#romulan-matches).)
 - Why objective 17 (rescue prisoners) never appears in COMMAND or the
   report; is it tracked at all?
 - Where the colony site is in eighths (hover the hub with the Tricorder).

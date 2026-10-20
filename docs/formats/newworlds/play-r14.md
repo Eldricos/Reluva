@@ -79,13 +79,13 @@ Selection panel (61 samples). Romulan (owner ROMULAN):
 | Name in panel | Model | How sure |
 |---|---|---|
 | colony hub (2:38, 9:28; 120 %; generator LOW, consumption 66 %, demand met 100 %) | `rch` (the arch) | sure |
-| construction yard (3:07, 17:38; 80 %) | splayed tan portrait | fairly (as R12) |
-| science station (5:02, 14:24, 15:44; 80 %) | crab-like tan portrait; builder help at 2:41 "science research station" | fairly |
+| construction yard (3:07, 17:38; 80 %) | splayed tan portrait: `rcy_a` | sure (portrait; [colony.md](colony.md#romulan-matches)) |
+| science station (5:02, 14:24, 15:44; 80 %) | crab-like tan portrait (`rsb_a`); builder help at 2:41 "science research station" | sure |
 | resource processor (7:23, 9:33, 9:39; damaged, 66-68 %) | ribbed block (`rrpp_a`) | sure |
 | vehicle yard (12:36 on, several; 80-110 %) | tan shell-like portrait, octagonal on the pad (`rvy`) | fairly |
-| static disruptor (11:39, 42:31; 120 %) | grey finned column (`rdds`?) | fairly |
-| photon defense (36:01-44:15; 80-120 %, one INCOMPLETE 0 % at 41:05) | grey column | fairly |
-| shield generator (40:26; 80 %) | tan pyramid/tent-shaped portrait | guess |
+| static disruptor (11:39, 42:31; 120 %) | grey finned column (`rdds`, portrait `rdsb`) | fairly |
+| photon defense (36:01-44:15; 80-120 %, one INCOMPLETE 0 % at 41:05) | grey column (`rpds`) | fairly |
+| shield generator (40:26; 80 %) | tan pyramid/tent-shaped portrait: `rsg`, the model `rcss` | fairly |
 
 Units: **cloaked tank** (10:40 on), photon artillery (19:20 on, often part
 red), science vehicle (30:31, 42:56), **"cloaked assault vehicl[e]"** (42:11
@@ -99,8 +99,9 @@ Science message came with the camera on one at 47:18). **Taubat** "Taubat
 temple" (34:10; tan base with a green-lit top: the black towers with a glowing
 green ring seen from 29:00 on) and "Taubat hangar" (38:39; triangle
 portrait), both owner TAUBAT and damaged - as in R12 and K14. Grey rounded
-pods with green and red slashes stand in groups (30:30, 44:00, 47:10;
-Metar or Taubat? not selected). Fliers attack from early on (white craft
+pods with green and red slashes stand in groups (30:30, 44:00, 47:10; not
+selected): `th`, the Taubat house, by shape and texture (sure; the same pods
+stand by the Metar portal in R12). Fliers attack from early on (white craft
 with red markings 11:00, 15:00; fire at the colony 7:00-8:30). A slim
 green-slashed spire stands on the plain (6:30, 13:00, 22:00, 35:30): the
 containment field device, `hcp` (fairly sure; never selected).
@@ -196,11 +197,11 @@ MET) under the status lines. Portraits:
   separate message? The MISSION REPORT was not reached.
 - What raised the capacity 80 -> 90 between 4:00 and 5:20, and how 91/90
   (22:14) happens.
-- Which Metar building is the "colony core" (never selected by name here;
-  R12 and K14 named it) - the black, violet-glowing spiky buildings?
-- The grey pods with green/red slashes: Metar or Taubat, and their name.
-- The shield generator and the cloaked assault vehicle (full name cut
-  off): find their models in `rombuild` / `romactor`.
+- The "colony core" is the black spire with violet-blue prongs (`mch`, R12
+  and J9R); are all the black violet-glowing buildings here colony cores?
+- (Answered since: the slashed pods are `th`, Taubat houses; the shield
+  generator is `rcss`, [colony.md](colony.md#romulan-matches).) The cloaked
+  assault vehicle's full name, and whether it is `rapc` drawn cloaked.
 - Who flies the white-and-red craft attacking the colony from 7:00?
 - Match the Science grin face (new for R12/R14) and the others to
   `ptrt/crew/lg/r_c1..`.

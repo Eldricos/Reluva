@@ -83,15 +83,17 @@ Selection panel (16 samples), all owner ROMULAN:
 |---|---|---|
 | colony hub (4:14, 4:19; OPERATIONAL, efficiency 120 %) | `rch` (the arch) | sure |
 | construction yard (4:55; 80 %) | `rcy_a` (low base with four raised corners, green-lit) | fairly (ground view at 3:35 and the JUMP TO icon match) |
-| science station (5:21; INCOMPLETE, 0 %) | portrait splayed, crab-like (as in J7); `rsb_a`? | guess; it is being built, so not a starting building |
+| science station (5:21; INCOMPLETE, 0 %) | portrait splayed, crab-like (as in J7): `rsb_a` | sure ([colony.md](colony.md#romulan-matches)); it is being built, so not a starting building |
 | vehicle yard (5:42, 6:34; OPERATIONAL, 100 %) | `rvy` (octagonal ring) | sure (also the page-6 model) |
 | APC (2:32; READY, shield BASIC) | pale crystal-like vehicle portrait | - |
 | ground scout (3:02; EN ROUTE, BASIC) | same pale crystal portrait | - |
 | armed transport (3:38; READY, BASIC) | same pale crystal portrait | - |
 
 Also on the pad: a low ramp-shaped building with steps (top right at 2:30;
-`rsf` or `rrpp_b`? guess), two tower-like JUMP TO icons (`rch_b`/`rps1`?
-guess). MULTISELECTION panels of 15 units (3 x 5) at 5:15 and 6:00-7:30, the
+`rsf`, the material storage that stands beside the hub in every Romulan
+start: likely), two tower-like JUMP TO icons (the portraits of the static
+disruptor `rdds` and the photon defense `rpds`, as in J9R's JUMP TO list:
+fairly). MULTISELECTION panels of 15 units (3 x 5) at 5:15 and 6:00-7:30, the
 escort; some health bars part red after 6:15.
 
 A large grey flying ship with a violet-blue glowing underside passes low over
@@ -198,7 +200,8 @@ MISSION, close); green-titled briefing pages with NEXT and MISSION. Portraits:
   (the shockwave at 7:30, near <279:404>?).
 - The MISSION REPORT screen (recording ends at the CONTINUE emblem).
 - Polycomp after 5:29: 118/114 or 1118/1114?
-- Models of the ramp building, the two tower icons and the science station.
+- (Answered since: ramp building `rsf`, tower icons the static disruptor and
+  photon defense, science station `rsb_a`.)
 - Which body in the star-system view is the star.
 - Match the Science face (new) and the pale Engineering face to
   `ptrt/crew/lg/r_c1..`.

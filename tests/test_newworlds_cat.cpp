@@ -659,6 +659,7 @@ void testColony() {
     CHECK(buildingModel("colony-hub", 'K') == "geo/kln/kch.geo");
     CHECK(buildingModel("accommodation", 'K', &matched) == "geo/kln/kab.geo" && matched); // the Arsenal
     CHECK(buildingModel("sickbay", 'R') == "geo/rom/ruh_a.geo");
+    CHECK(buildingModel("transporter-pad", 'R', &matched) == "geo/rom/rbcs.geo" && matched);
     CHECK(buildingModel("transporter-pad", 'F').empty() && buildingModel("disruptor-tank", 'K').empty());
 
     // A flat 8 x 8 block map, a deposit in block (6, 4), a cliff along

@@ -84,22 +84,24 @@ Selection panel (30 samples), Romulan unless said:
 | colony hub (OPERATIONAL, 120 %) | 4:05, 6:58 | `rch` (the arch) | sure |
 | COLONY HUB UPGRADE (OPERATIONAL, 120 %) | 4:06 | portrait the arch with a tower; on the pad a tall tower beside the arch, `rch_b` | fairly |
 | construction yard (80 %; shield BASIC at 6:19, HIGH at 12:38) | 6:19, 12:38 | `rcy_a` (low base, four raised green-lit corners) | sure |
-| science station (80 %; BASIC 7:08-7:49, HIGH from 11:03) | 7:08-13:01 | `rsb_a`? (splayed dome portrait; a turtle-like dome on the pad) | guess |
-| resource processor upg (80 %) | 10:57 | portrait low block with ribs; `rrpp_a`? | guess |
+| science station (80 %; BASIC 7:08-7:49, HIGH from 11:03) | 7:08-13:01 | `rsb_a` (splayed dome portrait; the six-bayed dome on the pad at 7:08, with three ribbed `rsb_b` slabs in its bays by 13:05) | sure |
+| resource processor upg (80 %) | 10:57 | portrait `rrpp` (the base); the panel lists five plant upgrades, model `rrpp_b` | fairly |
 | vehicle yard (80 %, shield HIGH) | 11:53 | `rvy` (octagonal ring) | fairly |
-| APC (READY) | 2:03 | pale crystal craft | - |
-| photon artillery | 3:36-9:45 | pale crystal craft (cannon) | - |
-| science vehicle | 6:09, 11:40 | pale crystal craft | - |
-| ground scout | 6:14-12:09 | pale crystal craft | - |
-| **cloaked assault vehicl** (sic, cut by the panel) | 10:35, 11:14 | a translucent pale-green wedge portrait | - |
+| APC (READY) | 2:03 | pale crystal craft | `rapc` (portrait) |
+| photon artillery | 3:36-9:45 | pale crystal craft (cannon) | `rpa` (portrait `rptl`) |
+| science vehicle | 6:09, 11:40 | pale crystal craft | `rsv` (portrait) |
+| ground scout | 6:14-12:09 | pale crystal craft | `rfgs` (portrait) |
+| **cloaked assault vehicl** (sic, cut by the panel) | 10:35, 11:14 | a translucent pale-green wedge portrait (`rcapc`, the `rapc` shape cloaked) | tentative |
 | **phaser defense turret**, owner **METAR** (OPERATIONAL) | 4:40 | - | Metar |
-| **Metar colony core**, owner METAR (red-backed portrait with a violet spike) | 11:34 | - | Metar (the "cores" of failure 16) |
+| **Metar colony core**, owner METAR (red-backed portrait with a violet spike) | 11:34 | `mch` (a dark spire with violet-blue prongs at the frame's edge; the same model named so in R12) | fairly; Metar (the "cores" of failure 16) |
 
 Shield cover goes from BASIC to **HIGH** on the buildings between 7:49 and
 11:03 (an upgrade researched or built; not seen when). The pad also shows a
-low ramp building with vents (`rsf`?, guess) and small spider-like towers
-(`rps2`?, guess). The hub at 13:08 has grown into a tall four-legged column
-(the arch with its upgrades). The build menu (4:15) offers the science
+low ramp building with vents (`rsf`, the material storage: likely) and small
+spider-like towers (`rps2`, the adv. power generator: fairly). The hub at
+13:08 has grown: a tall column (`rch_b`) stands inside the four-legged arch
+and a spiked grey plate (`rch_c`) at its foot, neither seen at 4:06 from
+above, when only the column could be hidden by the arch. The build menu (4:15) offers the science
 station (47 polycomp, 58 thermoconc, 22 trans al, 120 kg nitrium); at 4:10
 a resource processor and a science station were queued and the game asked
 whether to cancel a construction (the player answered at 4:12).
@@ -239,12 +241,15 @@ cancelling a construction (4:10). Portraits:
   recordings.
 - Page 6's model: is the two-pronged spire `mch` (a Metar spire) or the Metar
   starship? And what is the starship that was captured (not on screen)?
-- The grey octagonal tower with the green top at 11:40: the Metar temple?
+- The grey octagonal tower with the green top at 11:40 is `tt` by shape (the
+  Taubat temple model); is it the scan target the scripts call the Metar
+  temple?
 - What happened at 5:18 (the big pale ring around the portal craft): its
   weapon, a cloak, or a teleport?
 - When shield cover went to HIGH (between 7:49 and 11:03), and what did it.
 - Duranium at 2:46: 5000 or 6000? Thermoconc at 12:40.
 - Is there a campaign-end screen after the MISSION REPORT / CONTINUE?
-- Models of the ramp building, the spider-like towers, the science station
-  and the resource processor upgrade.
+- (Answered since: ramp building `rsf`, spider-like towers `rps2`, science
+  station `rsb_a`, resource processor upgrade `rrpp_b`;
+  [colony.md](colony.md#romulan-matches).)
 - Match the Engineering and Science faces to `ptrt/crew/lg/r_c1..`.

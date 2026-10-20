@@ -28,7 +28,7 @@ plays over that page.
 | `J3R005` (19.6 s, **not matched**) | 0:21 (expected) | STELLAR CARTOGRAPHY (3) | the galaxy, red and blue arms, turning (0:21-0:41) |
 | `J3R006` (9.4 s, score 0.44) | 0:42 | PLANETARY DATA (4) | the star system: a large orange-cream body low centre, small teal-green, tan-pink, rust-red and bright red bodies |
 | `J3R007` (14.4 s, 0.74) | 0:55 | BACKGROUND DATA (5) | ground flyover of the grassland: grey Taubat triangles (`tw`) with green tops, dark purple-veined folded structures (Hubrin-like), a tall twin-pronged blue/purple spire in the distance; RELIEF inset top right |
-| `J3R008` (30.2 s, 0.92) | 1:17 | OBJECTIVE (6) (scan the weapon's focal point) | close on the twin-pronged spire among Taubat triangles (the focal point? guess) |
+| `J3R008` (30.2 s, 0.92) | 1:17 | OBJECTIVE (6) (scan the weapon's focal point) | close on the twin-pronged spire among Taubat triangles (the focal point? guess): the dark spire with violet-blue prongs is `mch`, the Metar colony hub model (fairly) |
 | `J3R009` (24.7 s, 0.83) | 1:56 | OBJECTIVE (7) (capture three workshops) | Taubat triangles close up, the spire passing at 2:15 |
 | `J3R010` (12.2 s, 0.92) | 2:29 | (no panel) | ground: the colony site, the hub arch (`rch`) and a low box on a concrete pad, grey-pink rocky hills |
 | `J3R011` (11.2 s, 0.77) | 2:41 | MISSION-PARAMETERS (8) (panel lower on the screen, at about y 250) | the relief/grid map turning, light-green raised blocks and a blue grid area, a cross marker, camera inset |
@@ -107,12 +107,12 @@ Selection panel (103 samples). Romulan (owner ROMULAN), matched to
 | colony hub | `rch` (the arch; from above an arrow shape) | sure |
 | construction yard | `rcy_a` | fairly |
 | vehicle yard | `rvy` | fairly |
-| science station | `rsb_a`? | guess |
+| science station | `rsb_a` | fairly (by the other recordings' portraits, [colony.md](colony.md#romulan-matches)) |
 | adv. power generator | `rps2` (tower on splayed legs) | fairly |
-| resource processor | ? (ribbed block) | guess |
-| mining station | ? (boomerang/X portrait) | guess |
-| static disruptor | ? (pale pillar) | guess |
-| photon defense | ? (slab) | guess |
+| resource processor | `rrpp_a` (ribbed block portrait) | fairly |
+| mining station | `rms` (X portrait `rms1`) | fairly |
+| static disruptor | `rdds` (pale finned pillar, portrait `rdsb`) | fairly |
+| photon defense | `rpds` (slab, portrait `rddt`) | fairly |
 
 Units: science vehicle, ground scout, photon artillery, disruptor tank,
 **"cloaked assault vehicl"** (truncated; the infiltration messages follow its
@@ -240,12 +240,13 @@ blue message text, green-titled briefing pages. Portraits:
   inset ([play-j9r.md](play-j9r.md)); worth checking here. What does mined
   talgonite add to the stock?
 - The colony's own position (no hub-centred reading identified).
-- Is the spire in `J3R008` the weapon's focal point? Which model is it
-  (Metar `m*`, or Taubat)?
+- Is the spire in `J3R008` (`mch`, a Metar model among Taubat buildings)
+  the weapon's focal point?
 - The ADDITIONAL page (9) and objective 13 never showed: does the Romulan
   briefing skip it, or did the player click past?
-- Models of resource processor, mining station, static disruptor, photon
-  defense; the dark flat building at the start; the box beside the hub.
+- The dark flat building at the start; the box beside the hub (the
+  material storage `rsf`, as in every Romulan start?). (The rest answered
+  since, [colony.md](colony.md#romulan-matches).)
 - Two Engineering faces (25:45 vs 37:23); Senate face = the 66:46 incoming
   face; the bald alien's identity. Match against `ptrt/crew/lg/r_c1..`.
 - The active portal (Metar): which `forbuild`/`bad` model.
