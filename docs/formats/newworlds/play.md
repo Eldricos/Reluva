@@ -2,7 +2,11 @@
 
 Notes from watching recorded play-throughs of the original game (observed
 behaviour; the recordings and the game's wording stay out of the
-repository). One page per mission:
+repository).
+
+What is still to collect by playing the game: [vm-checklist.md](vm-checklist.md).
+
+One page per mission:
 
 | Page | Mission | Side |
 |---|---|---|
