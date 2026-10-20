@@ -672,12 +672,14 @@ void MissionViewer::stepScript() {
     if (run_->finished())
         return;
     std::vector<MissionRun::Output> out;
+    ScriptEvent fired{"timer", {}};
     if (walkPos_ < walk_.size()) {
         const ScriptEvent& e = walk_[walkPos_++];
         walkNote_ = "event " + std::to_string(walkPos_) + "/" + std::to_string(walk_.size()) + ": " + e.kind;
         for (const std::string& a : e.args)
             walkNote_ += " " + a;
         out = run_->fire(e);
+        fired = e;
         // The colony grows as the script builds (on the missions page only:
         // the game's own building is the player's).
         if (e.kind == "built" && !e.args.empty() && colony_) {
@@ -691,6 +693,15 @@ void MissionViewer::stepScript() {
         out = run_->advance(run_->nextTimer());
     } else {
         walkNote_ = "nothing more scripted";
+    }
+    // The game's own spoken announcement for it (Media/Misc), if any.
+    if (const std::string voice = announcementFor(fired, out, side); !voice.empty() && mixer_) {
+        stopClip();
+        if (auto sound = loadSound(voice))
+            clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
+        else
+            soundStatus_.clear(); // the game folder may not have Misc
+        walkNote_ += " [" + voice + "]";
     }
     for (const MissionRun::Output& o : out) {
         if (o.kind == MissionRun::Output::Message)

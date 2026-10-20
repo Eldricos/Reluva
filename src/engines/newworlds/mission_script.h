@@ -122,4 +122,11 @@ private:
     int depth_ = 0;
 };
 
+// The game's spoken announcement (a stem in Media/Misc) for what a step
+// did, for the side ('F', 'K', 'R'): the mission won or lost, an objective
+// met, power low, production held up (Federation), a building finished
+// (its name, B_f...com, A_k...com, B_r...com); the first of these that
+// applies, or empty. Matched in recordings (docs/formats/newworlds/media.md).
+std::string announcementFor(const ScriptEvent& event, const std::vector<MissionRun::Output>& out, char side);
+
 } // namespace reluva::newworlds

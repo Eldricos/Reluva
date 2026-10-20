@@ -18,8 +18,8 @@ MP3s named after the mission and a number from 005 (`F1005`, `K12009`,
 | Folder | Missions | Files |
 |---|---|---|
 | `FedVO` | F1 (005-015), F2 (005-012), F3 (005-017), F8 (005-014), F12 (005-010), F14 (005-013); J1F (005, 006, 010-021), J2F-J9F | 135 |
-| `KlingVO` | K1 (005-013), K2 (005-012), K7 (005-013), K8 (005-015), K12 (005-013, plus a `K12009A`), K14 (005-011); J1K-J9K | 120 |
-| `RomVO` | R1 (005-013), R2 (005-016, no 012), R8 (005-014), R9 (005-014), R12 (005-009), R14 (005-010); J1R-J9R | 116 |
+| `KlingVO` | K1 (005-013), K2 (005-012), K7 (005-013), K8 (005-015), K12 (005-013, plus a `K12009A`), K14 (005-011); J1K-J9K | 124 |
+| `RomVO` | R1 (005-013), R2 (005-016, no 012), R8 (005-014), R9 (005-014), R12 (005-009), R14 (005-010); J1R-J9R (each without gaps from 005: J1R, J2R to 011, J3R, J6R, J7R to 013, J4R to 015, J8R, J9R to 009) | 113 |
 
 Exactly the missions with text in the side's misc archive (`fedmisc`,
 `klimisc`, `rommisc`; no J5), mission 14 with its own recordings though it
@@ -80,6 +80,24 @@ WAV files, the same for every mission:
   training and tutorial missions' speech (`cvr03.stb`'s `~INSTRUCTION~`
   pages).
 
+Heard in recordings (found by cross-correlation, as the voice clips are;
+F1's YouTube recording and K2's):
+
+- A building's `com` line plays as it's finished (`B_fcycom` at 5:03, as
+  the construction yard is; `B_fabcom` at 20:54, the accommodation block)
+  and also in quick runs of different buildings, as the player goes
+  through the build menu (8:18-8:28, 21:15-26:16): it's the building's
+  spoken name.
+- `lowpowr` two seconds before each "not enough power" message (K2 8:12,
+  9:12); `atckvoc` after weapons fire is reported (F1 15:37-16:38, K2
+  5:20); `objmet` as objectives are met (F1 26:46, 29:21, 31:10);
+  `miswin` as the mission is won (F1 31:27).
+- Of the eight lines: `FED002c` with both "held up" messages (F1 17:41,
+  18:12: short of resources, of crew); `FED001c` as the vehicle yard is
+  finished (7:22) and once later; `FED004b` as a scan starts (13:13);
+  `FED005b` and `KLI005a`, short, every minute or so: acknowledging orders,
+  presumably.
+
 ## Music (`Music`)
 
 MP3s:
@@ -109,9 +127,13 @@ game folder's loose `.mp3` and `.wav` files after the archives' sounds and
 plays them; `reluva-tool wav-info` and `wav-decode` take MP3s too. The
 missions page plays each mission's voice clips and its planet's theme (see
 [level.md](level.md#in-reluva)). The voice
-MP3s decode to within 1 of ffmpeg's samples.
+MP3s decode to within 1 of ffmpeg's samples. Stepping through a mission's
+script (**X**), it plays the side's announcement for each step: the
+building's name as it's finished, power low, production held up, an
+objective met, the mission won or lost (`announcementFor` in
+`mission_script.h`).
 
 ## Open questions
 
 - Each mission's briefing script: which page and view go with each clip (seen for F1, K1, K2, J1, J2).
-- Which of the eight lines per side is what.
+- Which of the eight lines per side is what (four of the Federation's are placed above).

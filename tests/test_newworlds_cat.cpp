@@ -635,6 +635,15 @@ void testMissionScripts() {
     CHECK(out.size() == 1 && out[0].text == "The mine at 404, 220 has run out of minerals.");
     out = f1.fire({"built", {"vehicle-yard"}});
     CHECK(!out.empty() && out[0].text == "Vehicle yard finished.");
+    // The game's spoken announcements.
+    CHECK(announcementFor({"built", {"construction-yard"}}, {}, 'F') == "B_fcycom");
+    CHECK(announcementFor({"built", {"accommodation"}}, {}, 'K') == "A_kacom");
+    CHECK(announcementFor({"built", {"sickbay"}}, {}, 'R').empty());
+    CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
+    CHECK(announcementFor({"short-crew", {}}, {}, 'F') == "FED002c" && announcementFor({"short-crew", {}}, {}, 'K').empty());
+    CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16}}, 'R') == "robjmet");
+    CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16}, {MissionRun::Output::Won, {}, {}, 0}},
+                          'F') == "fmiswin");
 }
 
 void testColony() {

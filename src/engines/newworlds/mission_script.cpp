@@ -397,4 +397,49 @@ std::vector<ScriptEvent> MissionRun::walkthrough() const {
     return out;
 }
 
+std::string announcementFor(const ScriptEvent& event, const std::vector<MissionRun::Output>& out, char side) {
+    const std::string s = side == 'K' ? "k" : side == 'R' ? "r" : "f";
+    auto has = [&](MissionRun::Output::Kind k) {
+        return std::any_of(out.begin(), out.end(), [&](const MissionRun::Output& o) { return o.kind == k; });
+    };
+    if (has(MissionRun::Output::Won))
+        return s + "miswin";
+    if (has(MissionRun::Output::Lost))
+        return s + "mislose";
+    if (has(MissionRun::Output::Completed))
+        return s + "objmet";
+    if (event.kind == "power-low")
+        return s + "lowpowr";
+    if ((event.kind == "short-resources" || event.kind == "short-crew") && side == 'F')
+        return "FED002c";
+    if (event.kind != "built" || event.args.empty())
+        return {};
+    // A building's spoken name: its short name in the file's (fab, the
+    // Federation's accommodation block, and fcy heard as each finished).
+    struct Name {
+        const char* building;
+        const char *fed, *kln, *rom;
+    };
+    static constexpr Name kNames[] = {
+        {"construction-yard", "cy", "cy", "cy"}, {"vehicle-yard", "vy", "vy", "vy"},
+        {"accommodation", "ab", "a", ""},       {"arsenal", "", "a", ""},
+        {"power-generator", "pg", "pg", ""},    {"advanced-generator", "apg", "apg", ""},
+        {"resource-processor", "rp", "rp", "rp"}, {"mining-station", "ms", "ms", "ms"},
+        {"sickbay", "sb", "sb", ""},            {"science-station", "", "ss", ""},
+        {"security-center", "sc", "", ""},      {"hydroponics-farm", "hf", "", ""},
+        {"livestock-farm", "", "lf", ""},       {"storage-facility", "sf", "sf", "sf"},
+        {"transporter-pad", "tp", "tp", "tp"},  {"photon-turret", "pt", "", ""},
+        {"colony-hub", "", "ch", ""},           {"disruptor-tank", "", "dt", ""},
+        {"disruptor-turret", "", "sg", ""},
+    };
+    for (const Name& n : kNames)
+        if (event.args[0] == n.building) {
+            const std::string code = side == 'K' ? n.kln : side == 'R' ? n.rom : n.fed;
+            if (code.empty())
+                return {};
+            return std::string(side == 'K' ? "A_" : "B_") + s + code + "com";
+        }
+    return {};
+}
+
 } // namespace reluva::newworlds
