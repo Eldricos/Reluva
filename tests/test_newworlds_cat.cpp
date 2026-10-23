@@ -611,6 +611,17 @@ void testMissionScripts() {
                                "  ai K assault-1\n  hostile taubat\n  give dilithium 100\n  random a b\n"
                                "on signal hit*2\n  complete 5\non all-completed\n  win\n",
                                s));
+    // The monitors compare.
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\nobjective 2\nobjective 3\non stock dilithium 200\n  complete 1\n"
+                               "on count taubat-house <= 5\n  complete 2\non colony-size 200\n  complete 3\n", s));
+    MissionRun mon(s[0], nullptr);
+    CHECK(mon.fire({"stock", {"dilithium", "150"}}).empty() && mon.fire({"stock", {"dilithium", "210"}}).size() == 1);
+    CHECK(mon.fire({"count", {"taubat-house", "7"}}).empty() && mon.fire({"count", {"taubat-house", "5"}}).size() == 1);
+    CHECK(mon.fire({"colony-size", {"150"}}).empty() && mon.fire({"colony-size", {"200"}}).size() == 1);
+    CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
+                               "  ai K assault-1\n  hostile taubat\n  give dilithium 100\n  random a b\n"
+                               "on signal hit*2\n  complete 5\non all-completed\n  win\n",
+                               s));
     MissionRun sig(s[0], nullptr);
     out = sig.fire({"start", {}});
     CHECK(sig.won() && sig.nextTimer() < 0);

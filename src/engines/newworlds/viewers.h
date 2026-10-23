@@ -637,6 +637,7 @@ private:
     std::unique_ptr<Economy> economy_;
     std::vector<int> structureIds_; // per colony building, its economy structure
     int housed_ = 0;                // vehicles the mission starts inside the hub
+    std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
     bool buildMenu_ = false, ghostOk_ = false;
     std::string placing_;            // the type being placed, or empty
     int ghostA_ = -1, ghostB_ = -1; // where its hologram stands

@@ -1,10 +1,15 @@
 # Star Trek: New Worlds: Reluva's mission scripts
 
 The original keeps its missions' logic in `STNW.exe`; none of it is in the
-data files. Reluva writes its own, from what recordings of play showed
-([play.md](play.md)): which events each mission reacts to, in what order,
-and what follows. The scripts are in `src/engines/newworlds/mission_scripts.cpp`,
-read by `mission_script.h/.cpp`.
+data files. Reluva's scripts follow that logic as studied in the executable
+([exe.md](exe.md#the-script-engine)): the same objectives and fail criteria,
+triggers, conditions, delays and order of events, rewritten in Reluva's
+own format (a handler per event, not the game's graph object by object)
+and in its own words - every message paraphrases the game's, and a check
+makes sure none shares a run of six words with the game's text. The first
+scripts were written from recordings of play ([play.md](play.md)); the
+recordings now serve to check them. The scripts are in
+`src/engines/newworlds/mission_scripts.cpp`, read by `mission_script.h/.cpp`.
 
 ## What's in a script
 
@@ -34,23 +39,27 @@ The format is described at the top of `mission_script.h`.
 
 ## How far they go
 
-Scripted: the 44 missions with recordings, F1-F14 and the Klingon
-campaign with the joint missions from each of those sides, the Romulan
-recordings (R1, R2, R9, R12, R14 and J1-J4, J6-J9 as the Romulans), and the
-bonus missions C9, C10 and C11. Each one's blocks are in the order the recording
-showed them, and a test plays every script through in that order (the
-walkthrough) and checks it ends in a win where the recording did. Blocks
-the recordings didn't show (a fail never reached, a message the panel
-hid) are inferred from the objective and fail strings and marked
-"(inferred)".
+Scripted: all 51 playable missions and sides - F1-F14, K1-K14 and R1-R14
+(R8 too, which has no recording), the joint missions J1-J4 and J6-J9 from
+each of the three sides, the training missions C1 and C4-C8, and the bonus
+missions C9-C11. Each plays through in a test: its handlers' events in the
+order written, then time running, ending in a win.
 
-Not known, so not scripted: where the starting colonies, units and enemies
-are (the missions page approximates the colonies: [colony.md](colony.md)); the timing of attacks; how close "approach" is; the exact amounts
-(the dilithium targets come from the objective strings). Those need a
-running game to fill in. Of the Romulan campaign only R8 has no recording,
-so no script. Where a Romulan recording's beat had no event of its own (a
-repair or a hold before the end, a taunt minutes after a fight) the script
-approximates it with a timer, and says so.
+Besides the player's own events, the scripts carry the game's attacks and
+AI moves as `ai` actions (each side's scheduled assaults, the random raids
+every few minutes, build orders and their cancelling), stance changes
+(`hostile taubat`) and stock given or taken, for the game to carry out as
+those parts of Reluva grow. Play already feeds them the colony's buildings,
+its stock and building counts, key presses (the training missions wait
+for keys) and timers; scans, captures, sightings and destroyed enemies
+come once units and combat do.
+
+Each script ends with what the game does that the format can't say yet:
+most often a fail announced and the mission ended 10-20 s later (Reluva
+ends it at once or with timers), monitors the game switches on or off
+part-way, attack groups spawned, damage, meteor and area storms, messages
+to every side, and events about rival sides (a rival's scan, research or
+pass).
 
 ## In Reluva
 

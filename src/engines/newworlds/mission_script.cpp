@@ -233,6 +233,33 @@ bool MissionRun::requirementsMet(const ScriptEvent& want) const {
 bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) {
     if (want.kind == "built-all")
         return got.kind == "built" && requirementsMet(want);
+    // The game's monitors compare: stock <material> <at least>; count <what>
+    // <op> <n> against count <what> <now>; colony-size [<side>] <percent>,
+    // reached growing (over 100) or shrinking (to 100 or under).
+    if (want.kind == got.kind && (want.kind == "stock" || want.kind == "count" || want.kind == "colony-size")) {
+        auto num = [](const std::string& v, double& out) {
+            char* end = nullptr;
+            out = std::strtod(v.c_str(), &end);
+            return end && *end == 0 && !v.empty();
+        };
+        double w = 0, g = 0;
+        if (want.kind == "stock")
+            return want.args.size() == 2 && got.args.size() == 2 && want.args[0] == got.args[0] &&
+                   num(want.args[1], w) && num(got.args[1], g) && g >= w;
+        if (want.kind == "count") {
+            if (want.args.size() != 3 || got.args.size() != 2 || want.args[0] != got.args[0] || !num(want.args[2], w) ||
+                !num(got.args[1], g))
+                return false;
+            const std::string& op = want.args[1];
+            return op == "==" ? g == w : op == "<=" ? g <= w : op == ">=" ? g >= w : false;
+        }
+        if (want.args.empty() || want.args.size() != got.args.size() || !num(want.args.back(), w) ||
+            !num(got.args.back(), g))
+            return false;
+        if (want.args.size() == 2 && want.args[0] != got.args[0])
+            return false;
+        return w > 100 ? g >= w : g <= w;
+    }
     if (want.kind == "signal" && got.kind == "signal" && !want.args.empty() && !got.args.empty()) {
         // signal <name>*N: the N-th time it's raised.
         const size_t star = want.args[0].find('*');
@@ -426,6 +453,9 @@ std::vector<ScriptEvent> MissionRun::walkthrough() const {
             continue;
         }
         ScriptEvent ev = e;
+        // A count monitor reports the count it waits for.
+        if (ev.kind == "count" && ev.args.size() == 3)
+            ev.args = {ev.args[0], ev.args[2]};
         for (std::string& arg : ev.args)
             if (arg == "*")
                 arg = "somewhere";

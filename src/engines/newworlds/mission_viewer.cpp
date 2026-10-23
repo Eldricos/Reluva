@@ -345,6 +345,7 @@ void MissionViewer::stopPlay() {
     world_.reset();
     economy_.reset();
     structureIds_.clear();
+    lastCounts_.clear();
     run_.reset();
     log_.clear();
     walkNote_.clear();
@@ -445,6 +446,28 @@ bool MissionViewer::playEvent(const Event& ev) {
     if (ev.type == EventType::MouseMove || ev.type == EventType::MouseDown || ev.type == EventType::MouseUp)
         mouseX_ = ev.mouseX, mouseY_ = ev.mouseY;
     const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0;
+    // The tutorials wait for keys, by the game's (Windows) key codes.
+    if (ev.type == EventType::KeyDown && run_ && !run_->finished()) {
+        int code = 0;
+        if (ev.key == key::Tab)
+            code = 9;
+        else if (ev.key == key::Up || ev.key == key::Down || ev.key == key::Left || ev.key == key::Right)
+            code = ev.key == key::Left ? 37 : ev.key == key::Up ? 38 : ev.key == key::Right ? 39 : 40;
+        else if (ev.key >= key::F1 && ev.key < key::F1 + 12)
+            code = 112 + int(ev.key - key::F1);
+        else if (ev.key >= key::Kp0 && ev.key <= key::Kp0 + 9)
+            code = 96 + int(ev.key - key::Kp0);
+        else if (ev.key == key::LCtrl || ev.key == key::RCtrl)
+            code = 17;
+        else if (ev.key >= '0' && ev.key <= '9')
+            code = int(ev.key);
+        else if (ev.key == key::Home)
+            code = 36;
+        if (code) {
+            const ScriptEvent k{"key", {std::to_string(code)}};
+            deliver(k, run_->fire(k));
+        }
+    }
     switch (ev.type) {
     case EventType::KeyDown:
         if (ev.key == key::Escape && (buildMenu_ || !placing_.empty())) {
@@ -718,6 +741,29 @@ void MissionViewer::update(uint64_t nowMs) {
         }
         // The script hears what happened, and its timers run.
         if (run_ && !run_->finished()) {
+            // The colony's state for the scripts' monitors: the stock once a
+            // second, and its building counts as they change.
+            if (economy_ && nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000) {
+                const Stock st = economy_->stock();
+                for (int m = 0; m < kMaterials; ++m) {
+                    std::string name = materialName(m);
+                    std::transform(name.begin(), name.end(), name.begin(),
+                                   [](unsigned char c) { return char(std::tolower(c)); });
+                    happened.push_back({"stock", {name, std::to_string(st[size_t(m)])}});
+                }
+            }
+            if (economy_) {
+                std::map<std::string, int> counts;
+                for (const ColonyStructure& c : economy_->structures())
+                    counts[c.type] += c.progress >= 1;
+                for (const auto& [type, n] : counts)
+                    if (auto it = lastCounts_.find(type); it == lastCounts_.end() || it->second != n)
+                        happened.push_back({"count", {type, std::to_string(n)}});
+                for (const auto& [type, n] : lastCounts_)
+                    if (!counts.count(type))
+                        happened.push_back({"count", {type, "0"}});
+                lastCounts_ = std::move(counts);
+            }
             for (const ScriptEvent& e : happened)
                 deliver(e, run_->fire(e));
             const ScriptEvent tick{"timer", {}};
