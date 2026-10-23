@@ -94,6 +94,7 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/world.cpp
     src/engines/newworlds/model_pose.cpp
     src/engines/newworlds/economy.cpp
+    src/engines/newworlds/start_data.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp
     src/engines/newworlds/sound_viewer.cpp

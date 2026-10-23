@@ -660,7 +660,8 @@ void testColony() {
     CHECK(buildingModel("accommodation", 'K', &matched) == "geo/kln/kab.geo" && matched); // the Arsenal
     CHECK(buildingModel("sickbay", 'R') == "geo/rom/ruh_a.geo");
     CHECK(buildingModel("transporter-pad", 'R', &matched) == "geo/rom/rbcs.geo" && matched);
-    CHECK(buildingModel("transporter-pad", 'F').empty() && buildingModel("disruptor-tank", 'K').empty());
+    // The game's landing pad is the transporter pad (exe.md).
+    CHECK(buildingModel("transporter-pad", 'F') == "geo/fed/landpad.geo" && buildingModel("disruptor-tank", 'K').empty());
 
     // A flat 8 x 8 block map, a deposit in block (6, 4), a cliff along
     // block row 2's west half, nothing beyond column 7; buildings one tile
@@ -823,60 +824,73 @@ void testEconomy() {
     auto count = [](const std::vector<ScriptEvent>& ev, const char* kind) {
         return std::count_if(ev.begin(), ev.end(), [&](const ScriptEvent& e) { return e.kind == kind; });
     };
-    // Dilithium (kind 1) under tile 4,6's block, 50 units of it.
+    auto run = [](Economy& e, double seconds) {
+        std::vector<ScriptEvent> all;
+        for (double t = 0; t < seconds; t += 0.25)
+            for (ScriptEvent& x : e.advance(0.25))
+                all.push_back(std::move(x));
+        return all;
+    };
+    // Magnesite (kind 5) in block 2,3 holding 30, nothing else.
     ColonyMap map;
-    map.depositKind = [](int tx, int ty) { return tx / 2 == 2 && ty / 2 == 3 ? 1 : 0; };
-    map.depositAmount = [](int, int) { return 50; };
-    Economy e('F', {500, 988, 2211, 497, 3500, 5000}, 20, 50, map);
+    map.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+    map.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 30 : 0; };
+    Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
     e.addBuilt("colony-hub", 0, 0);
     const BuildingType* yard = buildingType("construction-yard");
     const BuildingType* mine = buildingType("mining-station");
     CHECK(yard && mine && e.available(*yard) && !e.available(*mine) && !e.available(*buildingType("colony-hub")));
+    CHECK(yard->costFor('F')[Nitrium] == 50 && yard->costFor('R')[Nitrium] == 500); // per side
+    CHECK(buildingType("power-generator")->costFor('F')[Dilithium] == 35);
     CHECK(e.order("mining-station", 0, 0, 4, 6) == 0); // no processor yet
-    const int id = e.order("construction-yard", 1000, 1000, 0, 0);
-    CHECK(id != 0 && e.stock()[Thermoconc] == 2211);
-    auto ev = e.advance(1);
-    CHECK(e.stock()[Thermoconc] == 2211 - 89 && e.stock()[Nitrium] == 3450 && count(ev, "built") == 0);
-    for (int i = 0; i < 50 && count(ev, "built") == 0; ++i)
-        ev = e.advance(1);
-    CHECK(count(ev, "built") == 1 && ev[0].args.size() == 1 && ev[0].args[0] == "construction-yard");
-    CHECK(e.capacity() == 50 && e.stock()[Thermoconc] == 2211 - 89); // paid once; no housing
-    // Six more yards: demand 70 over the hub's 60.
-    for (int i = 0; i < 6; ++i)
-        e.addBuilt("vehicle-yard", 0, 0);
-    CHECK(e.demandMet() < 1);
-    ev = e.advance(1);
-    CHECK(count(ev, "power-low") == 1 && count(e.advance(1), "power-low") == 0); // not again at once
-    e.addBuilt("power-generator", 0, 0);
-    CHECK(e.demandMet() == 1);
-    // An order it can't pay for waits and says so.
-    Economy poor('F', {}, 20, 50, map);
+    // The cost is taken at the order.
+    CHECK(e.order("construction-yard", 1000, 1000, 0, 0) != 0);
+    CHECK(e.stock()[Thermoconc] == 2211 && e.stock()[Nitrium] == 3950 && e.colonySize() == 2);
+    auto ev = run(e, 44);
+    CHECK(count(ev, "built") == 0);
+    ev = run(e, 2);
+    CHECK(count(ev, "built") == 1 && ev[0].args[0] == "construction-yard" && e.capacity() == 50);
+    // Upgrades: once each, after their building, the advanced after the improved.
+    CHECK(!e.available(*buildingType("colony-hub-advanced")) && e.available(*buildingType("colony-hub-upgrade")));
+    CHECK(!e.available(*buildingType("security-center")));
+    CHECK(e.order("colony-hub-upgrade", 0, 0, 0, 0) != 0 && !e.available(*buildingType("colony-hub-upgrade")));
+    // Short of materials: nothing spent, and the colony is told.
+    Economy poor('F', {}, 50, map);
     poor.addBuilt("colony-hub", 0, 0);
-    poor.addBuilt("construction-yard", 0, 0);
-    CHECK(poor.order("sickbay", 0, 0, 0, 0) != 0);
-    ev = poor.advance(1);
-    CHECK(count(ev, "short-resources") == 1 && poor.structures().back().progress == 0);
-    // A mine on the deposit digs it dry; the processor refines its ore.
+    CHECK(poor.order("construction-yard", 0, 0, 0, 0) == 0);
+    CHECK(count(poor.advance(0.1), "short-resources") == 1 && poor.structures().size() == 1);
+    // Power: three yards' buffers draining faster than the hub's 600 a tick
+    // refills them.
+    Economy busy('F', {}, 50, map);
+    busy.addBuilt("colony-hub", 0, 0);
+    for (int i = 0; i < 4; ++i)
+        busy.addBuilt("science-station", 0, 0);
+    ev = run(busy, 120);
+    CHECK(busy.demandMet() < 0.75f && count(ev, "power-low") == 2); // once a minute
+    // A mine on the deposit: magnesite refined into nitrium, ten stock
+    // units a tonne; the block's 30 takes, then dry.
     e.addBuilt("resource-processor", 0, 0);
     CHECK(e.order("mining-station", 0, 0, 0, 0) == 0); // no deposit there
+    const int nitrium = e.stock()[Nitrium];
     CHECK(e.order("mining-station", 5 * kTile, 7 * kTile, 5, 7) != 0);
-    const int dilithium = e.stock()[Dilithium];
     bool dry = false;
     int at = -1, bt = -1;
     for (int i = 0; i < 2000 && !dry; ++i)
-        for (const ScriptEvent& x : e.advance(1))
+        for (const ScriptEvent& x : e.advance(0.25))
             if (x.kind == "mine-exhausted")
                 dry = true, at = x.a, bt = x.b;
     CHECK(dry && at == 3 * 8 + 4 && bt == 2 * 8 + 4);
-    for (int i = 0; i < 200; ++i)
-        e.advance(1);
-    CHECK(e.stock()[Dilithium] >= dilithium + 199 && e.stock()[Dilithium] <= dilithium + 200 && e.oreStock()[0] < 1);
-    // The crew grows, one every 150 s, up to the capacity.
-    const int crew = e.crew();
-    e.advance(150);
-    CHECK(crew > 20 && e.crew() == crew + 1);
-    e.advance(9000);
-    CHECK(e.crew() == e.capacity());
+    run(e, 120);
+    const Stock s = e.stock();
+    // Of 30 takes, 2 in 8 are the cell's own ore and 1 in 8 each kind: about
+    // 11 t of magnesite (110 nitrium), 4 t of each other ore.
+    CHECK(s[Nitrium] - nitrium >= 100 && s[Nitrium] - nitrium <= 120);
+    CHECK(e.oreStock()[4] < 0.01f);
+    // Housing raises the capacity, up to 90.
+    Economy home('F', {}, 85, map);
+    home.addBuilt("accommodation", 0, 0);
+    home.addBuilt("farm", 0, 0);
+    CHECK(home.capacity() == 90);
 }
 
 void testWorld() {

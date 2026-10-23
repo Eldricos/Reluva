@@ -81,30 +81,40 @@ goes up by itself once placed).
   block; a mining station's middle must be on one. The hologram is the
   model tinted green or red. Whether the game forbids building on
   deposits isn't known (Reluva's colony layout keeps them free for mines).
-- **Construction:** the cost comes off the stock at the order, as the
-  VM recordings show (an order the stock can't pay waits, and the colony
-  is told "short resources" once a minute). Each type takes its own time,
-  as timed in the training missions ([play-vm-tutorials.md](play-vm-tutorials.md#build-times)),
-  and low power doesn't slow it (C6's generators went up as fast at 20 %
-  demand met). It is drawn as the recordings show it: an
+- **The start:** the colony and vehicles the mission itself places, as
+  read from the executable ([exe.md](exe.md#starting-colonies)): vehicles
+  placed on the hub start inside it. The mission's own starting stock.
+- **Construction:** the cost comes off the stock at the order; if the
+  stock can't pay, nothing is spent and the colony is told ("short
+  resources"). Each type takes its own time, as timed in the training
+  missions ([play-vm-tutorials.md](play-vm-tutorials.md#build-times)): the
+  game's bees build at a pace the executable doesn't give as a number;
+  power doesn't enter into it. It is drawn as the recordings show it: an
   apron (the model pressed flat) for the first 15 % of the time, then the
   building rising out of it, with two of the side's construction bees
   (`fconbee`, `conbee`, `rcb`) at its corners playing their `manipulate`
-  animation. How many bees the game sends, and whether they come from the
-  construction yard, isn't known (the recordings show 2-4). When it's
-  done, the script hears `built <type>` (Engineering's message, the
-  game's spoken announcement); housing (accommodation, the transporter
-  pad) raises the colony's capacity, other buildings don't.
-- **Power:** the hub and each generator supply 60, other buildings use
-  5-15. Short of power, mining and refining slow, and the
-  colony is told once a minute. The title shows supply / demand.
-- **Mining:** a mining station digs its block's ore (the block's map
-  value × 4) for the resource processor, which refines it into the
-  material of the same place in the list (ore kind 1 into dilithium,
-  2 into polycomp, and so on: which ore makes what isn't known). A block
-  dug dry tells the script `mine-exhausted` at its middle.
-- **Crew:** grows by one every 150 s up to the capacity; the NEW WORLDS
-  panel shows it as COLONY SIZE.
+  animation (the game's sites have room for four). When it's done, the
+  script hears `built <type>` (Engineering's message, the game's spoken
+  announcement). Upgrades (improved and advanced hub and yards, vehicle
+  yard stages) are in the menu once their building stands; they go on it
+  at once, with no placing.
+- **Power:** the game's rules (exe.md#the-economy): generators and the hub
+  supply their output a tick at 1.2 efficiency; each building keeps a
+  power buffer it refills at up to its intake a tick and draws its use
+  from; the supply, and the reserve behind it, is shared out over what's
+  asked; DEMAND MET is the share granted. Below three quarters the colony
+  is warned, once a minute. The title shows supply / asked.
+- **Mining:** a mining station works the nearest ore within three blocks
+  of its own, a tonne a take; of every eight takes two are the cell's own
+  ore and one each kind. The bees' carrying (about 2 t a second a mine,
+  measured) feeds the processor, which refines a quarter tonne a tick, in
+  turn per ore, one for one: dilithium, talgonite, silicon, kelbonite,
+  magnesite, dolamide into dilithium, polycomp, thermoconc, trans al,
+  nitrium, duranium. When nothing is left in reach the script hears
+  `mine-exhausted` at the mine's block.
+- **Colony size:** COLONY SIZE counts the colony's buildings and vehicles
+  (those inside the hub too); the capacity starts at 50, accommodation
+  adds 5 and a farm 10, up to 90.
 - **The script:** the mission's script ([mission-scripts.md](mission-scripts.md))
   starts with play: `start` fires, its timers run, and the economy's events
   reach it; its messages show in COMMUNICATIONS and its objectives in
@@ -122,12 +132,12 @@ goes up by itself once placed).
 | First-person view | 0.6 block, 6° | by eye |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md) |
-| Costs | the training missions' build menu; accommodation's taken as the sickbay's | play-tutorials.md |
-| Power | hub and generator +60; buildings −5 to −15 | Reluva's, so the hub alone runs a few buildings |
-| Capacity added | +10 transporter pad, +15 accommodation, nothing else | no other building raised it in C1, C4-C8; F1's rose 50, 55, 65, 80, 90 |
-| Mining | 1.1 ore a second; a block holds its map value × 4 | C7's processor stock; the training missions' mines ran out after 6-13 minutes |
-| Refining | 3 ore a second, one material per ore, kind k into material k | Reluva's |
-| Crew growth | one every 150 s | C8: 20 to 35 in 38 minutes; C1, C6, C7 one every 1.5-3.5 minutes (F1's 20 to 40 in 18 minutes was faster) |
+| Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
+| Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
+| Capacity | starts at 50, at most 90; accommodation +5, farms +10 | the executable |
+| Mining | the 7 x 7 blocks round a mine, a tonne a take, 2 t a second carried by the bees | the executable; the carrying rate measured in C7 |
+| Refining | a quarter tonne a tick in turn per ore, ore kind k into material k | the executable |
+| Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,

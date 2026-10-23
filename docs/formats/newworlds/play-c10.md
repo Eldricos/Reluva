@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, bonus mission C10
 
+> The executable registers C10 on `coverd1`, not `f2` ([exe.md](exe.md#missions)).
+
 The bonus Klingon mission C10 ("The Archer of Heaven", commented out in
 `level.dat`), in a 37-minute recording with commentary titled "Klingon
 Mission 15" (YouTube `SZQWcZi8mSc`). Observed behaviour; messages

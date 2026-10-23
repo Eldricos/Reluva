@@ -156,12 +156,16 @@ std::vector<std::string> missionMapNames(std::string_view shortName) {
     std::vector<std::string> names = {"map/" + lower + ".gmf"};
     if (lower.size() > 2 && lower.compare(lower.size() - 2, 2, "14") == 0)
         names.push_back("map/" + lower.substr(0, lower.size() - 2) + "12.gmf");
-    // The bonus missions have no map of their own name; their recordings'
-    // mines and ore readings lie on these (play-c9.md, c10, c11).
-    if (lower == "c9")
-        names = {"map/f3.gmf", "map/j3.gmf"};
+    // The training and bonus missions have no map of their own name; the
+    // executable registers each mission with its map (exe.md#missions):
+    // the training missions on coverd3, C9 on demo1, C10 on coverd1, C11
+    // on f1. The recordings' guesses follow as fallbacks (play-c9.md, c10).
+    if (lower == "c1" || (lower.size() == 2 && lower[0] == 'c' && lower[1] >= '4' && lower[1] <= '8'))
+        names = {"map/coverd3.gmf"};
+    else if (lower == "c9")
+        names = {"map/demo1.gmf", "map/f3.gmf", "map/j3.gmf"};
     else if (lower == "c10")
-        names = {"map/f2.gmf"};
+        names = {"map/coverd1.gmf", "map/f2.gmf"};
     else if (lower == "c11")
         names = {"map/f1.gmf"};
     return names;

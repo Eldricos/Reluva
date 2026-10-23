@@ -1,0 +1,424 @@
+# Star Trek: New Worlds: what the executable says
+
+Facts learnt by studying `STNW.exe` (the user's own copy: PE32, built August
+2000, not packed or protected), October 2026. The executable was
+disassembled and decompiled with Ghidra, and its start-up initialisers were
+run in an emulator to read the tables they build. Only facts are taken -
+numbers, rules, data layouts - and written here in our own words; no code
+and none of the game's text is copied, and nothing from the executable is
+in the repository except the numeric tables generated from it
+(`src/engines/newworlds/start_data.cpp`, and the costs in `economy.cpp`).
+The analysis itself stays outside the repository. This is the same way
+ScummVM studies original executables and extracts engine data from them.
+
+Confidence: **sure** where a value and its use were both traced; *likely*
+where the value is certain but its meaning comes from how one or two places
+use it; *guess* otherwise. Unmarked figures are sure.
+
+## The simulation clock
+
+- The game advances in fixed steps of **50 ms** (20 a second); an
+  options checkbox switches to 66 ms (about 15 a second; which option isn't
+  known).
+- The mission scripts count time in **sixteenths of a second**: a script
+  timer of N seconds runs 16N of its units. The vehicle yard's build values
+  (below) fit sixteenths too (128 = 8 s, which is what the tutorial's scout
+  took). How the two clocks relate isn't settled.
+- Warnings are paced in real time: the low-power warning at most once a
+  minute (as measured in C8), "construction delayed" messages 0.6 s apart.
+
+## Object types
+
+Every building, vehicle, upgrade and effect has a type id from one global
+list (318 entries). A name record per type gives its panel name and up to
+four prerequisites (other type ids, upgrades included); a cost record gives
+up to eight (material, amount) pairs and one more number, the **build
+value**, which only the vehicle yard reads. Materials are numbered 1-6 in
+the panel's order; amounts are kept in the game's units, a thousand per
+stock unit for dilithium to trans al and a hundred for nitrium and
+duranium (so 89000 is the panel's 89 T, 5000 nitrium its 50 KG).
+
+Upgrades are separate types: Federation 159/160 improved/advanced hub,
+161/162 improved/advanced construction yard, 146/147 extended/specialist
+vehicle yard, 164 and 293-297 the science labs (shield buffer, tracking
+systems, phaser coil, energy, sensor, away team), 165 and 298-301 the
+sickbay wards, 166/167 the processor plants. Klingon: hub 168/169, yard
+191/192, vehicle yard 183, labs 184-186 and 302-304, wards 187/188, 305,
+306, plants 190. Romulan: hub 174/175, yard 176, vehicle yard 177, labs 179
+and 307-311, wards 180 and 312-315, plants 181. Hubs: 23 Federation, 28
+Klingon, 43 Romulan *likely* (not in the build menus).
+
+## Costs and prerequisites
+
+Panel units (T, G, KG all one stock unit each). The build value is the
+vehicle yard's work, in what are probably sixteenths of a second at full
+efficiency. Some tutorial readings were misread digits in the small font:
+the generator's dilithium is 35, the improved yard's thermoconc 30, the
+advanced hub's 30.
+
+### Federation
+
+| id | type | dilithium | polycomp | thermoconc | trans al | nitrium | duranium | build value | needs |
+|---|---|---|---|---|---|---|---|---|---|
+| 122 | storage facility |  |  |  |  |  |  | 0 | storage processor |
+| 22 | power generator | 35 | 1 | 35 |  | 800 |  | 0 | construction yard |
+| 77 | construction yard |  | 12 | 89 | 5 | 50 |  | 0 |  |
+| 24 | vehicle yard |  | 10 | 90 | 5 |  |  | 0 | construction yard |
+| 26 | storage processor |  | 4 | 30 | 2 |  |  | 0 | construction yard |
+| 45 | mining station |  | 14 | 80 | 10 |  | 140 | 0 | storage processor |
+| 171 | hydroponics farm |  | 18 | 75 | 40 |  |  | 0 | construction yard, accomodation block |
+| 27 | landing pad |  | 6 | 32 | 2 |  |  | 0 | improved yard |
+| 126 | science block |  | 4 | 53 | 17 | 120 |  | 0 | construction yard |
+| 123 | sickbay |  | 8 | 48 | 20 |  |  | 0 | construction yard |
+| 44 | accomodation block |  | 20 | 50 | 36 |  |  | 0 | improved yard, landing pad |
+| 16 | security centre |  | 10 | 100 | 10 | 1200 |  | 0 | improved yard, improved hub |
+| 80 | defensive weapon |  |  | 92 | 12 |  | 500 | 0 | improved yard, improved hub, shield generator |
+| 21 | shield generator | 20 | 2 | 40 |  |  | 800 | 0 | improved yard, shield buffer lab, security centre |
+| 83 | defensive artillery |  |  | 93 | 13 | 250 | 500 | 0 | advanced yard, advanced hub, security centre |
+| 158 | advanced power generator | 50 | 2 | 40 |  | 850 |  | 0 | advanced yard, improved hub |
+| 163 | advanced mining station |  | 18 | 92 | 15 |  | 1600 | 0 | advanced yard, advanced hub, storage processor |
+| 118 | CFD |  | 6 | 110 | 52 | 300 |  | 0 |  |
+| 13 | cargo bee | 1 | 1 |  | 1 |  |  | 128 | vehicle yard |
+| 14 | construction bee | 1 | 1 |  | 1 |  |  | 0 | vehicle yard |
+| 12 | worker bee |  |  |  | 1 |  |  | 0 | vehicle yard |
+| 55 | unarmed APC | 5 | 10 |  | 2 |  |  | 0 | vehicle yard, away team lab |
+| 62 | science vehicle | 8 | 14 |  | 2 |  | 80 | 640 | vehicle yard, sensor lab |
+| 97 | ground scout | 3 | 1 |  | 1 |  |  | 0 | vehicle yard |
+| 8 | phaser tank | 15 | 18 |  | 2 |  | 100 | 640 | extended vehicle yard, phaser coil lab |
+| 56 | armed APC | 4 | 3 |  | 1 |  | 30 | 240 | vehicle yard |
+| 47 | photon artillery | 10 | 16 |  |  | 100 | 80 | 640 | security centre, extended vehicle yard |
+| 9 | advanced photon artillery | 12 | 18 |  |  | 150 | 90 | 640 | vehicle yard, specialist vehicle yard, security centre, science block |
+| 154 | mobile shield generator | 16 | 20 |  | 2 |  | 160 | 640 | specialist vehicle yard, defensive weapon, defensive artillery, energy lab |
+
+### Klingon
+
+| id | type | dilithium | polycomp | thermoconc | trans al | nitrium | duranium | build value | needs |
+|---|---|---|---|---|---|---|---|---|---|
+| 61 | cargo bee | 1 | 2 |  | 1 |  |  | 0 | vehicle yard |
+| 46 | construction bee | 1 | 2 |  | 1 |  |  | 0 | vehicle yard |
+| 11 | worker bee |  |  |  | 1 |  |  | 0 | vehicle yard |
+| 88 | unarmed APC | 5 | 10 |  | 2 |  |  | 240 | vehicle yard, trooper center |
+| 95 | science vehicle | 8 | 14 |  | 2 |  | 80 | 640 | vehicle yard, sensor lab |
+| 37 | ground scout | 3 | 1 |  | 1 |  |  | 128 | vehicle yard |
+| 10 | disruptor tank | 15 | 18 |  | 2 |  | 100 | 640 | vehicle yard, disruptor matrix, vehicle yard upgrade |
+| 40 | armed APC | 4 | 3 |  | 1 |  | 30 | 240 | vehicle yard |
+| 36 | photon artillery | 10 | 16 |  |  | 100 | 80 | 640 | vehicle yard, security centre, vehicle yard upgrade |
+| 228 | disruptor battery | 18 | 26 |  | 2 |  | 120 | 640 | advanced hub, defensive weapon, defensive artillery, special weapons |
+| 229 | cloaked disruptor tank | 20 | 20 |  | 4 |  | 80 | 640 | advanced hub, defensive weapon, defensive artillery, disruptor matrix |
+| 32 | storage facility |  |  |  |  |  |  | 0 | construction yard, storage processor |
+| 30 | power generator | 35 | 1 | 30 |  | 850 |  | 0 | construction yard |
+| 53 | construction yard |  | 12 | 89 | 50 | 30 |  | 0 |  |
+| 31 | vehicle yard |  | 10 | 90 | 5 |  |  | 0 | construction yard |
+| 51 | storage processor |  | 4 | 30 | 3 |  |  | 0 | construction yard |
+| 52 | mining station |  | 14 | 80 | 50 |  | 140 | 0 | storage processor, construction yard |
+| 50 | livestock farm |  | 18 | 75 | 38 |  |  | 0 | improved yard, landing pad, accomodation block |
+| 73 | landing pad |  | 6 | 32 | 2 |  |  | 0 | improved yard |
+| 127 | science block |  | 4 | 53 | 32 | 120 |  | 0 | construction yard |
+| 124 | sickbay |  | 8 | 48 | 26 |  |  | 0 | construction yard |
+| 68 | accomodation block |  | 16 | 60 | 40 |  |  | 0 | improved yard, landing pad |
+| 75 | security centre |  | 10 | 100 | 100 | 120 |  | 0 | improved yard |
+| 54 | defensive weapon |  |  | 92 | 12 |  | 500 | 0 | improved yard, shield generator, disruptor matrix, security centre |
+| 29 | shield generator | 20 | 2 | 20 |  |  | 800 | 0 | improved yard, security centre, shield buffer |
+| 82 | defensive artillery |  |  | 93 | 11 | 250 | 500 | 0 | advanced yard, shield generator, tracking systems |
+| 172 | advanced power generator | 50 | 2 | 37 |  | 870 |  | 0 | advanced yard |
+| 189 | advanced mining station |  | 18 | 92 | 75 |  | 1600 | 0 | advanced yard |
+| 207 | CFD |  | 6 | 110 | 52 | 300 |  | 0 |  |
+
+### Romulan
+
+| id | type | dilithium | polycomp | thermoconc | trans al | nitrium | duranium | build value | needs |
+|---|---|---|---|---|---|---|---|---|---|
+| 90 | cargo bee | 1 | 2 |  | 1 |  |  | 128 | vehicle yard |
+| 91 | construction bee | 1 | 2 |  | 1 |  |  | 0 | vehicle yard |
+| 92 | worker bee |  |  |  | 1 |  |  | 0 | vehicle yard |
+| 89 | unarmed apc | 5 | 10 |  | 2 |  |  | 0 | vehicle yard, infiltration lab |
+| 63 | science vehicle | 8 | 14 |  | 2 |  | 80 | 640 | vehicle yard, science block, sensor lab |
+| 98 | ground scout | 3 | 1 |  | 1 |  |  | 0 | vehicle yard |
+| 148 | tank | 15 | 18 |  | 2 |  | 100 | 640 | vehicle yard, science block, disruptor matrix |
+| 64 | armed APC | 5 | 5 |  | 1 |  | 30 | 240 | vehicle yard |
+| 87 | photon artillery | 10 | 16 |  |  | 100 | 80 | 640 | vehicle yard upgrade, security centre |
+| 35 | cloaked tank | 18 | 18 |  | 2 |  | 120 | 640 | vehicle yard upgrade, energy lab |
+| 230 | cloaked apc | 5 | 7 |  | 1 |  | 40 | 240 | advanced hub, defensive weapon, defensive artillery, sensor lab |
+| 66 | storage facility |  |  |  |  |  |  | 0 | storage processor |
+| 70 | power generator | 35 | 1 | 30 |  | 850 |  | 0 | construction yard |
+| 78 | construction yard |  | 12 | 89 | 3 | 500 |  | 0 | hub |
+| 71 | vehicle yard |  | 10 | 90 | 2 |  |  | 0 | construction yard |
+| 121 | storage processor |  | 4 | 30 | 2 |  |  | 0 | construction yard |
+| 65 | mining station |  | 14 | 80 | 4 |  | 140 | 0 | storage processor |
+| 182 | clone farm |  | 18 | 75 | 36 |  |  | 0 | yard upgrade, landing pad, accomodation block |
+| 72 | landing pad |  | 6 | 32 | 2 |  |  | 0 | yard upgrade |
+| 128 | science block |  | 4 | 53 | 22 | 120 |  | 0 | construction yard |
+| 125 | sickbay |  | 8 | 48 | 36 |  |  | 0 | construction yard |
+| 67 | accomodation block |  | 16 | 60 | 42 |  |  | 0 | yard upgrade, landing pad |
+| 74 | security centre |  | 10 | 100 | 27 | 1200 |  | 0 | yard upgrade, improved hub |
+| 81 | defensive weapon |  |  | 92 | 12 |  | 500 | 0 | yard upgrade, security centre, shield generator |
+| 69 | shield generator | 20 | 2 | 20 |  |  | 800 | 0 | yard upgrade, science block, shield buffer |
+| 84 | defensive artillery |  |  | 93 | 11 | 250 | 500 | 0 | yard upgrade, advanced hub, security centre, energy lab |
+| 178 | advanced power generator | 50 | 2 | 37 |  | 870 |  | 0 | yard upgrade, advanced hub |
+| 173 | advanced mining station |  | 18 | 92 | 7 |  | 1600 | 0 | yard upgrade, advanced hub, storage processor |
+| 208 | CFD |  | 6 | 110 | 52 | 300 |  | 0 |  |
+
+Upgrades (all sides alike unless noted): improved hub 4 polycomp, 40
+thermoconc, 1000 duranium; advanced hub 50, 30, 20 trans al; improved yard
+2, 30, 4 trans al (Klingon and Romulan 2); advanced yard 20, 10, 6 trans al
+(Klingon 2; Romulan as the improved one); vehicle yard upgrades 1, 50, 3;
+science labs 10 polycomp, 15 thermoconc, 7 trans al (Klingon 4, Romulan
+5); sickbay wards 2, 25, 6 (4, 5); processor plants 2, 12, 10 (Klingon and
+Romulan 2 trans al).
+
+## Vehicles and turrets
+
+Hit points as the game sets them; for the human player's side in a single
+player game they are raised (Federation x1.2, Romulan x1.3, Klingon x1),
+and a switch doubles them. Weapons hit at once (no travelling shot):
+**burst** weapons fire their shots (4) and reload; each shot does the
+damage shown times (the best crew weapons skill + 1). **Single** weapons
+(Klingon) fire one shot a reload, damage not divided; **artillery** lobs a
+shell. Range in world units (a tile is 8192, a block 16384): 20000 is 1.2
+blocks. Reload in simulation ticks. Traverse is the turret's yaw limits
+(180,180 turns all round), elevation up and down, in degrees. Pace is the
+game's path steps a tick (how long a step is wasn't found, so no world
+speed yet): scouts, bees and Klingon tanks 0.125, most others 0.0833. Fog:
+the size of the area a unit reveals (classes 3 and 4: 5 blocks across; 5:
+7 blocks). Scan: sensor range.
+
+| id | side | type | hp | weapon: damage / range / reload ticks / shots / traverse / elevation | pace | fog | scan | build value |
+|---|---|---|---|---|---|---|---|---|---|
+| 8 | F | phaser tank | 30 | burst 6 / 20000 / 40 / 4 / 180,180 / 20,-45 | 0.08333 | 3 | - | 640 |
+| 55 | F | unarmed APC | 30 | - | 0.08333 | 3 | - | 0 |
+| 56 | F | armed APC | 50 | burst 6 / 20000 / 40 / 4 / 180,180 / 10,-45 | 0.08333 | 3 | - | 240 |
+| 12 | F | worker bee | 5 | - | 0.16667 | - | - | 0 |
+| 13 | F | cargo bee | 5 | - | 0.125 | - | - | 128 |
+| 14 | F | construction bee | 5 | - | 0.125 | - | - | 0 |
+| 97 | F | ground scout | 30 | - | 0.125 | 5 | 60000 | 0 |
+| 47 | F | photon artillery | 50 | artillery 80 / 20000 / 40 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
+| 9 | F | advanced photon artillery | 60 | artillery 80 / 40000 / 20 / 1 / 180,180 / 10,-90 | 0.08333 | 3 | - | 640 |
+| 80 | F | defensive weapon | 200 | burst 26 / 20000 / 40 / 4 / 180,180 / 5,-70 | - | - | - | 0 |
+| 62 | F | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
+| 83 | F | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 154 | F | mobile shield generator | 90 | - | 0.08333 | 2 | shield | 640 |
+| 88 | K | unarmed APC | 30 | - | 0.08333 | 3 | - | 240 |
+| 10 | K | disruptor tank | 60 | single 40 / 20000 / 40 / 1 / 180,180 / 5,-60 | 0.125 | 3 | - | 640 |
+| 229 | K | cloaked disruptor tank | 60 | single 40 / 20000 / 40 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
+| 228 | K | disruptor battery | 90 | single 80 / 20000 / 20 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
+| 11 | K | worker bee | 5 | - | 0.16667 | - | - | 0 |
+| 36 | K | photon artillery | 50 | artillery 80 / 20000 / 40 / 1 / 180,180 / 10,-90 | 0.125 | 3 | - | 640 |
+| 37 | K | ground scout | 30 | - | 0.125 | 5 | 60000 | 128 |
+| 40 | K | armed APC | 30 | single 20 / 20000 / 40 / 1 / 90,-90 / 15,-50 | 0.08333 | 3 | - | 240 |
+| 46 | K | construction bee | 5 | - | 0.125 | - | - | 0 |
+| 61 | K | cargo bee | 5 | - | 0.125 | - | - | 0 |
+| 54 | K | defensive weapon | 200 | single 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 82 | K | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 95 | K | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
+| 84 | R | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 89 | R | unarmed apc | 30 | - | 0.08333 | 3 | - | 0 |
+| 35 | R | cloaked tank | 60 | burst 13 / 20000 / 40 / 4 / 180,180 / 5,-75 | 0.08333 | 3 | - | 640 |
+| 98 | R | ground scout | 30 | - | 0.125 | 5 | 60000 | 0 |
+| 87 | R | photon artillery | 60 | artillery 80 / 20000 / 20 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
+| 81 | R | defensive weapon | 200 | burst 26 / 20000 / 40 / 4 / 180,180 / 5,-90 | - | - | - | 0 |
+| 64 | R | armed APC | 50 | burst 6 / 20000 / 40 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
+| 230 | R | cloaked apc | 50 | burst 6 / 20000 / 40 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
+| 90 | R | cargo bee | 5 | - | 0.125 | - | - | 128 |
+| 91 | R | construction bee | 5 | - | 0.125 | - | - | 0 |
+| 92 | R | worker bee | 5 | - | 0.16667 | - | - | 0 |
+| 63 | R | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
+| 148 | R | tank | 60 | burst 13 / 20000 / 40 / 4 / 180,180 / 30,-60 | 0.08333 | 3 | - | 640 |
+
+Cloaking units (Romulan cloaked tank 35 and APC 230, Klingon cloaked
+disruptor tank 229) have no cloak figure: they are given a different
+behaviour when ordered, and the same combat figures as the uncloaked ones.
+Vehicles repair themselves, 1 hit point every 6400 / max hp ticks.
+
+## Buildings
+
+Power buffer: how much a building stores and how fast it may refill it a
+tick; use: what it draws from its buffer each tick; output: a generator's
+supply a tick at full efficiency. Staff is the number of crew a building
+needs to work; housing the crew it holds (the hub 150, accommodation 200).
+
+| id | side | type | hp | power buffer / intake a tick | use a tick | output a tick | staff, housing | scan |
+|---|---|---|---|---|---|---|---|---|
+| 16 | F | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 21 | F | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
+| 22 | F | power generator | 200 | - | - | 500 | - | 2500 |
+| 23 | F | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
+| 24 | F | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 77 | F | construction yard | 400 | 34000 / 550 | 85 | - | 1, 0 | 5000 |
+| 26 | F | storage processor | 400 | 24000 / 300 | 60 | - | 1, 0 | 5000 |
+| 122 | F | storage facility | 600 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
+| 27 | F | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
+| 44 | F | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 45 | F | mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 2500 |
+| 163 | F | advanced mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
+| 80 | F | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
+| 83 | F | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
+| 123 | F | sickbay | 200 | 44000 / 550 | 440 | - | 1, 0 | 5000 |
+| 126 | F | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 158 | F | advanced power generator | 200 | - | - | 1500 | - | 5000 |
+| 171 | F | hydroponics farm | 400 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
+| 118 | F | CFD | 30 | - | 0 | - | - | - |
+| 75 | K | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 73 | K | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
+| 28 | K | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
+| 29 | K | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
+| 30 | K | power generator | 200 | - | - | 500 | - | 2500 |
+| 172 | K | advanced power generator | 200 | - | - | 1500 | - | 5000 |
+| 31 | K | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 51 | K | storage processor | 600 | 44000 / 425 | 85 | - | 1, 0 | 5000 |
+| 32 | K | storage facility | 600 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
+| 68 | K | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 50 | K | livestock farm | 400 | 34000 / 425 | 60 | - | 1, 0 | 5000 |
+| 52 | K | mining station | 200 | 44000 / 550 | 110 | - | 1, 0 | 2500 |
+| 189 | K | advanced mining station | 200 | 44000 / 550 | 110 | - | 1, 0 | 1666 |
+| 53 | K | construction yard | 400 | 44000 / 550 | 110 | - | 1, 0 | 5000 |
+| 54 | K | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
+| 82 | K | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
+| 124 | K | sickbay | 400 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
+| 127 | K | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 207 | K | CFD | 30 | - | 0 | - | - | - |
+| 84 | R | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
+| 74 | R | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 69 | R | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
+| 71 | R | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 72 | R | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
+| 43 | R | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
+| 81 | R | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
+| 66 | R | storage facility | 600 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
+| 121 | R | storage processor | 400 | 44000 / 425 | 85 | - | 1, 0 | 5000 |
+| 78 | R | construction yard | 400 | 34000 / 425 | 85 | - | 1, 0 | 5000 |
+| 70 | R | power generator | 200 | - | - | 1000 | - | 2500 |
+| 178 | R | advanced power generator | 200 | - | - | 3000 | - | 5000 |
+| 67 | R | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 182 | R | clone farm | 400 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
+| 65 | R | mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 2500 |
+| 173 | R | advanced mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
+| 125 | R | sickbay | 200 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
+| 128 | R | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 208 | R | CFD | 30 | - | 0 | - | - | - |
+
+## The economy
+
+- **Mining.** A map cell's 16-bit value holds its ore kind (bits 12-15) and
+  amount (bits 0-11, the 50-300 seen in the maps). A mining station works
+  the 7 x 7 blocks round its own, taking from the nearest ore cell (ring by
+  ring); each take uses one unit of the cell's amount and gives a tonne of
+  raw ore. A cell at 0 turns into plain ground. A mine fills 40 t loads and
+  waits for the bees to carry them (cargo bees carry two, worker bees one);
+  with 4 loads waiting, or no crew, it waits 24 s before trying again. A
+  counter shared by all the colony's mines makes every mine yield all six
+  ores: in each 8 takes, 2 of the cell's own kind and 1 of each kind (so 3
+  to 1). The rate the processor receives therefore depends on the bees;
+  the training missions measured about 2 t a second per mine.
+- **Refining.** The resource processor turns to one of its 16 store slots
+  a tick and refines up to a quarter tonne of that ore, one for one, into
+  its material: **dilithium into dilithium, talgonite into polycomp,
+  silicon into thermoconc, kelbonite into trans al, magnesite into
+  nitrium, dolamide into duranium**. A processor plant for a material
+  doubles it. About 0.31 t a second of each at most - shown as 0.31 a
+  second for the first four and 3.1 for nitrium and duranium (counted in
+  hundreds), as C5 measured.
+- **Stock.** The sum of every store the side has. The default starting
+  stock is 500 / 1000 / 2300 / 500 / 4000 / 5000 (80 of the missions);
+  exceptions: F12, K12, R12 800 / 1750 / 2300 / 1000 / 24000 / 25000; J7
+  150 / 1000 / 2300 / 200 / 4000 / 10000; R2 dilithium 100; R8 polycomp and
+  thermoconc only; the later tutorials less dilithium and nitrium.
+- **Construction.** The full cost is checked and taken when the order is
+  given; short, nothing is spent and the colony hears it's delayed. A
+  placed building becomes a site with room for 4 construction bees; it is
+  finished when the bees have finished its model's four corner sections.
+  How fast a bee works wasn't traced, so build times stay as measured.
+  Neither power nor crew enters into it.
+- **Vehicles.** The vehicle yard's work for a vehicle is its build value x
+  300 power units; each tick it draws up to 300 from its buffer times its
+  efficiency. It stops below 0.2 efficiency and restarts above 0.35. It
+  can't build while the colony is at its capacity.
+- **Power.** Each side has a pool with a reserve of 640000 (the panel's
+  RESERVE % is reserve / 6400). Each tick generators add their output x
+  efficiency; buildings ask to refill their buffers (at most their intake)
+  in four priority classes; DEMAND MET is what was granted over what was
+  asked, CONSUMPTION what was drawn over what was produced. Outputs: hub
+  500, Federation and Klingon generator 500, Romulan 1000; advanced 1500
+  and 3000. The LOW / MED labels are fixed per building type. The colony is
+  warned when less than three quarters of its demand is met.
+- **Efficiency.** 0.4 x (health + buffer fill + the best officer skill for
+  the building's kind) x the share of its staff it has; generators, hubs,
+  shield generators, landing pads, accommodation and turrets always count
+  as fully staffed. A whole, powered, staffed generator runs at 1.2 (the
+  panel's 120 %); a hub without an officer at 0.8.
+- **Colony size and capacity.** COLONY SIZE a / b: a counts the side's
+  buildings and vehicles (not crew); b starts at 50 (a mission may set
+  another: C1's 60) and never passes 90. Accommodation adds 5, a farm
+  (hydroponics, livestock, clone) 10, each sickbay ward 5; nothing else
+  (the landing pad, upgrades). That gives F1's 50, 55, 65, 80, 90.
+- **Crew.** Each building has places for its staff and occupants; it works
+  only with its staff in. The hub holds the colony's pool (150).
+
+## Missions
+
+48 missions are registered, each with its map (an archive and its map's
+place in it). They reproduce every campaign map in [level.md](level.md),
+and add: the training missions C1 and C4-C8 on `coverd3` (in `alpwrld.cat`),
+C9 on `demo1`, C10 on `coverd1`, C11 on `f1`; also two cover-disk demos,
+head-to-head and test levels.
+
+Each mission has seven side slots: 0 Federation, 1 Klingon, 2 Romulan,
+3-5 the natives (which race is where varies), 6 the whole mission. A side
+holds its script objects, its **starting placements**, AI orders, its
+objectives and fail criteria (by the mission's `.stb` string ids, hidden
+ones flagged), research topics, starting stock, its stance towards each
+other side, and named officers.
+
+### Starting colonies
+
+Each side's placements are its starting colony: a type and a map position
+(block column and row, and which quarter of the block). 21 of the 23
+starting mining stations sit on ore deposits read that way. Vehicles
+placed on the hub start inside it (its panel's bee and transport counts).
+F1's Federation hub is at 438:218, four blocks from the recorded Tricorder
+reading of 407:209; the sites guessed from recordings ([colony.md](colony.md))
+were 1-19 blocks off. Reluva places every mission's colony and vehicles
+from these (`start_data.cpp`).
+
+### The script engine
+
+A mission's logic is a graph of named objects, each of one of 49 kinds
+(34 used). A message is a plain string sent from one object to its
+targets. The main kinds:
+
+| Kind | What it does |
+|---|---|
+| Timer | Counts down its seconds, then sends its message to its targets; a "Random Event" timer instead sends to one of its eight targets at random and starts again. |
+| Relay | Sends its own message when it has received N messages (N = 0: every time). Every mail line, objective counter and mission pass/fail director is one. |
+| Distributor, filter, switch | Pass messages on: to all targets; only the first N; only while switched on. |
+| Count monitors | Fire when the side has exactly / at least / at most N buildings or units of a type or group (N = 0 with "at most": all destroyed). |
+| Capture monitor | Fires when a type is held by a side; can toggle, or require it held for a time (J1's temple: 60 s). |
+| Colony size monitor | Fires when the colony has grown or shrunk to a percentage of its starting size. |
+| Cell seen / scanned | Fires when the side has seen, or scanned, a map cell (the "approach" and scan events). |
+| Group condition | The scan / capture sequence: a named group destroyed, captured or scanned (weak or strong, science / medical / engineering) for a set time; sends start, lost, success, "beaten to it" and futile messages to its targets. |
+| Area detectors | Fire when units of a side or a group are inside or outside a rectangle. |
+| Spawners and effects | Create attack groups, beam a group off the map, damage a group, move a unit along waypoints, change a side's stance, give, take or top up resources, spread a disease, meteor storms, and "build and hold for 10 minutes" (the CFD objectives of F12, K12, R12). |
+
+Built-in receivers per side take objectives (by name, "Primary Objective
+n"), fail criteria, research and the mail: a mail line is sent whole, an
+optional speech file name, then a three-digit officer number, the heading
+and the text. A mission passes when its scripts count its objectives and
+then send `pass` (10 s message, 20 s pass); any fail criterion fails it the
+same way.
+
+Compared with Reluva's guessed scripts ([mission-scripts.md](mission-scripts.md)),
+the objectives and fail criteria have the right string ids, but the logic
+often differs: F1's temple scan starts two clocks (the Taubat turn hostile
+after 325 s; the mission fails at 1200 s), not one 300 s fail; F1's
+Klingons attack on a schedule (100, 500, 800 and 1100 s, and a random
+assault every 300 s) and build to a timetable. The scripts are to be
+rewritten from the executable's graphs.
+
+## Still open
+
+- How long a path step is (so units' real speeds), and how fast
+  construction bees build.
+- How the 50 ms step and the scripts' sixteenths relate.
+- How fast bees carry ore from the mines.
+- Placement flags, a third placement phase, and the AI order codes (named
+  from their identifiers).
+- Several unnamed type ids (natives' units and buildings, effects).

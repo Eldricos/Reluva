@@ -1,5 +1,10 @@
 # Star Trek: New Worlds: starting colonies
 
+> Every mission's real starting colony is now known from the game's
+> executable ([exe.md](exe.md#starting-colonies)); Reluva places those. The
+> sites and layouts below, worked out from recordings, are kept for the
+> record and as the fallback for missions without placements.
+
 The maps don't hold the colonies a mission starts with ([gmf.md](gmf.md)):
 the game places them from its mission scripts inside `STNW.exe`. The
 recordings of play ([play.md](play.md)) show them only in passing. This

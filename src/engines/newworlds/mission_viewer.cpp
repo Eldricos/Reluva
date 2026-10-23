@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
+#include "engines/newworlds/start_data.h"
 #include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
 
@@ -198,15 +199,32 @@ void MissionViewer::startColony() {
     if (hasMap_) {
         const Level& level = missions_[size_t(current_)];
         const char side = missionSides(level.shortName)[size_t(side_)];
-        colonySite_ = colonySite(level.shortName, side);
-        if (colonySite_.a >= 0) {
-            ColonyGround ground{map_.blocksWide(), map_.blocksHigh(),
-                                [this](int bx, int by) { return map_.depositAt(bx, by); },
-                                [this](int a, int b) { return map_.groundAt(a, b); },
-                                [this](const std::string& model) { return map_.modelSize(model); }};
+        ColonyGround ground{map_.blocksWide(), map_.blocksHigh(),
+                            [this](int bx, int by) { return map_.depositAt(bx, by); },
+                            [this](int a, int b) { return map_.groundAt(a, b); },
+                            [this](const std::string& model) { return map_.modelSize(model); }};
+        // The colony the mission places (the executable's), its hub first;
+        // else one round the site the recordings give.
+        std::vector<ColonyBuilding> placed;
+        for (const StartPlacement& p : startPlacements(level.shortName, side))
+            if (const ObjectType* t = objectType(p.type); t && t->building && *t->model) {
+                const ColonyBuilding c{t->name, t->model, p.a, p.b};
+                if (std::string_view(t->name) == "colony-hub")
+                    placed.insert(placed.begin(), c);
+                else
+                    placed.push_back(c);
+            }
+        if (!placed.empty() && placed[0].name == "colony-hub") {
+            colonySite_ = {placed[0].a, placed[0].b, "the mission's own placements (exe.md)"};
             colony_ = std::make_unique<ColonyLayout>(side, std::move(ground));
-            if (!colony_->start(colonySite_.a, colonySite_.b))
-                colony_.reset();
+            colony_->startWith(placed);
+        } else {
+            colonySite_ = colonySite(level.shortName, side);
+            if (colonySite_.a >= 0) {
+                colony_ = std::make_unique<ColonyLayout>(side, std::move(ground));
+                if (!colony_->start(colonySite_.a, colonySite_.b))
+                    colony_.reset();
+            }
         }
     }
     showColony();
@@ -247,14 +265,18 @@ void MissionViewer::startPlay() {
     const Level& level = missions_[size_t(current_)];
     const char side = missionSides(level.shortName)[size_t(side_)];
     world_ = std::make_unique<World>(map_.terrain());
-    // The colony as it starts: the hub alone, and the stock every
-    // recording started with (the Romulans a little less).
+    // The colony as it starts: the hub alone, and the game's default stock
+    // (exe.md#the-stock). The Romulan recordings start with exactly a
+    // Romulan construction yard's cost less, presumably one paid for as
+    // the mission starts.
     colonyShown_ = true;
     startColony();
     static constexpr Stock kStart{500, 1000, 2300, 500, 4000, 5000}, kRomulan{500, 988, 2211, 497, 3500, 5000};
-    ColonyMap ground{[this](int tx, int ty) { return map_.depositAt(tx / 2, ty / 2); },
-                     [this](int tx, int ty) { return map_.depositAmount(tx / 2, ty / 2); }};
-    economy_ = std::make_unique<Economy>(side, side == 'R' ? kRomulan : kStart, 20, 50, std::move(ground));
+    Stock stock = side == 'R' ? kRomulan : kStart;
+    startStock(level.shortName, side, stock); // the mission's own, when the executable gives it
+    ColonyMap ground{[this](int bx, int by) { return map_.depositAt(bx, by); },
+                     [this](int bx, int by) { return map_.depositAmount(bx, by); }};
+    economy_ = std::make_unique<Economy>(side, stock, 50, std::move(ground));
     structureIds_.clear();
     if (colony_)
         for (const ColonyBuilding& c : colony_->buildings())
@@ -274,12 +296,35 @@ void MissionViewer::startPlay() {
     placing_.clear();
     float hx = map_.worldWidth() / 2, hy = map_.worldHeight() / 2;
     hubPosition(hx, hy);
-    // In a row south of the hub, each on the nearest open tile.
-    for (int i = 0; i < 4; ++i) {
-        const float x = hx + (float(i) - 1.5f) * 2500, y = hy - 1.4f * kTile;
-        const auto path = world_->findPath(x, y, x, y);
-        const float px = path.empty() ? x : path.back().first, py = path.empty() ? y : path.back().second;
-        world_->addUnit(side, groundScout(side), px, py, 3.1416f / 2);
+    // The mission's own vehicles where it places them (several on one spot
+    // spread a little); else four ground scouts in a row south of the hub.
+    // Each on the nearest open tile. Their speed: the by-eye scout speed
+    // scaled by the game's pace for the type (scouts and bees 0.125).
+    std::vector<std::pair<UnitKind, std::pair<float, float>>> start;
+    std::map<std::pair<int, int>, int> onSpot;
+    housed_ = 0;
+    for (const StartPlacement& p : startPlacements(level.shortName, side))
+        if (const ObjectType* t = objectType(p.type); t && !t->building && colony_ && !colony_->buildings().empty() &&
+                                                       p.a == colony_->buildings()[0].a && p.b == colony_->buildings()[0].b)
+            ++housed_;
+    // Those placed on the hub itself stay inside it (its panel counts its
+    // bees and transports).
+    for (const StartPlacement& p : startPlacements(level.shortName, side))
+        if (const ObjectType* t = objectType(p.type);
+            t && !t->building && *t->model && !(colony_ && !colony_->buildings().empty() &&
+                                                 p.a == colony_->buildings()[0].a && p.b == colony_->buildings()[0].b)) {
+            const int n = onSpot[{p.a, p.b}]++;
+            const float x = float(p.b) / 8 * MapViewer::kBlockUnits + float(n % 3 - 1) * 2500;
+            const float y = float(p.a) / 8 * MapViewer::kBlockUnits + float(n / 3) * 2500;
+            start.push_back({UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f}, {x, y}});
+        }
+    if (start.empty())
+        for (int i = 0; i < 4; ++i)
+            start.push_back({groundScout(side), {hx + (float(i) - 1.5f) * 2500, hy - 1.4f * kTile}});
+    for (const auto& [kind, at] : start) {
+        const auto path = world_->findPath(at.first, at.second, at.first, at.second);
+        const float px = path.empty() ? at.first : path.back().first, py = path.empty() ? at.second : path.back().second;
+        world_->addUnit(side, kind, px, py, 3.1416f / 2);
     }
     playing_ = true;
     interface_ = true;
@@ -325,8 +370,10 @@ std::vector<const BuildingType*> MissionViewer::buildMenu() const {
     if (!economy_)
         return out;
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    // What can be built now, as the game's menu offers it: buildings the
+    // side has a model for, and upgrades.
     for (const BuildingType& t : buildingTypes())
-        if (t.needs != "-" && !buildingModel(t.id, side).empty())
+        if (economy_->available(t) && (!t.upgradeOf.empty() || !buildingModel(t.id, side).empty()))
             out.push_back(&t);
     return out;
 }
@@ -334,6 +381,17 @@ std::vector<const BuildingType*> MissionViewer::buildMenu() const {
 void MissionViewer::choose(const BuildingType& t) {
     if (!economy_ || !economy_->available(t))
         return;
+    if (!t.upgradeOf.empty()) {
+        // An upgrade goes on its building at once.
+        for (const ColonyStructure& s : economy_->structures())
+            if (s.type == t.upgradeOf && s.progress >= 1) {
+                if (const int id = economy_->order(t.id, s.x, s.y, 0, 0); id && colony_ && colony_->add(t.id))
+                    structureIds_.push_back(id), showColony();
+                break;
+            }
+        buildMenu_ = false;
+        return;
+    }
     placing_ = t.id;
     buildMenu_ = false;
     ghostA_ = ghostB_ = -1;
@@ -651,6 +709,10 @@ void MissionViewer::update(uint64_t nowMs) {
             showUnits();
         std::vector<ScriptEvent> happened;
         if (economy_) {
+            const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+            economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
+                                                    [&](const Unit& u) { return u.side == side; })) +
+                                  housed_);
             happened = economy_->advance(std::min(dt, 0.25));
             showProgress();
         }
@@ -987,8 +1049,8 @@ void MissionViewer::drawInterface() {
         const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
         const BuildingType* placing = placing_.empty() ? nullptr : buildingType(placing_);
         if (buildMenu_) {
-            // The menu: each type with its key; dim if what it needs
-            // doesn't stand yet, plain if the stock can't pay for it.
+            // The menu: what can be built now, each with its key; plain
+            // if the stock can't pay for it.
             ui_.drawSmall(screen_, x + 10, ty, "BUILD", bright);
             const Color dim{uint8_t(text.r / 2), uint8_t(text.g / 2), uint8_t(text.b / 2)};
             for (size_t i = 0; i < menu.size(); ++i) {
@@ -1001,10 +1063,10 @@ void MissionViewer::drawInterface() {
             ui_.drawSmall(screen_, x + 10, ty, placing->panel, bright);
             int line = 1;
             for (int m = 0; m < kMaterials; ++m)
-                if (placing->cost[size_t(m)] > 0)
+                if (placing->costFor(side)[size_t(m)] > 0)
                     ui_.drawSmall(screen_, x + 10, ty + lh * line++,
-                                  std::string(materialName(m)) + " = " + std::to_string(placing->cost[size_t(m)]),
-                                  economy_->stock()[size_t(m)] >= placing->cost[size_t(m)] ? text : Color{255, 80, 60});
+                                  std::string(materialName(m)) + " = " + std::to_string(placing->costFor(side)[size_t(m)]),
+                                  economy_->stock()[size_t(m)] >= placing->costFor(side)[size_t(m)] ? text : Color{255, 80, 60});
         } else if (sel.size() == 1) {
             // One unit: its name and state, as the game's panel.
             const Unit* u = world_->unit(sel[0]);
@@ -1019,7 +1081,7 @@ void MissionViewer::drawInterface() {
                 for (int i = 0; i < 6; ++i)
                     kStock[i].second = economy_->stock()[size_t(i)];
                 ui_.drawSmall(screen_, x + 10, ty,
-                              "COLONY SIZE = " + std::to_string(economy_->crew()) + "/" +
+                              "COLONY SIZE = " + std::to_string(economy_->colonySize()) + "/" +
                                   std::to_string(economy_->capacity()),
                               bright);
             } else {

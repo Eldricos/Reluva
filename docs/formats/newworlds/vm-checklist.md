@@ -22,15 +22,6 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 - **Compass and row 0** [shot]: at any start, point the camera along the
   compass's north and read the Tricorder at two points along that line;
   note which way row numbers grow. ([gmf.md](gmf.md#map-positions-in-the-game))
-- **Starting colony from above** [shot]: in several missions per side (F1,
-  K1, R1 at least), raise the camera straight over the start; screenshot the
-  layout and read the Tricorder at each corner of the concrete pad and over
-  each building. ([colony.md](colony.md#reluvas-layout))
-- **Colony site positions** [shot]: at the start of each mission, hover the
-  ground beside the hub and note the readout. Not known at all for F2, F3,
-  F8, F14, J1F, J3F, J4F, J6F, J7F, J8F, K8, J6K, J7K, J8K, R1, R8, J8R, J9R,
-  C11; the rest are estimated from mines and need a check (J6R thought row
-  11-13, col 24-25). ([colony.md](colony.md#where-the-colonies-are))
 - **Other sites** [shot]: read the Tricorder over the places messages name:
   K1 Taubat temple and the four groups of ruins (R1 too), R9 Federation and
   Klingon bases, J4R Klingon arsenal, C11 Hubrin fortress, J2 transporter
@@ -43,45 +34,18 @@ never delete a message unread. **[shot]** = a screenshot is enough;
   a kind-2 block (talgonite, J3R) and a kind-5 block with the whole readout
   in frame (magnesite: C11, J6R <200:253>, <212:254>, R9).
   ([play-j9r.md](play-j9r.md), [play-c11.md](play-c11.md), [gmf.md](gmf.md#resource-deposits))
-- **Ores to materials** [rec]: watch a resource processor's stock and the
-  six materials as each ore comes in; which ore makes which material, and
-  what mined talgonite adds. The training missions show it isn't one for
-  one (all six rose together in C5; talgonite piled up unused in C6, C8;
-  [play-vm-tutorials.md](play-vm-tutorials.md)): best a single mine of one kind, with the processor's
-  page and NEW WORLDS in view. ([gmf.md](gmf.md#open-questions), [play-j3r.md](play-j3r.md))
-- **Mining rates** [rec]: answered for the Federation training missions
-  (about 1.1 ore a second, mines dry after 6-13 minutes; [play-vm-tutorials.md](play-vm-tutorials.md)); still
-  worth one Klingon or Romulan mine to see if they differ. ([play-tutorials.md](play-tutorials.md#open-questions))
-- **Build times** [rec]: the Federation's are timed now ([play-vm-tutorials.md](play-vm-tutorials.md));
-  still wanted: the other two sides (do they differ?), sickbay,
-  transporter pad, accommodation, advanced generator, and R9's device.
-  ([play-r9.md](play-r9.md))
-- **Building on deposits** [shot]: pick a power generator and hold its
-  hologram over a deposit block (one the Tricorder names an ore on), then
-  over bare ground beside it; is it red on the deposit? Reluva keeps
-  deposits for mines only. ([game.md](game.md#the-colony))
-- **Build costs** [shot]: the Federation's are all read now ([play-vm-tutorials.md](play-vm-tutorials.md));
-  still wanted: the Klingon and Romulan menus, the accommodation block,
-  advanced generator, and two blurred digits (ground scout's dilithium 2
-  or 3, phaser tank's polycomp 12 or 18). ([play-tutorials.md](play-tutorials.md#build-costs-shown-structures-from-a-construction-yard))
-- **Unit speeds** [rec]: send each vehicle type a known distance over flat
-  ground (read the Tricorder at both ends) and time it. Not in the
-  training-mission recordings.
-  ([play-f1.md](play-f1.md#still-to-look-at))
-- **Power** [shot]: COLONY DETAILS and a generator's panel before and after
-  an advanced generator; what each building draws. (The Federation
-  generator and C6's five generators are covered: [play-vm-tutorials.md](play-vm-tutorials.md).)
-  ([play-tutorials.md](play-tutorials.md#open-questions))
-- **Colony capacity growth** [rec]: note the colony size maximum after each
-  building finishes; which building gives which step (in the training
-  missions nothing but housing was built and it never rose:
-  accommodation and the transporter pad are the suspects) (seen: 50, 55, 60, 75,
-  80, 90 in R1, J4R, J6R, R14, C11) and how size can exceed it (R14 91/90).
-  ([play-r1.md](play-r1.md), [play-j6r.md](play-j6r.md), [play-r14.md](play-r14.md))
-- **Starting stock and size** [shot]: the NEW WORLDS panel in the first
-  seconds of each mission; doubtful ones: J4R (small digits), J7 (38/90 vs
-  45/90 on the Klingon side), J8 all three sides (45/50), R12 (very large
-  stock, 50/90). ([play.md](play.md#what-they-established))
+- **Build times** [rec]: how long each building takes to go up is the one
+  economy figure the executable doesn't fix (its bees build it); the
+  Federation's are timed ([play-vm-tutorials.md](play-vm-tutorials.md)).
+  Still wanted: a Klingon and a Romulan building or two, and whether more
+  construction bees build faster. ([exe.md](exe.md#the-economy))
+- **Unit speeds** [rec]: send a ground scout and a tank a known distance
+  over flat ground (read the Tricorder at both ends) and time it: the
+  executable gives each type's pace in path steps but not a step's
+  length. ([exe.md](exe.md#vehicles-and-turrets))
+- **Power** [shot]: COLONY DETAILS before and after a generator is built,
+  to check the power rules read from the executable
+  ([exe.md](exe.md#the-economy)).
 - **Camera** [rec]: lowest and highest heights, whether the view follows a
   selection (the keys are confirmed by C1).
   ([play-tutorials.md](play-tutorials.md#open-questions))
@@ -166,7 +130,6 @@ which page and view are on screen when it starts.
 - **J2K** [rec]: play to the end; is the tenth message (new orders) on this side too? ([play-j2r.md](play-j2r.md))
 - **J7K** [rec]: when the Hubrin guide counts as arrived; starting size. ([play-j7r.md](play-j7r.md))
 - **J8K** [shot]: starting stock. ([play-j8r.md](play-j8r.md))
-- **C10** [shot]: confirm `f2`'s map (hub readout). ([play-c10.md](play-c10.md))
 
 **Romulan**
 
@@ -196,10 +159,6 @@ screen and the Communications panel are answered by the VM recordings
 
 ## 5. Missing data files
 
-- **Tutorial maps** [shot]: `c1.gmf`-`c8.gmf` are in none of the 24
-  archives; ask which archive or CD folder holds the tutorial maps (search
-  the CD and game folder for `*.gmf` and any extra `.cat`).
-  ([level.md](level.md#in-reluva), [play-tutorials.md](play-tutorials.md#map))
 - **Last joint clips** [rec]: `Media/RomVO` holds 113 files (confirmed), so
   J1R, J2R, J8R and J9R simply have fewer clips than the other sides; just
   check their briefings end where the recordings do.

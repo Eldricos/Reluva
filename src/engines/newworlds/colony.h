@@ -57,6 +57,9 @@ public:
     // Puts the hub near the site, where there's room around it. False if
     // there's nowhere.
     bool start(int a, int b);
+    // The colony as the mission places it (start_data.h): the hub first,
+    // each building at its position. False if there's no hub.
+    bool startWith(const std::vector<ColonyBuilding>& buildings);
     // Adds a building; false if the side has no model for it (or it's a
     // unit), it upgrades a building that isn't there, or there's no room.
     bool add(std::string_view building);

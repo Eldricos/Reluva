@@ -85,7 +85,8 @@ constexpr ModelEntry kModels[] = {
     {"clone-farm", "", "", "rcbf"},
     {"storage-facility", "", "KSF", "RSF"},
     {"landing-pad", "landpad", "", ""},
-    {"transporter-pad", "", "", "RBCS"},
+    {"transporter-pad", "landpad", "", "RBCS"},
+    {"farm", "FHF", "KLF", "rcbf"},
     {"photon-turret", "fpdt", "", ""},
     {"disruptor-turret", "", "KSG", ""},
     {"static-disruptor", "", "kdws", "RDDS"},
@@ -241,6 +242,34 @@ bool ColonyLayout::start(int a, int b) {
     for (int y = bestRect.y - kPad; y < bestRect.y + bestRect.h + kPad; ++y)
         for (int x = bestRect.x - kPad; x < bestRect.x + bestRect.w + kPad; ++x)
             if (groundFits(x, y, false, kPadFlat))
+                pad_.push_back({x, y});
+    return true;
+}
+
+bool ColonyLayout::startWith(const std::vector<ColonyBuilding>& buildings) {
+    buildings_.clear();
+    taken_.clear();
+    pad_.clear();
+    heightSet_ = false;
+    if (buildings.empty() || ground_.width <= 0)
+        return false;
+    for (const ColonyBuilding& c : buildings) {
+        // Its footprint round its position, as the tile grid allows.
+        Rect r = footprint(c.model, 0, 0);
+        r.x = int(std::lround(float(c.b) / kTile - float(r.w) / 2));
+        r.y = int(std::lround(float(c.a) / kTile - float(r.h) / 2));
+        taken_.push_back(r);
+        buildings_.push_back(c);
+    }
+    const Rect hub = taken_.front();
+    hubHeight_ = ground_.heightAt(hub.y * kTile + 2, hub.x * kTile + 2);
+    heightSet_ = !std::isnan(hubHeight_);
+    // Its concrete: the flat ground round the hub at the hub's own level
+    // (not the sunken tiles beside it).
+    for (int y = hub.y - kPad; y < hub.y + hub.h + kPad; ++y)
+        for (int x = hub.x - kPad; x < hub.x + hub.w + kPad; ++x)
+            if (groundFits(x, y, false, kPadFlat) &&
+                std::fabs(ground_.heightAt(y * kTile + 2, x * kTile + 2) - hubHeight_) < kPadFlat)
                 pad_.push_back({x, y});
     return true;
 }
