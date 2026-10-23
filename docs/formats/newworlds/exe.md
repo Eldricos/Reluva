@@ -476,6 +476,46 @@ a few natives' types carry several weapons. Not found: how a unit picks
 its target, whether a moving unit fires, and whether a burst's shots are
 spaced.
 
+### Scans and captures
+
+**Scans.** Ground scouts and science vehicles scan (their playbook offers
+science, medical and engineering scans; a science scan is their default
+action on another side's unit or building). The range is the type's
+sensor range plus the target's size: 60000 for a scout, 18000 for a
+science vehicle; out of range, the scanner drives closer. A scan has no
+length of its own: every tick the scanner is in range it marks the
+target as scanned by its side, with one of six flags (weak or strong
+science, medical, engineering), and the marks fade two ticks after it
+stops. The mission's **raids** (82 of its group watches, `ai_data.cpp`)
+read them: the flag held for their start time (1 to 160 script ticks)
+sends the start, held as long again as their hold time (160 = 10 s, 480 =
+30 s) the success; a break between sends "lost". So a scan only
+succeeds if it is kept up, in range, to the end. A scan is **strong**
+when an officer aboard is good enough at it: an officer of the scan's
+speciality (science 4, medical 3, engineering 1) counts their skill, a
+command officer (7) their skill less a quarter (at least a quarter) for
+engineering; the best must reach 0.5. Officers' skills are 0.25-1 (F1:
+the doctor 0.5, the others 0.25). Scouts carry no one, so their scans are
+weak. On a scan's second tick the side's "scan database" relay sends its
+stock reply for the kind (nothing unusual found), once per spell of
+scanning. Buildings don't scan, and no AI order scans.
+
+**Captures.** Only armed APCs capture ("Capture building", on another
+side's building). The APC first fires on it until it's down to 80 % of
+its hit points, then drives to its entrance and sends in an away team of
+ten crewmen; 336 ticks (16.8 s) later the building is **held** by the
+APC's side: its hit points full, its owner unchanged (the panel says
+CAPTURED), and it goes on working. One APC at a time. The hold lasts as
+long as the APC keeps the order; another order brings the team out and
+the building's hit points back to what they were. If the APC is
+destroyed the building stays held. The scripts' capture watches read the
+hold (J1's temple: held 60 s).
+
+**Officers.** A side's officers are named, each with a speciality and
+skill, posted in a building (the hub, the sickbay, a yard). A vehicle
+with room for people (science vehicles, APCs) takes up to 16; an
+officer moves to a selected vehicle within 1414 units of where they are.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast
@@ -484,6 +524,8 @@ spaced.
 - How fast bees carry ore from the mines.
 - Placement flags, a third placement phase, and the AI order task codes 1,
   2 and 6-8 (read from the orders' names).
+- Which of the posture bits the scan and capture menus test is hostile
+  and which neutral; how the player moves officers (the gesture).
 - How the AI picks targets, and whether it builds units for its orders
   (Reluva takes an order's units from the side, and makes up any it
   lacks at the side's first building).

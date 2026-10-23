@@ -19,6 +19,7 @@
 #include "engines/newworlds/star_system.h"
 #include "engines/newworlds/world.h"
 #include "engines/newworlds/ai_sides.h"
+#include "engines/newworlds/field_work.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -643,6 +644,12 @@ private:
     // world (0 once destroyed), shots and blasts being drawn, and the
     // sites the scripts have heard seen or approached.
     std::unique_ptr<AiSides> ai_;
+    // Scans, captures and officers; a field order waiting for its target
+    // (s, m, e: a scan; c: a capture; 0 none).
+    std::unique_ptr<FieldWork> fieldWork_;
+    char pendingOrder_ = 0;
+    void orderOn(int target);
+    const char* pendingOrderName() const;
     int playerSlot_ = 0;
     std::vector<int> colonyObjects_; // -1 once destroyed, 0 if not a target
     size_t shownBuildings_ = 0;

@@ -105,17 +105,16 @@ struct Raid {
 };
 std::vector<const Raid*> raids(std::string_view mission);
 
-// A side's named officers: where each starts (a building type), and their
+// A side's named officers: where each starts (a building type), their
 // speciality (1 the yards: engineering; 2 security; 3 the sickbay:
-// medical; 4 science; 7 the hub: command) and a second figure (1-8; its
-// meaning isn't known).
+// medical; 4 science; 7 the hub: command) and skill (0.25-1).
 struct Officer {
     const char* mission;
     int slot;
     const char* name;
     int building;
     int speciality;
-    int grade;
+    float skill;
 };
 std::vector<const Officer*> officers(std::string_view mission, int slot);
 

@@ -308,6 +308,13 @@ void MissionViewer::startPlay() {
     if (colony_)
         for (size_t i = 0; i < colony_->buildings().size(); ++i)
             addColonyObject(i);
+    {
+        const MissionScript* own = findMissionScript(level.shortName, side);
+        fieldWork_ = std::make_unique<FieldWork>(level.shortName, playerSlot_, *world_,
+                                                 own ? own->sites : std::map<std::string, std::pair<int, int>>{});
+        fieldWork_->placeOfficers();
+        pendingOrder_ = 0;
+    }
     // The mission's script, from its start, if Reluva has one.
     run_.reset();
     walk_.clear();
@@ -378,6 +385,7 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    fieldWork_.reset();
     ai_.reset();
     world_.reset();
     colonyObjects_.clear();
@@ -394,6 +402,41 @@ void MissionViewer::stopPlay() {
     map_.unlock();
     redraw();
     updateTitle();
+}
+
+const char* MissionViewer::pendingOrderName() const {
+    switch (pendingOrder_) {
+    case 's': return "> SCIENCE SCAN";
+    case 'm': return "> MEDICAL SCAN";
+    case 'e': return "> ENGINEERING SCAN";
+    case 'c': return "> CAPTURE BUILDING";
+    default: return "";
+    }
+}
+
+// The selection's order on another side's unit or building: the field
+// work chosen (S, M, E, C), else a scout or science vehicle scans it (the
+// game's default for them: a science scan) and the rest attack it.
+void MissionViewer::orderOn(int target) {
+    std::vector<int> attackers;
+    for (int id : world_->selection()) {
+        const Unit* u = world_->unit(id);
+        if (!u)
+            continue;
+        if (fieldWork_)
+            fieldWork_->cancel(id);
+        const FieldWork::Kind kind = pendingOrder_ == 'm'   ? FieldWork::Medical
+                                     : pendingOrder_ == 'e' ? FieldWork::Engineering
+                                                            : FieldWork::Science;
+        if (fieldWork_ && pendingOrder_ == 'c' && FieldWork::canCapture(*u) && fieldWork_->capture(id, target))
+            continue;
+        if (fieldWork_ && pendingOrder_ != 'c' && FieldWork::canScan(*u) && fieldWork_->scan(id, target, kind))
+            continue;
+        attackers.push_back(id);
+    }
+    if (!attackers.empty() && pendingOrder_ != 's' && pendingOrder_ != 'm' && pendingOrder_ != 'e')
+        world_->attack(attackers, target);
+    pendingOrder_ = 0;
 }
 
 // A colony building as something the other sides can shoot at (an
@@ -538,6 +581,28 @@ void MissionViewer::drawCombat() {
             for (int dx = -r; dx <= r; ++dx)
                 if (dx * dx + dy * dy <= r * r && (dx * dx + dy * dy) * 3 >= r * r * int(t * 3))
                     plot(screen_, cx + dx, cy + dy, 255, uint8_t(220 - 160 * t), uint8_t(80 - 70 * t));
+    }
+    // Scans as a dotted pale blue line; held buildings marked.
+    if (fieldWork_) {
+        for (const auto& [from, to] : fieldWork_->scanning()) {
+            const Unit* a = world_->unit(from);
+            const Unit* b = world_->unit(to);
+            int ax = 0, ay = 0, bx = 0, by = 0;
+            if (!a || !b || !toScreen(a->x, a->y, 700, ax, ay) || !toScreen(b->x, b->y, 800, bx, by))
+                continue;
+            const int n = std::max({std::abs(bx - ax), std::abs(by - ay), 1});
+            const int phase = int(nowMs_ / 60 % 6);
+            for (int i = 0; i <= n && n < 4000; ++i)
+                if ((i + phase) % 6 < 3)
+                    plot(screen_, ax + (bx - ax) * i / n, ay + (by - ay) * i / n, 140, 210, 255);
+        }
+        for (const Unit& u : world_->units())
+            if (const int holder = fieldWork_->heldBy(u.id); holder >= 0) {
+                int sx = 0, sy = 0;
+                if (toScreen(u.x, u.y, 3500, sx, sy))
+                    ui_.drawSmall(screen_, sx - ui_.smallWidth("CAPTURED") / 2, sy - 12, "CAPTURED",
+                                  holder == playerSlot_ ? Color{120, 255, 120} : Color{255, 90, 60});
+            }
     }
     for (const Unit& u : world_->units()) {
         if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0)
@@ -732,6 +797,21 @@ bool MissionViewer::playEvent(const Event& ev) {
             interface_ = !interface_;
             break;
         }
+        // Field work, for the selection: S, M, E a science, medical or
+        // engineering scan and C a capture (on the next unit or building
+        // clicked); O takes aboard the officers of the building beside it
+        // (Shift+O puts them down).
+        if ((ev.key == 's' || ev.key == 'm' || ev.key == 'e' || ev.key == 'c') && !world_->selection().empty()) {
+            pendingOrder_ = pendingOrder_ == char(ev.key) ? 0 : char(ev.key);
+            break;
+        }
+        if (ev.key == 'o' && fieldWork_) {
+            int moved = 0;
+            for (int id : world_->selection())
+                moved += shift ? fieldWork_->disembark(id) : fieldWork_->board(id);
+            walkNote_ = std::to_string(moved) + (shift ? " officers put down" : " officers aboard");
+            break;
+        }
         if (map_.gameKey(ev.key, mouseX_, mouseY_))
             break;
         return true; // the data viewer's keys don't apply in play
@@ -817,12 +897,16 @@ bool MissionViewer::playEvent(const Event& ev) {
             }
             float gx = 0, gy = 0;
             if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
-                world_->attack(world_->selection(), other);
+                orderOn(other);
             else if (best >= 0)
                 world_->select({best});
             else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
-                if (!world_->selection().empty())
+                if (!world_->selection().empty()) {
+                    for (int id : world_->selection())
+                        if (fieldWork_)
+                            fieldWork_->cancel(id);
                     world_->moveSelected(gx, gy);
+                }
                 else if (ev.clicks >= 2)
                     map_.lockOn(gx, gy);
             }
@@ -951,6 +1035,12 @@ void MissionViewer::update(uint64_t nowMs) {
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
         combatStep(happened);
+        if (fieldWork_) {
+            auto worked = fieldWork_->advance(std::min(dt, 0.25), [this](const ScriptEvent& e) {
+                return run_ && run_->handles(e);
+            });
+            happened.insert(happened.end(), worked.begin(), worked.end());
+        }
         if (nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
             sightings(happened);
         if (economy_) {
@@ -1340,11 +1430,20 @@ void MissionViewer::drawInterface() {
             // One unit: its name and state, as the game's panel.
             const Unit* u = world_->unit(sel[0]);
             ui_.drawSmall(screen_, x + 10, ty, u->kind.name, bright);
-            ui_.drawSmall(screen_, x + 10, ty + lh, u->moving() ? "EN ROUTE" : "READY", text);
+            const std::string work = fieldWork_ ? fieldWork_->status(u->id) : std::string();
+            ui_.drawSmall(screen_, x + 10, ty + lh, !work.empty() ? work : u->moving() ? "EN ROUTE" : "READY", text);
+            int line = 2;
+            if (fieldWork_)
+                for (const Officer* o : fieldWork_->aboard(u->id))
+                    ui_.drawSmall(screen_, x + 10, ty + lh * line++, std::string("OFFICER ") + o->name, text);
+            if (pendingOrder_)
+                ui_.drawSmall(screen_, x + 10, ty + lh * line, pendingOrderName(), bright);
         } else if (sel.size() > 1) {
             ui_.drawSmall(screen_, x + 10, ty, "MULTISELECTION", bright);
             for (size_t i = 0; i < sel.size() && i < 6; ++i)
                 ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), world_->unit(sel[i])->kind.name, text);
+            if (pendingOrder_)
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(std::min<size_t>(sel.size(), 6) + 1), pendingOrderName(), bright);
         } else {
             if (economy_) {
                 for (int i = 0; i < 6; ++i)

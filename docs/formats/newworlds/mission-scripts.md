@@ -56,8 +56,11 @@ R9's trigger) and the stance changes
 ([game.md](game.md#the-other-sides-and-combat)), and feeds the scripts the
 colony's buildings, its stock and building counts, key presses (the
 training missions wait for keys), timers, what combat destroys, the
-counts of every side's units and buildings, and sightings of the sites;
-scans and captures are still to come.
+counts of every side's units and buildings, sightings of the sites, and
+scans and captures through the mission's own watches on them (the
+executable's raids: [game.md](game.md#the-other-sides-and-combat)). The
+capture events follow the raids: `entered` when the away team is in,
+`captured` when it has held the building long enough.
 
 Handlers can be switched: a label at the end of a handler's line (`on
 scanned science temple as temple-scan dormant`), `arm` and `disarm` to turn

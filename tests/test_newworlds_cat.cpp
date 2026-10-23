@@ -10,6 +10,7 @@
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
+#include "engines/newworlds/field_work.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -30,6 +31,8 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
+#include <set>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -1134,6 +1137,99 @@ void testAiSides() {
           }));
 }
 
+void testFieldWork() {
+    // F1 on an open plain: the Taubat placed, the Federation's science
+    // vehicle and armed APC by them, its hub and sickbay by the colony.
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    World w(t);
+    AiSides ai("F1", 0, w);
+    ai.start();
+    auto at = [](int a, int b) { return std::pair<float, float>{float(b) / 8 * 16384, float(a) / 8 * 16384}; };
+    std::map<std::string, std::pair<int, int>> sites{{"temple", {332, 152}}};
+    auto find = [&](const std::string& label) {
+        for (const Unit& u : w.units())
+            if (u.label == label)
+                return u.id;
+        return 0;
+    };
+    const int mine = find("taubat-mine"), temple = find("taubat-temple"), colony = find("taubat-colony");
+    CHECK(mine && temple && colony);
+    CHECK(w.unit(temple)->kind.model == "geo/bad/tt.geo");
+    const auto [hx, hy] = at(438, 218);
+    spawnObject(w, 0, 'F', *combatType(23), hx, hy, {}, {}, true);
+    const int sickbay = spawnObject(w, 0, 'F', *combatType(123), hx + 16000, hy, {}, {}, true);
+    FieldWork fw("F1", 0, w, sites);
+    fw.placeOfficers();
+    CHECK(fw.officers().size() == 5);
+    std::set<std::string> wanted{"scan-started science taubat-mine", "scanned science taubat-mine",
+                                 "scanned strong-medical taubat-colony", "entered taubat-temple",
+                                 "captured taubat-temple", "held temple 10", "vacated taubat-temple"};
+    auto handled = [&](const ScriptEvent& e) {
+        std::string s = e.kind;
+        for (const auto& a : e.args)
+            s += " " + a;
+        return wanted.count(s) > 0;
+    };
+    std::vector<std::string> heard;
+    auto run = [&](double seconds) {
+        for (int i = 0; i < int(seconds * 10); ++i) {
+            ai.advance(0.1);
+            w.advance(0.1);
+            for (const ScriptEvent& e : fw.advance(0.1, handled)) {
+                std::string s = e.kind;
+                for (const auto& a : e.args)
+                    s += " " + a;
+                heard.push_back(s);
+            }
+        }
+    };
+    auto heardIt = [&](const std::string& s) { return std::find(heard.begin(), heard.end(), s) != heard.end(); };
+    // A weak science scan of the mine: started after 1 s, done after 10 s more.
+    const auto [mx, my] = at(392, 206);
+    const int sci = spawnObject(w, 0, 'F', *combatType(62), mx, my, {}, {}, true);
+    CHECK(FieldWork::canScan(*w.unit(sci)) && !fw.strong(sci, FieldWork::Medical));
+    CHECK(fw.scan(sci, mine, FieldWork::Science));
+    run(3);
+    CHECK(heardIt("scan-started science taubat-mine") && !heardIt("scanned science taubat-mine"));
+    CHECK(fw.status(sci) == "SCANNING");
+    run(10);
+    CHECK(heardIt("scanned science taubat-mine"));
+    // The doctor aboard (Kowalski, medical, skill 0.5) makes a medical scan strong.
+    w.unit(sci)->x = hx + 16000 - 5000, w.unit(sci)->y = hy;
+    fw.cancel(sci);
+    CHECK(fw.board(sci) >= 1 && fw.strong(sci, FieldWork::Medical) && !fw.strong(sci, FieldWork::Science));
+    const auto [cx, cy] = at(326, 176);
+    w.unit(sci)->x = cx, w.unit(sci)->y = cy - 10000;
+    CHECK(fw.scan(sci, colony, FieldWork::Medical));
+    run(13);
+    CHECK(heardIt("scanned strong-medical taubat-colony"));
+    // A scan no one wants: the "nothing" reply.
+    heard.clear();
+    const int house = find("taubat-colony-1");
+    CHECK(house && fw.scan(sci, house, FieldWork::Engineering));
+    run(6);
+    CHECK(heardIt("scanned-nothing engineering"));
+    fw.cancel(sci);
+    // The temple taken: fired on to 80 %, the team in for 16.8 s, then held.
+    const auto [tx, ty] = at(338, 150);
+    const int apc = spawnObject(w, 0, 'F', *combatType(56), tx, ty - 15000, {}, {}, true);
+    CHECK(FieldWork::canCapture(*w.unit(apc)) && !FieldWork::canCapture(*w.unit(sci)));
+    CHECK(!fw.capture(sci, temple) && !fw.capture(apc, sickbay) && fw.capture(apc, temple));
+    for (int i = 0; i < 600 && fw.status(apc) == "ATTACKING"; ++i)
+        run(0.1);
+    CHECK(w.unit(temple) && w.unit(temple)->hp <= w.unit(temple)->maxHp * 0.8f);
+    run(15);
+    CHECK(fw.heldBy(temple) == -1 && !heardIt("entered taubat-temple"));
+    run(15);
+    CHECK(fw.heldBy(temple) == 0 && w.unit(temple)->hp == w.unit(temple)->maxHp);
+    CHECK(heardIt("entered taubat-temple") && heardIt("held temple 10") && heardIt("captured taubat-temple"));
+    fw.cancel(apc);
+    run(0.2);
+    CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple"));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -1261,6 +1357,7 @@ int main() {
     testWorld();
     testCombat();
     testAiSides();
+    testFieldWork();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

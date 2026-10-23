@@ -48,8 +48,10 @@ namespace reluva::newworlds {
 //
 // Events: start; built <building>; built-all <building>[*count][|...]...;
 // approach <who> <site>; scan-started, scanned, scan-lost <kind> <site>;
-// scanned-nothing <kind>; researched <topic>; entered, captured, arrived
-// <site>; destroyed <what>; hub-destroyed, side-failed <side>; completed
+// scanned-nothing <kind>; researched <topic>; entered <site> (an away team
+// in), captured (held long enough), capture-lost (left before that),
+// vacated (left after), held <site> <seconds>; arrived <site>; destroyed
+// <what>; hub-destroyed, side-failed <side>; completed
 // <objective>; all-completed; timer <name>; signal <name>[*count] (the
 // count-th time it's raised); mine-exhausted, power-low, short-resources,
 // short-crew; and the game's monitors: count <what> <=|>=|== <n>, held

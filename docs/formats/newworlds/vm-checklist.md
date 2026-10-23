@@ -54,6 +54,13 @@ never delete a message unread. **[shot]** = a screenshot is enough;
   from a scout for ten minutes: whether its parked tanks leave for the
   attacks, whether new ones come out of its vehicle yard, and whether its
   attacks fight the Taubat they pass. ([exe.md](exe.md#sides-and-combat))
+- **Scans and captures** [rec]: in F1, a science scan of the Taubat mine
+  by the science vehicle alone and again with the science officer aboard
+  (how the officer is moved: a drag of the officer card?), timing each
+  message; whether a scan of the right target also gets the "nothing
+  unusual" reply; a capture of the temple with one armed APC (does it
+  fire on the temple first; how long until "the away team is inside").
+  ([exe.md](exe.md#scans-and-captures))
 - **Power** [shot]: COLONY DETAILS before and after a generator is built,
   to check the power rules read from the executable
   ([exe.md](exe.md#the-economy)).

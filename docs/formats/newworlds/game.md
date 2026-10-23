@@ -19,7 +19,10 @@ As the first tutorial teaches them:
 | Left click on a unit | selects it |
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there |
-| Left click on another side's unit or building (units selected) | sends them to attack it |
+| Left click on another side's unit or building (units selected) | sends them to attack it (scouts and science vehicles scan it instead: a science scan) |
+| S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
+| C, then a click on a building | the selected armed APCs capture it |
+| O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
 | Double click on the ground (nothing selected) | locks the camera on the spot; numpad 4/6 orbit it |
 | Right click | drops the selection (or the camera's lock) |
@@ -47,7 +50,7 @@ The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
 modelled: the playbook (a double click with units selected), selecting
 buildings, units building (here a building goes up by itself once
-placed), capturing, scanning.
+placed); the game's playbook and officer cards are keys here.
 
 ## What's modelled
 
@@ -158,6 +161,25 @@ placed), capturing, scanning.
   colonies, and fights natives only when they fire on it: F1's Klingons,
   hostile to every slot, pass the Taubat by as the recordings show. A
   script's stance action turns the side named towards the player.
+- **Scans** as the executable has them ([exe.md](exe.md#scans-and-captures)):
+  a scout or science vehicle drives into sensor range (60000, 18000, plus
+  the target's size) and scans for as long as it stays; the mission's
+  raids turn a scan kept up for their times into `scan-started`, then
+  `scanned <kind> <target>` (or `scan-lost`), the kind `strong-…` when an
+  officer aboard is good enough (skill 0.5 in the scan's speciality). The
+  target is named by the mission's label for its group (`taubat-mine`),
+  its type and the script's sites within 2 blocks. A scan no handler
+  waits for gets `scanned-nothing <kind>` (the game's stock reply); one a
+  handler waits for but no raid covers takes 1 s to start and 10 s more.
+  A pale blue dotted line marks a scan going on.
+- **Captures:** an armed APC fires on the building to 80 %, drives up and
+  sends its team in; 16.8 s later the building is held (CAPTURED over
+  it, its hit points full) while the APC keeps the order. The scripts
+  hear `entered`, then `captured` once a raid's hold time is up (at once
+  where none watches it), `held <target> <seconds>` each second,
+  `capture-lost` or `vacated` when the team comes out.
+- **Officers** start where the mission posts them; the panel lists those
+  aboard a selected vehicle.
 - **Sightings:** the scripts hear `seen <site>` when one of the player's
   units comes within 2.5 blocks of a site, and `approach <who> <site>`
   when a unit is within 1.5 blocks (who: the unit's kind for the player's,
@@ -189,9 +211,13 @@ placed), capturing, scanning.
 | An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Sightings | seen within 2.5 blocks, approach within 1.5 | Reluva's |
+| Scans, captures, officers | ranges, flags, strength, 80 %, 16.8 s, 16 seats, 1414 units | the executable (exe.md#scans-and-captures) |
+| A target's size | buildings 6000, vehicles 1000 | Reluva's (the game uses the model's bounding radius) |
+| A scan no raid covers | 1 s to start, 10 s more | Reluva's (the scripts' own targets) |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
 groups, combat), `ai_sides.h` (the other sides and their orders),
-`ai_data.h` (what the executable gives for every side), `economy.h` (stock, construction, power, mining, crew),
+`ai_data.h` (what the executable gives for every side), `field_work.h`
+(scans, captures, officers), `economy.h` (stock, construction, power, mining, crew),
 `colony.h` (`ColonyLayout::spotAt`, where a building fits), the map view's game camera and picking (`viewers.h`,
 `MapViewer::gameKey`), and the missions page's play mode.
