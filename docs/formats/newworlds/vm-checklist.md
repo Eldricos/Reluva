@@ -43,6 +43,17 @@ never delete a message unread. **[shot]** = a screenshot is enough;
   over flat ground (read the Tricorder at both ends) and time it: the
   executable gives each type's pace in path steps but not a step's
   length. ([exe.md](exe.md#vehicles-and-turrets))
+- **Combat** [rec]: in F1, park the four phaser tanks south of the hub and
+  record the first Klingon attack (at about 100 s): whether units fire on
+  the move, how a burst's four shots are spaced, how quickly each side's
+  units find a target, whether the tanks fire at the Klingons before
+  they're hit (F1's Federation is neutral to them), and how many hits a
+  tank takes. Then send the tanks at a Klingon tank and note whether its
+  neighbours join in. ([exe.md](exe.md#sides-and-combat))
+- **AI armies** [rec]: in F1 (or K1), watch the Klingon (Taubat) colony
+  from a scout for ten minutes: whether its parked tanks leave for the
+  attacks, whether new ones come out of its vehicle yard, and whether its
+  attacks fight the Taubat they pass. ([exe.md](exe.md#sides-and-combat))
 - **Power** [shot]: COLONY DETAILS before and after a generator is built,
   to check the power rules read from the executable
   ([exe.md](exe.md#the-economy)).

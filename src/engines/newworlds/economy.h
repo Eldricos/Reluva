@@ -114,6 +114,8 @@ public:
     // (short-resources). tx, ty: the tile under its middle.
     int order(const std::string& type, float x, float y, int tx, int ty);
     bool has(const std::string& type) const; // built
+    // A building destroyed: it no longer counts, works or draws power.
+    void remove(int id);
 
     // Moves time on: construction, power, mining and refining. Returns what
     // happened, as the mission scripts' events (built <type>, power-low,

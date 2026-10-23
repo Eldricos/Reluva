@@ -16,6 +16,11 @@ namespace {
 constexpr float kScoutSpeed = 4000;
 // Spacing of units sent to one point.
 constexpr float kSpread = 2500;
+// How far past a building's middle a shot reaches it (its walls); a
+// placeholder.
+constexpr float kBuildingReach = 6000;
+// Ticks between a burst's shots; a placeholder.
+constexpr int kBurstGap = 3;
 
 } // namespace
 
@@ -108,8 +113,18 @@ std::vector<std::pair<float, float>> World::findPath(float x0, float y0, float x
                 open.push({c + guess(x + dx, y + dy), int(j)});
             }
     }
-    if (!reached)
-        return {};
+    if (!reached) {
+        // Out of reach (in a pit, say): as near as it can get instead.
+        float best = 1e30f;
+        int nearest = -1;
+        for (size_t i = 0; i < cost.size(); ++i)
+            if (cost[i] < 1e30f && guess(int(i) % w, int(i) / w) < best)
+                best = guess(int(i) % w, int(i) / w), nearest = int(i);
+        if (nearest < 0 || nearest == int(index(sx, sy)))
+            return {};
+        gx = nearest % w, gy = nearest / w;
+        moved = true;
+    }
     std::vector<std::pair<float, float>> path;
     for (int i = int(index(gx, gy)); i != int(index(sx, sy)); i = from[size_t(i)])
         path.push_back({(float(i % w) + 0.5f) * kTile, (float(i / w) + 0.5f) * kTile});
@@ -150,6 +165,29 @@ std::vector<std::pair<float, float>> World::findPath(float x0, float y0, float x
     return out;
 }
 
+std::pair<float, float> World::openSpot(float x, float y) const {
+    const int tx = tileOf(x), ty = tileOf(y);
+    // Its ways out (0 if a vehicle already stands there).
+    auto ways = [&](int cx, int cy) {
+        int n = 0;
+        for (int dy = -1; dy <= 1; ++dy)
+            for (int dx = -1; dx <= 1; ++dx)
+                n += (dx || dy) && canStep(cx, cy, dx, dy);
+        for (const Unit& u : units_)
+            if (!u.building && tileOf(u.x) == cx && tileOf(u.y) == cy && (cx != tx || cy != ty))
+                return 0;
+        return passable(cx, cy) ? n : 0;
+    };
+    if (ways(tx, ty) >= 4)
+        return {x, y};
+    for (int r = 1; r < 8; ++r)
+        for (int dy = -r; dy <= r; ++dy)
+            for (int dx = -r; dx <= r; ++dx)
+                if (std::max(std::abs(dx), std::abs(dy)) == r && ways(tx + dx, ty + dy) >= 4)
+                    return {(float(tx + dx) + 0.5f) * kTile, (float(ty + dy) + 0.5f) * kTile};
+    return {x, y};
+}
+
 int World::addUnit(char side, const UnitKind& kind, float x, float y, float heading) {
     Unit u;
     u.id = nextId_++;
@@ -165,6 +203,55 @@ Unit* World::unit(int id) {
         if (u.id == id)
             return &u;
     return nullptr;
+}
+
+const Unit* World::unit(int id) const {
+    for (const Unit& u : units_)
+        if (u.id == id)
+            return &u;
+    return nullptr;
+}
+
+void World::remove(int id) {
+    units_.erase(std::remove_if(units_.begin(), units_.end(), [&](const Unit& u) { return u.id == id; }), units_.end());
+    for (Unit& u : units_)
+        if (u.target == id)
+            u.target = 0, u.ordered = false, u.firing = false;
+}
+
+int World::stance(int from, int to) const {
+    if (from == to)
+        return 1;
+    if (from < 0 || to < 0 || from > 6 || to > 6)
+        return 2;
+    const int s = stances_[size_t(from)][size_t(to)];
+    return s ? s : 2;
+}
+
+void World::setStance(int from, int to, int posture) {
+    if (from >= 0 && to >= 0 && from <= 6 && to <= 6)
+        stances_[size_t(from)][size_t(to)] = posture;
+}
+
+void World::attack(const std::vector<int>& ids, int target) {
+    const Unit* t = unit(target);
+    if (!t)
+        return;
+    for (int id : ids)
+        if (Unit* u = unit(id); u && u->id != target && u->weapon.kind != WeaponKind::None) {
+            u->target = target;
+            u->ordered = true;
+            u->path.clear();
+        }
+}
+
+void World::moveTo(int id, float x, float y) {
+    if (Unit* u = unit(id); u && !u->building) {
+        u->path = findPath(u->x, u->y, x, y);
+        u->ordered = false;
+        u->target = 0;
+        u->firing = false;
+    }
 }
 
 void World::select(const std::vector<int>& ids) {
@@ -196,7 +283,7 @@ void World::moveSelected(float x, float y) {
     for (int i = 0; i < n; ++i) {
         const float ox = (float(i % cols) - float(cols - 1) / 2) * kSpread;
         const float oy = (float(i / cols) - float((n - 1) / cols) / 2) * kSpread;
-        sel[size_t(i)]->path = findPath(sel[size_t(i)]->x, sel[size_t(i)]->y, x + ox, y + oy);
+        moveTo(sel[size_t(i)]->id, x + ox, y + oy);
     }
 }
 
@@ -236,7 +323,15 @@ bool World::groupCentre(int n, float& x, float& y) const {
 
 bool World::advance(double seconds) {
     bool any = false;
+    tickClock_ += seconds * 20;
+    while (tickClock_ >= 1) {
+        tickClock_ -= 1;
+        combatTick();
+        any = true;
+    }
     for (Unit& u : units_) {
+        if (u.firing || u.building)
+            continue;
         float left = u.kind.speed * float(seconds);
         while (left > 0 && !u.path.empty()) {
             const auto [tx, ty] = u.path.front();
@@ -255,6 +350,102 @@ bool World::advance(double seconds) {
         }
     }
     return any;
+}
+
+std::vector<WorldEvent> World::takeEvents() {
+    std::vector<WorldEvent> out;
+    out.swap(events_);
+    return out;
+}
+
+// A tick of combat (exe.md#sides-and-combat): each armed object keeps or finds a
+// target and fires at it when it's in range and loaded. A burst weapon
+// fires its magazine a few ticks apart, then reloads; others fire one
+// shot and reload. What's out of hit points is destroyed.
+void World::combatTick() {
+    ++tick_;
+    auto distance = [](const Unit& a, const Unit& b) { return std::hypot(b.x - a.x, b.y - a.y); };
+    auto inRange = [&](const Unit& u, const Unit& t) {
+        return distance(u, t) <= u.weapon.range + (t.building ? kBuildingReach : 0);
+    };
+    for (Unit& u : units_) {
+        if (u.weapon.kind == WeaponKind::None || u.hp <= 0)
+            continue;
+        if (u.cooldown > 0)
+            --u.cooldown;
+        Unit* t = u.target ? unit(u.target) : nullptr;
+        if (t && (t->hp <= 0 || (!u.ordered && !(u.ai ? prey(u.slot, t->slot) : hostile(u, *t)) && t->id != u.lastAttacker)))
+            t = nullptr;
+        if (t && !u.ordered && !inRange(u, *t))
+            t = nullptr;
+        // Finding one: the nearest enemy in range (a unit driving on its
+        // player's orders doesn't stop to look; an AI's goes for its prey);
+        // or whoever fired at it.
+        if (!t && (u.ai || u.building || !u.moving())) {
+            float best = 1e30f;
+            for (Unit& v : units_)
+                if (v.hp > 0 && v.id != u.id && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
+                    distance(u, v) < best)
+                    best = distance(u, v), t = &v;
+        }
+        if (!t && u.lastAttacker && (u.ai || u.building || !u.moving()))
+            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && inRange(u, *a))
+                t = a;
+        if (!t) {
+            u.target = 0, u.ordered = false, u.firing = false, u.burstLeft = 0;
+            continue;
+        }
+        u.target = t->id;
+        if (!inRange(u, *t)) {
+            // Told to attack it: drive after it.
+            u.firing = false;
+            if (!u.building && (u.path.empty() || (tick_ + u.id) % 20 == 0))
+                u.path = findPath(u.x, u.y, t->x, t->y);
+            continue;
+        }
+        u.firing = true;
+        u.path.clear();
+        u.turretYaw = std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading);
+        if (u.burstLeft > 0) {
+            if (--u.burstGap <= 0) {
+                fire(u, *t);
+                --u.burstLeft;
+                u.burstGap = kBurstGap;
+            }
+        } else if (u.cooldown == 0) {
+            fire(u, *t);
+            u.burstLeft = u.weapon.kind == WeaponKind::Burst ? u.weapon.magazine - 1 : 0;
+            u.burstGap = kBurstGap;
+            u.cooldown = u.weapon.reload;
+        }
+    }
+    // The destroyed go.
+    std::vector<int> dead;
+    for (const Unit& u : units_)
+        if (u.hp <= 0)
+            dead.push_back(u.id);
+    for (int id : dead) {
+        WorldEvent e;
+        e.kind = WorldEvent::Destroyed;
+        e.what = *unit(id);
+        e.x0 = e.x1 = e.what.x, e.y0 = e.y1 = e.what.y;
+        events_.push_back(std::move(e));
+        remove(id);
+        for (auto& g : groups_)
+            g.erase(std::remove(g.begin(), g.end(), id), g.end());
+    }
+}
+
+void World::fire(Unit& u, Unit& t) {
+    t.hp -= float(u.weapon.damage * std::max(1, u.weapon.guns));
+    t.lastAttacker = u.id;
+    WorldEvent e;
+    e.kind = WorldEvent::Shot;
+    e.from = u.id, e.to = t.id;
+    e.fromSlot = u.slot, e.toSlot = t.slot;
+    e.x0 = u.x, e.y0 = u.y, e.x1 = t.x, e.y1 = t.y;
+    e.weapon = u.weapon.kind;
+    events_.push_back(std::move(e));
 }
 
 } // namespace reluva::newworlds

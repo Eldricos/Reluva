@@ -2,8 +2,9 @@
 
 Reluva's first playable layer: the missions page's play mode (**F3**), with
 the game's camera and controls, the colony's starting units to select and
-move, buildings to place and build, the colony's economy, and the
-mission's script running on what happens. It is built from what recordings of play show
+move, buildings to place and build, the colony's economy, the other
+sides' colonies and natives with their AI, combat, and the mission's
+script running on what happens. It is built from what recordings of play show
 ([play-tutorials.md](play-tutorials.md) for the controls,
 [play.md](play.md) for the rest). Figures the recordings can't give are
 named placeholders, listed below, to be replaced with readings from the
@@ -18,6 +19,8 @@ As the first tutorial teaches them:
 | Left click on a unit | selects it |
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there |
+| Left click on another side's unit or building (units selected) | sends them to attack it |
+| Left click on the TRICORDER | takes the camera there |
 | Double click on the ground (nothing selected) | locks the camera on the spot; numpad 4/6 orbit it |
 | Right click | drops the selection (or the camera's lock) |
 | Ctrl + left / right click | zooms in on the pointed spot / out |
@@ -43,8 +46,8 @@ As the first tutorial teaches them:
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
 modelled: the playbook (a double click with units selected), selecting
-buildings, units defending themselves, units building (here a building
-goes up by itself once placed).
+buildings, units building (here a building goes up by itself once
+placed), capturing, scanning.
 
 ## What's modelled
 
@@ -57,8 +60,9 @@ goes up by itself once placed).
   tile flags' bits 16-17 ([gmf.md](gmf.md#tiles-and-ground-models)), is 0:
   holes, `water_01` and the rock formations, which nothing in the
   recordings crosses. Between tiles, the ground may not climb more than
-  750 units in a quarter tile, so the walls between levels block and ramps
-  don't. A unit finds its way round with A* over the 8192-unit tiles,
+  1800 units in a quarter tile, so the walls between levels (a level is about
+  1840) block and ramps (F1's climb up to 1800) don't; units spawned in a pit
+  (F1's frozen pools) are moved to the nearest tile they can drive out of. A unit finds its way round with A* over the 8192-unit tiles,
   straightening the path where a line is clear. Units sent to one spot
   spread over a small grid round it.
 - **Selection:** the NEW WORLDS panel names one selected unit and its state
@@ -120,6 +124,45 @@ goes up by itself once placed).
   reach it; its messages show in COMMUNICATIONS and its objectives in
   COMMAND.
 
+## The other sides and combat
+
+- **The sides:** every slot of the mission but the player's is placed as
+  the executable places it ([exe.md](exe.md#sides-and-combat)): the other
+  colonies (F1's Klingons), the natives (Taubat, Metar, Hubrin, Orion),
+  rivals; their buildings drawn with the map's, their units round the
+  spots they're placed on (the bees left out). Each side's stances are the
+  mission's; the TRICORDER marks the player's units green, those hostile
+  to the player red, the rest yellow.
+- **Combat** runs at the game's 20 ticks a second with the executable's
+  figures: hit points (the player's own times 1.2 for the Federation, 1.3
+  for the Romulans), weapon damage, range and reload; a burst weapon fires
+  its four shots a few ticks apart, artillery a shell. An armed unit or
+  turret finds the nearest enemy in range: a side fires at those it's
+  hostile to, the player's units also at those hostile to the player, and
+  anyone fires back at whoever hit it. The player's units driving
+  somewhere don't stop to fight; sent to attack, they give chase. What
+  runs out of hit points is destroyed: a blast, a building left as its
+  flattened wreck (and gone from the economy), and the scripts hear
+  `destroyed <name>`, the new counts (`count taubat-house 4`) and, for
+  another colony's hub, `hub-destroyed <race>`. Shots are drawn as beams
+  (orange phasers, green disruptors) or a flying shell; damaged or
+  selected units show a hit point bar.
+- **The AI** carries out the scripts' `ai` actions with the mission's own
+  orders: an assault takes its count of the type from the side's idle
+  units (or beams them in where the game's attack group does) and drives
+  along its waypoints, fighting what it meets, then goes for the nearest
+  enemy; a guard holds its spot and goes for enemies near it; a patrol
+  goes round; a build puts the building up after its delay; `abort` stops
+  an order. The orders the game runs from the start (the natives'
+  patrols) start with play. A colony's AI (slots 0-2) goes only for other
+  colonies, and fights natives only when they fire on it: F1's Klingons,
+  hostile to every slot, pass the Taubat by as the recordings show. A
+  script's stance action turns the side named towards the player.
+- **Sightings:** the scripts hear `seen <site>` when one of the player's
+  units comes within 2.5 blocks of a site, and `approach <who> <site>`
+  when a unit is within 1.5 blocks (who: the unit's kind for the player's,
+  its race for another side's), once each.
+
 ## Placeholders
 
 | What | Value | From |
@@ -139,8 +182,16 @@ goes up by itself once placed).
 | Refining | a quarter tonne a tick in turn per ore, ore kind k into material k | the executable |
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
+| Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
+| A burst's shots | 3 ticks apart | Reluva's |
+| Reach on a building | 6000 units past its middle | Reluva's |
+| Target finding | the nearest enemy in range, every tick; AI colonies go only for colonies | Reluva's (F1's recordings for the last) |
+| An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
+| Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
+| Sightings | seen within 2.5 blocks, approach within 1.5 | Reluva's |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
-groups), `economy.h` (stock, construction, power, mining, crew),
+groups, combat), `ai_sides.h` (the other sides and their orders),
+`ai_data.h` (what the executable gives for every side), `economy.h` (stock, construction, power, mining, crew),
 `colony.h` (`ColonyLayout::spotAt`, where a building fits), the map view's game camera and picking (`viewers.h`,
 `MapViewer::gameKey`), and the missions page's play mode.

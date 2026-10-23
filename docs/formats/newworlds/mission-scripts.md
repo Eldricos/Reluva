@@ -48,11 +48,16 @@ order written, then time running, ending in a win.
 Besides the player's own events, the scripts carry the game's attacks and
 AI moves as `ai` actions (each side's scheduled assaults, the random raids
 every few minutes, build orders and their cancelling), stance changes
-(`hostile taubat`) and stock given or taken, for the game to carry out as
-those parts of Reluva grow. Play already feeds them the colony's buildings,
-its stock and building counts, key presses (the training missions wait
-for keys) and timers; scans, captures, sightings and destroyed enemies
-come once units and combat do.
+(`hostile taubat`) and stock given or taken. Play carries out the `ai`
+actions with the mission's own orders from the executable (1601 of the
+scripts' 1610 order names are the game's; the rest are other kinds of
+object: the bird-of-prey controllers, C1's artillery path controllers,
+R9's trigger) and the stance changes
+([game.md](game.md#the-other-sides-and-combat)), and feeds the scripts the
+colony's buildings, its stock and building counts, key presses (the
+training missions wait for keys), timers, what combat destroys, the
+counts of every side's units and buildings, and sightings of the sites;
+scans and captures are still to come.
 
 Handlers can be switched: a label at the end of a handler's line (`on
 scanned science temple as temple-scan dormant`), `arm` and `disarm` to turn

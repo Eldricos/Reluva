@@ -18,6 +18,7 @@
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
 #include "engines/newworlds/world.h"
+#include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -638,6 +639,31 @@ private:
     std::vector<int> structureIds_; // per colony building, its economy structure
     int housed_ = 0;                // vehicles the mission starts inside the hub
     std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
+    // The other sides, and combat: each colony building's object in the
+    // world (0 once destroyed), shots and blasts being drawn, and the
+    // sites the scripts have heard seen or approached.
+    std::unique_ptr<AiSides> ai_;
+    int playerSlot_ = 0;
+    std::vector<int> colonyObjects_; // -1 once destroyed, 0 if not a target
+    size_t shownBuildings_ = 0;
+    std::array<int, 4> tricorder_{}; // the TRICORDER panel's map, as last drawn (x, y, w, h)      // the other sides' buildings last shown
+    struct Flash {
+        float x0, y0, x1, y1;
+        WeaponKind weapon;
+        uint64_t until;
+    };
+    std::vector<Flash> flashes_;
+    struct Blast {
+        float x, y, size;
+        uint64_t start;
+    };
+    std::vector<Blast> blasts_;
+    std::set<std::string> seenSites_;
+    std::set<std::pair<std::string, std::string>> approached_;
+    void addColonyObject(size_t index);           // a colony building as a target
+    void combatStep(std::vector<ScriptEvent>& happened); // what combat did, for the scripts
+    void sightings(std::vector<ScriptEvent>& happened);  // seen and approach events
+    void drawCombat();
     bool buildMenu_ = false, ghostOk_ = false;
     std::string placing_;            // the type being placed, or empty
     int ghostA_ = -1, ghostB_ = -1; // where its hologram stands

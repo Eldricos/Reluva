@@ -240,8 +240,21 @@ void MissionViewer::showColony() {
         bee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
     }
     if (colony_ && colonyShown_)
-        for (const ColonyBuilding& c : colony_->buildings())
-            buildings.push_back({c.model, c.a, c.b, 0, 1, bee});
+        for (size_t i = 0; i < colony_->buildings().size(); ++i) {
+            const ColonyBuilding& c = colony_->buildings()[i];
+            // A destroyed one is left as its flattened wreck.
+            const bool razed = i < colonyObjects_.size() && colonyObjects_[i] < 0;
+            buildings.push_back({c.model, c.a, c.b, 0, razed ? 0.0f : 1.0f, razed ? std::string() : bee});
+        }
+    // The other sides' buildings.
+    shownBuildings_ = 0;
+    if (world_)
+        for (const Unit& u : world_->units())
+            if (u.building && u.slot != playerSlot_ && !u.kind.model.empty()) {
+                buildings.push_back({u.kind.model, int(u.y / MapViewer::kBlockUnits * 8),
+                                     int(u.x / MapViewer::kBlockUnits * 8), 0, 1, {}});
+                ++shownBuildings_;
+            }
     map_.setBuildings(buildings);
     showProgress();
     map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});
@@ -282,6 +295,19 @@ void MissionViewer::startPlay() {
         for (const ColonyBuilding& c : colony_->buildings())
             structureIds_.push_back(economy_->addBuilt(c.name, float(c.b) / 8 * MapViewer::kBlockUnits,
                                                        float(c.a) / 8 * MapViewer::kBlockUnits));
+    // The other sides as the mission places them, and the colony's own
+    // buildings as things they can shoot at.
+    playerSlot_ = side == 'K' ? 1 : side == 'R' ? 2 : 0;
+    ai_ = std::make_unique<AiSides>(level.shortName, playerSlot_, *world_);
+    ai_->start();
+    colonyObjects_.clear();
+    flashes_.clear();
+    blasts_.clear();
+    seenSites_.clear();
+    approached_.clear();
+    if (colony_)
+        for (size_t i = 0; i < colony_->buildings().size(); ++i)
+            addColonyObject(i);
     // The mission's script, from its start, if Reluva has one.
     run_.reset();
     walk_.clear();
@@ -300,7 +326,12 @@ void MissionViewer::startPlay() {
     // spread a little); else four ground scouts in a row south of the hub.
     // Each on the nearest open tile. Their speed: the by-eye scout speed
     // scaled by the game's pace for the type (scouts and bees 0.125).
-    std::vector<std::pair<UnitKind, std::pair<float, float>>> start;
+    struct Start {
+        UnitKind kind;
+        float x, y;
+        int type;
+    };
+    std::vector<Start> start;
     std::map<std::pair<int, int>, int> onSpot;
     housed_ = 0;
     for (const StartPlacement& p : startPlacements(level.shortName, side))
@@ -316,15 +347,20 @@ void MissionViewer::startPlay() {
             const int n = onSpot[{p.a, p.b}]++;
             const float x = float(p.b) / 8 * MapViewer::kBlockUnits + float(n % 3 - 1) * 2500;
             const float y = float(p.a) / 8 * MapViewer::kBlockUnits + float(n / 3) * 2500;
-            start.push_back({UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f}, {x, y}});
+            start.push_back({UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f}, x, y, p.type});
         }
     if (start.empty())
         for (int i = 0; i < 4; ++i)
-            start.push_back({groundScout(side), {hx + (float(i) - 1.5f) * 2500, hy - 1.4f * kTile}});
-    for (const auto& [kind, at] : start) {
-        const auto path = world_->findPath(at.first, at.second, at.first, at.second);
-        const float px = path.empty() ? at.first : path.back().first, py = path.empty() ? at.second : path.back().second;
-        world_->addUnit(side, kind, px, py, 3.1416f / 2);
+            start.push_back({groundScout(side), hx + (float(i) - 1.5f) * 2500, hy - 1.4f * kTile, 0});
+    for (const Start& at : start) {
+        const auto [px, py] = world_->openSpot(at.x, at.y);
+        // With the type's hit points and weapon, where they're known.
+        if (const CombatType* ct = combatType(at.type)) {
+            const int id = spawnObject(*world_, playerSlot_, side, *ct, px, py, {}, at.kind.model, true);
+            world_->unit(id)->kind = at.kind;
+        } else {
+            world_->unit(world_->addUnit(side, at.kind, px, py, 3.1416f / 2))->slot = playerSlot_;
+        }
     }
     playing_ = true;
     interface_ = true;
@@ -342,7 +378,9 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    ai_.reset();
     world_.reset();
+    colonyObjects_.clear();
     economy_.reset();
     structureIds_.clear();
     lastCounts_.clear();
@@ -358,11 +396,172 @@ void MissionViewer::stopPlay() {
     updateTitle();
 }
 
+// A colony building as something the other sides can shoot at (an
+// upgrade is part of its building).
+void MissionViewer::addColonyObject(size_t index) {
+    if (colonyObjects_.size() <= index)
+        colonyObjects_.resize(index + 1, 0);
+    if (!world_ || !colony_ || index >= colony_->buildings().size())
+        return;
+    const ColonyBuilding& c = colony_->buildings()[index];
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    for (int id = 1; id < 330; ++id)
+        if (const CombatType* t = combatType(id); t && t->building && t->race == side && c.name == t->name) {
+            colonyObjects_[index] = spawnObject(*world_, playerSlot_, side, *t, float(c.b) / 8 * MapViewer::kBlockUnits,
+                                                float(c.a) / 8 * MapViewer::kBlockUnits, {}, c.model, true);
+            return;
+        }
+}
+
+// What combat did since the last step: shots and blasts to draw, the
+// colony's destroyed buildings flattened and taken out of the economy,
+// and the scripts' events (destroyed, counts).
+void MissionViewer::combatStep(std::vector<ScriptEvent>& happened) {
+    if (!world_ || !ai_)
+        return;
+    const auto events = world_->takeEvents();
+    bool rebuild = false;
+    for (const WorldEvent& e : events) {
+        if (e.kind == WorldEvent::Shot) {
+            flashes_.push_back({e.x0, e.y0, e.x1, e.y1, e.weapon, nowMs_ + (e.weapon == WeaponKind::Artillery ? 500 : 150)});
+            continue;
+        }
+        blasts_.push_back({e.x0, e.y0, e.what.building ? 5000.0f : 2500.0f, nowMs_});
+        if (!e.what.building)
+            continue;
+        rebuild = true;
+        for (size_t i = 0; i < colonyObjects_.size(); ++i)
+            if (colonyObjects_[i] == e.what.id) {
+                colonyObjects_[i] = -1;
+                if (economy_ && i < structureIds_.size())
+                    economy_->remove(structureIds_[i]);
+            }
+    }
+    size_t others = 0;
+    for (const Unit& u : world_->units())
+        others += u.building && u.slot != playerSlot_ && !u.kind.model.empty();
+    if (rebuild || others != shownBuildings_)
+        showColony();
+    if (!events.empty())
+        showUnits();
+    auto said = ai_->observe(events);
+    happened.insert(happened.end(), said.begin(), said.end());
+    flashes_.erase(std::remove_if(flashes_.begin(), flashes_.end(), [&](const Flash& f) { return f.until <= nowMs_; }),
+                   flashes_.end());
+    blasts_.erase(std::remove_if(blasts_.begin(), blasts_.end(), [&](const Blast& b) { return b.start + 800 <= nowMs_; }),
+                  blasts_.end());
+    if (!flashes_.empty() || !blasts_.empty() || !events.empty())
+        redraw();
+}
+
+// The scripts' sightings, once each: a site seen (one of the player's
+// units near enough to see it), and a side's units (by race), or one of
+// the player's units (by kind), near a site.
+void MissionViewer::sightings(std::vector<ScriptEvent>& happened) {
+    if (!world_ || !run_)
+        return;
+    const MissionScript* script = findMissionScript(missions_[size_t(current_)].shortName,
+                                                    missionSides(missions_[size_t(current_)].shortName)[size_t(side_)]);
+    if (!script)
+        return;
+    // Placeholders: how far a unit sees, and how near is near.
+    constexpr float kSee = 2.5f * MapViewer::kBlockUnits, kNear = 1.5f * MapViewer::kBlockUnits;
+    for (const auto& [site, at] : script->sites) {
+        const float sx = float(at.second) / 8 * MapViewer::kBlockUnits, sy = float(at.first) / 8 * MapViewer::kBlockUnits;
+        for (const Unit& u : world_->units()) {
+            if (u.building)
+                continue;
+            const float d = std::hypot(u.x - sx, u.y - sy);
+            if (u.slot == playerSlot_ && d < kSee && seenSites_.insert(site).second)
+                happened.push_back({"seen", {site}, at.first, at.second});
+            if (d < kNear) {
+                const std::string who = u.slot == playerSlot_ ? u.name : raceName(u.side);
+                if (!who.empty() && approached_.insert({who, site}).second)
+                    happened.push_back({"approach", {who, site}, at.first, at.second});
+            }
+        }
+    }
+}
+
+namespace {
+
+void plot(Surface& s, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
+    if (x >= 0 && y >= 0 && x < s.w && y < s.h) {
+        uint8_t* p = s.row(y) + x * 4;
+        p[0] = r, p[1] = g, p[2] = b;
+    }
+}
+
+void line(Surface& s, int x0, int y0, int x1, int y1, uint8_t r, uint8_t g, uint8_t b) {
+    const int n = std::max({std::abs(x1 - x0), std::abs(y1 - y0), 1});
+    if (n > 4000)
+        return;
+    for (int i = 0; i <= n; ++i)
+        plot(s, x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n, r, g, b);
+}
+
+} // namespace
+
+// Shots as beams (phasers orange, disruptors green) or a shell flying,
+// blasts where something was destroyed, and a hit point bar over what's
+// damaged or selected.
+void MissionViewer::drawCombat() {
+    if (!world_ || tricorderFull_)
+        return;
+    auto toScreen = [&](float x, float y, float up, int& sx, int& sy) {
+        return map_.worldToScreen(x, y, map_.groundAtWorld(x, y) + up, sx, sy);
+    };
+    for (const Flash& f : flashes_) {
+        int ax = 0, ay = 0, bx = 0, by = 0;
+        if (!toScreen(f.x0, f.y0, 700, ax, ay) || !toScreen(f.x1, f.y1, 500, bx, by))
+            continue;
+        if (f.weapon == WeaponKind::Artillery) {
+            const float t = 1 - float(f.until - std::min(f.until, nowMs_)) / 500.0f;
+            const int px = ax + int(float(bx - ax) * t), py = ay + int(float(by - ay) * t) - int(std::sin(t * 3.1416f) * 40);
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx)
+                    plot(screen_, px + dx, py + dy, 255, 240, 160);
+        } else if (f.weapon == WeaponKind::Single) {
+            line(screen_, ax, ay, bx, by, 90, 255, 90);
+            line(screen_, ax, ay + 1, bx, by + 1, 40, 200, 40);
+        } else {
+            line(screen_, ax, ay, bx, by, 255, 170, 60);
+        }
+    }
+    for (const Blast& b : blasts_) {
+        int cx = 0, cy = 0, ex = 0, ey = 0;
+        if (!toScreen(b.x, b.y, 300, cx, cy) || !toScreen(b.x + b.size, b.y, 300, ex, ey))
+            continue;
+        const float t = float(nowMs_ - b.start) / 800.0f;
+        const int r = std::max(2, int(std::hypot(float(ex - cx), float(ey - cy)) * (0.3f + t)));
+        for (int dy = -r; dy <= r; ++dy)
+            for (int dx = -r; dx <= r; ++dx)
+                if (dx * dx + dy * dy <= r * r && (dx * dx + dy * dy) * 3 >= r * r * int(t * 3))
+                    plot(screen_, cx + dx, cy + dy, 255, uint8_t(220 - 160 * t), uint8_t(80 - 70 * t));
+    }
+    for (const Unit& u : world_->units()) {
+        if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0)
+            continue;
+        int sx = 0, sy = 0;
+        if (!toScreen(u.x, u.y, u.building ? 3000 : 1500, sx, sy))
+            continue;
+        const int w = u.building ? 24 : 14, filled = int(float(w) * u.hp / u.maxHp);
+        for (int x = 0; x < w; ++x)
+            for (int y = 0; y < 2; ++y) {
+                const bool on = x < filled;
+                const float share = u.hp / u.maxHp;
+                plot(screen_, sx - w / 2 + x, sy + y, on ? uint8_t(share < 0.5f ? 255 : 80) : 40,
+                     on ? uint8_t(share < 0.25f ? 60 : 220) : 40, on ? 60 : 40);
+            }
+    }
+}
+
 void MissionViewer::showUnits() {
     std::vector<MapViewer::UnitDraw> draw;
     if (world_)
         for (const Unit& u : world_->units())
-            draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected});
+            if (!u.building && !u.kind.model.empty())
+                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.firing ? u.turretYaw : 0, 0});
     map_.setUnits(std::move(draw));
 }
 
@@ -386,8 +585,11 @@ void MissionViewer::choose(const BuildingType& t) {
         // An upgrade goes on its building at once.
         for (const ColonyStructure& s : economy_->structures())
             if (s.type == t.upgradeOf && s.progress >= 1) {
-                if (const int id = economy_->order(t.id, s.x, s.y, 0, 0); id && colony_ && colony_->add(t.id))
-                    structureIds_.push_back(id), showColony();
+                if (const int id = economy_->order(t.id, s.x, s.y, 0, 0); id && colony_ && colony_->add(t.id)) {
+                    structureIds_.push_back(id);
+                    addColonyObject(colony_->buildings().size() - 1);
+                    showColony();
+                }
                 break;
             }
         buildMenu_ = false;
@@ -427,6 +629,7 @@ void MissionViewer::placeBuilding() {
     if (id == 0 || !colony_->addAt(placing_, ghostA_, ghostB_))
         return;
     structureIds_.push_back(id);
+    addColonyObject(colony_->buildings().size() - 1);
     placing_.clear();
     map_.setGhost({}, 0, 0, false);
     showColony();
@@ -544,6 +747,15 @@ bool MissionViewer::playEvent(const Event& ev) {
             }
             break;
         }
+        if (ev.button == MouseButton::Left && interface_ && !ctrl && tricorder_[2] > 0 &&
+            ev.mouseX >= tricorder_[0] && ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
+            ev.mouseY < tricorder_[1] + tricorder_[3]) {
+            // A click on the tricorder takes the camera there.
+            const float fx = float(ev.mouseX - tricorder_[0]) / float(tricorder_[2]);
+            const float fy = 1 - float(ev.mouseY - tricorder_[1] + 1) / float(tricorder_[3]);
+            map_.centreOn(fx * map_.worldWidth(), fy * map_.worldHeight());
+            break;
+        }
         if (ev.button == MouseButton::Left && ctrl) {
             map_.zoomAt(ev.mouseX, ev.mouseY, true);
         } else if (ev.button == MouseButton::Right && ctrl) {
@@ -573,8 +785,6 @@ bool MissionViewer::playEvent(const Event& ev) {
         if (ev.button != MouseButton::Left || !boxing_)
             return true;
         boxing_ = false;
-        const Level& level = missions_[size_t(current_)];
-        const char side = missionSides(level.shortName)[size_t(side_)];
         const int x0 = std::min(boxX_, ev.mouseX), x1 = std::max(boxX_, ev.mouseX);
         const int y0 = std::min(boxY_, ev.mouseY), y1 = std::max(boxY_, ev.mouseY);
         std::vector<int> picked;
@@ -582,7 +792,8 @@ bool MissionViewer::playEvent(const Event& ev) {
             // A box: the side's units inside it.
             for (const Unit& u : world_->units()) {
                 int sx = 0, sy = 0;
-                if (u.side == side && map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y), sx, sy) &&
+                if (u.slot == playerSlot_ && !u.building &&
+                    map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y), sx, sy) &&
                     sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1)
                     picked.push_back(u.id);
             }
@@ -591,17 +802,23 @@ bool MissionViewer::playEvent(const Event& ev) {
             // A click: the nearest unit to it, if close; else, with units
             // selected, they go there; a double click on the ground locks
             // the camera on it.
-            int best = -1, bestD = 18 * 18;
+            // With units selected, a click on another side's unit or
+            // building sends them to attack it.
+            int best = -1, bestD = 18 * 18, other = -1, otherD = 18 * 18;
             for (const Unit& u : world_->units()) {
                 int sx = 0, sy = 0;
-                if (!map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y) + 300, sx, sy))
+                if (!map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y) + (u.building ? 1500 : 300), sx, sy))
                     continue;
                 const int d = (sx - ev.mouseX) * (sx - ev.mouseX) + (sy - ev.mouseY) * (sy - ev.mouseY);
-                if (d < bestD && u.side == side)
+                if (u.slot == playerSlot_ && !u.building && d < bestD)
                     best = u.id, bestD = d;
+                else if (u.slot != playerSlot_ && d < (u.building ? 2 : 1) * otherD)
+                    other = u.id, otherD = u.building ? d / 2 : d;
             }
             float gx = 0, gy = 0;
-            if (best >= 0)
+            if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
+                world_->attack(world_->selection(), other);
+            else if (best >= 0)
                 world_->select({best});
             else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
                 if (!world_->selection().empty())
@@ -728,9 +945,14 @@ void MissionViewer::update(uint64_t nowMs) {
     if (playing_ && world_) {
         const double dt = double(nowMs - lastTickMs_) / 1000.0;
         lastTickMs_ = nowMs;
+        std::vector<ScriptEvent> happened;
+        if (ai_)
+            ai_->advance(std::min(dt, 0.25));
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
-        std::vector<ScriptEvent> happened;
+        combatStep(happened);
+        if (nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
+            sightings(happened);
         if (economy_) {
             const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
             economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
@@ -821,6 +1043,7 @@ void MissionViewer::drawNoMap() {
 
 void MissionViewer::drawBriefing() {
     if (playing_) {
+        drawCombat();
         if (interface_)
             drawInterface();
         drawPlay();
@@ -1146,15 +1369,18 @@ void MissionViewer::drawInterface() {
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
         if (hasMap_) {
             map_.drawMinimap(screen_, x + 12, y + 14, w - 24, h - 30 - lh);
+            tricorder_ = {x + 12, y + 14, w - 24, h - 30 - lh};
+            // The player's own green, those hostile to it red, the rest yellow.
             if (world_)
                 for (const Unit& u : world_->units()) {
                     int px = 0, py = 0;
                     map_.minimapPoint(u.x, u.y, x + 12, y + 14, w - 24, h - 30 - lh, px, py);
+                    const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
                     for (int dy = 0; dy < 2; ++dy)
                         for (int dx = 0; dx < 2; ++dx)
                             if (px + dx >= 0 && py + dy >= 0 && px + dx < screen_.w && py + dy < screen_.h) {
                                 uint8_t* p = screen_.row(py + dy) + (px + dx) * 4;
-                                p[0] = 120, p[1] = 255, p[2] = 120;
+                                p[0] = own ? 120 : 255, p[1] = own ? 255 : enemy ? 70 : 230, p[2] = own ? 120 : 60;
                             }
                 }
             int a = 0, b = 0;
@@ -1296,6 +1522,10 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
             walkNote_ += "; mission lost";
         else if (o.kind == MissionRun::Output::Failing)
             walkNote_ += "; mission failing";
+        else if (o.kind == MissionRun::Output::Ai && ai_)
+            ai_->order(o.sender, o.text);
+        else if (o.kind == MissionRun::Output::Stance && ai_)
+            ai_->stance(o.sender, o.text);
     }
     if (!out.empty())
         redraw();

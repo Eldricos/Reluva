@@ -4,6 +4,7 @@
 // Tests for the New Worlds .cat reader against archives built here, following
 // docs/formats/newworlds/cat.md, so no game data is needed.
 
+#include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/arf.h"
 #include "engines/newworlds/briefing.h"
 #include "engines/newworlds/cat_archive.h"
@@ -1006,6 +1007,133 @@ void testWorld() {
     CHECK(w.groupCentre(1, gx, gy) && std::fabs(gx - 3.5f * kTile) < 1500 && !w.groupCentre(3, gx, gy));
 }
 
+void testCombat() {
+    Terrain t;
+    t.width = t.height = 20;
+    t.moveClass.assign(400, 1);
+    World w(t);
+    const CombatType* disruptor = combatType(10);
+    const CombatType* phaser = combatType(8);
+    const CombatType* house = combatType(114);
+    CHECK(disruptor && phaser && house);
+    CHECK(disruptor->weapon.kind == WeaponKind::Single && disruptor->weapon.damage == 40 && disruptor->hp == 60);
+    CHECK(phaser->weapon.kind == WeaponKind::Burst && phaser->weapon.damage == 6 && phaser->weapon.magazine == 4 &&
+          phaser->weapon.reload == 40 && phaser->weapon.range == 20000);
+    CHECK(house->building && house->hp == 200 && std::string(house->name) == "taubat-house");
+    // A Klingon tank hostile to the Federation finds the tank in range and
+    // destroys it with its first shot; the Federation (neutral) can't answer.
+    w.setStance(1, 0, 3);
+    const int fed = spawnObject(w, 0, 'F', *phaser, 5 * kTile, 5 * kTile, {});
+    const int kli = spawnObject(w, 1, 'K', *disruptor, 6.5f * kTile, 5 * kTile, {});
+    CHECK(w.stance(1, 0) == 3 && w.stance(0, 1) == 2 && w.stance(1, 1) == 1);
+    for (int i = 0; i < 10; ++i)
+        w.advance(0.1);
+    CHECK(!w.unit(fed) && w.unit(kli));
+    bool shot = false, destroyed = false;
+    for (const WorldEvent& e : w.takeEvents()) {
+        shot = shot || (e.kind == WorldEvent::Shot && e.from == kli && e.weapon == WeaponKind::Single);
+        destroyed = destroyed || (e.kind == WorldEvent::Destroyed && e.what.id == fed && e.what.name == "phaser-tank");
+    }
+    CHECK(shot && destroyed);
+    // The player's tank (1.2 times the hit points) ordered onto a house:
+    // 24 a burst every 2 s, so 9 bursts for its 200.
+    const int mine = spawnObject(w, 0, 'F', *phaser, 12 * kTile, 12 * kTile, {}, {}, true);
+    const int home = spawnObject(w, 3, 'T', *house, 14 * kTile, 12 * kTile, "taubat-colony");
+    CHECK(w.unit(mine)->maxHp == 36.0f && !w.unit(mine)->ai);
+    w.attack({mine}, home);
+    for (int i = 0; i < 100; ++i)
+        w.advance(0.1);
+    CHECK(w.unit(home) && w.unit(home)->hp < 200);
+    for (int i = 0; i < 120; ++i)
+        w.advance(0.1);
+    CHECK(!w.unit(home));
+    // A neutral answers fire: the Klingon tank, attacked, shoots back.
+    w.takeEvents();
+    w.attack({mine}, kli);
+    for (int i = 0; i < 400 && w.unit(mine) && w.unit(mine)->hp >= 36; ++i)
+        w.advance(0.1);
+    CHECK(!w.unit(mine) || w.unit(mine)->hp < 36);
+    const auto names = scriptNames(*w.unit(kli), 0);
+    CHECK(names.size() == 1 && names[0] == "klingon-disruptor-tank");
+}
+
+void testAiSides() {
+    // F1 on an open plain as big as its map: the Klingon colony and the
+    // Taubat placed, stances as the mission sets them, an assault sent.
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    World w(t);
+    AiSides ai("F1", 0, w);
+    ai.start();
+    int kli = 0, taubat = 0, mine = 0;
+    for (const Unit& u : w.units())
+        kli += u.slot == 1, taubat += u.slot == 3, mine += u.slot == 0;
+    CHECK(kli > 10 && taubat > 10 && mine == 0);
+    CHECK(w.stance(1, 0) == 3 && w.stance(0, 1) == 2 && w.stance(3, 0) == 2);
+    CHECK(ai.slotsNamed("klingon") == std::vector<int>{1} && ai.slotsNamed("taubat") == std::vector<int>{3});
+    CHECK(ai.slotsNamed("metar") == std::vector<int>{5} && ai.raceOf(3) == 'T');
+    auto first = ai.observe({});
+    auto has = [&](const std::vector<ScriptEvent>& ev, const std::string& what, int n) {
+        return std::any_of(ev.begin(), ev.end(), [&](const ScriptEvent& e) {
+            return e.kind == "count" && e.args.size() == 2 && e.args[0] == what && (n < 0 || e.args[1] == std::to_string(n));
+        });
+    };
+    CHECK(has(first, "klingon-hub", 1) && has(first, "taubat-house", -1) && has(first, "taubat-colony", -1));
+    CHECK(ai.observe({}).empty()); // nothing changed
+    CHECK(!ai.order("klingon", "no-such-order"));
+    CHECK(ai.order("klingon", "initial-assault-one"));
+    const auto running = ai.running();
+    CHECK(std::count(running.begin(), running.end(), "initial-assault-one") == 1);
+    ai.advance(1.0);
+    int driving = 0;
+    for (const Unit& u : w.units())
+        driving += u.slot == 1 && u.moving();
+    CHECK(driving >= 2);
+    CHECK(ai.order("klingon", "abort initial-assault-one"));
+    ai.advance(1.0);
+    const auto after = ai.running();
+    CHECK(std::count(after.begin(), after.end(), "initial-assault-one") == 0);
+    ai.stance("taubat", "hostile");
+    CHECK(w.stance(3, 0) == 3 && w.stance(0, 3) == 2);
+    // A build order: the building stands after its delay (the con yard at 60 s).
+    CHECK(ai.order("klingon", "kli-npc-build-con-yard"));
+    for (int i = 0; i < 61; ++i)
+        ai.advance(1.0);
+    CHECK(has(ai.observe({}), "klingon-construction-yard", 1));
+
+    // The first assault reaches the Federation colony and fights it: shots
+    // both ways, the losses reported as the scripts name them.
+    World w2(t);
+    AiSides ai2("F1", 0, w2);
+    ai2.start();
+    const float hubX = 218.0f / 8 * 16384, hubY = 438.0f / 8 * 16384;
+    const int hub = spawnObject(w2, 0, 'F', *combatType(23), hubX, hubY, {}, {}, true);
+    for (int i = 0; i < 4; ++i)
+        spawnObject(w2, 0, 'F', *combatType(8), hubX - 8000 + float(i) * 2500, hubY - 6000, {}, {}, true);
+    for (const char* o : {"initial-assault-one", "initial-assault-two", "initial-assault-three"})
+        CHECK(ai2.order("klingon", o));
+    bool kliFired = false, fedFired = false;
+    std::vector<ScriptEvent> heard;
+    for (int i = 0; i < 6000 && !(kliFired && fedFired && !heard.empty()); ++i) {
+        ai2.advance(0.1);
+        w2.advance(0.1);
+        const auto events = w2.takeEvents();
+        for (const WorldEvent& e : events)
+            if (e.kind == WorldEvent::Shot) {
+                kliFired = kliFired || e.fromSlot == 1;
+                fedFired = fedFired || e.fromSlot == 0;
+            }
+        for (const ScriptEvent& e : ai2.observe(events))
+            if (e.kind == "destroyed")
+                heard.push_back(e);
+    }
+    CHECK(kliFired && fedFired && !heard.empty());
+    CHECK(w2.unit(hub) || std::any_of(heard.begin(), heard.end(), [](const ScriptEvent& e) {
+              return e.args[0] == "colony-hub";
+          }));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -1131,6 +1259,8 @@ int main() {
     testModelPose();
     testEconomy();
     testWorld();
+    testCombat();
+    testAiSides();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

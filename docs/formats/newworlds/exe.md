@@ -413,12 +413,78 @@ Klingons attack on a schedule (100, 500, 800 and 1100 s, and a random
 assault every 300 s) and build to a timetable. The scripts are to be
 rewritten from the executable's graphs.
 
+### Sides and combat
+
+Every slot of every mission, not only the player's, is in the
+executable: 3560 placements (the briefing's phase-2 objects left out),
+157 sides with their stances, and 1756 AI orders. Reluva carries them in
+`ai_data.cpp` (generated: type ids, figures, positions and the order
+names the scripts use - no text).
+
+**The natives' slots.** Which race holds slots 3-5 varies by mission; it
+shows in what they place (by type id). Taubat: temple 110 (and 119 in
+F1's slot 3), tank 111, artillery 112, APC 113, house 114, hangar
+(workshop) 115, gun 316. Metar: units 48, 99-101, 105, 106, 129, 203-206,
+hub 102, building 103, portal 201, starships 223 and 262, turret 317, and
+copies of a captured colony's buildings (J4: 209-214); 119 in a Metar slot
+is the anomaly device. Hubrin: unit 108, fortress 109. Orion: 117, 264
+(R2 and C11 put Orion tanks in the Taubat slot). K2's rebel Taubat (slot
+4) have their own ids, 138-143. R1's rival Romulans (slot 4): tank 149,
+hub 150, defensive weapon 153. Their models are matched by name from
+`foractor.cat` / `forbuild.cat` (`tt` temple, `tw` workshop, `th` house,
+`tgp` gun platform, `ta` artillery, `tapc`, `tsg` static gun; Metar `mch`,
+`mport`, `mss`, `mad`, the units `mb`, `md`, `mj`, `mn`, `mr`, `my` and
+their second kinds; Hubrin `h`, `hf`; Orion `odv`). Which Metar unit is
+which kind is a guess from their weapons (two kinds of each share the
+figures).
+
+**Stances.** Each side has seven postures, its own towards each slot: 1
+self or ally, 2 neutral, 3 hostile. They are one-sided: in F1 the
+Klingons are hostile to everyone, the Federation neutral to the Klingons
+and hostile to the Romulans, the Taubat neutral to all. The script's
+posture switch sets one side's posture towards one other (F1's Taubat
+turn hostile to the Federation 300 s after the temple scan).
+
+**Orders.** An AI side's orders come in named and unnamed forms. Named
+ones wait for a script message (start, `Abort`, `Trigger`); unnamed ones
+run from the start (the natives' patrols, some guards and builds). Each
+gives a task, a unit type and count (or a building type and a delay) and
+up to four map positions:
+
+| Task | Orders | Reading |
+|---|---|---|
+| 1, 2 | 144 unnamed patrols, 68 named orders | patrol round the positions |
+| 4 | 112 named orders (`..._Protection_...`), 44 unnamed unit orders | guard the position |
+| 5 | 378 named orders | assault along the positions |
+| 6, 7, 8 | 655 named orders (most of the random raids) | assaults too, by their names |
+| 9 | 237 named builds | build the type at the position after the delay (F1's Klingons: construction yard at 60 s, vehicle yard 180, processor 300, accommodation 420, shield 540, science 660) |
+| 3 | 130 unnamed builds | the same, from the start |
+
+73 **attack group** script objects create an order's units: the count of
+the type round one position ("with a transporter effect"), then start the
+order. C9's Orion raids come this way (from 434:301 and 326:281); 66
+orders have such a spawn point. Other orders take the side's own units:
+F1's Klingons start with their tanks, artillery and scouts parked at the
+hub ("units are placed at the hub spot and spread by the game").
+
+**Combat.** The figures are in [Vehicles and turrets](#vehicles-and-turrets)
+and [Buildings](#buildings): hit points, burst / single / artillery
+weapons with range and reload in ticks. Buildings and the natives'
+structures have hit points too (Taubat house 200, hangar and temple 400,
+Metar hub 400, Hubrin fortress 400 with three guns, Metar starship 800);
+a few natives' types carry several weapons. Not found: how a unit picks
+its target, whether a moving unit fires, and whether a burst's shots are
+spaced.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast
   construction bees build.
 - How the 50 ms step and the scripts' sixteenths relate.
 - How fast bees carry ore from the mines.
-- Placement flags, a third placement phase, and the AI order codes (named
-  from their identifiers).
+- Placement flags, a third placement phase, and the AI order task codes 1,
+  2 and 6-8 (read from the orders' names).
+- How the AI picks targets, and whether it builds units for its orders
+  (Reluva takes an order's units from the side, and makes up any it
+  lacks at the side's first building).
 - Several unnamed type ids (natives' units and buildings, effects).

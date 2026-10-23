@@ -389,4 +389,10 @@ std::vector<ScriptEvent> Economy::advance(double seconds) {
     return out;
 }
 
+void Economy::remove(int id) {
+    structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
+                                     [&](const ColonyStructure& c) { return c.id == id; }),
+                      structures_.end());
+}
+
 } // namespace reluva::newworlds

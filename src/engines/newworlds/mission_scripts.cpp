@@ -2852,7 +2852,7 @@ on approach orion orion-approach
 
 # --- The Orion waves (each a spawned group sent on its attack order) ---
 on start
-  ai orion orion-attack-2        # 2 units from 434:373 at once
+  ai orion orion-attack2        # 2 units from 434:373 at once
   timer orion-first-group 7
   timer orion-wave-1 180
   timer orion-wave-2 360
@@ -2865,37 +2865,37 @@ on start
   timer orion-wave-9 1620
   timer orion-wave-10 1800
 on timer orion-first-group
-  ai orion orion-attack-1        # 2 units from 434:301
+  ai orion orion-attack1        # 2 units from 434:301
 on timer orion-wave-1
-  ai orion orion-attack-1a       # 2 units from each point
-  ai orion orion-attack-2a
+  ai orion orion-attack1a       # 2 units from each point
+  ai orion orion-attack2a
 on timer orion-wave-2
-  ai orion orion-attack-1b       # 4 from each
-  ai orion orion-attack-2b
+  ai orion orion-attack1b       # 4 from each
+  ai orion orion-attack2b
 on timer orion-wave-3
-  ai orion orion-attack-1c
-  ai orion orion-attack-2c
+  ai orion orion-attack1c
+  ai orion orion-attack2c
 on timer orion-wave-4
-  ai orion orion-attack-1d
-  ai orion orion-attack-2d
+  ai orion orion-attack1d
+  ai orion orion-attack2d
 on timer orion-wave-5
-  ai orion orion-attack-1e       # 6 from each
-  ai orion orion-attack-2e
+  ai orion orion-attack1e       # 6 from each
+  ai orion orion-attack2e
 on timer orion-wave-6
-  ai orion orion-attack-1f
-  ai orion orion-attack-2f
+  ai orion orion-attack1f
+  ai orion orion-attack2f
 on timer orion-wave-7
-  ai orion orion-attack-1g
-  ai orion orion-attack-2g
+  ai orion orion-attack1g
+  ai orion orion-attack2g
 on timer orion-wave-8
-  ai orion orion-attack-1h       # 8 from each
-  ai orion orion-attack-2h
+  ai orion orion-attack1h       # 8 from each
+  ai orion orion-attack2h
 on timer orion-wave-9
-  ai orion orion-attack-1i
-  ai orion orion-attack-2i
+  ai orion orion-attack1i
+  ai orion orion-attack2i
 on timer orion-wave-10
-  ai orion orion-attack-1j
-  ai orion orion-attack-2j
+  ai orion orion-attack1j
+  ai orion orion-attack2j
 
 # --- The last wave beaten: that wakes the watch for the last Orion; when none is left,
 # Starfleet's message and the objective ---
