@@ -118,6 +118,9 @@ public:
     // Moves time on, firing timers that run out.
     std::vector<Output> advance(double seconds);
     bool finished() const { return won_ || lost_; }
+    // Whether any of its handlers, on or off, waits for such an event (a
+    // scan of something no handler wants gets the "nothing found" reply).
+    bool handles(const ScriptEvent& event) const;
     bool failing() const { return failing_; }
     bool won() const { return won_; }
     State objectiveState(uint32_t id) const;
@@ -134,7 +137,7 @@ private:
         bool fired = false;
         bool armed = true;
     };
-    bool matches(const ScriptEvent& want, const ScriptEvent& got);
+    bool matches(const ScriptEvent& want, const ScriptEvent& got) const;
     bool requirementsMet(const ScriptEvent& want) const;
     void run(const MissionScript::Handler& h, const ScriptEvent& ev, std::vector<Output>& out);
     std::string expand(const std::string& text, const ScriptEvent& ev) const;

@@ -91,4 +91,32 @@ struct NpcOrder {
 };
 std::vector<const NpcOrder*> npcOrders(std::string_view mission);
 
+// The game's watches on a named group (its placements' label): held by a
+// side, or scanned by it, for a while. Condition: 2 held (captured); 3 its
+// map cell scanned; 4-6 a weak science, medical or engineering scan; 7-9 a
+// strong one. The watch starts after start ticks of the condition (the
+// scripts' 16 a second), then succeeds after hold ticks more of it.
+struct Raid {
+    const char* mission;
+    const char* label; // "taubat-temple"
+    int condition;
+    int side;          // whose capture or scan it watches
+    int start, hold;   // ticks
+};
+std::vector<const Raid*> raids(std::string_view mission);
+
+// A side's named officers: where each starts (a building type), and their
+// speciality (1 the yards: engineering; 2 security; 3 the sickbay:
+// medical; 4 science; 7 the hub: command) and a second figure (1-8; its
+// meaning isn't known).
+struct Officer {
+    const char* mission;
+    int slot;
+    const char* name;
+    int building;
+    int speciality;
+    int grade;
+};
+std::vector<const Officer*> officers(std::string_view mission, int slot);
+
 } // namespace reluva::newworlds

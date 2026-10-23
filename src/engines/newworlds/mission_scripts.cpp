@@ -265,7 +265,7 @@ on timer taubat-death
   signal failing
 
 # --- Objective 19: hold the temple for 10 s (a watch that sleeps until the survey) ----------------
-every captured temple as temple-capture dormant
+every entered temple as temple-capture dormant
   say engineering "The away team is inside, Sir. Starting on the field realignment."
 on held temple 10 as temple-capture dormant
   say engineering "The containment field is aligned again and radiation is dropping. Just in time, Sir."
@@ -714,7 +714,7 @@ on scanned science temple
 
 # --- Objective 25: take the temple and hold it for a minute ---------------
 # Our capture monitor reports each entry until the hold succeeds, then stops.
-every captured temple as fed-temple-watch
+every entered temple as fed-temple-watch
   say engineering "We're inside the Taubat temple, sir."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."
@@ -3038,7 +3038,7 @@ on signal taubat-down*3
   signal objective
 
 # Optional objective 24: hold the temple 10 s; its transporter sends minerals home.
-on captured taubat-temple
+on entered taubat-temple
   say security "The temple is ours. Switching on its mineral transporter."
 on held taubat-temple 10
   say engineering "The minerals have reached our base. We should pull out of the temple and destroy it."
@@ -3430,7 +3430,7 @@ every captured-by romulan taubat-colony 30
 
 # --- Objective 21: take the temple and hold it for a minute ---------------
 # Our capture monitor reports each entry until the hold succeeds, then stops.
-every captured temple as kli-temple-watch
+every entered temple as kli-temple-watch
   say engineering "The Taubat temple is ours. Tracing the power source now."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."
@@ -5988,7 +5988,7 @@ on seen taubat-hangar-two
 
 # Optional objective 16: hold the temple 10 s; its mineral transporter
 # sends 100 T polycomposite, 100 T transaluminium and 1000 KG duranium.
-on captured taubat-temple
+on entered taubat-temple
   say security "The temple is ours. It holds technology for transporting minerals; we're switching it on."
 on held taubat-temple 10
   say engineering "The minerals are at our base now. We should pull out of the temple and destroy it."
@@ -6222,7 +6222,7 @@ on scanned science temple
 
 # --- Objective 25: take the temple and hold it for a minute ---------------
 # Our capture monitor reports each entry until the hold succeeds, then stops.
-every captured temple as rom-temple-watch
+every entered temple as rom-temple-watch
   say engineering "Sir, the Taubat temple is ours."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."

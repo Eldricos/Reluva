@@ -253,7 +253,11 @@ bool MissionRun::requirementsMet(const ScriptEvent& want) const {
     return true;
 }
 
-bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) {
+bool MissionRun::handles(const ScriptEvent& event) const {
+    return std::any_of(rules_.begin(), rules_.end(), [&](const Rule& r) { return matches(r.handler->event, event); });
+}
+
+bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) const {
     if (want.kind == "built-all")
         return got.kind == "built" && requirementsMet(want);
     // The game's monitors compare: stock <material> <at least>; count <what>
