@@ -27,16 +27,26 @@ namespace reluva::newworlds {
 //   lose 21 destroyed colony-hub     lost, with that fail string, on an event
 //   on <event> <args>...             once, the first time the event happens
 //   every <event> <args>...          each time
-//     say <sender> "text"            then actions, indented
+//     say <sender> "text" [clip]     then actions, indented (clip: a voice
+//                                    clip's stem the game plays with it)
 //     complete 16 | reveal 19 | win | lose 21
-//     research <topic> | timer <name> <seconds>
+//     research <topic> | timer <name> <seconds> | stop <timer>
+//     signal <name>                  raise the event "signal <name>"
+//     random <signal> <signal>...    raise one of them, chosen at random
+//     hostile|neutral|allied <side>  the mission's side's stance changes
+//     ai <side> <order>              an AI side acts: an attack, a build
+//                                    order, a patrol (named as the game does)
+//     give|take <material> <amount>  stock in or out (panel units)
 //
 // Events: start; built <building>; built-all <building>[*count][|...]...;
 // approach <who> <site>; scan-started, scanned, scan-lost <kind> <site>;
 // scanned-nothing <kind>; researched <topic>; entered, captured, arrived
 // <site>; destroyed <what>; hub-destroyed, side-failed <side>; completed
-// <objective>; all-completed; timer <name>; mine-exhausted, power-low,
-// short-resources, short-crew. An argument "*" matches anything. In text,
+// <objective>; all-completed; timer <name>; signal <name>[*count] (the
+// count-th time it's raised); mine-exhausted, power-low, short-resources,
+// short-crew; and the game's monitors: count <what> <=|>=|== <n>, held
+// <what> <seconds>, seen <site>, colony-size <percent>, stock <material>
+// <amount>, key <code>. An argument "*" matches anything. In text,
 // {site:name} becomes the site's position, {a}, {b} the event's position,
 // {1} the event's first argument (dashes as spaces, capitalised).
 
@@ -80,9 +90,12 @@ const MissionScript* findMissionScript(std::string_view shortName, char side);
 class MissionRun {
 public:
     struct Output {
-        enum Kind { Message, Completed, Revealed, Won, Lost } kind;
+        // Stance, Ai, Stock: for the game to carry out (sender = the side,
+        // text = the stance, the order, or the material and amount).
+        enum Kind { Message, Completed, Revealed, Won, Lost, Stance, Ai, Stock } kind;
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
+        std::string clip;          // a message's voice clip (a media stem), if any
     };
     enum class State { Incomplete, Complete, Hidden };
 
@@ -118,6 +131,8 @@ private:
     std::map<std::string, int> built_;
     std::set<uint32_t> completed_, revealed_;
     std::map<std::string, double> timers_;
+    std::map<std::string, int> signals_; // times each signal was raised
+    uint32_t random_ = 12345;
     bool won_ = false, lost_ = false, allDone_ = false;
     int depth_ = 0;
 };

@@ -50,6 +50,7 @@
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
+#include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/model_render.h"
 #include "common/font.h"
@@ -2371,6 +2372,65 @@ int cmdGeoSurvey(int argc, char** argv) {
 
 } // namespace
 
+// Reads a mission script file (Reluva's format, mission_script.h), plays
+// each mission in it through its walkthrough with the generic rules, and
+// prints what it says and how it ends.
+int cmdScriptCheck(int argc, char** argv) {
+    if (argc != 3) {
+        std::fprintf(stderr, "usage: reluva-tool script-check <script file>\n");
+        return 2;
+    }
+    namespace nw = reluva::newworlds;
+    std::ifstream in(argv[2], std::ios::binary);
+    if (!in) {
+        std::fprintf(stderr, "cannot open %s\n", argv[2]);
+        return 1;
+    }
+    const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    std::vector<nw::MissionScript> scripts;
+    if (reluva::Error err = nw::parseMissionScripts(text, scripts)) {
+        std::printf("doesn't read: %s\n", err.message.c_str());
+        return 1;
+    }
+    const nw::MissionScript* generic = nw::findMissionScript("generic", 'F');
+    int bad = 0;
+    for (const nw::MissionScript& m : scripts) {
+        nw::MissionRun run(m, generic);
+        auto show = [](const std::vector<nw::MissionRun::Output>& out) {
+            for (const auto& o : out) {
+                switch (o.kind) {
+                case nw::MissionRun::Output::Message: std::printf("    %s: %s\n", o.sender.c_str(), o.text.c_str()); break;
+                case nw::MissionRun::Output::Completed: std::printf("    [objective %u complete]\n", o.objective); break;
+                case nw::MissionRun::Output::Revealed: std::printf("    [objective %u revealed]\n", o.objective); break;
+                case nw::MissionRun::Output::Won: std::printf("    [won]\n"); break;
+                case nw::MissionRun::Output::Lost: std::printf("    [lost: %u]\n", o.objective); break;
+                default: std::printf("    [%s %s]\n", o.sender.c_str(), o.text.c_str()); break;
+                }
+            }
+        };
+        std::printf("mission %s (%c): %zu objectives, %zu handlers\n", m.mission.c_str(), m.side, m.objectives.size(),
+                    m.handlers.size());
+        for (const nw::ScriptEvent& e : run.walkthrough()) {
+            std::string what = e.kind;
+            for (const std::string& a : e.args)
+                what += " " + a;
+            std::printf("  %s\n", what.c_str());
+            show(run.fire(e));
+            if (run.finished())
+                break;
+        }
+        double t = 0;
+        while (!run.finished() && run.nextTimer() >= 0 && t < 7200) {
+            t += run.nextTimer();
+            std::printf("  (%.0f s later)\n", t);
+            show(run.advance(run.nextTimer()));
+        }
+        std::printf("  => %s\n", run.won() ? "won" : run.finished() ? "LOST" : "not finished");
+        bad += !run.won();
+    }
+    return bad ? 1 : 0;
+}
+
 int main(int argc, char** argv) {
     if (argc >= 2 && std::strcmp(argv[1], "hexdump") == 0)
         return cmdHexdump(argc, argv);
@@ -2402,6 +2462,8 @@ int main(int argc, char** argv) {
         return cmdGmfInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "geo-textures") == 0)
         return cmdGeoTextures(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "script-check") == 0)
+        return cmdScriptCheck(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "mdl-info") == 0)
         return cmdMdlInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "wav-info") == 0)
@@ -2440,6 +2502,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-survey <file.cat>...\n"
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
                  "  reluva-tool mdl-info <file.mdl | file.cat>\n"
+                 "  reluva-tool script-check <script file>\n"
                  "  reluva-tool wav-info <file.wav | file.mp3 | file.cat>\n"
                  "  reluva-tool wav-decode <in.wav | in.mp3> <out.wav>\n"
                  "  reluva-tool fif-info <file.fif | file.cat>\n"

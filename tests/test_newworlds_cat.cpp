@@ -606,6 +606,16 @@ void testMissionScripts() {
     MissionRun lost(s[0], nullptr);
     CHECK(lost.fire({"destroyed", {"hub"}}).back().kind == MissionRun::Output::Lost && lost.finished());
     CHECK(bool(parseMissionScripts("mission T F\non start\n  frobnicate\n", s)));
+    // Signals, counted; a random choice; actions for the game to carry out.
+    CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
+                               "  ai K assault-1\n  hostile taubat\n  give dilithium 100\n  random a b\n"
+                               "on signal hit*2\n  complete 5\non all-completed\n  win\n",
+                               s));
+    MissionRun sig(s[0], nullptr);
+    out = sig.fire({"start", {}});
+    CHECK(sig.won() && sig.nextTimer() < 0);
+    CHECK(std::count_if(out.begin(), out.end(), [](const auto& o) { return o.kind == MissionRun::Output::Ai && o.sender == "K"; }) == 1);
+    CHECK(std::count_if(out.begin(), out.end(), [](const auto& o) { return o.kind == MissionRun::Output::Stance; }) == 1);
     CHECK(bool(parseMissionScripts("  say command \"x\"\n", s)));
 
     // Reluva's scripts all read, and each recorded mission's walkthrough
@@ -620,7 +630,8 @@ void testMissionScripts() {
         MissionRun r(m, generic);
         for (const ScriptEvent& e : r.walkthrough())
             r.fire(e);
-        while (!r.finished() && r.nextTimer() >= 0)
+        // Time passes (two hours at most: some timers repeat for ever).
+        for (double t = 0; !r.finished() && r.nextTimer() >= 0 && t < 7200; t += r.nextTimer())
             r.advance(r.nextTimer());
         const bool endsInWin = std::any_of(m.handlers.begin(), m.handlers.end(), [](const auto& h) {
             return std::any_of(h.actions.begin(), h.actions.end(), [](const auto& a) { return a.verb == "win"; });
@@ -644,8 +655,8 @@ void testMissionScripts() {
     CHECK(announcementFor({"built", {"sickbay"}}, {}, 'R').empty());
     CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
     CHECK(announcementFor({"short-crew", {}}, {}, 'F') == "FED002c" && announcementFor({"short-crew", {}}, {}, 'K').empty());
-    CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16}}, 'R') == "robjmet");
-    CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16}, {MissionRun::Output::Won, {}, {}, 0}},
+    CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}}, 'R') == "robjmet");
+    CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}, {MissionRun::Output::Won, {}, {}, 0, {}}},
                           'F') == "fmiswin");
 }
 

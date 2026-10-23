@@ -1226,7 +1226,14 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
     if (playing_ && !out.empty())
         walkNote_ = fired.kind; // in play, the latest that said anything
-    if (const std::string voice = announcementFor(fired, out, side); !voice.empty() && mixer_) {
+    // A message's own voice clip first; else the game's announcement.
+    std::string voice;
+    for (const MissionRun::Output& o : out)
+        if (o.kind == MissionRun::Output::Message && !o.clip.empty())
+            voice = o.clip;
+    if (voice.empty())
+        voice = announcementFor(fired, out, side);
+    if (!voice.empty() && mixer_) {
         stopClip();
         if (auto sound = loadSound(voice))
             clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);

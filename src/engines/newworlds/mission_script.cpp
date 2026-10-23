@@ -161,17 +161,29 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                 };
                 int n;
                 if (a.verb == "say") {
-                    if (a.args.size() != 2)
-                        return bad("expected: say <sender> \"text\"");
+                    if (a.args.size() != 2 && a.args.size() != 3)
+                        return bad("expected: say <sender> \"text\" [clip]");
                 } else if (a.verb == "complete" || a.verb == "reveal" || a.verb == "lose") {
                     if (a.args.size() != 1 || !toInt(a.args[0], n))
                         return bad("expected: " + a.verb + " <objective id>");
                 } else if (a.verb == "timer") {
                     if (a.args.size() != 2 || !toInt(a.args[1], n))
                         return bad("expected: timer <name> <seconds>");
-                } else if (a.verb == "research") {
+                } else if (a.verb == "research" || a.verb == "stop" || a.verb == "signal") {
                     if (a.args.size() != 1)
-                        return bad("expected: research <topic>");
+                        return bad("expected: " + a.verb + " <name>");
+                } else if (a.verb == "random") {
+                    if (a.args.empty())
+                        return bad("expected: random <signal>...");
+                } else if (a.verb == "hostile" || a.verb == "neutral" || a.verb == "allied") {
+                    if (a.args.size() != 1)
+                        return bad("expected: " + a.verb + " <side>");
+                } else if (a.verb == "ai") {
+                    if (a.args.size() < 2)
+                        return bad("expected: ai <side> <order>");
+                } else if (a.verb == "give" || a.verb == "take") {
+                    if (a.args.size() != 2 || !toInt(a.args[1], n))
+                        return bad("expected: " + a.verb + " <material> <amount>");
                 } else if (a.verb != "win") {
                     return bad("unknown action " + a.verb);
                 }
@@ -221,6 +233,15 @@ bool MissionRun::requirementsMet(const ScriptEvent& want) const {
 bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) {
     if (want.kind == "built-all")
         return got.kind == "built" && requirementsMet(want);
+    if (want.kind == "signal" && got.kind == "signal" && !want.args.empty() && !got.args.empty()) {
+        // signal <name>*N: the N-th time it's raised.
+        const size_t star = want.args[0].find('*');
+        if (want.args[0].substr(0, star) != got.args[0])
+            return false;
+        const int n = star == std::string::npos ? 1 : std::atoi(want.args[0].c_str() + star + 1);
+        const auto it = signals_.find(got.args[0]);
+        return star == std::string::npos ? true : it != signals_.end() && it->second == n;
+    }
     if (want.kind != got.kind || want.args.size() > got.args.size())
         return false;
     for (size_t i = 0; i < want.args.size(); ++i)
@@ -266,28 +287,45 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
             break;
         if (a.verb == "say") {
             const char* section = sectionName(a.args[0]);
-            out.push_back({Output::Message, section ? section : a.args[0], expand(a.args[1], ev), 0});
+            out.push_back({Output::Message, section ? section : a.args[0], expand(a.args[1], ev), 0,
+                           a.args.size() > 2 ? a.args[2] : std::string()});
         } else if (a.verb == "complete") {
             const uint32_t id = uint32_t(std::atoi(a.args[0].c_str()));
             if (completed_.insert(id).second) {
                 revealed_.insert(id);
-                out.push_back({Output::Completed, {}, {}, id});
+                out.push_back({Output::Completed, {}, {}, id, {}});
                 follow.push_back({"completed", {a.args[0]}});
             }
         } else if (a.verb == "reveal") {
             const uint32_t id = uint32_t(std::atoi(a.args[0].c_str()));
             if (revealed_.insert(id).second)
-                out.push_back({Output::Revealed, {}, {}, id});
+                out.push_back({Output::Revealed, {}, {}, id, {}});
         } else if (a.verb == "win") {
             won_ = true;
-            out.push_back({Output::Won, {}, {}, 0});
+            out.push_back({Output::Won, {}, {}, 0, {}});
         } else if (a.verb == "lose") {
             lost_ = true;
-            out.push_back({Output::Lost, {}, {}, uint32_t(std::atoi(a.args[0].c_str()))});
+            out.push_back({Output::Lost, {}, {}, uint32_t(std::atoi(a.args[0].c_str())), {}});
         } else if (a.verb == "timer") {
             timers_[a.args[0]] = std::atof(a.args[1].c_str());
         } else if (a.verb == "research") {
             follow.push_back({"research-available", {a.args[0]}});
+        } else if (a.verb == "stop") {
+            timers_.erase(a.args[0]);
+        } else if (a.verb == "signal") {
+            follow.push_back({"signal", {a.args[0]}});
+        } else if (a.verb == "random") {
+            random_ = random_ * 1664525u + 1013904223u;
+            follow.push_back({"signal", {a.args[(random_ >> 16) % a.args.size()]}});
+        } else if (a.verb == "hostile" || a.verb == "neutral" || a.verb == "allied") {
+            out.push_back({Output::Stance, a.args[0], a.verb, 0, {}});
+        } else if (a.verb == "ai") {
+            std::string order;
+            for (size_t i = 1; i < a.args.size(); ++i)
+                order += (i > 1 ? " " : "") + a.args[i];
+            out.push_back({Output::Ai, a.args[0], order, 0, {}});
+        } else if (a.verb == "give" || a.verb == "take") {
+            out.push_back({Output::Stock, a.verb, a.args[0] + " " + a.args[1], 0, {}});
         }
     }
     for (const ScriptEvent& f : follow) {
@@ -321,6 +359,8 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
     ++depth_;
     if (event.kind == "built" && !event.args.empty())
         ++built_[event.args[0]];
+    if (event.kind == "signal" && !event.args.empty())
+        ++signals_[event.args[0]];
     for (Rule& r : rules_) {
         if ((r.fired && !r.handler->every) || !matches(r.handler->event, event))
             continue;
@@ -372,7 +412,8 @@ std::vector<ScriptEvent> MissionRun::walkthrough() const {
         // Lost-mission handlers, follow-on events and timers happen by
         // themselves (or shouldn't, in a walkthrough).
         if (h.every || e.kind == "completed" || e.kind == "all-completed" || e.kind == "timer" ||
-            e.kind == "research-available" || (!h.actions.empty() && h.actions[0].verb == "lose"))
+            e.kind == "signal" || e.kind == "research-available" ||
+            (!h.actions.empty() && h.actions[0].verb == "lose"))
             continue;
         if (e.kind == "built-all") {
             for (const std::string& req : e.args) {
