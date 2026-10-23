@@ -54,6 +54,13 @@ its stock and building counts, key presses (the training missions wait
 for keys) and timers; scans, captures, sightings and destroyed enemies
 come once units and combat do.
 
+Handlers can be switched: a label at the end of a handler's line (`on
+scanned science temple as temple-scan dormant`), `arm` and `disarm` to turn
+it on and off - the game's monitors that wake only after an earlier step,
+or go to sleep. A fail can be delayed as the game's are (`fail 21
+destroyed colony-hub`: the cause, the "you have failed" line, the end 20 s
+later).
+
 Each script ends with what the game does that the format can't say yet:
 most often a fail announced and the mission ended 10-20 s later (Reluva
 ends it at once or with timers), monitors the game switches on or off

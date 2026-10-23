@@ -1294,6 +1294,8 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
             walkNote_ += "; mission won";
         else if (o.kind == MissionRun::Output::Lost)
             walkNote_ += "; mission lost";
+        else if (o.kind == MissionRun::Output::Failing)
+            walkNote_ += "; mission failing";
     }
     if (!out.empty())
         redraw();

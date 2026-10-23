@@ -64,6 +64,9 @@ std::string displayName(const std::string& id) {
     return s;
 }
 
+// The timer a failing mission ends on (a name no script can use).
+const std::string kFailTimer = "\x01" "fail";
+
 const char* sectionName(const std::string& s) {
     static const std::pair<const char*, const char*> names[] = {
         {"command", "Command"},         {"operations", "Operations"}, {"engineering", "Engineering"},
@@ -131,22 +134,32 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                     return fail("unknown objective flag " + t[i]);
             }
             m.objectives.push_back(o);
-        } else if (t[0] == "lose") {
-            int id;
-            if (t.size() < 3 || !toInt(t[1], id))
-                return fail("expected: lose <string id> <event>...");
+        } else if (t[0] == "lose" || t[0] == "fail" || t[0] == "on" || t[0] == "every") {
+            // A handler; "as <label> [dormant]" at its end.
             MissionScript::Handler h;
-            h.event = {t[2], {t.begin() + 3, t.end()}};
-            h.actions.push_back({"lose", {t[1]}});
+            if (!t.empty() && t.back() == "dormant") {
+                h.dormant = true;
+                t.pop_back();
+            }
+            if (t.size() >= 2 && t[t.size() - 2] == "as") {
+                h.label = t.back();
+                t.resize(t.size() - 2);
+            } else if (h.dormant) {
+                return fail("a dormant handler needs a label: ... as <label> dormant");
+            }
             h.line = lineNo;
-            m.handlers.push_back(std::move(h));
-        } else if (t[0] == "on" || t[0] == "every") {
-            if (t.size() < 2)
-                return fail("expected an event");
-            MissionScript::Handler h;
-            h.every = t[0] == "every";
-            h.event = {t[1], {t.begin() + 2, t.end()}};
-            h.line = lineNo;
+            if (t[0] == "lose" || t[0] == "fail") {
+                int id;
+                if (t.size() < 3 || !toInt(t[1], id))
+                    return fail("expected: " + t[0] + " <string id> <event>...");
+                h.event = {t[2], {t.begin() + 3, t.end()}};
+                h.actions.push_back({t[0], {t[1]}});
+            } else {
+                if (t.size() < 2)
+                    return fail("expected an event");
+                h.every = t[0] == "every";
+                h.event = {t[1], {t.begin() + 2, t.end()}};
+            }
             m.handlers.push_back(std::move(h));
         } else {
             return fail("unknown line " + t[0]);
@@ -169,6 +182,16 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                 } else if (a.verb == "timer") {
                     if (a.args.size() != 2 || !toInt(a.args[1], n))
                         return bad("expected: timer <name> <seconds>");
+                } else if (a.verb == "fail") {
+                    if (a.args.empty() || a.args.size() > 2 || !toInt(a.args[0], n) ||
+                        (a.args.size() == 2 && !toInt(a.args[1], n)))
+                        return bad("expected: fail <objective id> [seconds]");
+                } else if (a.verb == "arm" || a.verb == "disarm") {
+                    if (a.args.size() != 1)
+                        return bad("expected: " + a.verb + " <label>");
+                    if (std::none_of(m.handlers.begin(), m.handlers.end(),
+                                     [&](const MissionScript::Handler& o) { return o.label == a.args[0]; }))
+                        return bad("no handler labelled " + a.args[0]);
                 } else if (a.verb == "research" || a.verb == "stop" || a.verb == "signal") {
                     if (a.args.size() != 1)
                         return bad("expected: " + a.verb + " <name>");
@@ -200,10 +223,10 @@ const MissionScript* findMissionScript(std::string_view shortName, char side) {
 
 MissionRun::MissionRun(const MissionScript& script, const MissionScript* generic) : script_(script) {
     for (const auto& h : script.handlers)
-        rules_.push_back({&h});
+        rules_.push_back({&h, false, !h.dormant});
     if (generic)
         for (const auto& h : generic->handlers)
-            rules_.push_back({&h});
+            rules_.push_back({&h, false, !h.dormant});
     for (const auto& o : script.objectives)
         if (!o.hidden)
             revealed_.insert(o.id);
@@ -339,6 +362,22 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
             follow.push_back({"research-available", {a.args[0]}});
         } else if (a.verb == "stop") {
             timers_.erase(a.args[0]);
+        } else if (a.verb == "arm" || a.verb == "disarm") {
+            for (Rule& r : rules_)
+                if (r.handler->label == a.args[0]) {
+                    r.armed = a.verb == "arm";
+                    if (r.armed)
+                        r.fired = false;
+                }
+        } else if (a.verb == "fail") {
+            // Failing: lost when the delay runs out (the game says why, then
+            // that the mission has failed, then ends it).
+            if (!failing_) {
+                failing_ = true;
+                failId_ = uint32_t(std::atoi(a.args[0].c_str()));
+                timers_[kFailTimer] = a.args.size() > 1 ? std::atof(a.args[1].c_str()) : 20.0;
+                out.push_back({Output::Failing, {}, {}, failId_, {}});
+            }
         } else if (a.verb == "signal") {
             follow.push_back({"signal", {a.args[0]}});
         } else if (a.verb == "random") {
@@ -389,7 +428,7 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
     if (event.kind == "signal" && !event.args.empty())
         ++signals_[event.args[0]];
     for (Rule& r : rules_) {
-        if ((r.fired && !r.handler->every) || !matches(r.handler->event, event))
+        if (!r.armed || (r.fired && !r.handler->every) || !matches(r.handler->event, event))
             continue;
         r.fired = true;
         run(*r.handler, event, out);
@@ -412,6 +451,13 @@ std::vector<MissionRun::Output> MissionRun::advance(double seconds) {
     }
     for (const std::string& name : due) {
         timers_.erase(name);
+        if (name == kFailTimer) {
+            if (!finished()) {
+                lost_ = true;
+                out.push_back({Output::Lost, {}, {}, failId_, {}});
+            }
+            continue;
+        }
         auto more = fire({"timer", {name}});
         out.insert(out.end(), more.begin(), more.end());
     }
@@ -440,7 +486,7 @@ std::vector<ScriptEvent> MissionRun::walkthrough() const {
         // themselves (or shouldn't, in a walkthrough).
         if (h.every || e.kind == "completed" || e.kind == "all-completed" || e.kind == "timer" ||
             e.kind == "signal" || e.kind == "research-available" ||
-            (!h.actions.empty() && h.actions[0].verb == "lose"))
+            (!h.actions.empty() && (h.actions[0].verb == "lose" || h.actions[0].verb == "fail")))
             continue;
         if (e.kind == "built-all") {
             for (const std::string& req : e.args) {

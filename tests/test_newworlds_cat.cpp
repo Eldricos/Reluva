@@ -607,17 +607,26 @@ void testMissionScripts() {
     CHECK(lost.fire({"destroyed", {"hub"}}).back().kind == MissionRun::Output::Lost && lost.finished());
     CHECK(bool(parseMissionScripts("mission T F\non start\n  frobnicate\n", s)));
     // Signals, counted; a random choice; actions for the game to carry out.
-    CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
-                               "  ai K assault-1\n  hostile taubat\n  give dilithium 100\n  random a b\n"
-                               "on signal hit*2\n  complete 5\non all-completed\n  win\n",
+    // Handlers switched on and off by label; a fail that ends the mission
+    // after its delay.
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\non start\n  arm watch\non scanned science temple as watch dormant\n"
+                               "  complete 1\n  disarm guard\nfail 9 destroyed temple as guard\non all-completed\n  win\n",
                                s));
-    // The monitors compare.
-    CHECK(!parseMissionScripts("mission T F\nobjective 1\nobjective 2\nobjective 3\non stock dilithium 200\n  complete 1\n"
-                               "on count taubat-house <= 5\n  complete 2\non colony-size 200\n  complete 3\n", s));
-    MissionRun mon(s[0], nullptr);
-    CHECK(mon.fire({"stock", {"dilithium", "150"}}).empty() && mon.fire({"stock", {"dilithium", "210"}}).size() == 1);
-    CHECK(mon.fire({"count", {"taubat-house", "7"}}).empty() && mon.fire({"count", {"taubat-house", "5"}}).size() == 1);
-    CHECK(mon.fire({"colony-size", {"150"}}).empty() && mon.fire({"colony-size", {"200"}}).size() == 1);
+    MissionRun sw(s[0], nullptr);
+    CHECK(sw.fire({"scanned", {"science", "temple"}}).empty()); // still dormant
+    sw.fire({"start", {}});
+    sw.fire({"scanned", {"science", "temple"}});
+    CHECK(sw.won());
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\nfail 9 destroyed temple\non destroyed temple\n"
+                               "  say command \"Gone.\"\n",
+                               s));
+    MissionRun fl(s[0], nullptr);
+    out = fl.fire({"destroyed", {"temple"}});
+    CHECK(fl.failing() && !fl.finished() && out.size() == 2 && out[0].kind == MissionRun::Output::Failing &&
+          out[0].objective == 9 && out[1].text == "Gone.");
+    CHECK(fl.advance(19).empty() && fl.advance(1).back().kind == MissionRun::Output::Lost && fl.finished() && !fl.won());
+    CHECK(bool(parseMissionScripts("mission T F\non start\n  arm nothing\n", s))); // no such label
+    CHECK(bool(parseMissionScripts("mission T F\non start dormant\n  win\n", s)));  // dormant needs a label
     CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
                                "  ai K assault-1\n  hostile taubat\n  give dilithium 100\n  random a b\n"
                                "on signal hit*2\n  complete 5\non all-completed\n  win\n",

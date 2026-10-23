@@ -25,12 +25,20 @@ namespace reluva::newworlds {
 //   objective 19 hidden              mission's table; hidden until revealed;
 //   objective 21 optional            optional ones don't hold up the end
 //   lose 21 destroyed colony-hub     lost, with that fail string, on an event
+//   fail 21 destroyed colony-hub     failing: lost 20 s after the event
 //   on <event> <args>...             once, the first time the event happens
 //   every <event> <args>...          each time
+//   ... as <label> [dormant]         (after an on, every, lose or fail line)
+//                                    a label to switch it by; dormant: off
+//                                    until armed
 //     say <sender> "text" [clip]     then actions, indented (clip: a voice
 //                                    clip's stem the game plays with it)
 //     complete 16 | reveal 19 | win | lose 21
 //     research <topic> | timer <name> <seconds> | stop <timer>
+//     arm <label> | disarm <label>   switch the handlers with that label on
+//                                    (a once-only one may fire again) / off
+//     fail <id> [seconds]            the mission is failing: lost after the
+//                                    delay (20 s), its messages said first
 //     signal <name>                  raise the event "signal <name>"
 //     random <signal> <signal>...    raise one of them, chosen at random
 //     hostile|neutral|allied <side>  the mission's side's stance changes
@@ -63,6 +71,8 @@ struct MissionScript {
     };
     struct Handler {
         bool every = false;
+        std::string label;    // for arm / disarm; empty for none
+        bool dormant = false; // off until armed
         ScriptEvent event;
         std::vector<Action> actions;
         int line = 0;
@@ -92,7 +102,9 @@ public:
     struct Output {
         // Stance, Ai, Stock: for the game to carry out (sender = the side,
         // text = the stance, the order, or the material and amount).
-        enum Kind { Message, Completed, Revealed, Won, Lost, Stance, Ai, Stock } kind;
+        // Failing: the mission will be lost (objective = the fail string)
+        // when its delay runs out.
+        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock } kind;
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
         std::string clip;          // a message's voice clip (a media stem), if any
@@ -106,6 +118,7 @@ public:
     // Moves time on, firing timers that run out.
     std::vector<Output> advance(double seconds);
     bool finished() const { return won_ || lost_; }
+    bool failing() const { return failing_; }
     bool won() const { return won_; }
     State objectiveState(uint32_t id) const;
     // Seconds to the next timer, or a negative number if none is running.
@@ -119,6 +132,7 @@ private:
     struct Rule {
         const MissionScript::Handler* handler;
         bool fired = false;
+        bool armed = true;
     };
     bool matches(const ScriptEvent& want, const ScriptEvent& got);
     bool requirementsMet(const ScriptEvent& want) const;
@@ -133,7 +147,8 @@ private:
     std::map<std::string, double> timers_;
     std::map<std::string, int> signals_; // times each signal was raised
     uint32_t random_ = 12345;
-    bool won_ = false, lost_ = false, allDone_ = false;
+    bool won_ = false, lost_ = false, allDone_ = false, failing_ = false;
+    uint32_t failId_ = 0;
     int depth_ = 0;
 };
 
