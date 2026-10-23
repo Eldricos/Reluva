@@ -56,6 +56,7 @@ One page per mission:
 | [play-j9r.md](play-j9r.md) | J9 The Lost Tribes | Romulan (14th) |
 | [play-c11.md](play-c11.md) | C11 False Sanctuary (bonus) | Romulan |
 | [play-tutorials.md](play-tutorials.md) | C1, C4-C8, the training missions | Federation |
+| [play-vm-tutorials.md](play-vm-tutorials.md) | C1, C4-C8 again, the project's own VM recordings: build times, costs, power, mining | Federation |
 
 Playing on the map, with the game's controls: [game.md](game.md).
 Reluva's mission scripts are written from these pages:

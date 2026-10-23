@@ -45,38 +45,46 @@ never delete a message unread. **[shot]** = a screenshot is enough;
   ([play-j9r.md](play-j9r.md), [play-c11.md](play-c11.md), [gmf.md](gmf.md#resource-deposits))
 - **Ores to materials** [rec]: watch a resource processor's stock and the
   six materials as each ore comes in; which ore makes which material, and
-  what mined talgonite adds. ([gmf.md](gmf.md#open-questions), [play-j3r.md](play-j3r.md))
-- **Mining rates** [rec]: one mining station on a fresh deposit; note its
-  raw stock every minute and when it reports exhausted. ([play-tutorials.md](play-tutorials.md#open-questions))
-- **Build times** [rec]: note order and finish times for each building,
-  upgrade and vehicle on one side (ideally all three); include R9's device.
+  what mined talgonite adds. The training missions show it isn't one for
+  one (all six rose together in C5; talgonite piled up unused in C6, C8;
+  [play-vm-tutorials.md](play-vm-tutorials.md)): best a single mine of one kind, with the processor's
+  page and NEW WORLDS in view. ([gmf.md](gmf.md#open-questions), [play-j3r.md](play-j3r.md))
+- **Mining rates** [rec]: answered for the Federation training missions
+  (about 1.1 ore a second, mines dry after 6-13 minutes; [play-vm-tutorials.md](play-vm-tutorials.md)); still
+  worth one Klingon or Romulan mine to see if they differ. ([play-tutorials.md](play-tutorials.md#open-questions))
+- **Build times** [rec]: the Federation's are timed now ([play-vm-tutorials.md](play-vm-tutorials.md));
+  still wanted: the other two sides (do they differ?), sickbay,
+  transporter pad, accommodation, advanced generator, and R9's device.
   ([play-r9.md](play-r9.md))
 - **Building on deposits** [shot]: pick a power generator and hold its
   hologram over a deposit block (one the Tricorder names an ore on), then
   over bare ground beside it; is it red on the deposit? Reluva keeps
   deposits for mines only. ([game.md](game.md#the-colony))
-- **Build costs** [shot]: hover every build icon on each side and screenshot
-  its cost; missing even for the Federation: phaser tank, photon artillery,
-  science block, phaser coil lab. ([play-tutorials.md](play-tutorials.md#build-costs-shown-structures-from-a-construction-yard))
+- **Build costs** [shot]: the Federation's are all read now ([play-vm-tutorials.md](play-vm-tutorials.md));
+  still wanted: the Klingon and Romulan menus, the accommodation block,
+  advanced generator, and two blurred digits (ground scout's dilithium 2
+  or 3, phaser tank's polycomp 12 or 18). ([play-tutorials.md](play-tutorials.md#build-costs-shown-structures-from-a-construction-yard))
 - **Unit speeds** [rec]: send each vehicle type a known distance over flat
-  ground (read the Tricorder at both ends) and time it.
+  ground (read the Tricorder at both ends) and time it. Not in the
+  training-mission recordings.
   ([play-f1.md](play-f1.md#still-to-look-at))
 - **Power** [shot]: COLONY DETAILS and a generator's panel before and after
-  each generator and advanced generator; how many C6 needs.
+  an advanced generator; what each building draws. (The Federation
+  generator and C6's five generators are covered: [play-vm-tutorials.md](play-vm-tutorials.md).)
   ([play-tutorials.md](play-tutorials.md#open-questions))
 - **Colony capacity growth** [rec]: note the colony size maximum after each
-  building finishes; which building gives which step (seen: 50, 55, 60, 75,
+  building finishes; which building gives which step (in the training
+  missions nothing but housing was built and it never rose:
+  accommodation and the transporter pad are the suspects) (seen: 50, 55, 60, 75,
   80, 90 in R1, J4R, J6R, R14, C11) and how size can exceed it (R14 91/90).
   ([play-r1.md](play-r1.md), [play-j6r.md](play-j6r.md), [play-r14.md](play-r14.md))
 - **Starting stock and size** [shot]: the NEW WORLDS panel in the first
   seconds of each mission; doubtful ones: J4R (small digits), J7 (38/90 vs
   45/90 on the Klingon side), J8 all three sides (45/50), R12 (very large
   stock, 50/90). ([play.md](play.md#what-they-established))
-- **Camera** [rec]: lowest and highest heights, tilt and rotate keys (C1's
-  tilt message), whether the view follows a selection.
+- **Camera** [rec]: lowest and highest heights, whether the view follows a
+  selection (the keys are confirmed by C1).
   ([play-tutorials.md](play-tutorials.md#open-questions))
-- **Communications panel** [shot]: can it be dragged to the top centre
-  (seen in R9, R12, C11)? ([play.md](play.md#what-they-established))
 - **Shield cover** [rec]: what turns a building's shield cover from BASIC to
   HIGH (J9R between 7:49 and 11:03). ([play-j9r.md](play-j9r.md))
 
@@ -111,15 +119,13 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
 ## 3. Interface
 
-- **Options and resolution** [shot]: open Options from the main menu;
-  screenshot every page; note the in-game resolution and whether it matches
-  the game.ini 640x480. ([play-tutorials.md](play-tutorials.md#open-questions), [level.md](level.md#gameini))
 - **Difficulty and Cadet mode** [rec]: start the same mission at each
   difficulty and with Cadet mode; note starting stock, size and enemy
   strength. ([play-tutorials.md](play-tutorials.md#main-menu-and-setup-screens))
-- **Panels never opened** [shot]: About, Multiplayer setup, and in play the
-  COMMAND objective list at start, midway and end (K1, R1, C11), plus each
-  MISSION REPORT page. ([play-k1.md](play-k1.md#still-to-look-at), [play-r1.md](play-r1.md))
+- **Panels never opened** [shot]: Multiplayer setup, and in play the
+  COMMAND objective list at start, midway and end (K1, R1, C11), plus the
+  campaign missions' MISSION REPORT pages (About and the training
+  missions' reports are seen now). ([play-k1.md](play-k1.md#still-to-look-at), [play-r1.md](play-r1.md))
 - **Portraits per officer** [shot]: open STAFF on each side's hub and
   screenshot every officer card (face, name, section, post); then note each
   message's face and section. Settles which face goes with which section,
@@ -181,12 +187,12 @@ which page and view are on screen when it starts.
 
 **Tutorials** ([play-tutorials.md](play-tutorials.md#open-questions))
 
-- **C1** [rec]: play to the end (completed or quit? report?); are the objectives (ids 10-16) shown; the tilt-keys message's clip; hub readout (272 or 373 in the second number).
-- **C4-C8** [rec]: which clip plays with each in-game message; listen for `tut-2_05`-`07`, `12`, `17`, `22`, `27`, `tutor40`, `tutor41`.
-- **C6** [rec]: does it complete, with what message; generator count and figures.
-- **C7, C8** [shot]: briefing views for C7 page 49 and C8 page 65.
-- **C1 briefing** [shot]: the green ship under `Tutor07`.
+- **C4-C8** [rec]: which clip plays with each in-game message: the VM recording's sound was too poor after C5's briefing; a recording with clearer sound would settle `tut-2_05`-`07`, `12`, `17`, `22`, `27`.
 - **Map** [shot]: Tricorder readings at the map's far corners in C1 and C5 (size past 64 blocks; same map for C1 and C5-C8?).
+
+C1, C6, the C7 and C8 briefing views, the `Tutor07` model, the options
+screen and the Communications panel are answered by the VM recordings
+([play-vm-tutorials.md](play-vm-tutorials.md)).
 
 ## 5. Missing data files
 

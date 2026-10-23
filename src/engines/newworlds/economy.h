@@ -36,6 +36,7 @@ struct BuildingType {
     int capacity = 0;  // colony capacity it adds once built
     bool onDeposit = false; // a mining station: stands on a deposit
     std::string needs;      // a building that must stand first ("" none)
+    double buildSeconds = 40; // order to finished
 };
 // The types the build menu offers (the training missions' Federation
 // list; the other sides are taken to cost the same until seen).

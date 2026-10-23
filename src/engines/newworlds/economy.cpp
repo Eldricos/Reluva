@@ -10,23 +10,20 @@ namespace reluva::newworlds {
 
 namespace {
 
-// Placeholders (game.md#placeholders), until measured in the game:
-// - a building goes up in about 40 s (F1's vehicle yard: placed 6:40,
-//   finished 7:22);
-constexpr double kBuildSeconds = 40;
-// - a mining station digs 1.5 ore a second (C5's two mines met its 200
-//   dilithium and 1500 nitrium targets in about ten minutes);
-constexpr float kMineRate = 1.5f;
+// Figures from the VM recordings of the training missions
+// (play-vm-tutorials.md), and placeholders (game.md#placeholders):
+// - a mining station digs about 1.1 ore a second (C7's processor stock);
+constexpr float kMineRate = 1.1f;
 // - the processor refines 3 ore a second, one material per ore;
 constexpr float kRefineRate = 3;
 // - a deposit block holds its map value (50-300) times 4 ore (the
-//   tutorials' mines ran out after some eight minutes);
+//   training missions' mines ran out after 6-13 minutes);
 constexpr float kOrePerUnit = 4;
-// - the crew grows by one every 30 s up to the capacity (F1: 20 to 40 in
-//   18 minutes);
-constexpr double kCrewSeconds = 30;
+// - the crew grows by one about every 150 s up to the capacity (C8: 20
+//   to 35 in 38 minutes; C1, C6, C7 one every 1.5-3.5 minutes);
+constexpr double kCrewSeconds = 150;
 // - warnings repeat once a minute while they hold (K2's power messages at
-//   8:14 and 9:14).
+//   8:14 and 9:14; C8's 60 s apart).
 constexpr double kWarnEvery = 60;
 
 } // namespace
@@ -45,23 +42,26 @@ const std::vector<BuildingType>& buildingTypes() {
     // Costs as the training missions' build menu shows them, in the
     // stock's order (Dilithium, Polycomp, Thermoconc, Transalumin,
     // Nitrium, Duranium; play-tutorials.md#build-costs-shown). The
-    // accommodation block's isn't shown: a sickbay's, a guess. Power and
-    // capacity are placeholders: the hub's generator covers a few
-    // buildings (C6 starts at 31 % demand met with its hub alone loaded),
-    // and each building adds a little capacity, accommodation most (F1's
-    // capacity rose 50, 55, 65, 80, 90 as it built).
+    // accommodation block's isn't shown: a sickbay's, a guess. Build times
+    // as the VM recordings timed them, order to finished
+    // (play-vm-tutorials.md#build-times); those not seen are 40 s. Power
+    // is a placeholder: the hub's generator covers a few buildings (C6
+    // starts at 20 % demand met, C7 at 14 %). No building but the
+    // colony's housing raised the capacity in the training missions (50
+    // or 60 throughout); F1's rose 50, 55, 65, 80, 90, from which ones
+    // isn't known: accommodation and the transporter pad, guessed.
     static const std::vector<BuildingType> kTypes = {
-        {"colony-hub", "COLONY HUB", {}, 60, 0, false, "-"},
-        {"construction-yard", "CONSTRUCTION YARD", {0, 12, 89, 5, 50, 0}, -10, 5, false, "colony-hub"},
-        {"vehicle-yard", "VEHICLE YARD", {0, 10, 90, 5, 0, 0}, -10, 5, false, "construction-yard"},
-        {"power-generator", "POWER GENERATOR", {35, 1, 35, 0, 800, 0}, 60, 0, false, "construction-yard"},
-        {"resource-processor", "RESOURCE PROCESSOR", {0, 4, 30, 2, 0, 0}, -10, 5, false, "construction-yard"},
-        {"mining-station", "MINING STATION", {0, 14, 80, 10, 0, 140}, -15, 0, true, "resource-processor"},
-        {"science-station", "SCIENCE STATION", {0, 4, 53, 17, 120, 0}, -10, 5, false, "construction-yard"},
-        {"transporter-pad", "TRANSPORTER PAD", {0, 6, 32, 2, 0, 0}, -5, 10, false, "construction-yard"},
-        {"sickbay", "SICKBAY", {0, 8, 48, 20, 0, 0}, -10, 5, false, "construction-yard"},
-        {"accommodation", "ACCOMMODATION", {0, 8, 48, 20, 0, 0}, -5, 15, false, "construction-yard"},
-        {"security-center", "SECURITY CENTER", {0, 10, 100, 10, 1200, 0}, -15, 5, false, "construction-yard"},
+        {"colony-hub", "COLONY HUB", {}, 60, 0, false, "-", 0},
+        {"construction-yard", "CONSTRUCTION YARD", {0, 12, 89, 5, 50, 0}, -10, 0, false, "colony-hub", 45},
+        {"vehicle-yard", "VEHICLE YARD", {0, 10, 90, 5, 0, 0}, -10, 0, false, "construction-yard", 65},
+        {"power-generator", "POWER GENERATOR", {35, 1, 35, 0, 800, 0}, 60, 0, false, "construction-yard", 30},
+        {"resource-processor", "RESOURCE PROCESSOR", {0, 4, 30, 2, 0, 0}, -10, 0, false, "construction-yard", 25},
+        {"mining-station", "MINING STATION", {0, 14, 80, 10, 0, 140}, -15, 0, true, "resource-processor", 60},
+        {"science-station", "SCIENCE STATION", {0, 4, 53, 17, 120, 0}, -10, 0, false, "construction-yard", 75},
+        {"transporter-pad", "TRANSPORTER PAD", {0, 6, 32, 2, 0, 0}, -5, 10, false, "construction-yard", 40},
+        {"sickbay", "SICKBAY", {0, 8, 48, 20, 0, 0}, -10, 0, false, "construction-yard", 40},
+        {"accommodation", "ACCOMMODATION", {0, 8, 48, 20, 0, 0}, -5, 15, false, "construction-yard", 40},
+        {"security-center", "SECURITY CENTER", {0, 10, 100, 10, 1200, 0}, -15, 0, false, "construction-yard", 83},
     };
     return kTypes;
 }
@@ -148,8 +148,9 @@ std::vector<ScriptEvent> Economy::advance(double seconds) {
         out.push_back({"power-low", {}});
         lastPowerWarning_ = clock_;
     }
-    // Construction: paid for when it starts, then up over kBuildSeconds,
-    // slower without full power.
+    // Construction: paid for when it starts (at the order, if the stock
+    // can pay: the recordings' stock drops at the click), then up over the
+    // type's build time.
     bool waiting = false;
     for (ColonyStructure& s : structures_) {
         if (s.progress >= 1)
@@ -164,7 +165,9 @@ std::vector<ScriptEvent> Economy::advance(double seconds) {
                 stock_[size_t(m)] -= t->cost[size_t(m)];
             s.started = true;
         }
-        s.progress = float(std::min(1.0, s.progress + seconds / kBuildSeconds * std::max(0.25f, met)));
+        // At the type's own pace: the training missions' generators went up
+        // as fast at 20 % demand met as at full power (C6).
+        s.progress = float(std::min(1.0, s.progress + seconds / std::max(1.0, t->buildSeconds)));
         if (s.progress >= 1) {
             capacity_ += t->capacity;
             out.push_back({"built", {s.type}});

@@ -81,25 +81,29 @@ goes up by itself once placed).
   block; a mining station's middle must be on one. The hologram is the
   model tinted green or red. Whether the game forbids building on
   deposits isn't known (Reluva's colony layout keeps them free for mines).
-- **Construction:** the cost comes off the stock when work starts (an
-  order the stock can't pay waits, and the colony is told "short
-  resources" once a minute). It is drawn as the recordings show it: an
+- **Construction:** the cost comes off the stock at the order, as the
+  VM recordings show (an order the stock can't pay waits, and the colony
+  is told "short resources" once a minute). Each type takes its own time,
+  as timed in the training missions ([play-vm-tutorials.md](play-vm-tutorials.md#build-times)),
+  and low power doesn't slow it (C6's generators went up as fast at 20 %
+  demand met). It is drawn as the recordings show it: an
   apron (the model pressed flat) for the first 15 % of the time, then the
   building rising out of it, with two of the side's construction bees
   (`fconbee`, `conbee`, `rcb`) at its corners playing their `manipulate`
   animation. How many bees the game sends, and whether they come from the
-  construction yard, isn't known. When it's done, the script hears `built
-  <type>` (Engineering's message, the game's spoken announcement) and the
-  colony's capacity grows.
+  construction yard, isn't known (the recordings show 2-4). When it's
+  done, the script hears `built <type>` (Engineering's message, the
+  game's spoken announcement); housing (accommodation, the transporter
+  pad) raises the colony's capacity, other buildings don't.
 - **Power:** the hub and each generator supply 60, other buildings use
-  5-15. Short of power, construction, mining and refining slow, and the
+  5-15. Short of power, mining and refining slow, and the
   colony is told once a minute. The title shows supply / demand.
 - **Mining:** a mining station digs its block's ore (the block's map
   value × 4) for the resource processor, which refines it into the
   material of the same place in the list (ore kind 1 into dilithium,
   2 into polycomp, and so on: which ore makes what isn't known). A block
   dug dry tells the script `mine-exhausted` at its middle.
-- **Crew:** grows by one every 30 s up to the capacity; the NEW WORLDS
+- **Crew:** grows by one every 150 s up to the capacity; the NEW WORLDS
   panel shows it as COLONY SIZE.
 - **The script:** the mission's script ([mission-scripts.md](mission-scripts.md))
   starts with play: `start` fires, its timers run, and the economy's events
@@ -117,14 +121,14 @@ goes up by itself once placed).
 | Sky view | 14 blocks, 65° | by eye |
 | First-person view | 0.6 block, 6° | by eye |
 | Spacing of a group's spots | 2500 units | Reluva's |
-| Build time | 40 s at full power (a quarter speed at the least) | F1's vehicle yard: placed 6:40, done 7:22 |
+| Build time | per type: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md) |
 | Costs | the training missions' build menu; accommodation's taken as the sickbay's | play-tutorials.md |
 | Power | hub and generator +60; buildings −5 to −15 | Reluva's, so the hub alone runs a few buildings |
-| Capacity added | +5 a building, +10 transporter pad, +15 accommodation | F1's capacity rose 50, 55, 65, 80, 90 |
-| Mining | 1.5 ore a second; a block holds its map value × 4 | C5's mines met its targets in about ten minutes |
+| Capacity added | +10 transporter pad, +15 accommodation, nothing else | no other building raised it in C1, C4-C8; F1's rose 50, 55, 65, 80, 90 |
+| Mining | 1.1 ore a second; a block holds its map value × 4 | C7's processor stock; the training missions' mines ran out after 6-13 minutes |
 | Refining | 3 ore a second, one material per ore, kind k into material k | Reluva's |
-| Crew growth | one every 30 s | F1: 20 to 40 in 18 minutes |
-| Warnings | once a minute while they hold | K2's power messages a minute apart |
+| Crew growth | one every 150 s | C8: 20 to 35 in 38 minutes; C1, C6, C7 one every 1.5-3.5 minutes (F1's 20 to 40 in 18 minutes was faster) |
+| Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
 groups), `economy.h` (stock, construction, power, mining, crew),

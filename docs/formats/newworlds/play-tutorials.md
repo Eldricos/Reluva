@@ -1,5 +1,12 @@
 # Star Trek: New Worlds: watched in play, the training missions
 
+> The project's own VM recordings of the same missions
+> ([play-vm-tutorials.md](play-vm-tutorials.md)) correct some of this page:
+> C1 has 45 messages and ends with a report; message 26 has its clip
+> (`Tutor26`); C6 can be completed (five generators); every training
+> mission ends with a MISSION REPORT; C1's starting stock and size differ
+> from C4's.
+
 A third-party Let's Play ("Colony Commander's first steps", 1:52:47, no
 commentary transcribed) of the Federation training: the training mission C1
 ("Duty first.") and the five tutorials C4-C8 (`cvr03.stb`). Observed

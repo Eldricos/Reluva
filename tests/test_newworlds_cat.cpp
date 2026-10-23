@@ -837,10 +837,10 @@ void testEconomy() {
     CHECK(id != 0 && e.stock()[Thermoconc] == 2211);
     auto ev = e.advance(1);
     CHECK(e.stock()[Thermoconc] == 2211 - 89 && e.stock()[Nitrium] == 3450 && count(ev, "built") == 0);
-    for (int i = 0; i < 40 && count(ev, "built") == 0; ++i)
+    for (int i = 0; i < 50 && count(ev, "built") == 0; ++i)
         ev = e.advance(1);
     CHECK(count(ev, "built") == 1 && ev[0].args.size() == 1 && ev[0].args[0] == "construction-yard");
-    CHECK(e.capacity() == 55 && e.stock()[Thermoconc] == 2211 - 89); // paid once
+    CHECK(e.capacity() == 50 && e.stock()[Thermoconc] == 2211 - 89); // paid once; no housing
     // Six more yards: demand 70 over the hub's 60.
     for (int i = 0; i < 6; ++i)
         e.addBuilt("vehicle-yard", 0, 0);
@@ -871,11 +871,11 @@ void testEconomy() {
     for (int i = 0; i < 200; ++i)
         e.advance(1);
     CHECK(e.stock()[Dilithium] >= dilithium + 199 && e.stock()[Dilithium] <= dilithium + 200 && e.oreStock()[0] < 1);
-    // The crew grows, one every 30 s, up to the capacity.
+    // The crew grows, one every 150 s, up to the capacity.
     const int crew = e.crew();
-    e.advance(30);
+    e.advance(150);
     CHECK(crew > 20 && e.crew() == crew + 1);
-    e.advance(3600);
+    e.advance(9000);
     CHECK(e.crew() == e.capacity());
 }
 
