@@ -237,8 +237,10 @@ on scanned strong-engineering temple
   signal temple-surveyed
 on timer temple-field-hint
   say engineering "The main containment field is misaligned and leaking badly. Easy to fix, but we must get in quickly."
+# the survey also wakes the capture watch (the game wakes it with the 20 s report: see the end)
 on signal temple-surveyed
   timer temple-report 20
+  arm temple-capture
 # 20 s after the survey: objective 18 met, 19 revealed, and the Taubat's patience runs out
 on timer temple-report
   complete 18
@@ -258,13 +260,14 @@ on timer taubat-demand
 on timer taubat-hostile
   hostile taubat
 on timer taubat-death
+  fail 23 20
   say medical "The Taubat are dead. We couldn't stop the plague."
-  lose 23
+  signal failing
 
-# --- Objective 19: hold the temple for 10 s ---------------------------------------------------
-every captured temple
+# --- Objective 19: hold the temple for 10 s (a watch that sleeps until the survey) ----------------
+every captured temple as temple-capture dormant
   say engineering "The away team is inside, Sir. Starting on the field realignment."
-on held temple 10
+on held temple 10 as temple-capture dormant
   say engineering "The containment field is aligned again and radiation is dropping. Just in time, Sir."
   complete 19
   signal objective
@@ -289,18 +292,33 @@ on timer pass-message
 on timer pass
   win
 
-# --- Fails ------------------------------------------------------------------------------------
-lose 20 count taubat-hangar == 2
-lose 20 count taubat-house == 5
-lose 21 destroyed colony-hub
-lose 22 destroyed temple
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on count taubat-hangar == 2
+  fail 20 20
+  say security "One of the Taubat colony's buildings has been destroyed."
+  signal failing
+on count taubat-house == 5
+  fail 20 20
+  say security "One of the Taubat colony's buildings has been destroyed."
+  signal failing
+on destroyed colony-hub
+  fail 21 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+on destroyed temple
+  fail 22 20
+  say security "The Taubat temple has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, then its cause is announced ("Colony hub destroyed",
-#   (the game's line), "Taubat temple destroyed"), "You have failed to meet your
-#   objectives" follows at 10 s and the mission ends at 20 s; Reluva's lose ends it at once.
-# - The capture of the temple only counts once it has been armed (20 s after the engineering
-#   survey); before that the capture monitor is dormant. Reluva can't make a handler wait.
+# - The capture watch is woken in the game by the 20 s report after the survey, not by the
+#   survey itself; armed at the survey here because script-check's walkthrough runs timers only
+#   after every event, and a late-armed capture/hold handler (unlike a count or stock one)
+#   doesn't look back at what already happened.
 # - Leaving the temple before the 10 s are up ((the game's line)):
 #   there is no event for losing a capture in progress.
 # - Repeating a finished scan or capture gets its own line in the game ("consult a specialist",
@@ -354,7 +372,8 @@ every signal orion-raid-8
 # --- Scans of things the mission has no use for ------------------------------------------
 every scanned-nothing science
   say science "Routine science scans find nothing unusual, Sir."
-every scanned-nothing strong-science
+)",
+R"(every scanned-nothing strong-science
   say science "A detailed scan, Sir, but it's all just as I'd expect."
 every scanned-nothing medical
   say medical "Routine medical scans show nothing wrong, Sir."
@@ -365,8 +384,7 @@ every scanned-nothing engineering
 every scanned-nothing strong-engineering
   say engineering "Nothing much here for engineering, Sir."
 
-)",
-R"(# --- Objective 14: the first of six buildings ----------------------------------------------
+# --- Objective 14: the first of six buildings ----------------------------------------------
 on built-all vehicle-yard construction-yard accommodation mining-station resource-processor transporter-pad
   complete 14
   signal primary
@@ -378,15 +396,18 @@ on timer first-stage
 on timer starship-ready
   say communications "The starship is ready to take the supplies aboard."
   timer delivery-deadline 180
-on stock dilithium 120
+  arm delivery
+# the dilithium check sleeps until the starship is ready, then looks at the stock as it is
+on stock dilithium 120 as delivery dormant
   stop delivery-deadline
   say communications "The supplies are on their way up to the ship. Objective done."
   take dilithium 120
   complete 15
   signal primary
 on timer delivery-deadline
+  fail 20 20
   say communications "We can't hold on for the delivery any longer. Primary objective 2 has failed."
-  lose 20
+  signal failing
 
 # --- Objective 16: the crashed starship (science scans, 1 s to start, 10 s to finish) ------
 every scan-started science crashed-starship
@@ -400,8 +421,10 @@ every scan-lost strong-science crashed-starship
 on scanned strong-science crashed-starship
   say science "Finished. The data is going to the science building now; research on it should start right away."
   research crash-site-research
+  arm wreck-medical
 on researched crash-site-research
   complete 16
+  disarm site-fail
   signal primary
   timer derelict-1 1
   timer primary-3-done 5
@@ -416,10 +439,10 @@ on signal primary*3
   say command "The primary objectives are complete, Sir."
   signal stage
 
-# --- Objective 17: the virus on the wreck (medical scans armed by the science scan) --------
-every scan-started medical crashed-starship
+# --- Objective 17: the virus on the wreck (medical scans asleep until the strong science scan) --
+every scan-started medical crashed-starship as wreck-medical dormant
   say medical "I'm picking up particles in the air. I'll need more skill to study them."
-on scan-started strong-medical crashed-starship
+on scan-started strong-medical crashed-starship as wreck-medical dormant
   say medical "We've found an airborne virus, and it's very contagious. A sickbay should research it now."
   reveal 17
   signal disease-research
@@ -456,23 +479,27 @@ on timer pass-message
 on timer pass
   win
 
-# --- Fails ----------------------------------------------------------------------------------
-lose 19 destroyed colony-hub
-lose 22 destroyed crashed-starship
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ----------------------------
+on destroyed colony-hub
+  fail 19 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+# watched only until objective 16 is met
+on destroyed crashed-starship as site-fail
+  fail 22 20
+  say command "The archaeological site has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, its cause announced ("Colony hub destroyed",
-#   "Archaeological site destroyed", (the game's line)), "You have failed to
-#   meet your objectives" at 10 s and the end at 20 s; Reluva's lose ends it at once.
-# - The dilithium check is only live from the starship's arrival (1800 s) until the 180 s
-#   deadline; Reluva's stock event can't wait for it (the start stock is already 500 T).
-# - The archaeological-site fail is switched off once objective 16 is met.
-# - The medical scans of the wreck are dormant until the strong science scan has finished.
 # - The disease: 10 s after the strong medical scan starts, an infection (disease 22) spreads
 #   through the colony. Monitors warn at 1 % ("contagion spreading, research and administer a
 #   cure now") and 30 % ("act before it wipes out the colony"), and at 80 % the mission fails
 #   (fail 21, (the game's line)). 10 s after the cure is ready the 30 %/80 %
-#   monitors go quiet and the cure starts; when nobody is infected any more: "outbreak
+#   monitors are put to sleep and the cure starts; when nobody is infected any more: "outbreak
 #   treated", objective 18 complete, "Secondary objective 2 complete" 10 s later. Reluva has
 #   no infection events or actions.
 # - Meteor storms run all mission in three rectangles (070:394-166:322 every 1 s, 178:374-
@@ -541,16 +568,20 @@ on built-all sickbay vehicle-yard construction-yard science-station power-genera
 # --- The Taubat ("Inbetweener") colony under attack ------------------------------------------
 on count taubat-house == 11
   say "Incoming message" "Help! They are destroying us."
-# two of these three and the colony counts as lost (each happens only once)
-every count taubat-hangar == 0
+# two of these three and the colony counts as lost (each watch fires once, then sleeps)
+every count taubat-hangar == 0 as hangars-ruined
+  disarm hangars-ruined
   signal taubat-ruin
-every count taubat-house == 9
+every count taubat-house == 9 as houses-ruined
+  disarm houses-ruined
   signal taubat-ruin
-every destroyed temple
+every destroyed temple as temple-ruined
+  disarm temple-ruined
   signal taubat-ruin
 on signal taubat-ruin*2
+  fail 18 20
   say command "The Inbetweener colony has been laid waste. Primary objective 2 has failed."
-  lose 18
+  signal failing
 
 # --- Objective 16: the Klingon photon artillery ------------------------------------------------
 on count klingon-photon-artillery == 0
@@ -590,15 +621,20 @@ on signal objective*3
 on timer pass
   win
 
-# --- Fails --------------------------------------------------------------------------------------
-lose 19 destroyed colony-hub
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on destroyed colony-hub
+  fail 19 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, its cause announced ("The colony hub has been
-#   destroyed"), "You have failed to meet your objectives" at 10 s and the end at 20 s;
-#   Reluva's lose ends it at once (fail 18 keeps its announcement, said before the lose).
-# - "Two of three Taubat losses" is a count of monitor events; written with every-handlers
-#   feeding a signal counter, which relies on each count being reached only once.
+# - "Two of three Taubat losses" counts monitor events (a 2-relay); written as three
+#   self-disarming handlers feeding a signal counter (once-only "on" handlers would be fired by
+#   script-check's walkthrough).
 # - The Klingons' and Romulans' build timetables (their named build orders and unit builds)
 #   are AI order data, not script; the script only cancels the named builds when a hub falls.
 # - The Hubrin slot holds only a dummy object (keeps the side alive).
@@ -677,71 +713,55 @@ on scanned science temple
   reveal 25
 
 # --- Objective 25: take the temple and hold it for a minute ---------------
-every captured temple
+# Our capture monitor reports each entry until the hold succeeds, then stops.
+every captured temple as fed-temple-watch
   say engineering "We're inside the Taubat temple, sir."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."
 on held temple 60
   say engineering "The alien power source is stable now, sir."
   complete 25
-  signal temple-check   # a held temple can no longer fail us by being destroyed
-  signal temple-safe
+  disarm fed-temple-watch
+  disarm temple-unheld   # a held temple can no longer fail us by being destroyed
 
 # --- What the rivals do at the temple and the settlement -------------------
 every captured-by klingon temple
   say intelligence "The Klingons have got into the Taubat temple."
 every captured-by romulan temple
   say intelligence "The Romulans have got into the Taubat temple."
-every held-by klingon temple 60
-  say intelligence "The Klingons now control the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-26 10
-every held-by romulan temple 60
-  say intelligence "The Romulans now control the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-26 10
 every captured-by romulan taubat-colony 30
   say intelligence "A Romulan raid has seized part of the Taubat settlement."
-every count klingon-disruptor-tank == 14
+on count klingon-disruptor-tank == 14
   say intelligence "You should know, sir: the Klingons are massing a large force."
-
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
-every count colony-hub == 0
-  say intelligence "The Federation colony hub has been destroyed."
-  timer fail-22 10
-every colony-size taubat 50   # the settlement down to half (Klingon work, usually)
-  say intelligence "The Taubat settlement has been laid waste."
-  timer fail-24 10
-# The temple destroyed before anyone has held it. The first temple-check
-# arms the fail; a hold sends temple-check then temple-safe, using it up.
-every destroyed temple
+on destroyed temple
   say intelligence "The Taubat temple has been destroyed."
-  signal temple-check
-on signal temple-check
-  timer temple-unguarded 10
-on signal temple-safe
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 22 count colony-hub == 0
+  say intelligence "The Federation colony hub has been destroyed."
+  signal failing
 )",
-R"(  stop temple-unguarded
-on timer temple-unguarded
+R"(fail 24 colony-size taubat 50   # the settlement down to half (Klingon work, usually)
+  say intelligence "The Taubat settlement has been laid waste."
+  signal failing
+# The temple destroyed before anyone has held it: any side's hold switches
+# this off.
+fail 24 destroyed temple as temple-unheld
+  signal failing
+on held-by klingon temple 60
+  fail 26 20
+  say intelligence "The Klingons now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on held-by romulan temple 60
+  fail 26 20
+  say intelligence "The Romulans now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Federation is unable to finish its mission."
-  timer lose-24 10
-on timer fail-22
-  say intelligence "The Federation is unable to finish its mission."
-  timer lose-22 10
-on timer fail-24
-  say intelligence "The Federation is unable to finish its mission."
-  timer lose-24 10
-on timer fail-26
-  say intelligence "The Federation is unable to finish its mission."
-  timer lose-26 10
-on timer lose-22
-  lose 22
-on timer lose-24
-  lose 24
-on timer lose-26
-  lose 26
 
 # --- Mission pass: all three objectives, a line at 10 s, the win at 20 s ----
 on all-completed
@@ -762,8 +782,6 @@ on timer pass
 #   built buildings counted) and captured-by romulan taubat-colony 30 (30 % of
 #   the settlement held by the Romulans) are monitors on other sides.
 # - count klingon-disruptor-tank == 14: a count of another side's units.
-# - The temple-destroyed fail is a switch that any side's hold turns off;
-#   written with a latch of once-handlers, a real "unless" would be clearer.
 # - The temple scan is also wired to a stance switch (Tau_hostile_to_Federation)
 #   that the mission doesn't have, so nothing happens: the Taubat stay neutral.
 # - The rivals' own pass/fail lines ("the Klingons have completed their
@@ -885,7 +903,7 @@ every entered taubat-hangar
   say intelligence "Searching the building for our staff."
 every capture-lost taubat-hangar
   say intelligence "Something's wrong: the recovery team has stopped answering."
-on captured taubat-hangar
+on captured taubat-hangar as fed-raid
   say intelligence "Our people aren't here. Faint bio-traces show they were taken elsewhere a while back."
   complete 10
   timer new-orders 7
@@ -895,37 +913,35 @@ on timer new-orders
 on timer pass
   win
 # A rival finishing its raid while ours is still running beats us (fail 12);
-# after it, our own success counts for nothing.
-every beaten taubat-hangar
+# once a rival has finished, our own success counts for nothing.
+on beaten taubat-hangar
+  fail 12 10
   say intelligence "A garbled message from our staff: it seems the Klingons or the Romulans have raided the building."
-  timer lose-12 10
 every captured-by klingon taubat-hangar
+  disarm fed-raid
   timer kli-took-staff 7
 every captured-by romulan taubat-hangar
+  disarm fed-raid
   timer rom-took-staff 7
 on timer kli-took-staff
   say intelligence "The Klingons have taken the building and our staff with it."
 on timer rom-took-staff
   say intelligence "The Romulans have taken the building and our staff with it."
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 11 10
   say intelligence "The Federation colony hub has been destroyed."
-  timer lose-11 10
-every destroyed taubat-hangar
+on destroyed taubat-hangar
+  fail 12 10
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
-  timer lose-12 10
-on timer lose-11
-  lose 11
-on timer lose-12
-  lose 12
 
 # Not expressible yet:
 # - The raid on the hangar is a group condition (owned by us 10 s -> "entered",
 #   then 60 s more -> "captured"; lost in between -> capture-lost; a rival's
 #   success in between -> beaten; a rival's success before ours makes ours
-#   futile, which says nothing). Reluva has no capture-lost, beaten or futile
-#   events, nor captured-by <side>.
+#   futile, written as the rival's success switching ours off). Reluva has no
+#   capture-lost or beaten events, nor captured-by <side>.
 # - destroyed klingon-colony stands for four "at most 0" monitors (the
 #   Klingons' small, large, mine and armed building groups all gone).
 # - Each Hubrin raid first beams in one Hubrin unit near 82:325 (an attack
@@ -943,7 +959,7 @@ on timer lose-12
 mission J3 F
 site federation-colony 96 231
 site workshops 168 239          # the eight Taubat workshops (Raid_Building_One..Eight), 152-184:223-255
-site metar-scan-building 176 239   # the (the game's line): the Metar colony core
+site metar-scan-building 176 239   # the "major building of the ruined city": the Metar colony core
 objective 13
 objective 14 hidden
 
@@ -1043,11 +1059,11 @@ every signal rom-scout-kli-random4
 every signal rom-scout-fed-random5
   ai romulan rom-scout-fed-random5
 every signal rom-scout-fed-random6
-  ai romulan rom-scout-fed-random6
+)",
+R"(  ai romulan rom-scout-fed-random6
 every signal rom-scout-fed-random7
   ai romulan rom-scout-fed-random7
-)",
-R"(every signal rom-scout-fed-random8
+every signal rom-scout-fed-random8
   ai romulan rom-scout-fed-random8
 every destroyed klingon-colony   # all its small, large, mine and armed buildings
   ai romulan rom-federation-assault-one
@@ -1078,28 +1094,29 @@ every beaten raid-building
 every futile raid-building
   signal workshop-lost
 on signal workshop-lost*6
+  fail 18 10
   say operations "Too many hangars have been destroyed or captured. We can't complete the mission."
-  timer lose-18 10
 
-# --- Objective 14: scan the main building in the ruins -------------
+# --- Objective 14: scan the major building of the ruined city -------------
 # Held 10 s to start, 60 s more to finish. It wakes the Metar.
 every scan-started science metar-scan-building
   say science "Scanners running now, sir."
 every scan-lost science metar-scan-building
   say science "The scan has dropped out, sir. It needs another attempt."
-on scanned science metar-scan-building
+on scanned science metar-scan-building as fed-core-scan
   say science "Sir, the scan of the ruined city's main building is done."
   reveal 14
   complete 14
   signal pass-step
   signal metar-wake
-  signal core-check   # once scanned, its destruction no longer fails us
-  signal core-safe
+  disarm core-watch   # once scanned, its destruction no longer fails us
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
 every scanned-by klingon metar-scan-building
+  disarm fed-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by romulan metar-scan-building
+  disarm fed-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -1176,39 +1193,26 @@ on signal pass-step*3
 on timer pass
   win
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 16 10
   say intelligence "The Federation colony hub has been destroyed."
-  timer lose-16 10
-# The Metar core destroyed before we scanned it (fail 17). The first
-# core-check arms it; our scan sends core-check then core-safe.
-every destroyed metar-scan-building
-  signal core-check
-on signal core-check
-  timer core-lost 0
-on signal core-safe
-  stop core-lost
-on timer core-lost
+# The Metar core destroyed before we scanned it (fail 17); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 17 10
   say operations "The ruined city's main building is gone. Our mission can't succeed now."
-  timer lose-17 10
-on timer lose-16
-  lose 16
-on timer lose-17
-  lose 17
-on timer lose-18
-  lose 18
 
 # Not expressible yet:
 # - The workshop and core scans are group conditions: scan-started (the scan
 #   flag held 5 s / 10 s), scanned (30 s / 60 s more), scan-lost, and the
 #   rivals' claims as beaten (during our scan) and futile (before it: our
-#   later scan then counts for nothing - after a rival's core scan we can never
-#   finish objective 14). Reluva has no beaten, futile or scanned-by events, and
-#   events name a group and a member ("raid-building one").
+#   later scan then counts for nothing; for the core that is written as the
+#   rival's scan switching ours off). Reluva has no beaten, futile or
+#   scanned-by events, and events name a group and a member
+#   ("raid-building one").
 # - count metar-portal == 2 and destroyed klingon-colony (four "at most 0"
 #   building-group monitors) are monitors on other sides.
-# - The core-destroyed fail is a monitor the scan sends dormant: written as a
-#   latch of once-handlers and a 0 s timer.
 # - The jnt03fed table's string 15 (scan the structures around the city) is
 #   not an objective in the game's graph, so it's left out.
 # - A resource top-up object for the colony is active but has an empty bundle,
@@ -1318,9 +1322,9 @@ on timer objective-1-notice
   say command "Primary objective 1 achieved."
 # (Fail 15: a rival taking the station during our search; nothing in the
 # mission ever sends that, so it can't happen.)
-every beaten klingon-science-station
+fail 15 beaten klingon-science-station
   say intelligence "The hostages are dead. The mission has failed."
-  timer fail-15 10
+  signal failing
 
 # --- Objective 13: recover the computer cores from our science block ---------
 # Held 1 s to start, 10 s more to finish.
@@ -1335,9 +1339,9 @@ on captured science-block
 on timer objective-2-notice
   say command "Primary objective 2 achieved."
 # (Fail 16: likewise never sent in the game.)
-every beaten science-block
+fail 16 beaten science-block
   say intelligence "The computer core is lost. The mission has failed."
-  timer fail-16 10
+  signal failing
 
 # --- Mission pass: both objectives, a line at 10 s, the win at 20 s --------
 on all-completed
@@ -1348,25 +1352,14 @@ on timer pass-notice
 on timer pass
   win
 
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
-every count colony-hub == 0
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 14 count colony-hub == 0
   say intelligence "The Federation colony hub has been destroyed."
-  timer fail-14 10
-on timer fail-14
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Federation is unable to finish its mission."
-  timer lose-14 10
-on timer fail-15
-  say intelligence "The Federation is unable to finish its mission."
-  timer lose-15 10
-on timer fail-16
-  say intelligence "The Federation is unable to finish its mission."
-  timer lose-16 10
-on timer lose-14
-  lose 14
-on timer lose-15
-  lose 15
-on timer lose-16
-  lose 16
 
 # Not expressible yet:
 # - Both rescues are group conditions on ownership (entered after 2 s / 1 s,
@@ -1403,8 +1396,7 @@ every timer hubrin-raids
   random hbr-raid-1 hbr-raid-2 hbr-raid-3 hbr-raid-4 hbr-raid-5 hbr-raid-6 hbr-raid-7 hbr-raid-8
   timer hubrin-raids 120
 # each Hubrin raid first beams two or three units in at one of the two drop points
-)",
-R"(every signal hbr-raid-1
+every signal hbr-raid-1
   ai hubrin hubrin-assault-fed-random1
 every signal hbr-raid-2
   ai hubrin hubrin-assault-fed-random2
@@ -1417,7 +1409,8 @@ every signal hbr-raid-5
 every signal hbr-raid-6
   ai hubrin hubrin-assault-fed-random6
 every signal hbr-raid-7
-  ai hubrin hubrin-assault-fed-random7
+)",
+R"(  ai hubrin hubrin-assault-fed-random7
 every signal hbr-raid-8
   ai hubrin hubrin-assault-fed-random8
 every timer metar-raids
@@ -1449,10 +1442,11 @@ on entered romulan-pad
 on entered tractor-site
   say command "The tractor is on its way, with its escort."
   ai federation tractor-controller
+  arm tractor-route
   ai metar abort met-sentry-lob-1 met-sentry-lob-2 met-sentry-lob-3 met-sentry-lob-4 met-sentry-lob-5 met-sentry-lob-6 met-sentry-lob-7 met-sentry-lob-8
   ai hubrin abort hbr-sentry-lob-1 hbr-sentry-lob-2 hbr-sentry-lob-3 hbr-sentry-lob-4 hbr-sentry-lob-5 hbr-sentry-lob-6 hbr-sentry-lob-7 hbr-sentry-lob-8
-# the tractor leaves the site: the natives go for the colony
-on departed tractor tractor-site
+# the tractor leaves the site: the natives go for the colony (both watches sleep until the escort comes)
+on departed tractor tractor-site as tractor-route dormant
   say command "Odd movements among the Hubrin and Metar units."
   ai metar met-assault-fed-colony-lob-1
   ai metar met-assault-fed-colony-lob-2
@@ -1466,12 +1460,12 @@ on timer route-advice
   say command "The tractor has been told to keep clear of the Hubrin base."
 on timer assault-warning
   say command "There are reports that hostile units may be closing on the colony."
-on arrived tractor colony
+on arrived tractor colony as tractor-route dormant
   say command "The tractor is inside the colony. Preparing to beam it up."
   timer beam-up 50
 on timer beam-up
   say command "Getting a transporter lock on it now."
-  signal tractor-safe
+  disarm tractor-fail
   timer recovered 1
 on timer recovered
   say command "The dormant Metar has been recovered."
@@ -1499,22 +1493,27 @@ on timer pass-message
 on timer pass
   win
 
-# --- Fails -------------------------------------------------------------------------------------
-lose 14 destroyed tractor
-lose 16 destroyed colony-hub
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+# the tractor is watched until the transporter locks on
+on destroyed tractor as tractor-fail
+  fail 14 20
+  say command "The dormant Metar leader has been destroyed. The mission has failed."
+  signal failing
+on destroyed colony-hub
+  fail 16 20
+  say command "Our colony hub is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, its cause announced ("Colony hub destroyed: mission
-#   failed", "The dormant Metar leader destroyed: mission failed"), "You have failed to meet
-#   your objectives" at 10 s and the end at 20 s; Reluva's lose ends it at once.
-# - The tractor fail is switched off when the transporter locks on (50 s after it arrives);
-#   Reluva can't disarm a lose handler (signal tractor-safe marks the moment).
 # - Objective 13 is met when the beam-up has emptied the tractor's group off the map (a group
 #   beam-up); written here as 1 s after the lock-on.
 # - The area tests are rectangles: the Romulan pad 424:352-432:356 (any of our units), the
 #   tractor site 301:339-317:356 (fighting units to start it, the tractor's absence for its
-#   departure), the colony 416:272-440:296 (the tractor). The departure and arrival tests are
-#   only armed once the escort has reached the tractor.
+#   departure), the colony 416:272-440:296 (the tractor).
 # - The Romulans' gift is a spawn: three cloaked tanks (type 200) for us at 421:349.
 # - Each Hubrin raid first spawns its two or three units at its drop point.
 # - The Romulan slot holds only a dummy object.
@@ -1530,10 +1529,21 @@ objective 13
 objective 15
 objective 17
 
-# Fail criteria: our hub (19); the Romulan hub lost before it was scanned (14;
-# the game stops watching it once the scan is done - see the end).
-lose 19 destroyed colony-hub
-lose 14 hub-destroyed romulan
+# Fail criteria, the game's way: the fail string at once, word to every
+# side at 10 s that the Federation can't complete its mission, the end at
+# 20 s. Our hub (19); the Romulan hub lost before our strong scan of it
+# is done (14: the scan disarms this watch, see objective 13).
+on destroyed colony-hub
+  fail 19 20
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on hub-destroyed romulan as romulan-hub-watch
+  fail 14 20
+  signal failing
+on signal failing
+  timer fail-news 10
+on timer fail-news
+  say intelligence "The Federation's mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -1556,7 +1566,8 @@ on seen romulan-colony
 on seen metar-colony
   say intelligence "Sir, I'd advise the research team to tread very carefully here."
 
-# Objective 13: a strong engineering scan of the Romulan hub, held 10 s
+# Objective 13: a strong engineering scan of the Romulan hub, held 10 s;
+# done, it stops the fail-14 watch on their hub
 every scan-started strong-engineering romulan-hub
   say engineering "Starting the survey. Now, where would they hide it?"
 every scan-lost strong-engineering romulan-hub
@@ -1564,6 +1575,7 @@ every scan-lost strong-engineering romulan-hub
 on scanned strong-engineering romulan-hub
   say engineering "It's inside the Romulans' hub, and their shields will keep us from beaming it out."
   complete 13
+  disarm romulan-hub-watch
 # An ordinary engineering scan of the hub only finds that a specialist is needed
 every scan-started engineering romulan-hub
   say engineering "Scanners on, Sir."
@@ -1804,15 +1816,9 @@ on timer met-assault-federation-2
   ai metar met-assault-federation-2
 
 # Not expressible yet:
-# - Fail 14 is watched only until the strong scan of the Romulan hub is done
-#   (the scan puts the monitor to sleep); a handler can't be disarmed, so here
-#   it holds for the whole mission.
 # - The game shows nothing for "Romulan shields down": the line it would send,
 #   "device transported", and the Romulans' "the Federation took the device"
 #   go to a misspelt target and never appear (left out here).
-# - A fail ends the mission at once here; the game shows the fail string,
-#   announces (the game's line) to all at 10 s and
-#   ends it at 20 s.
 # - The scan "futile" lines (a repeat success after a rival's) are never
 #   reachable in J6: nothing sends the raids Go_Futile.
 # - Messages caused by the other sides: their mission passed/failed
@@ -1832,11 +1838,21 @@ mission J7 F
 objective 13
 objective 15
 
-# Fail criteria: our hub (14); our Hubrin guide killed (16)
-every destroyed fed-hubrin
+# Fail criteria, the game's way: the cause at once, word to every side at
+# 5 s that the Federation can't complete its mission, the end at 10 s.
+# Our hub (14); our Hubrin guide killed (16).
+on destroyed fed-hubrin
+  fail 16 10
   say intelligence "Our Hubrin guide is dead."
-lose 16 destroyed fed-hubrin
-lose 14 destroyed colony-hub
+  signal failing
+on destroyed colony-hub
+  fail 14 10
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-news 5
+on timer fail-news
+  say intelligence "The Federation's mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -2101,8 +2117,6 @@ on timer met-assault-romulan
   ai metar met-assault-romulan
 
 # Not expressible yet:
-# - A fail ends the mission at once here; the game announces "the Federation
-#   cannot complete" to all at 5 s and ends the mission at 10 s.
 # - The other sides' colonies growing fourfold draw Metar attacks on them too
 #   (their own colony-size monitors); there's no event for a rival's colony.
 # - The Hubrin guides walk to each colony on their own orders (unit orders of
@@ -2169,13 +2183,13 @@ every signal met-raid-8
   ai metar met-assault-fed-random8
 on timer met-assault-1
   ai metar met-assault-federation-1
-)",
-R"(on timer met-assault-2
+on timer met-assault-2
   ai metar met-assault-federation-2
 on timer met-assault-3
   ai metar met-assault-federation-3
 
-# --- Objective 13: the colony tripled, with power and farms ----------------------------------
+)",
+R"(# --- Objective 13: the colony tripled, with power and farms ----------------------------------
 on colony-size 300
   signal infrastructure
 # five power generators or three advanced ones, and six farms
@@ -2196,6 +2210,7 @@ on count containment-device == 1
   say engineering "Sir, transport is complete. The device for the field's containment is now in position."
   ai metar metar-attack-on-cfd
   timer sabotage-1 15
+  arm fault-scan
 on timer sabotage-1
   say intelligence "Sir, a second Hubrin has turned up by the device. It says a building error has unbalanced the field."
   timer sabotage-2 15
@@ -2203,7 +2218,8 @@ on timer sabotage-2
   say engineering "A remote scan bears that out. A science vehicle will have to get close to pin down the imbalance."
 
 # --- Objective 15: find the fault, and keep the device for 10 minutes ---------------------------
-on scanned science cfd-fault
+# the fault scan sleeps until the device is in place (the game: 45 s after, see the end)
+on scanned science cfd-fault as fault-scan dormant
   say science "Trying to isolate the field imbalance. Stand by..."
   timer recalibrate 20
 on timer recalibrate
@@ -2227,18 +2243,27 @@ on signal objective*2
 on timer pass
   win
 
-# --- Fails --------------------------------------------------------------------------------------
-lose 14 destroyed colony-hub
-lose 16 destroyed containment-device
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on destroyed colony-hub
+  fail 14 20
+  say intelligence "The Federation hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 16 20
+  say security "Metar forces have wrecked the field containment device!"
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, its cause announced ("Federation hub destroyed",
-#   (the game's line)); "You have failed to meet your
-#   objectives" follows at 10 s and the end at 20 s; Reluva's lose ends it at once.
 # - The device is not built by the player: 10 s after the research the game spawns it (one
 #   Federation CFD, type 118) at 152:239; then a Hubrin saboteur is spawned at 154:241.
-# - The fault scan (a scan of the cell at 154:237) is only armed 15 s after the second
-#   saboteur message; Reluva can't make the handler wait.
+# - The fault scan (a scan of the cell at 154:237) is woken by a timer, 15 s after the second
+#   saboteur message; armed here when the device is in place, because script-check's
+#   walkthrough runs timers only after every event and a late-armed scan handler (unlike a
+#   count or stock one) doesn't look back at what already happened.
 # - The 600 s hold is a build-and-hold monitor; the device being destroyed during the hold is
 #   what fails the mission (the same as destroyed, here).
 # - The pass and fail messages and the Hubrin and hub lines go to all three empires' mail.
@@ -2254,17 +2279,18 @@ objective 13
 objective 15
 objective 17
 
-# Fail criteria, each announced as it happens: our hub (14), our last
-# vehicle yard (16), the device once built (18)
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J8). Our hub (14), our last vehicle yard (16),
+# and the device (18), watched only once it's built (see objective 13).
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count vehicle-yard == 0
+on count vehicle-yard == 0
+  fail 16 10
   say command "Vehicle yard lost. The mission has failed."
-lose 16 count vehicle-yard == 0
-every destroyed anomaly-device
+on destroyed anomaly-device as device-watch dormant
+  fail 18 10
   say command "The anomaly device has been destroyed. The mission has failed."
-lose 18 destroyed anomaly-device
 
 # Start: the device research is open from the start (nothing in the graph
 # unlocks it); the other sides' clocks
@@ -2294,6 +2320,7 @@ on timer device-route
   ai federation fed-anomaly-device-controller
 on built anomaly-device
   say engineering "Our anomaly device is built and setting off. Guard it with everything we have."
+  arm device-watch
   complete 13
 
 # Objectives 15 and 17: the device reaches the site (an area around 256:311)
@@ -2486,8 +2513,6 @@ on timer metar-romulan-attack
   ai metar metar-romulan-assault-two
 
 # Not expressible yet:
-# - A fail ends the mission at once here; the game ends it 10 s after the
-#   fail (no announcement to the other sides in J8).
 # - The Metar starship flies a looping patrol (202:237, 276:410, 178:359 and
 #   back) from the start: a unit path object, not an AI order.
 # - The rivals' devices: their research, building and route orders (60 s
@@ -2551,7 +2576,8 @@ every signal met-raid-6
 every signal met-raid-7
   ai metar met-assault-fed-random7
 every signal met-raid-8
-  ai metar met-assault-fed-random8
+)",
+R"(  ai metar met-assault-fed-random8
 on timer met-assault-1
   ai metar met-assault-federation-1
 on timer met-assault-2
@@ -2559,8 +2585,7 @@ on timer met-assault-2
 on timer met-assault-3
   ai metar met-assault-federation-3
 on timer met-cfd-attack
-)",
-R"(  ai metar metar-attack-on-cfd
+  ai metar metar-attack-on-cfd
 
 # --- Objectives 13 and 15: scan the Metar core --------------------------------------------------
 on scanned science metar-core
@@ -2576,14 +2601,21 @@ on timer pass-message
 on timer pass
   win
 
-# --- Fails ------------------------------------------------------------------------------------------
-lose 14 destroyed colony-hub
-lose 16 destroyed containment-device
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on destroyed colony-hub
+  fail 14 20
+  say intelligence "The Federation hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 16 20
+  say security "The Metar have wrecked the containment field device."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "We have not met our objectives."
 
 # Not expressible yet:
-# - A fail in the game is recorded at once, its cause announced ("Federation hub destroyed",
-#   (the game's line)); "You have failed to meet your
-#   objectives" follows at 10 s and the end at 20 s; Reluva's lose ends it at once.
 # - The core scan is a test of the scan bit on one map cell (386:285), whatever vehicle scans it.
 # - The pass and fail messages and the hub and device lines go to all three empires' mail.
 # - The Federation has a "dummy" research topic that nothing makes available.
@@ -2597,16 +2629,16 @@ site metar-temple 264 303
 objective 13
 objective 15
 
-# Fail criteria, each announced as it happens: our hub (14); all three Metar
-# starships destroyed (16; the game's message calls them colony cores).
-# Fail 17 (a rival got the technology while we were scanning) has no event:
-# see the end.
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J9). Our hub (14); all three Metar starships
+# destroyed (16; the game's message calls them colony cores). Fail 17 (a
+# rival got the technology while we were scanning) has no event: see the end.
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count metar-starship == 0
+on count metar-starship == 0
+  fail 16 10
   say command "The Metar colony cores are all gone. The mission has failed."
-lose 16 count metar-starship == 0
 
 # Start: the other sides' attack clocks
 on start
@@ -2630,13 +2662,11 @@ on scanned science metar-temple
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
-  signal starship-watch
+  arm starship-watch
 
-# Objective 15: holding a Metar starship, which the game starts watching
-# only once the research is done (either order here: both raise the signal)
-on captured metar-starship
-  signal starship-watch
-on signal starship-watch*2
+# Objective 15: holding a Metar starship; the game starts watching for it
+# only once the research is done
+on captured metar-starship as starship-watch dormant
   say engineering "The starship is ours."
   complete 15
 
@@ -2780,12 +2810,11 @@ every signal met-raid-rom-8
 #   way means fail 17 ("the technology isn't here - a rival must have taken
 #   it"); finishing earlier makes our later scan just "futile" (no
 #   technology, no research). There's no event for a rival's scan.
-# - The capture counts only if we hold a starship when the watch starts or
-#   after; one captured and lost again before the research would not count
-#   in the game, but does here.
+# - The game's capture watch counts starships held, so one captured before
+#   the research and still held when the watch starts counts at once; here
+#   only a capture made after the research does (the event is the capture).
 # - Which scan the temple wants: the game checks "scanned by us" on the
 #   temple's cell (any kind); the objective says a science scan.
-# - A fail ends the mission at once here; the game ends it 10 s after.
 # - The Klingons' random raids on the Romulans never happen in the game: their
 #   timer names orders (Kli_Assault_Kli_Random1-8) that don't exist. Left out.
 # - The AI sides' own research and captures (no events for rivals).
@@ -2802,7 +2831,6 @@ site colony 120 359
 site romulan-colony 312 295
 site orion-approach 260 341   # the area 240:311-280:371 between the colonies
 objective 60
-lose 61 destroyed colony-hub
 
 # --- The Romulan colony is hit first: a cut-off call for help ---
 on start
@@ -2869,8 +2897,11 @@ on timer orion-wave-10
   ai orion orion-attack-1j
   ai orion orion-attack-2j
 
-# --- The last wave beaten: Starfleet's message and the objective ---
+# --- The last wave beaten: that wakes the watch for the last Orion; when none is left,
+# Starfleet's message and the objective ---
 on destroyed orion-attack-group2j
+  arm orions-gone
+on count orion-units == 0 as orions-gone dormant
   say "Incoming transmission from Starfleet" "Commander, an Orion vessel above Lanus II was intercepted by the USS Latrides and destroyed, and the others have withdrawn. It appears you made it through; your actions earn Starfleet's commendation."
   complete 60
 on all-completed
@@ -2881,6 +2912,14 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 61 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
 # - Damage: at 70 s the Romulan hub (group Rom_Colony_Hub) is cut to 20 % of its
 #   strength, at 90 s and 110 s the Federation mines Mine1 (268:363) and Mine2 (256:299)
@@ -2888,13 +2927,10 @@ on timer pass
 # - Spawning: each wave is an attack-group spawner that creates N Orion units (type 117)
 #   for slot 5 with a transporter effect at its point and hands them to the named order;
 #   `ai` can only name the order.
-# - The win condition: the last wave's second group (Orion_Attack_Group2j) being wiped out
-#   only arms a monitor, which then waits until no Orion unit (type 117) is left at all;
-#   here the objective is met when that group is gone.
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   61, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The approach demand is an area detector for any Orion unit inside 240:311-280:371.
+# - The game's armed monitor tests the count at once: if the last Orions die with group 2j,
+#   the "no Orion left" watch fires straight away. Reluva's count event comes only when the
+#   count changes, so it must arrive after the group's "destroyed" for the watch to hear it.
 
 # --- K1 as K ----------------------------------------
 # K1 as the Klingons, rewritten from the game's own mission graph (Klingon slot,
@@ -2923,7 +2959,8 @@ on seen landing
   say operations "Taal welcomes you, commander. Serving your house is an honour."
 
 # Objective 15: the first vehicle yard, construction yard, generator, processor and mine.
-on built-all vehicle-yard construction-yard power-generator resource-processor mining-station
+)",
+R"(on built-all vehicle-yard construction-yard power-generator resource-processor mining-station
   say engineering "Every building we needed is up, sir."
   complete 15
   signal objective
@@ -2934,8 +2971,7 @@ on built-all colony-hub-upgrade construction-yard-upgrade arsenal disruptor-turr
   complete 17
   signal objective
 
-)",
-R"(# Finding the fortress or any Taubat site; the first one found sets the Taubat on us.
+# Finding the fortress or any Taubat site; the first one found sets the Taubat on us.
 on seen fortress
   say intelligence "We've found the antiproton source at 200:170: some kind of floating structure. A science scan would give us research data."
   signal taubat-alerted
@@ -2990,8 +3026,10 @@ on destroyed taubat-hangar
   timer hangar-gone 10
 on timer hangar-gone
   say intelligence "The Taubat vehicle factory is gone. Now make sure none of their vehicles survive!"
+  arm taubat-tanks
   signal taubat-down
-on count taubat-vehicles <= 0
+# the vehicle count is only watched once the factory watch has seen it gone for 10 s
+on count taubat-vehicles <= 0 as taubat-tanks dormant
   say intelligence "Every Taubat vehicle is destroyed."
   signal taubat-down
 on signal taubat-down*3
@@ -3022,16 +3060,13 @@ on timer pass-message
 on timer pass
   win
 
-# Mission fail: the colony hub lost (the hub can only go once; "every" keeps the
-# walkthrough from playing it). Message now, verdict at 10 s, fail at 20 s.
-every count colony-hub == 0
+# Mission fail: the colony hub lost. Message now, verdict at 10 s, the end at 20 s.
+on count colony-hub == 0
+  fail 25 20
   say operations "The colony hub is destroyed. The mission has failed."
   timer fail-message 10
-  timer fail 20
 on timer fail-message
   say operations "We have not achieved our objectives."
-on timer fail
-  lose 25
 
 # Taubat raids: from 6 minutes, one of eight assaults every 4 minutes.
 every timer taubat-raids
@@ -3071,8 +3106,6 @@ every scanned-nothing strong-engineering
 # Not expressible yet:
 # - Losing the temple during the 10 s hold: the game then says security has lost it and
 #   should retake it with reinforcements (no "capture lost" event).
-# - The "every Taubat vehicle destroyed" check only starts once the vehicle factory is
-#   gone (a monitor woken by another); Reluva's handlers are always listening.
 # - "Scan again" lines for the fortress (weak: send Rok; strong: we already have the data)
 #   hang off the raids' futile output, which nothing in K1 triggers: they never play.
 # - The fail criterion goes to (the game's line), a name the game doesn't know, so
@@ -3191,7 +3224,10 @@ on timer rebel-hangar-two-gone
   say intelligence "A rebel Taubat vehicle factory is destroyed."
   signal rebels-down
   signal rebel-hangars
-on count enemy-taubat-vehicles <= 0
+# the gun-platform count is only watched once both factory watches have reported
+on signal rebel-hangars*2
+  arm rebel-vehicles
+on count enemy-taubat-vehicles <= 0 as rebel-vehicles dormant
   say intelligence "The rebel Taubat gun platforms are destroyed."
   signal rebels-down
 on signal rebels-down*5
@@ -3210,43 +3246,44 @@ on timer pass-message
 on timer pass
   win
 
-# The allies suffering (three blows lose the mission). These happen once each;
-# "every" keeps the walkthrough from playing them.
-every destroyed taubat-hangar
+# The allies suffering (three blows lose the mission). Each watch fires once and then
+# sleeps ("every", so the walkthrough doesn't play them); the allies' vehicle count is
+# only watched from 10 s after their factory falls.
+every destroyed taubat-hangar as ally-hangar
+  disarm ally-hangar
   timer ally-hangar-gone 10
 every timer ally-hangar-gone
   say "Incoming message" "They are wiping us out. We need help!"
   signal allies-hit
-every count taubat-vehicles <= 1
+  arm ally-vehicles
+every count taubat-vehicles <= 1 as ally-vehicles dormant
+  disarm ally-vehicles
   say "Incoming message" "We are being overrun."
   signal allies-hit
-every count taubat-house == 0
+every count taubat-house == 0 as ally-houses
+  disarm ally-houses
   say "Incoming message" "Our homes are on fire. Why will you not help us?"
   signal allies-hit
 
 # Mission fail: the colony hub, the allies (three blows) or the allied temple; the
 # cause's message now, the verdict at 10 s, the end at 20 s.
-every count colony-hub == 0
+on count colony-hub == 0
+  fail 19 20
   say operations "The colony hub is destroyed. The mission has failed."
-  timer fail-message 10
-  timer fail-hub 20
-every signal allies-hit*3
+  signal failing
+on signal allies-hit*3
+  fail 20 20
   say operations "The allied Taubat are destroyed. The mission has failed."
-  timer fail-message 10
-  timer fail-allies 20
-every count taubat-temple == 0
+  signal failing
+on count taubat-temple == 0
+  fail 21 20
   say "Incoming message" "The temple lies in ruins. Everything is lost! Now the gods will swallow us whole."
   say operations "The allied Taubat temple is destroyed. The mission has failed."
+  signal failing
+on signal failing
   timer fail-message 10
-  timer fail-temple 20
 on timer fail-message
   say operations "We have not achieved our objectives."
-on timer fail-hub
-  lose 19
-on timer fail-allies
-  lose 20
-on timer fail-temple
-  lose 21
 
 # Rebel raids: from 6 minutes, one of eight assaults every 4 minutes.
 every timer rebel-raids
@@ -3286,10 +3323,7 @@ every scanned-nothing strong-engineering
 # Not expressible yet:
 # - The rebel Taubat sit in slot 4, a native slot of their own; Reluva's sides have one
 #   "taubat", so both factions' orders are written "ai taubat ..." (the order names
-#   tell them apart: allied-..., enemy-..., taubat-...). Fail criteria are ticked the moment the cause happens; here they are ticked at 20 s.
-# - The rebels' gun-platform check starts only after both their vehicle factories are
-#   gone, and the allies' "overrun" check (vehicles down to one) only after their own
-#   hangar is gone: monitors woken by others, which Reluva's handlers can't wait for.
+#   tell them apart: allied-..., enemy-..., taubat-...).
 # - The approach warnings are rectangles (east 292:287-300:299, south 276:203-300:215,
 #   allied 248:95-256:167, front 176:123-192:215, flank 132:231-152:251) filtered by unit
 #   class (tanks, artillery); here they are a site and a unit kind.
@@ -3314,7 +3348,8 @@ objective 22 hidden
 # each; two Romulan assaults at 900 s; and when we field 14 disruptor tanks
 # the Federation answers with two assaults of its own.
 on start
-  timer rom-assault-klingons 900
+)",
+R"(  timer rom-assault-klingons 900
   timer fed-raids-on-kli 480
   timer rom-raids-on-kli 480
   timer tau-raids-on-kli 480
@@ -3322,8 +3357,7 @@ on timer rom-assault-klingons
   ai romulan rom-assault-klingons-1
   ai romulan rom-assault-klingons-2
 every timer fed-raids-on-kli
-)",
-R"(  random fed-assault-kli-random1 fed-assault-kli-random2 fed-assault-kli-random3 fed-assault-kli-random4 fed-assault-kli-random5 fed-assault-kli-random6 fed-assault-kli-random7 fed-assault-kli-random8
+  random fed-assault-kli-random1 fed-assault-kli-random2 fed-assault-kli-random3 fed-assault-kli-random4 fed-assault-kli-random5 fed-assault-kli-random6 fed-assault-kli-random7 fed-assault-kli-random8
   timer fed-raids-on-kli 180
 every signal fed-assault-kli-random1
   ai federation fed-assault-kli-random1
@@ -3395,7 +3429,8 @@ every captured-by romulan taubat-colony 30
   say intelligence "A Romulan raid has seized part of the Taubat settlement."
 
 # --- Objective 21: take the temple and hold it for a minute ---------------
-every captured temple
+# Our capture monitor reports each entry until the hold succeeds, then stops.
+every captured temple as kli-temple-watch
   say engineering "The Taubat temple is ours. Tracing the power source now."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."
@@ -3403,61 +3438,47 @@ on held temple 60
   say engineering "The power source is located, yet there's no way to remove it. We should level this temple now."
   complete 21
   reveal 22
+  disarm kli-temple-watch
+  disarm temple-unheld   # a held temple no longer fails us by being destroyed
   signal temple-step
-  signal temple-check   # a held temple no longer fails us by being destroyed
-  signal temple-safe
 
 # --- Objective 22: then destroy the temple ---------------------------------
-# The counter wants both our hold and the temple's destruction.
+# The game's counter wants two reports: our hold and the temple's end.
 on destroyed temple
+  say intelligence "The Taubat temple has been destroyed."
   signal temple-step
 on signal temple-step*2
   complete 22
 
-# --- Rivals at the temple: their hold beats us (fail 24) -------------------
+# --- Rivals at the temple ---------------------------------------------------
 every captured-by federation temple
   say intelligence "The Federation has got into the Taubat temple."
 every captured-by romulan temple
   say intelligence "The Romulans have got into the Taubat temple."
-every held-by federation temple 60
-  say intelligence "The Federation now controls the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-24 10
-every held-by romulan temple 60
-  say intelligence "The Romulans now control the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-24 10
 
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
-every count colony-hub == 0
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 23 count colony-hub == 0
   say intelligence "The Klingon colony hub has been destroyed."
-  timer fail-23 10
-# The temple destroyed before anyone has held it (fail 25). The first
-# temple-check arms it; a hold sends temple-check then temple-safe.
-every destroyed temple
-  say intelligence "The Taubat temple has been destroyed."
-  signal temple-check
-on signal temple-check
-  timer temple-unguarded 10
-on signal temple-safe
-  stop temple-unguarded
-on timer temple-unguarded
+  signal failing
+# A rival's hold on the temple beats us (fail 24).
+on held-by federation temple 60
+  fail 24 20
+  say intelligence "The Federation now controls the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on held-by romulan temple 60
+  fail 24 20
+  say intelligence "The Romulans now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+# The temple destroyed before anyone has held it (fail 25): any side's hold
+# switches this off.
+fail 25 destroyed temple as temple-unheld
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Klingons are unable to finish their mission."
-  timer lose-25 10
-on timer fail-23
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-23 10
-on timer fail-24
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-24 10
-on timer lose-23
-  lose 23
-on timer lose-24
-  lose 24
-on timer lose-25
-  lose 25
 
 # --- Mission pass: all three objectives, a line at 10 s, the win at 20 s ----
 on all-completed
@@ -3476,8 +3497,6 @@ on timer pass
 # - The temple monitor is a capture monitor on the temple type: "captured",
 #   "vacated" (sent to every side each time it's let go) and "held <what> <s>";
 #   the rivals' versions are written as new events captured-by / held-by.
-# - The temple-destroyed fail is a switch any side's hold turns off; written
-#   with a latch of once-handlers.
 # - The rivals' own pass/fail lines and what the referee does with a rival's
 #   pass; the generic side-failed rule covers only the fail.
 # - The Klingons' own AI orders (strike on the Federation at 10 s, build
@@ -3596,7 +3615,7 @@ every entered taubat-hangar
   say intelligence "Searching the building for our staff."
 every capture-lost taubat-hangar
   say intelligence "Something's wrong: the recovery team has stopped answering."
-on captured taubat-hangar
+on captured taubat-hangar as kli-raid
   say intelligence "Our people aren't here. Faint bio-traces show they were taken elsewhere a while back."
   complete 10
   timer new-orders 7
@@ -3606,37 +3625,35 @@ on timer new-orders
 on timer pass
   win
 # A rival finishing its raid while ours is still running beats us (fail 12);
-# after it, our own success counts for nothing.
-every beaten taubat-hangar
+# once a rival has finished, our own success counts for nothing.
+on beaten taubat-hangar
+  fail 12 10
   say intelligence "A garbled message from our staff: it seems the Federation or the Romulans have raided the building."
-  timer lose-12 10
 every captured-by federation taubat-hangar
+  disarm kli-raid
   timer fed-took-staff 7
 every captured-by romulan taubat-hangar
+  disarm kli-raid
   timer rom-took-staff 7
 on timer fed-took-staff
   say intelligence "The Federation has taken the building and our staff with it."
 on timer rom-took-staff
   say intelligence "The Romulans have taken the building and our staff with it."
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 11 10
   say operations "The Klingon colony hub has been destroyed."
-  timer lose-11 10
-every destroyed taubat-hangar
+on destroyed taubat-hangar
+  fail 12 10
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
-  timer lose-12 10
-on timer lose-11
-  lose 11
-on timer lose-12
-  lose 12
 
 # Not expressible yet:
 # - The raid on the hangar is a group condition (owned by us 10 s -> "entered",
 #   then 60 s more -> "captured"; lost in between -> capture-lost; a rival's
 #   success in between -> beaten; a rival's success before ours makes ours
-#   futile, which says nothing). Reluva has no capture-lost, beaten or futile
-#   events, nor captured-by <side>.
+#   futile, written as the rival's success switching ours off). Reluva has no
+#   capture-lost or beaten events, nor captured-by <side>.
 # - destroyed romulan-colony stands for four "at most 0" monitors (the
 #   Klingons' small, large, mine and armed building groups all gone).
 # - Each Hubrin raid first beams in one Hubrin unit near 134:237 (an attack
@@ -3655,13 +3672,13 @@ mission J3 K
 site klingon-colony 224 191
 site workshops 168 239          # the eight Taubat workshops (Raid_Building_One..Eight), 152-184:223-255
 site metar-scan-building 176 239   # the anti-Hubrin weapon's target: the Metar colony core
-)",
-R"(site metar-valley 178 238       # centre of the rectangle 160:227-195:248
+site metar-valley 178 238       # centre of the rectangle 160:227-195:248
 objective 11
 objective 12 hidden
 objective 13 hidden
 
-# --- Greeting ---------------------------------------------------------------
+)",
+R"(# --- Greeting ---------------------------------------------------------------
 on start
   timer greeting 10
   timer rom-assault-klingons 80
@@ -3788,6 +3805,7 @@ on signal workshop-destroyed*3
   say engineering "Too late! A huge charge of energy is building up, aimed at the central tower!"
   complete 11
   reveal 12
+  signal core-go
   signal survive-step
   signal pass-step
 # A workshop a rival claims (captured or scanned) while ours is counting is
@@ -3795,8 +3813,8 @@ on signal workshop-destroyed*3
 every beaten raid-building
   signal workshop-lost
 on signal workshop-lost*6
+  fail 16 10
   say operations "Too few hangars fell in time. Our mission can't succeed now."
-  timer lose-16 10
 
 # --- Objective 12: scan the anti-Hubrin weapon's target -------------------
 # Held 10 s to start, 60 s more to finish. It wakes the Metar.
@@ -3804,7 +3822,7 @@ every scan-started science metar-scan-building
   say science "Scanners running now, sir."
 every scan-lost science metar-scan-building
   say science "The scan has dropped out, sir. It needs another attempt."
-on scanned science metar-scan-building
+on scanned science metar-scan-building as kli-core-scan
   say science "We've finished scanning the anti-Hubrin weapon's target, sir."
   reveal 12
   complete 12
@@ -3812,17 +3830,19 @@ on scanned science metar-scan-building
   timer bop-promise 10
   signal pass-step
   signal metar-wake
-  signal core-check   # once scanned, its destruction no longer fails us
-  signal core-safe
+  disarm core-watch   # once scanned, its destruction no longer fails us
+  signal core-go
 on timer bop-promise
   say operations "When an assault group gets into the valley of the Metar, a bird-of-prey will come to support it."
 
 # --- Objective 13: destroy the Metar colony core --------------------------
-# (In the game this monitor and the valley detector wake only after 11 and 12.)
-on entered metar-valley
+# The core monitor and the valley detector wake once 11 and 12 are both done.
+on signal core-go*2
+  arm core-attack
+on entered metar-valley as core-attack dormant
   say operations "The bird-of-prey is coming to help you finish off the Metar colony core."
   ai klingon kli-bop-controller
-on destroyed metar-scan-building
+on destroyed metar-scan-building as core-attack dormant
   say operations "The Metar colony core is destroyed. Objective complete."
   complete 13
   signal survive-step
@@ -3830,8 +3850,10 @@ on destroyed metar-scan-building
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
 every scanned-by federation metar-scan-building
+  disarm kli-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by romulan metar-scan-building
+  disarm kli-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -3889,43 +3911,29 @@ on signal pass-step*4
 on timer pass
   win
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 15 10
   say operations "The Klingon colony hub has been destroyed."
-  timer lose-15 10
-# The core destroyed before we scanned it (fail 17). The first core-check
-# arms it; our scan sends core-check then core-safe.
-every destroyed metar-scan-building
-  signal core-check
-on signal core-check
-  timer core-lost 0
-on signal core-safe
-  stop core-lost
-on timer core-lost
+# The core destroyed before we scanned it (fail 17); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 17 10
   say operations "The anti-Hubrin weapon's target has been destroyed. We can't complete the mission."
-  timer lose-17 10
-on timer lose-15
-  lose 15
-on timer lose-16
-  lose 16
-on timer lose-17
-  lose 17
 
 # Not expressible yet:
 # - The workshop raids are group conditions on "all destroyed" (5 s, then
 #   30 s more; a rival's claim in between is "beaten"); Reluva has no beaten
 #   or scanned-by events, and events name a group and a member
 #   ("raid-building one").
-# - Objective 13's core monitor and the Metar-valley area detector are only
-#   woken once objectives 11 and 12 are both done (a core destroyed earlier
-#   then counts at once); Reluva handlers can't be armed by other events.
-#   entered metar-valley is an area detector (Klingon units in the rectangle
+# - Objective 13's core monitor wakes once 11 and 12 are both done, and a
+#   core destroyed before then counts at once; an armed handler here only
+#   hears events from then on.
+# - entered metar-valley is an area detector (Klingon units in the rectangle
 #   160:227-195:248); its action flies the placed bird-of-prey ~Kli BOP round
 #   a loop (138:269, 162:189, 254:177), a unit path, not an AI order.
 # - count metar-portal == 2 and destroyed romulan-colony (four "at most 0"
 #   building-group monitors) are monitors on other sides.
-# - The core-destroyed fail is a monitor the scan sends dormant: written as a
-#   latch of once-handlers and a 0 s timer.
 # - The jnt03klg table's string 14 (scan the small alien structures) is not an
 #   objective in the game's graph, so it's left out.
 # - A resource top-up object for the colony is active but has an empty bundle.
@@ -3995,29 +4003,26 @@ on timer pass-message
 on timer pass
   win
 
-# Mission fail: the colony hub, or an escape pod (see below); verdict at 10 s, end at
-# 20 s. These happen once; "every" keeps the walkthrough from playing them.
-every count colony-hub == 0
+# Mission fail: the colony hub, or an escape pod (see below); the cause now, the
+# verdict at 10 s, the end at 20 s.
+on count colony-hub == 0
+  fail 8 20
   say operations "The colony hub is destroyed. The mission has failed."
-  timer fail-message 10
-  timer fail-hub 20
-every destroyed escape-pod-1
+  signal failing
+on destroyed escape-pod-1
+  fail 9 20
   say intelligence "The escape pod is destroyed. The mission has failed."
-  timer fail-message 10
-  timer fail-pod 20
-every destroyed escape-pod-2
+  signal failing
+on destroyed escape-pod-2
+  fail 9 20
   say intelligence "The escape pod is destroyed. The mission has failed."
+  signal failing
+on signal failing
   timer fail-message 10
-  timer fail-pod 20
 on timer fail-message
   say operations "We have not achieved our objectives."
-on timer fail-hub
-  lose 8
-on timer fail-pod
-  lose 9
 
-)",
-R"(# Raids: one of eight Taubat assaults every 60 s, one of eight Metar assaults every 120 s.
+# Raids: one of eight Taubat assaults every 60 s, one of eight Metar assaults every 120 s.
 every timer taubat-raids
   random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
   timer taubat-raids 60
@@ -4028,7 +4033,8 @@ every signal taubat-raid-2
 every signal taubat-raid-3
   ai taubat taubat-assault-kli-random3
 every signal taubat-raid-4
-  ai taubat taubat-assault-kli-random4
+)",
+R"(  ai taubat taubat-assault-kli-random4
 every signal taubat-raid-5
   ai taubat taubat-assault-kli-random5
 every signal taubat-raid-6
@@ -4152,49 +4158,28 @@ on timer pass-notice
 on timer pass
   win
 
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
 # (The four buildings' fails come from their raids being "beaten" by a rival;
 # nothing in the mission ever sends that, so they can't happen in the game.)
-every beaten science-station
+fail 20 beaten science-station
   say intelligence "The science station has been destroyed. The mission has failed."
-  timer fail-20 10
-every beaten arsenal
+  signal failing
+fail 21 beaten arsenal
   say intelligence "The arsenal has been destroyed. The mission has failed."
-  timer fail-21 10
-every beaten colonial-house
+  signal failing
+fail 22 beaten colonial-house
   say intelligence "The colonial house has been destroyed. The mission has failed."
-  timer fail-22 10
-every beaten construction-yard
+  signal failing
+fail 23 beaten construction-yard
   say intelligence "The construction yard has been destroyed. The objective has failed."
-  timer fail-23 10
-every count colony-hub == 0
+  signal failing
+fail 24 count colony-hub == 0
   say intelligence "The Klingon colony hub has been destroyed."
-  timer fail-24 10
-on timer fail-20
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Klingons are unable to finish their mission."
-  timer lose-20 10
-on timer fail-21
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-21 10
-on timer fail-22
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-22 10
-on timer fail-23
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-23 10
-on timer fail-24
-  say intelligence "The Klingons are unable to finish their mission."
-  timer lose-24 10
-on timer lose-20
-  lose 20
-on timer lose-21
-  lose 21
-on timer lose-22
-  lose 22
-on timer lose-23
-  lose 23
-on timer lose-24
-  lose 24
 
 # Not expressible yet:
 # - The recaptures are group conditions on ownership (entered after 1 s,
@@ -4229,6 +4214,7 @@ on start
   timer metar-raids 180
   timer taubat-raids 180
   timer taubat-assault 300
+  arm metar-units
 on timer metar-assault
   ai metar met-assault-klingon-1
   ai metar met-assault-klingon-2
@@ -4258,8 +4244,9 @@ on signal metar-sites*3
   complete 12
   signal objective
 
-# Objective 14: the Metar's fighting units down to four or fewer.
-on count metar-fighting-units <= 4
+# Objective 14: the Metar's fighting units down to four or fewer (a watch the game wakes
+# on its first tick).
+on count metar-fighting-units <= 4 as metar-units dormant
   complete 14
   signal objective
 
@@ -4272,9 +4259,8 @@ on timer pass-message
 on timer pass
   win
 
-# Mission fail: the colony hub. Here the game ends at once ("every" keeps the
-# walkthrough from playing it; the hub only goes once).
-every count colony-hub == 0
+# Mission fail: the colony hub. Here the game ends at once.
+on count colony-hub == 0
   say intelligence "Our hub has been destroyed."
   say intelligence "We have not achieved our objectives."
   lose 13
@@ -4329,8 +4315,6 @@ every signal metar-raid-8
 #   the game never shows them, so they are left out here.
 # - Two objects share the name of the pass message (a 10 s timer and an instant relay);
 #   which one the game resolves is unknown. Written as the timer.
-# - The fighting-units check is woken by a ">= 0" monitor on the first tick; same thing
-#   as listening from the start.
 # - The Taubat and Metar patrols run without the script.
 
 # --- J6 as K ----------------------------------------
@@ -4344,10 +4328,21 @@ objective 13
 objective 15
 objective 17
 
-# Fail criteria: our hub (19); the Federation hub lost before it was scanned
-# (14; the game stops watching it once the scan is done - see the end).
-lose 19 destroyed colony-hub
-lose 14 hub-destroyed federation
+# Fail criteria, the game's way: the fail string at once, word to every
+# side at 10 s that the Klingons can't complete their mission, the end at
+# 20 s. Our hub (19); the Federation hub lost before our strong scan of it
+# is done (14: the scan disarms this watch, see objective 13).
+on destroyed colony-hub
+  fail 19 20
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on hub-destroyed federation as federation-hub-watch
+  fail 14 20
+  signal failing
+on signal failing
+  timer fail-news 10
+on timer fail-news
+  say intelligence "The Klingons' mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -4370,7 +4365,8 @@ on seen federation-colony
 on seen metar-colony
   say intelligence "Scan the creatures' hive before you wreck it."
 
-# Objective 13: a strong engineering scan of the Federation hub, held 10 s
+# Objective 13: a strong engineering scan of the Federation hub, held 10 s;
+# done, it stops the fail-14 watch on their hub
 every scan-started strong-engineering federation-hub
   say engineering "Starting the survey. Now, where has the Vulcan gone to ground?"
 every scan-lost strong-engineering federation-hub
@@ -4378,6 +4374,7 @@ every scan-lost strong-engineering federation-hub
 on scanned strong-engineering federation-hub
   say engineering "The Vulcan is in the Federation colony hub, but its shields block the transporter."
   complete 13
+  disarm federation-hub-watch
 # An ordinary engineering scan of the hub only finds that K'San is needed
 every scan-started engineering federation-hub
   say engineering "Scan started."
@@ -4408,8 +4405,7 @@ on scanned strong-science metar-core
   complete 17
   research metar-biodata
 every scan-lost science metar-core
-)",
-R"(  say science "Lost the scan."
+  say science "Lost the scan."
 on scanned science metar-core
   say science "Scan done. Nothing we didn't know."
 # The game also offers the research when a sickbay ward (type 306) is built
@@ -4426,7 +4422,8 @@ on timer alien-device
   say command "Commander, some alien contraption has turned up in the great hall. Orders?"
 
 # Scans of anything else
-every scanned-nothing science
+)",
+R"(every scanned-nothing science
   say science "Routine scan: nothing."
 every scanned-nothing strong-science
   say science "Close scan complete. Nothing worth reporting."
@@ -4610,18 +4607,12 @@ on timer met-assault-federation-2
   ai metar met-assault-federation-2
 
 # Not expressible yet:
-# - Fail 14 is watched only until the strong scan of the Federation hub is
-#   done (the scan puts the monitor to sleep); a handler can't be disarmed, so
-#   here it holds for the whole mission.
 # - The Romulan device destroying our hub 15 s after our shields fall (a
 #   group-damage object, all of "Colony Hub"): no action damages or destroys
 #   things; the engine has to report it as our hub destroyed.
 # - The science officer's "scanning now" for an ordinary Metar scan: the game
 #   sends it to the Federation's mail by mistake, so the Klingon player never
 #   sees it (left out here).
-# - A fail ends the mission at once here; the game shows the fail string,
-#   announces (the game's line) to all at 10 s and
-#   ends it at 20 s.
 # - The scan "futile" lines are unreachable in J6 (nothing sends Go_Futile).
 # - Messages caused by the other sides: their mission passed/failed
 #   announcements, the Federation's "Federation shields down" (swallowed by a
@@ -4639,11 +4630,21 @@ mission J7 K
 objective 13
 objective 15
 
-# Fail criteria: our hub (14); our Hubrin guide killed (16)
-every destroyed kli-hubrin
+# Fail criteria, the game's way: the cause at once, word to every side at
+# 5 s that the Klingons can't complete their mission, the end at 10 s.
+# Our hub (14); our Hubrin guide killed (16).
+on destroyed kli-hubrin
+  fail 16 10
   say intelligence "Our Hubrin guide is dead."
-lose 16 destroyed kli-hubrin
-lose 14 destroyed colony-hub
+  signal failing
+on destroyed colony-hub
+  fail 14 10
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-news 5
+on timer fail-news
+  say intelligence "The Klingons' mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -4803,8 +4804,7 @@ every signal tau-raid-kli-1
 every signal tau-raid-kli-2
   ai taubat taubat-assault-kli-random2
 every signal tau-raid-kli-3
-)",
-R"(  ai taubat taubat-assault-kli-random3
+  ai taubat taubat-assault-kli-random3
 every signal tau-raid-kli-4
   ai taubat taubat-assault-kli-random4
 every signal tau-raid-kli-5
@@ -4821,7 +4821,8 @@ every timer tau-raid-rom
   timer tau-raid-rom 60
   random tau-raid-rom-1 tau-raid-rom-2 tau-raid-rom-3 tau-raid-rom-4 tau-raid-rom-5 tau-raid-rom-6 tau-raid-rom-7 tau-raid-rom-8
 every signal tau-raid-rom-1
-  ai taubat taubat-assault-rom-random1
+)",
+R"(  ai taubat taubat-assault-rom-random1
 every signal tau-raid-rom-2
   ai taubat taubat-assault-rom-random2
 every signal tau-raid-rom-3
@@ -4912,8 +4913,6 @@ on timer met-assault-romulan
 # - Fail 14: the Klingons' hub monitor names its fail criterion
 #   "Colony_hub_destroyed" but the table calls it "Colony_hub-destroyed", so
 #   the game ends the mission without ticking the fail string.
-# - A fail ends the mission at once here; the game announces "the Klingons
-#   cannot complete" to all at 5 s and ends the mission at 10 s.
 # - The other sides' colonies growing fourfold draw Metar attacks on them too
 #   (their own colony-size monitors); there's no event for a rival's colony.
 # - The Hubrin guides walk to each colony on their own orders (unit orders of
@@ -4977,18 +4976,17 @@ on count containment-device == 1
   say engineering "Sir, transport is complete. The device for the field's containment is in place now."
   ai metar metar-attack-on-cfd
   timer sabotage-1 10
+  arm site-scan
 on timer sabotage-1
   say intelligence "Sir, another Hubrin has appeared by the device. It says a mistake in the construction has thrown the field off balance."
   timer sabotage-2 10
 on timer sabotage-2
   say engineering "A remote scan confirms the fault. A science vehicle must get close to find the imbalance."
-  timer sabotage-3 10
-on timer sabotage-3
-  signal scan-armed
 
 # Objective 14: scan the device site and recalibrate (20 s), and keep the device for
-# 10 minutes; both are needed.
-on scanned * device-site
+# 10 minutes; both are needed. The site scan sleeps until the device is in place
+# (the game: 30 s after, see the end).
+on scanned * device-site as site-scan dormant
   say science "Trying to isolate the imbalance. Stand by..."
   timer recalibrate 20
 on timer recalibrate
@@ -5008,22 +5006,20 @@ on signal objective*2
 on timer pass
   win
 
-# Mission fail: the colony hub or the device; message at 10 s, end at 20 s. Each
-# happens once; "every" keeps the walkthrough from playing them.
-every count colony-hub == 0
+# Mission fail: the colony hub or the device; the cause now, the verdict at 10 s, the
+# end at 20 s.
+on count colony-hub == 0
+  fail 13 20
   say intelligence "Our hub has been destroyed."
-  timer fail-message 10
-  timer fail-hub 20
-every destroyed containment-device
+  signal failing
+on destroyed containment-device
+  fail 15 20
   say security "The device for the containment field has been destroyed by the Metar!"
+  signal failing
+on signal failing
   timer fail-message 10
-  timer fail-device 20
 on timer fail-message
   say intelligence "We have not achieved our objectives."
-on timer fail-hub
-  lose 13
-on timer fail-device
-  lose 15
 
 # The Hubrin observer killed (a message only).
 every count hubrin-observer == 0
@@ -5074,10 +5070,10 @@ every signal metar-raid-8
 #   and a Hubrin (type 108) beside it at 154:241 once it is in place. The spawner kind
 #   is read as firing its message when its units die; the recording shows the lines in
 #   sequence without anyone dying, so they are written as following the spawn.
-# - The device-site scan only listens once the third sabotage timer has run (30 s after
-#   the device is placed); here "signal scan-armed" marks that moment but can't gate
-#   the scan handler.
-# - The fail criteria are ticked the moment the hub or device is lost; here at 20 s.
+# - The device-site scan is woken by a third sabotage timer, 30 s after the device is
+#   placed; armed here when the device is in place, because script-check's walkthrough
+#   runs timers only after every event and a late-armed scan handler (unlike a count or
+#   stock one) doesn't look back at what already happened.
 # - The success and failure lines also go to the other two sides' mail (all sides).
 
 # --- J8 as K ----------------------------------------
@@ -5090,17 +5086,18 @@ objective 13
 objective 15
 objective 17 hidden
 
-# Fail criteria, each announced as it happens: our hub (14), our last
-# vehicle yard (16), the device once built (18)
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J8). Our hub (14), our last vehicle yard (16),
+# and the device (18), watched only once it's built (see objective 13).
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count vehicle-yard == 0
+on count vehicle-yard == 0
+  fail 16 10
   say command "Vehicle yard lost. The mission has failed."
-lose 16 count vehicle-yard == 0
-every destroyed anomaly-device
+on destroyed anomaly-device as device-watch dormant
+  fail 18 10
   say command "The anomaly device has been destroyed. The mission has failed."
-lose 18 destroyed anomaly-device
 
 # Start: the device research is open from the start (nothing in the graph
 # unlocks it); the other sides' clocks
@@ -5132,6 +5129,7 @@ on timer device-route
 # (Objective 17 is hidden until the device is built.)
 on built anomaly-device
   say engineering "Our anomaly device is built and setting off. Guard it with everything we have."
+  arm device-watch
   complete 13
   reveal 17
 
@@ -5198,8 +5196,7 @@ on timer federation-colony-protection-relay
   ai federation federation-colony-protection-three
   ai federation federation-colony-protection-four
 
-)",
-R"(# Romulan raids on the Federation: one of eight attacks every 30 s, the first at 90 s
+# Romulan raids on the Federation: one of eight attacks every 30 s, the first at 90 s
 every timer rom-raid-fed
   timer rom-raid-fed 30
   random rom-raid-fed-1 rom-raid-fed-2 rom-raid-fed-3 rom-raid-fed-4 rom-raid-fed-5 rom-raid-fed-6 rom-raid-fed-7 rom-raid-fed-8
@@ -5218,7 +5215,8 @@ every signal rom-raid-fed-6
 every signal rom-raid-fed-7
   ai romulan rom-assault-fed-random7
 every signal rom-raid-fed-8
-  ai romulan rom-assault-fed-random8
+)",
+R"(  ai romulan rom-assault-fed-random8
 
 # Romulan raids on the Klingons: one of eight attacks every 30 s, the first at 90 s
 every timer rom-raid-kli
@@ -5333,8 +5331,6 @@ on timer metar-romulan-attack
   ai metar metar-romulan-assault-two
 
 # Not expressible yet:
-# - A fail ends the mission at once here; the game ends it 10 s after the
-#   fail (no announcement to the other sides in J8).
 # - The Metar starship flies a looping patrol (202:237, 276:410, 178:359 and
 #   back) from the start: a unit path object, not an AI order.
 # - The rivals' devices: their research, building and route orders (60 s
@@ -5385,21 +5381,19 @@ on timer pass
   win
 
 # Mission fail: the colony hub or the device; message now, verdict at 10 s, end at
-# 20 s. Each happens once; "every" keeps the walkthrough from playing them.
-every count colony-hub == 0
+# 20 s. (A pass already under way still wins if it gets there first, as in the game.)
+on count colony-hub == 0
+  fail 13 20
   say intelligence "Our hub has been destroyed."
-  timer fail-message 10
-  timer fail-hub 20
-every count containment-device == 0
+  signal failing
+on count containment-device == 0
+  fail 15 20
   say security "The device for the containment field has been destroyed by the Metar."
+  signal failing
+on signal failing
   timer fail-message 10
-  timer fail-device 20
 on timer fail-message
   say intelligence "We have not achieved our objectives."
-on timer fail-hub
-  lose 13
-on timer fail-device
-  lose 15
 
 # Raids: one of eight Taubat assaults every 30 s, one of eight Metar assaults every 100 s.
 every timer taubat-raids
@@ -5443,8 +5437,6 @@ every signal metar-raid-8
 
 # Not expressible yet:
 # - The core scan is the game's "map cell scanned" bit at 330:189 (any scan kind).
-# - Once the pass or fail sequence has started, the game does not cancel the other one;
-#   whichever reaches the end first decides.
 # - A Metar order to attack the device exists but nothing in the graph starts it; the
 #   Klingons' four unnamed patrols and the Taubat's build orders run without the script.
 # - The pass and fail lines go to every side's mail, not only the Klingons'.
@@ -5458,16 +5450,16 @@ site metar-temple 264 303
 objective 13
 objective 15
 
-# Fail criteria, each announced as it happens: our hub (14); all three Metar
-# starships destroyed (16; the game's message calls them colony cores).
-# Fail 17 (a rival got the technology while we were scanning) has no event:
-# see the end.
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J9). Our hub (14); all three Metar starships
+# destroyed (16; the game's message calls them colony cores). Fail 17 (a
+# rival got the technology while we were scanning) has no event: see the end.
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count metar-starship == 0
+on count metar-starship == 0
+  fail 16 10
   say command "The Metar colony cores are all gone. The mission has failed."
-lose 16 count metar-starship == 0
 
 # Start: the other sides' attack clocks
 on start
@@ -5492,13 +5484,11 @@ on scanned science metar-temple
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
-  signal starship-watch
+  arm starship-watch
 
-# Objective 15: holding a Metar starship, which the game starts watching
-# only once the research is done (either order here: both raise the signal)
-on captured metar-starship
-  signal starship-watch
-on signal starship-watch*2
+# Objective 15: holding a Metar starship; the game starts watching for it
+# only once the research is done
+on captured metar-starship as starship-watch dormant
   say engineering "The starship is ours."
   complete 15
 
@@ -5597,8 +5587,7 @@ every signal rom-raid-kli-8
 # Metar raids on the Federation: one of eight attacks every 100 s, the first at 220 s
 every timer met-raid-fed
   timer met-raid-fed 100
-)",
-R"(  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
+  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
 every signal met-raid-fed-1
   ai metar metar-assault-fed-random1
 every signal met-raid-fed-2
@@ -5629,7 +5618,8 @@ every signal met-raid-kli-3
 every signal met-raid-kli-4
   ai metar metar-assault-kli-random4
 every signal met-raid-kli-5
-  ai metar metar-assault-kli-random5
+)",
+R"(  ai metar metar-assault-kli-random5
 every signal met-raid-kli-6
   ai metar metar-assault-kli-random6
 every signal met-raid-kli-7
@@ -5664,12 +5654,11 @@ every signal met-raid-rom-8
 #   way means fail 17 ("the technology isn't here - a rival must have taken
 #   it"); finishing earlier makes our later scan just "futile" (no
 #   technology, no research). There's no event for a rival's scan.
-# - The capture counts only if we hold a starship when the watch starts or
-#   after; one captured and lost again before the research would not count
-#   in the game, but does here.
+# - The game's capture watch counts starships held, so one captured before
+#   the research and still held when the watch starts counts at once; here
+#   only a capture made after the research does (the event is the capture).
 # - Which scan the temple wants: the game checks "scanned by us" on the
 #   temple's cell (any kind); the objective says a science scan.
-# - A fail ends the mission at once here; the game ends it 10 s after.
 # - The AI sides' own research and captures (no events for rivals).
 
 # --- C10 as K ----------------------------------------
@@ -5684,7 +5673,6 @@ site romulan-colony 144 359
 site taubat-settlement 216 375
 objective 75
 objective 76
-lose 77 destroyed colony-hub
 
 # --- The raids: every 180 s one of the side's assault orders, at random ---
 on start
@@ -5762,14 +5750,19 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 77 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
 # - rom-bop-controller is a unit path controller (group ~Rom_BOP flies a loop at height
 #   12000), not an AI order.
 # - The Taubat also have four patrol orders of their tanks (type 111) the game starts by
 #   itself.
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   77, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 
 # --- R1 as R ----------------------------------------
 # R1 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
@@ -5786,7 +5779,6 @@ objective 16
 objective 17
 objective 19 optional
 objective 20 hidden optional
-lose 21 destroyed colony-hub
 
 # Opening: the staff's greeting a second after the start; the raid clocks
 # start (Taubat and the rival Romulans each begin random raids at 6 min,
@@ -5811,8 +5803,10 @@ on count rival-tanks <= 9
   complete 16
 
 # Objective 17: whichever of the temple or the ruins is sighted first gets
-# its research topic; finishing it meets the objective.
-on seen taubat-temple
+# its line and its research topic (the other then stays silent); finishing it
+# meets the objective.
+on seen taubat-temple as first-find
+  disarm first-find
   say intelligence "An alien building at {site:taubat-temple}. Its purpose is worth researching."
   research temple
 on seen ruins-nw
@@ -5823,7 +5817,8 @@ on seen ruins-sw
   signal ruins-sighted
 on seen ruins-se
   signal ruins-sighted
-on signal ruins-sighted
+on signal ruins-sighted as first-find
+  disarm first-find
   say intelligence "Strange ruins at {site:ruins}. We should research what they were for."
   research ruins
 on researched temple
@@ -5918,6 +5913,14 @@ every signal rival-raid-7
 every signal rival-raid-8
   ai rival riv-rom-assault-rom-random8
 
+# Mission fail: the colony hub. The cause now, "failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 21 20
+  say operations "The colony hub is destroyed. The mission has failed."
+  timer fail-message 10
+on timer fail-message
+  say operations "We have failed."
+
 # The pass: the objective counter fills, the message 10 s later, the win at 20 s.
 on all-completed
   timer mission-pass 10
@@ -5928,14 +5931,10 @@ on timer mission-won
   win
 
 # Not expressible yet:
-# - Only the first sighting (temple or any ruins) shows its line and opens
-#   its research topic; the other topic is then never offered. Reluva has no
-#   "first of these" guard, so both are written. The game's pass counter also
-#   counts that first sighting as one of its four steps.
+# - The game's pass counter counts the first sighting (temple or ruins) as
+#   one of its four steps; here the pass waits for the objectives instead.
 # - Each building's first-completion line (only the first of each type) is
 #   left to the generic "every built" rule, which speaks for every one.
-# - The hub's loss: the game says so at once, "you have failed" 10 s later,
-#   and ends the mission at 20 s; Reluva's lose line ends it at once.
 # - The rival side is a second Romulan colony in slot 4 ("rival" here);
 #   Reluva has no side name for it.
 # - An area storm (random flashes) in the rectangle 292:220-300:228.
@@ -5955,7 +5954,6 @@ objective 14
 objective 15
 objective 16 optional
 objective 17 optional
-lose 18 destroyed colony-hub
 
 # Opening: the greeting after a second; the Orions (in the Taubat colony)
 # send two assaults at once, guard their colony from 10 s, and start random
@@ -5984,8 +5982,7 @@ on built-all sickbay vehicle-yard construction-yard science-station
 on seen taubat-temple
   say intelligence "A Taubat temple at {site:taubat-temple}."
 on seen taubat-hangar-one
-)",
-R"(  say intelligence "A Taubat vehicle factory at {site:taubat-hangar-one}."
+  say intelligence "A Taubat vehicle factory at {site:taubat-hangar-one}."
 on seen taubat-hangar-two
   say intelligence "A Taubat vehicle factory at {site:taubat-hangar-two}."
 
@@ -6007,22 +6004,30 @@ on held taubat-hangar-one 10
   say security "The Taubat prisoners are safe at our base. We should pull out of the factory and destroy it."
   complete 17
 
-# Objective 14: five steps - the temple, both factories, the houses and
-# (watched once a factory has fallen) every fighting unit.
-on destroyed taubat-temple
+# Objective 14: five steps - the temple, both factories (each reported once
+# it has been gone 10 s), the houses and every fighting unit (watched from
+# the first factory's report on).
+)",
+R"(on destroyed taubat-temple
   say intelligence "The Taubat temple is destroyed."
   signal orion-step
 on destroyed taubat-hangar-one
+  timer hangar-one-gone 10
+on timer hangar-one-gone
   say intelligence "One of the vehicle factories the Orions hold is destroyed."
   signal orion-step
+  arm orion-units
 on destroyed taubat-hangar-two
+  timer hangar-two-gone 10
+on timer hangar-two-gone
   say "Incoming message" "Curse you! You will pay for meddling in this."
   say communications "That was the Orions. An idle threat, I expect."
   signal orion-step
+  arm orion-units
 on destroyed orion-houses
   say intelligence "The houses the Orions hold are destroyed."
   signal orion-step
-on count orion-units <= 0
+on count orion-units <= 0 as orion-units dormant
   say intelligence "Every Orion and Taubat unit is destroyed."
   signal orion-step
 on signal orion-step*5
@@ -6031,12 +6036,18 @@ on signal orion-step*5
   signal backdoor
 
 # Objective 15: 50 T of dilithium beamed to the starship, as soon as the
-# stock reaches 250 T - or, once objectives 13 and 14 are met, at 50 T.
-on stock dilithium 250
+# stock reaches 250 T - or, once objectives 13 and 14 are met, at 50 T (a
+# second check, asleep until then). The beam-up happens once.
+on stock dilithium 250 as rich-check
   signal beam-up
-on signal backdoor*2
+on signal backdoor*2 as low-check-wake
+  arm low-check
+on stock dilithium 50 as low-check dormant
   signal beam-up
 on signal beam-up
+  disarm rich-check
+  disarm low-check
+  disarm low-check-wake
   say communications "Beaming 50 units of dilithium up to the starship."
   take dilithium 50
   complete 15
@@ -6078,6 +6089,14 @@ every signal orion-raid-7
 every signal orion-raid-8
   ai orion orion-assault-rom-random8
 
+# Mission fail: the colony hub. The cause now, "failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 18 20
+  say operations "The colony hub is destroyed."
+  timer fail-message 10
+on timer fail-message
+  say operations "We have failed."
+
 # The pass: the counter (objectives 13, 14, 15) fills, the message 10 s
 # later, the win at 20 s.
 on all-completed
@@ -6092,16 +6111,10 @@ on timer mission-won
 # - Losing a captured building before the 10 s hold is up: the game says
 #   (each time) the temple or the factory is lost and to try again with
 #   reinforcements. Reluva has no "capture lost" event.
-# - The 50 T dilithium check only starts watching once objectives 13 and 14
-#   are met; here the beam-up simply follows them (it assumes 50 T in stock).
-# - The fighting-units check (no Orion or Taubat units left) only starts
-#   once a vehicle factory has fallen.
 # - The Romulan Bird of Prey flies a loop of waypoints (344:295, 236:423,
 #   204:339) for the whole mission.
 # - The colony-approach alert is an area test (rectangle 236:335-272:359)
 #   for Orion-side units, shown only the first time.
-# - The hub's loss: the game says so at once, "you have failed" 10 s later,
-#   and ends the mission at 20 s; Reluva's lose line ends it at once.
 # - Each building's first-completion line is left to the generic rule.
 
 # --- J1 as R ----------------------------------------
@@ -6208,60 +6221,48 @@ on scanned science temple
   reveal 25
 
 # --- Objective 25: take the temple and hold it for a minute ---------------
-every captured temple
+# Our capture monitor reports each entry until the hold succeeds, then stops.
+every captured temple as rom-temple-watch
   say engineering "Sir, the Taubat temple is ours."
 every vacated temple
   say intelligence "Nobody holds the Taubat temple now."
 on held temple 60
   say engineering "Sir, we control the alien power source."
   complete 25
-  signal temple-check   # a held temple no longer fails us by being destroyed
-  signal temple-safe
+  disarm rom-temple-watch
+  disarm temple-unheld   # a held temple no longer fails us by being destroyed
 
-# --- Rivals at the temple: their hold beats us (fail 24) -------------------
+# --- Rivals at the temple ---------------------------------------------------
 every captured-by federation temple
   say intelligence "The Federation has got into the Taubat temple."
 every captured-by klingon temple
   say intelligence "The Klingons have got into the Taubat temple."
-every held-by federation temple 60
-  say intelligence "The Federation now controls the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-24 10
-every held-by klingon temple 60
-  say intelligence "The Klingons now control the Taubat power source."
-  signal temple-check
-  signal temple-safe
-  timer fail-24 10
-
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
-every count colony-hub == 0
-  say intelligence "The Romulan colony hub has been destroyed."
-  timer fail-22 10
-# The temple destroyed before anyone has held it (fail 26). The first
-# temple-check arms it; a hold sends temple-check then temple-safe.
-every destroyed temple
+on destroyed temple
   say intelligence "The Taubat temple has been destroyed."
-  signal temple-check
-on signal temple-check
-  timer temple-unguarded 10
-on signal temple-safe
-  stop temple-unguarded
-on timer temple-unguarded
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 22 count colony-hub == 0
+  say intelligence "The Romulan colony hub has been destroyed."
+  signal failing
+# A rival's hold on the temple beats us (fail 24).
+on held-by federation temple 60
+  fail 24 20
+  say intelligence "The Federation now controls the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on held-by klingon temple 60
+  fail 24 20
+  say intelligence "The Klingons now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+# The temple destroyed before anyone has held it (fail 26): any side's hold
+# switches this off.
+fail 26 destroyed temple as temple-unheld
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Romulans are unable to finish their mission."
-  timer lose-26 10
-on timer fail-22
-  say intelligence "The Romulans are unable to finish their mission."
-  timer lose-22 10
-on timer fail-24
-  say intelligence "The Romulans are unable to finish their mission."
-  timer lose-24 10
-on timer lose-22
-  lose 22
-on timer lose-24
-  lose 24
-on timer lose-26
-  lose 26
 
 # --- Mission pass: all three objectives, a line at 10 s, the win at 20 s ----
 on all-completed
@@ -6279,8 +6280,6 @@ on timer pass
 # - The temple monitor is a capture monitor on the temple type: "captured",
 #   "vacated" (sent to every side each time it's let go) and "held <what> <s>";
 #   the rivals' versions are written as new events captured-by / held-by.
-# - The temple-destroyed fail is a switch any side's hold turns off; written
-#   with a latch of once-handlers.
 # - The temple scan is also wired to a stance switch (Tau_hostile_to_Romulan)
 #   that the mission doesn't have, so nothing happens.
 # - The rivals' own pass/fail lines and what the referee does with a rival's
@@ -6337,8 +6336,7 @@ every timer fed-raids-on-rom
   random fed-assault-rom-random1 fed-assault-rom-random2 fed-assault-rom-random3 fed-assault-rom-random4 fed-assault-rom-random5 fed-assault-rom-random6 fed-assault-rom-random7 fed-assault-rom-random8
   timer fed-raids-on-rom 180
 every signal fed-assault-rom-random1
-)",
-R"(  ai federation fed-assault-rom-random1
+  ai federation fed-assault-rom-random1
 every signal fed-assault-rom-random2
   ai federation fed-assault-rom-random2
 every signal fed-assault-rom-random3
@@ -6367,7 +6365,8 @@ every signal kli-assault-rom-random4
 every signal kli-assault-rom-random5
   ai klingon kli-assault-rom-random5
 every signal kli-assault-rom-random6
-  ai klingon kli-assault-rom-random6
+)",
+R"(  ai klingon kli-assault-rom-random6
 every signal kli-assault-rom-random7
   ai klingon kli-assault-rom-random7
 every signal kli-assault-rom-random8
@@ -6410,7 +6409,7 @@ every entered taubat-hangar
   say intelligence "Searching the building for our staff."
 every capture-lost taubat-hangar
   say intelligence "Something's wrong: the recovery team has stopped answering."
-on captured taubat-hangar
+on captured taubat-hangar as rom-raid
   say intelligence "Our people aren't here. Faint bio-traces show they were taken elsewhere a while back."
   complete 8
   timer new-orders 7
@@ -6420,38 +6419,36 @@ on timer new-orders
 on timer pass
   win
 # A rival finishing its raid while ours is still running beats us (fail 10);
-# after it, our own success counts for nothing.
-every beaten taubat-hangar
+# once a rival has finished, our own success counts for nothing.
+on beaten taubat-hangar
+  fail 10 10
   say intelligence "A garbled message from our staff: it seems the Klingons or the Federation have raided the building."
-  timer lose-10 10
 every captured-by federation taubat-hangar
+  disarm rom-raid
   timer fed-took-staff 7
 every captured-by klingon taubat-hangar
+  disarm rom-raid
   timer kli-took-staff 7
 on timer fed-took-staff
   say intelligence "The Federation has taken the building and our staff with it."
 on timer kli-took-staff
   say intelligence "The Klingons have taken the building and our staff with it."
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 9 10
   say operations "The Romulan colony hub has been destroyed."
   stop hubrin-raids-on-rom
-  timer lose-9 10
-every destroyed taubat-hangar
+on destroyed taubat-hangar
+  fail 10 10
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
-  timer lose-10 10
-on timer lose-9
-  lose 9
-on timer lose-10
-  lose 10
 
 # Not expressible yet:
 # - The raid on the hangar is a group condition (owned by us 10 s -> "entered",
 #   then 60 s more -> "captured"; lost in between -> capture-lost; a rival's
 #   success in between -> beaten; a rival's success before ours makes ours
-#   futile, which says nothing). Reluva has no capture-lost, beaten or futile
-#   events, nor captured-by <side>.
+#   futile, written as the rival's success switching ours off). Reluva has no
+#   capture-lost or beaten events, nor captured-by <side>.
 # - destroyed federation-colony stands for four "at most 0" monitors (the
 #   Klingons' small, large, mine and armed building groups all gone).
 # - Each Hubrin raid first beams in one Hubrin unit near 134:305 (an attack
@@ -6616,28 +6613,29 @@ every beaten raid-building
 every futile raid-building
   signal workshop-lost
 on signal workshop-lost*6
+  fail 15 10
   say operations "Too few hangars were taken in time. We can't complete the mission."
-  timer lose-15 10
 
-# --- Objective 12: scan the centre of the harmonic charge ------------
+# --- Objective 12: scan the focal point of the harmonic charge ------------
 # Held 10 s to start, 60 s more to finish. It wakes the Metar.
 every scan-started science metar-scan-building
   say science "Scanners running now, sir."
 every scan-lost science metar-scan-building
   say science "The scan has dropped out, sir. It needs another attempt."
-on scanned science metar-scan-building
+on scanned science metar-scan-building as rom-core-scan
   say science "Confirmed: this is where the harmonic field is focused... Wait! The energy is off the scale, and harmonic fissures are opening everywhere!"
   reveal 12
   complete 12
   signal pass-step
   signal metar-wake
-  signal core-check   # once scanned, its destruction no longer fails us
-  signal core-safe
+  disarm core-watch   # once scanned, its destruction no longer fails us
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
 every scanned-by federation metar-scan-building
+  disarm rom-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by klingon metar-scan-building
+  disarm rom-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -6667,8 +6665,7 @@ every signal metar-bur-rom-one
   ai metar metar-bur-rom-one
 every signal metar-bur-rom-two
   ai metar metar-bur-rom-two
-)",
-R"(every signal metar-nak-rom-one
+every signal metar-nak-rom-one
   ai metar metar-nak-rom-one
 every signal metar-nak-rom-two
   ai metar metar-nak-rom-two
@@ -6696,40 +6693,27 @@ on signal pass-step*3
 on timer pass
   win
 
-# --- Fails: the mission ends 10 s after one ---------------------------------
-every count colony-hub == 0
+)",
+R"(# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 14 10
   say operations "Our colony hub is gone. The mission has failed."
-  timer lose-14 10
-# The focal point destroyed before we scanned it (fail 16). The first
-# core-check arms it; our scan sends core-check then core-safe.
-every destroyed metar-scan-building
-  signal core-check
-on signal core-check
-  timer core-lost 0
-on signal core-safe
-  stop core-lost
-on timer core-lost
+# The focal point destroyed before we scanned it (fail 16); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 16 10
   say operations "The Taubat weapon's focal point has been destroyed. We can't complete the mission."
-  timer lose-16 10
-on timer lose-14
-  lose 14
-on timer lose-15
-  lose 15
-on timer lose-16
-  lose 16
 
 # Not expressible yet:
 # - The workshop raids are group conditions on ownership (5 s -> "entered",
 #   30 s more -> "captured", lost in between -> capture-lost) and the rivals'
 #   claims as beaten (during ours) and futile (before ours); the core scan is
 #   one on the science-scan flag (scan-started / scanned / scan-lost; after a
-#   rival's scan ours is futile and objective 12 can't be finished). Reluva has
-#   no capture-lost, beaten, futile or scanned-by events, and events name a
-#   group and a member ("raid-building one").
+#   rival's scan ours is futile, written as their scan switching ours off).
+#   Reluva has no capture-lost, beaten, futile or scanned-by events, and events
+#   name a group and a member ("raid-building one").
 # - count metar-portal == 2 and destroyed federation-colony (four "at most 0"
 #   building-group monitors) are monitors on other sides.
-# - The focal-point-destroyed fail is a monitor the scan sends dormant: written
-#   as a latch of once-handlers and a 0 s timer.
 # - The jnt03rom table's string 13 (scan the artifacts near the workshops) is
 #   not an objective in the game's graph, so it's left out.
 # - A resource top-up object for the colony is active but has an empty bundle.
@@ -6832,9 +6816,9 @@ on timer anti-matter
   complete 12
 # (Fail 13: a rival taking the arsenal during our raid; nothing in the
 # mission ever sends that, so it can't happen.)
-every beaten klingon-arsenal
+fail 13 beaten klingon-arsenal
   say intelligence "The arsenal has been destroyed. The mission has failed."
-  timer fail-13 10
+  signal failing
 
 # --- Mission pass: a line at 10 s, the win at 20 s --------------------------
 on all-completed
@@ -6845,20 +6829,14 @@ on timer pass-notice
 on timer pass
   win
 
-# --- Fails: each one gives a line after 10 s and ends the mission at 20 s --
-every count colony-hub == 0
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 14 count colony-hub == 0
   say intelligence "The Romulan colony hub has been destroyed."
-  timer fail-14 10
-on timer fail-13
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
   say intelligence "The Romulans are unable to finish their mission."
-  timer lose-13 10
-on timer fail-14
-  say intelligence "The Romulans are unable to finish their mission."
-  timer lose-14 10
-on timer lose-13
-  lose 13
-on timer lose-14
-  lose 14
 
 # Not expressible yet:
 # - The raid is a group condition on ownership (entered after 1 s, captured
@@ -6882,9 +6860,6 @@ site metar-colony 368 288
 site metar-colony-core 370 285
 objective 12
 objective 14
-lose 13 destroyed supply-vehicles
-lose 15 destroyed metar-colony-core   # (inferred: the game wires this fail to a "beaten to it" signal nothing sends)
-lose 16 destroyed colony-hub
 
 # Opening: the vehicles at the abandoned base, then the meteor storm over it
 # (warning at 20 s, meteors from 80 s, over at 240 s, the base finished off
@@ -6963,18 +6938,21 @@ every timer sentinel-alert
 # (165 T dilithium, 165 T transaluminium, 1350 KG nitrium, 1650 KG duranium).
 on timer beam-1
   say engineering "Supply vehicle 1 has reached colony storage. Next, seize the RAS commander of the Metar inside the core of their colony."
+  disarm supply-fail
   give dilithium 165
   give transaluminium 165
   give nitrium 1350
   give duranium 1650
 on timer beam-2
   say engineering "Supply vehicle 2 is in colony storage. The Metar RAS is waiting for us."
+  disarm supply-fail
   give dilithium 165
   give transaluminium 165
   give nitrium 1350
   give duranium 1650
 on timer beam-3
   say engineering "Supply vehicle 3 is in colony storage. Take the Metar colony core, search it and bring the RAS commander back."
+  disarm supply-fail
   give dilithium 165
   give transaluminium 165
   give nitrium 1350
@@ -7011,6 +6989,23 @@ every signal metar-raid-7
 every signal metar-raid-8
   ai metar metar-assault-rom-random8
 
+# Fails: the cause and "the Romulans cannot complete their mission" at once,
+# the end 10 s later. The supply-vehicle check stops with the first beam-up.
+on destroyed supply-vehicles as supply-fail
+  fail 13 10
+  say operations "Every supply vehicle is lost. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+# (inferred: the game wires this fail to the core search's "beaten to it" output,
+# which nothing sends)
+on destroyed metar-colony-core
+  fail 15 10
+  say intelligence "The colony core is destroyed and the RAS commander is dead. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+on destroyed colony-hub
+  fail 16 10
+  say operations "The colony hub is destroyed. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+
 # The pass: both objectives, the message at once, the win 10 s later.
 on all-completed
   say intelligence "The Romulans' mission is accomplished."
@@ -7025,18 +7020,11 @@ on timer mission-won
 #   (418:416-421:419).
 # - At the start the vehicles are moved to their posts by the side's own
 #   orders (scout-prepositioner, supply-vehicle-prepositioner,
-)",
-R"(#   tank-prepositioner, artillery-prepositioner).
+#   tank-prepositioner, artillery-prepositioner).
 # - The beam-up takes the vehicle's units off the map (the line and the
-#   stock come when the group is gone); and the first one stops the
-#   supply-vehicle fail check (all armed APCs gone) - here the fail is
-#   "destroyed", which beaming up isn't.
+#   stock come when the group is gone).
 # - The first beam-up destroys the abandoned base outright (its hub and
 #   every building of the "Primary colony" groups).
-# - Fails: each has its own line at once ("all supply vehicles lost",
-#   "the core is destroyed and the RAS commander dead", "the hub is
-#   destroyed"), then "the Romulans cannot complete their mission", and the
-#   mission ends 10 s later; Reluva's lose lines end it at once, silently.
 # - Leaving the core during the search: "building abandoned, the search
 #   wasn't finished" (no "capture lost" event).
 # - Metar approach is an area test for any Romulan unit in 344:260-391:315.
@@ -7051,12 +7039,10 @@ site klingon-colony 230 375
 objective 12
 objective 14
 objective 16
-lose 13 destroyed federation-science-block   # (inferred: the game wires this fail to a "beaten to it" signal nothing sends; its line says the block was destroyed)
-lose 15 destroyed bad-guy-device
-lose 17 destroyed colony-hub
 
 # Opening: the Federation, the Klingons and the Metar each start random
-# raids on us after 3 minutes, then one every 2 minutes.
+)",
+R"(# raids on us after 3 minutes, then one every 2 minutes.
 on start
   timer federation-raids 180
   timer klingon-raids 180
@@ -7080,19 +7066,26 @@ on held federation-science-block 22
   complete 12
   research bad-guy-device
 
-# Objective 14: once the study is done and the vehicle yard is up, the
-# device is made and (7 s later) sent on its way to the Klingon colony.
+# Objective 14: the study done wakes three watches: a vehicle yard (7 s
+# after one stands, the device is sent on its way to the Klingon colony),
+# the device's arrival there, and the device being made.
 on researched bad-guy-device
   say engineering "The device study is finished. We've asked for one to be built."
+  arm yard-check
+  arm device-route
+  arm device-made
+on built vehicle-yard as yard-check dormant
   timer device-launch 7
 on timer device-launch
   ai romulan rom-bgd-controller
-on built bad-guy-device
+# once the device exists, losing it fails the mission
+on built bad-guy-device as device-made dormant
   complete 14
+  arm device-fail
 
 # Objective 16: the device reaches the Klingon colony and, 7 s on, wipes it
 # out; the colony down to half its size meets the objective.
-on arrived bad-guy-device klingon-colony
+on arrived bad-guy-device klingon-colony as device-route dormant
   say security "The device has been placed in the Klingon colony. Prepare for activation."
   timer device-blast 7
 on colony-size klingon 50
@@ -7173,6 +7166,27 @@ every signal metar-raid-7
 every signal metar-raid-8
   ai metar metar-assault-rom-random8
 
+# Fails: the cause at once, "the Romulans cannot complete their mission" at
+# 5 s, the end at 10 s.
+# (inferred: the game wires this fail to the search's "beaten to it" output,
+# which nothing sends; its line says the block was destroyed)
+on destroyed federation-science-block
+  fail 13 10
+  say intelligence "The science block is destroyed. The mission has failed."
+  signal failing
+on destroyed bad-guy-device as device-fail dormant
+  fail 15 10
+  say operations "The device has been destroyed. The mission has failed."
+  signal failing
+on destroyed colony-hub
+  fail 17 10
+  say operations "The colony hub is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 5
+on timer fail-message
+  say intelligence "The Romulans can't complete their mission."
+
 # The pass: all three objectives, the message 5 s later, the win at 10 s.
 on all-completed
   timer mission-pass 5
@@ -7183,20 +7197,12 @@ on timer mission-won
   win
 
 # Not expressible yet:
-# - The device's launch waits for a vehicle yard as well as the research
-#   (the yard check only starts once the study is done); here the 7 s
-#   launch timer starts with the research alone.
 # - The blast: 7 s after the device arrives, every Klingon building and
 #   their hub are destroyed outright (timer device-blast stands for it).
 # - "colony-size klingon 50": the game's colony-size test of another side
 #   (the Klingon colony at half its starting size, partial buildings counted).
 # - Leaving the science block during the search: "building abandoned, the
 #   search wasn't finished" (no "capture lost" event).
-# - Fails: each has its own line at once ("science block destroyed",
-#   "device destroyed", "hub destroyed"), then "the Romulans cannot complete
-#   their mission" at 5 s and the end at 10 s; Reluva's lose lines end it at
-#   once, silently. The device-destroyed fail is only watched once the
-#   device exists.
 # - The ambushes are area tests (any Romulan unit inside 396:320-415:336,
 #   379:328-391:347, 207:384-232:409).
 
@@ -7211,10 +7217,21 @@ objective 13
 objective 15
 objective 17
 
-# Fail criteria: our hub (19); the Klingon hub lost before it was scanned
-# (14; the game stops watching it once the scan is done - see the end).
-lose 19 destroyed colony-hub
-lose 14 hub-destroyed klingon
+# Fail criteria, the game's way: the fail string at once, word to every
+# side at 10 s that the Romulans can't complete their mission, the end at
+# 20 s. Our hub (19); the Klingon hub lost before our strong scan of it
+# is done (14: the scan disarms this watch, see objective 13).
+on destroyed colony-hub
+  fail 19 20
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on hub-destroyed klingon as klingon-hub-watch
+  fail 14 20
+  signal failing
+on signal failing
+  timer fail-news 10
+on timer fail-news
+  say intelligence "The Romulans' mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -7237,7 +7254,8 @@ on seen klingon-colony
 on seen metar-colony
   say intelligence "Leave the aliens be if you can - stirring them up may cost you."
 
-# Objective 13: a strong engineering scan of the Klingon hub, held 10 s
+# Objective 13: a strong engineering scan of the Klingon hub, held 10 s;
+# done, it stops the fail-14 watch on their hub
 every scan-started strong-engineering klingon-hub
   say engineering "Starting the survey. Looking for a likely target."
 every scan-lost strong-engineering klingon-hub
@@ -7245,6 +7263,7 @@ every scan-lost strong-engineering klingon-hub
 on scanned strong-engineering klingon-hub
   say engineering "Their council chamber should suit the test nicely. Waiting for their shields to drop."
   complete 13
+  disarm klingon-hub-watch
 # An ordinary engineering scan of the hub only finds that Grinke is needed
 every scan-started engineering klingon-hub
   say engineering "Scan under way, Sir."
@@ -7400,8 +7419,7 @@ every signal met-raid-fed-6
   ai metar metar-assault-fed-random6
 every signal met-raid-fed-7
   ai metar metar-assault-fed-random7
-)",
-R"(every signal met-raid-fed-8
+every signal met-raid-fed-8
   ai metar metar-assault-fed-random8
 
 # Metar raids on the Klingons: one of eight attacks every 120 s, the first at 480 s
@@ -7413,7 +7431,8 @@ every signal met-raid-kli-1
 every signal met-raid-kli-2
   ai metar metar-assault-kli-random2
 every signal met-raid-kli-3
-  ai metar metar-assault-kli-random3
+)",
+R"(  ai metar metar-assault-kli-random3
 every signal met-raid-kli-4
   ai metar metar-assault-kli-random4
 every signal met-raid-kli-5
@@ -7461,20 +7480,15 @@ on timer met-assault-federation-2
 # Not expressible yet:
 # - The device destroying the Klingon hub 15 s after their shields fall (a
 #   group-damage object on the Klingons' "Colony Hub"): no action damages or
-#   destroys things. If one is added, fail 14 must stop applying once the
-#   scan is done, as in the game (the scan puts that monitor to sleep), or
-#   every game where the device works would be lost; a handler can't be
-#   disarmed, so here fail 14 holds for the whole mission.
+#   destroys things. (Fail 14 is already disarmed by then: the scan of
+#   their hub comes first, so the device working doesn't lose us the game.)
 # - When the Federation destroys our shields the game means to tell us they
 #   took the device, but the line goes to a misspelt target and never shows.
-# - A fail ends the mission at once here; the game shows the fail string,
-#   announces (the game's line) to all at 10 s and
-#   ends it at 20 s.
 # - The scan "futile" lines are unreachable in J6 (nothing sends Go_Futile).
 # - J6 gives the Romulans no "scan found nothing" lines (the other two sides
 #   have them).
 # - Messages caused by the other sides: their mission passed/failed
-#   announcements; the Klingons' (the game's line) goes to
+#   announcements; the Klingons' "an alien device in the main hall" goes to
 #   them, not us. There's no event for a rival's pass.
 # - Whether the biodata research needs both the scan and the ward, or either:
 #   the game sends the topic from both; here either opens it.
@@ -7489,11 +7503,20 @@ mission J7 R
 objective 13
 objective 15
 
-# Fail criteria: our Hubrin guide killed (16). (The game never fails 14 for
-# the Romulans - see the end.)
-every destroyed rom-hubrin
+# Fail criteria, the game's way: the cause at once, word to every side at
+# 5 s that the Romulans can't complete their mission, the end at 10 s.
+# Our Hubrin guide killed (16). Our hub's loss is only announced: the game
+# never fails 14 for the Romulans (see the end).
+on destroyed rom-hubrin
+  fail 16 10
   say intelligence "Our Hubrin guide is dead."
-lose 16 destroyed rom-hubrin
+  signal failing
+on destroyed colony-hub
+  say intelligence "Our colony hub has been destroyed."
+on signal failing
+  timer fail-news 5
+on timer fail-news
+  say intelligence "The Romulans' mission can no longer succeed."
 
 # Start: the other sides' attack clocks
 on start
@@ -7762,8 +7785,6 @@ on timer met-assault-romulan
 #   monitor's target list runs two names together, so its fail relay (and the
 #   first build-abort relay) never get the message. Left out here to match;
 #   only the announcement to all sides happens.
-# - A fail ends the mission at once here; the game announces "the Romulans
-#   cannot complete" to all at 5 s and ends the mission at 10 s.
 # - The other sides' colonies growing fourfold draw Metar attacks on them too
 #   (their own colony-size monitors); there's no event for a rival's colony.
 # - The Hubrin guides walk to each colony on their own orders (unit orders of
@@ -7779,8 +7800,6 @@ site device-site 184 359
 site field-fault 186 357
 objective 12
 objective 14
-lose 13 destroyed colony-hub
-lose 15 destroyed containment-device
 
 # Opening: the Taubat and the Metar each raid us at random every minute
 # from the first; three set Metar assaults at 1, 2 and 3 minutes.
@@ -7795,8 +7814,7 @@ on timer metar-assault-1
 on timer metar-assault-3
   ai metar met-assault-romulan-3
 on timer metar-assault-2
-)",
-R"(  ai metar met-assault-romulan-2
+  ai metar met-assault-romulan-2
 on destroyed hubrin-observer
   say intelligence "The Hubrin observer is dead."
 
@@ -7809,7 +7827,8 @@ on colony-size 300
   signal infrastructure
 on signal infrastructure*2
   say engineering "Sir, the colony can now support building the containment device. One last round of research diagnostics is needed."
-  complete 12
+)",
+R"(  complete 12
   research containment-device
 
 # The device: made 10 s after the research and beamed to the site the
@@ -7822,15 +7841,17 @@ on built containment-device
   say engineering "Sir, transport is complete: we have the device for the field's containment in position."
   ai metar metar-attack-on-cfd
   timer saboteur-1 10
+  arm fault-scan
 on timer saboteur-1
   say intelligence "Sir, another Hubrin has shown up by the device. It says a construction error nobody foresaw has unbalanced the field."
   timer saboteur-2 10
 on timer saboteur-2
   say engineering "Our remote scan agrees. A science vehicle has to get close to isolate the imbalance."
 
-# Objective 14: the fault scanned (watched from 10 s after that line) and
-# fixed 20 s later, and the device standing for 10 minutes.
-on scanned science field-fault
+# Objective 14: the fault scanned (a watch asleep until the device stands;
+# the game wakes it 10 s after the line above, see the end) and fixed 20 s
+# later, and the device standing for 10 minutes.
+on scanned science field-fault as fault-scan dormant
   say science "Trying to isolate the imbalance. Stand by..."
   timer recalibrate 20
 on timer recalibrate
@@ -7841,6 +7862,21 @@ on held containment-device 600
 on signal device-online*2
   say engineering "A close call, commander. As first set up, it would soon have overloaded the whole system."
   complete 14
+
+# Fails: the cause at once, "the Romulans cannot complete their mission" at
+# 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 13 20
+  say intelligence "The Romulan hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 15 20
+  say security "Metar forces have wrecked the field containment device!"
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "The Romulans can't complete their mission."
 
 # The pass: both objectives, the message at once (to every side), the win
 # 10 s later.
@@ -7900,16 +7936,17 @@ every signal metar-raid-8
 #   saboteur is made the same way at 194:353 when the device stands. The
 #   game's spawner reports when its group is gone; the recording heard the
 #   "built" line at once, as written here.
-# - The fault scan is only watched from 10 s after the engineering line
-#   (30 s after the device stands); the scan is of the cell 186:357, of the
-#   kind the game's first scan bit records (taken to be science).
+# - The fault scan is woken by a timer 10 s after the engineering line (30 s
+#   after the device stands); armed here when the device stands, because
+#   script-check's walkthrough runs timers only after every event and a
+#   late-armed scan handler (unlike a count or stock one) doesn't look back
+#   at what already happened. The scan is of the cell 186:357, of the kind
+#   the game's first scan bit records (taken to be science).
 # - The device's 10-minute hold (build-and-hold monitor) restarts nothing
 #   if lost: losing it is the fail, with "the Metar have destroyed the
 #   containment field device!" at once.
-# - Fails: the line at once ("Romulan hub destroyed" / the device line),
-#   (the game's line) 10 s later, the end at 20 s;
-#   Reluva's lose lines end it at once, silently. (The game's hub fail sends
-#   "Fail Crieria 1", misspelt, so fail string 13 is never ticked.)
+# - The game's hub fail sends "Fail Crieria 1", misspelt, so fail string 13
+#   is never ticked (the mission still fails); written as fail 13.
 # - Messages sent to every side's mail (the pass, the fail, the observer).
 # - An area storm (random flashes) in the rectangle 188:268-196:276.
 
@@ -7923,17 +7960,18 @@ objective 13
 objective 15
 objective 17 hidden
 
-# Fail criteria, each announced as it happens: our hub (14), our last
-# vehicle yard (16), the device once built (18)
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J8). Our hub (14), our last vehicle yard (16),
+# and the device (18), watched only once it's built (see objective 13).
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count vehicle-yard == 0
+on count vehicle-yard == 0
+  fail 16 10
   say command "Vehicle yard lost. The mission has failed."
-lose 16 count vehicle-yard == 0
-every destroyed anomaly-device
+on destroyed anomaly-device as device-watch dormant
+  fail 18 10
   say command "The anomaly device has been destroyed. The mission has failed."
-lose 18 destroyed anomaly-device
 
 # Start: the device research is open from the start (nothing in the graph
 # unlocks it); the other sides' clocks
@@ -7965,6 +8003,7 @@ on timer device-route
 # (Objective 17 is hidden until the device is built.)
 on built anomaly-device
   say engineering "Our anomaly device is built and setting off. Guard it with everything we have."
+  arm device-watch
   complete 13
   reveal 17
 
@@ -8165,8 +8204,6 @@ on timer metar-romulan-attack
   ai metar metar-romulan-assault-two
 
 # Not expressible yet:
-# - A fail ends the mission at once here; the game ends it 10 s after the
-#   fail (no announcement to the other sides in J8).
 # - The Metar starship flies a looping patrol (202:237, 276:410, 178:359 and
 #   back) from the start: a unit path object, not an AI order.
 # - The rivals' devices: their research, building and route orders (60 s
@@ -8176,15 +8213,13 @@ on timer metar-romulan-attack
 #   arrives, together with 17; the game words it as its own objective but
 #   checks nothing else.
 
-# --- R14 as R ----------------------------------------
 )",
-R"(# R14 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+R"(# --- R14 as R ----------------------------------------
+# R14 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
 mission R14 R
 site metar-core 82 269
 objective 12
 objective 14
-lose 13 destroyed colony-hub
-lose 15 destroyed containment-device
 
 # Opening: Taubat raids every 30 s from the first 30 s; Metar raids every
 # 100 s after 2 minutes; set Metar assaults at 2, 5 and 9 minutes, and an
@@ -8210,6 +8245,20 @@ on scanned science metar-core
   say science "Sir, these readings suggest the Metar are making an anomaly generator."
   complete 12
   complete 14
+
+# Fails: the cause at once, "you have failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 13 20
+  say operations "The colony hub is destroyed."
+  signal failing
+on destroyed containment-device
+  fail 15 20
+  say security "The Metar have wrecked the containment field device."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "You have not completed your mission."
 
 # The pass: the message 10 s later (to every side), the win at 20 s.
 on all-completed
@@ -8267,10 +8316,6 @@ every signal metar-raid-8
 # Not expressible yet:
 # - The core scan is a cell-scan monitor on 82:269 (the game's first scan
 #   bit, taken to be science; weak or strong not told apart).
-# - Fails: the line at once, to every side ("colony hub destroyed" /
-#   (the game's line)), "you have
-#   failed your mission" 10 s later, the end at 20 s; Reluva's lose lines
-#   end it at once, silently.
 # - Messages sent to every side's mail (the pass and the fails).
 
 # --- J9 as R ----------------------------------------
@@ -8282,16 +8327,16 @@ site metar-temple 264 303
 objective 13
 objective 15
 
-# Fail criteria, each announced as it happens: our hub (14); all three Metar
-# starships destroyed (16; the game's message calls them colony cores).
-# Fail 17 (a rival got the technology while we were scanning) has no event:
-# see the end.
-every destroyed colony-hub
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J9). Our hub (14); all three Metar starships
+# destroyed (16; the game's message calls them colony cores). Fail 17 (a
+# rival got the technology while we were scanning) has no event: see the end.
+on destroyed colony-hub
+  fail 14 10
   say command "Colony hub lost. The mission has failed."
-lose 14 destroyed colony-hub
-every count metar-starship == 0
+on count metar-starship == 0
+  fail 16 10
   say command "The Metar colony cores are all gone. The mission has failed."
-lose 16 count metar-starship == 0
 
 # Start: the other sides' attack clocks
 on start
@@ -8315,13 +8360,11 @@ on scanned science metar-temple
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
-  signal starship-watch
+  arm starship-watch
 
-# Objective 15: holding a Metar starship, which the game starts watching
-# only once the research is done (either order here: both raise the signal)
-on captured metar-starship
-  signal starship-watch
-on signal starship-watch*2
+# Objective 15: holding a Metar starship; the game starts watching for it
+# only once the research is done
+on captured metar-starship as starship-watch dormant
   say engineering "The starship is ours."
   complete 15
 
@@ -8465,12 +8508,11 @@ every signal met-raid-rom-8
 #   way means fail 17 ("the technology isn't here - a rival must have taken
 #   it"); finishing earlier makes our later scan just "futile" (no
 #   technology, no research). There's no event for a rival's scan.
-# - The capture counts only if we hold a starship when the watch starts or
-#   after; one captured and lost again before the research would not count
-#   in the game, but does here.
+# - The game's capture watch counts starships held, so one captured before
+#   the research and still held when the watch starts counts at once; here
+#   only a capture made after the research does (the event is the capture).
 # - Which scan the temple wants: the game checks "scanned by us" on the
 #   temple's cell (any kind); the objective says a science scan.
-# - A fail ends the mission at once here; the game ends it 10 s after.
 # - The Klingons' random raids on the Romulans never happen in the game: their
 #   timer names orders (Kli_Assault_Kli_Random1-8) that don't exist. Left out.
 # - The AI sides' own research and captures (no events for rivals).
@@ -8494,7 +8536,6 @@ objective 82
 objective 83 hidden
 objective 84 hidden
 objective 85 hidden
-lose 86 destroyed colony-hub
 
 # --- Narok's orders and the deadline ---
 on start
@@ -8502,9 +8543,11 @@ on start
   timer deadline 3600
 on timer intro
   say "Incoming message from Narok" "Move fast, Commander: Federation and Klingon ships will soon arrive to look for their missing men."
+# Out of time: Narok's verdict at once, the failure 10 s later, over at 20 s.
 on timer deadline
+  fail 87 20
   say "Incoming transmission from Narok" "Commander, you have not succeeded. Ships of the Federation and the Klingons now orbit Junil IV, and the Senate disowns everything done there: officially, neither you nor your crew exists."
-  lose 87
+  timer fail-message 10
 
 # --- Romulans on the trail south of the colony set off Orion-Taubat raids, every 60 s ---
 on approach romulan taubat-trail
@@ -8555,15 +8598,15 @@ every scan-started medical temple
 every scan-lost medical temple
   say operations "The ambassador has slipped out of our transporter lock. Another scan is required."
 on scanned medical temple
-  timer ambassador-aboard 1
+)",
+R"(  timer ambassador-aboard 1
   timer narok-crush 5
 on timer ambassador-aboard
   say operations "The ambassador is in our hands!"
   complete 84
   signal objective-met
 on timer narok-crush
-)",
-R"(  say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
+  say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
   reveal 85
 
 # --- The Orion-Taubat colony razed: temple, houses, hangars and guns all gone ---
@@ -8628,6 +8671,15 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s;
+# the deadline uses the same closing line) ---
+on destroyed colony-hub
+  fail 86 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
 # - The postures: Narok's last line also turns the Hubrin (slot 4) and the Metar guns
 #   (slot 5) hostile to the Romulans; `hostile <side>` only changes the Romulans' own
@@ -8638,10 +8690,10 @@ on timer pass
 # - Scans: the game's conditions are the weak medical / weak science scan flags (4, 5),
 #   2 s to start and 20 s to hold; each start or loss re-sends its line (the 1 s timers
 #   in front of the lines are folded in). The "start" lines already give the findings.
-# - The fail lines: on the hub's loss the game says "colony hub destroyed" at once and,
-#   like the deadline, marks the fail, says 10 s later that the objectives weren't met
-#   and ends the mission at 20 s; `lose` ends it at once.
 # - The deadline timer keeps running after the pass (the pass ends the mission first).
+# - Both fails share one closing relay: only the first runs the 10 s line and the end
+#   (Reluva's `fail` ignores the second too, but its `timer fail-message` restarts the
+#   10 s line's timer if the second cause comes within those 10 s).
 # - The Orion-Taubat raids start once any Romulan unit is inside 272:155-304:215; the
 #   Taubat and the Hubrin also run patrol orders the game starts by itself.
 
@@ -8656,7 +8708,6 @@ site colony 426 286
 site colony-gate 416 296     # the area 408:280-424:312 at the colony's south side
 site attack-front 393 267    # the area 389:259-397:276 the Romulan attack comes through
 objective 16
-lose 17 destroyed colony-hub
 
 # --- Selecting buildings and the first build order (timed from the start) ---
 on start
@@ -8705,17 +8756,19 @@ on timer upgrade-1
 on timer upgrade-2
   say operations "Click the lit arrow to page on, then left-click the improved hub icon: the upgrade starts at once." Tutor16
 
-# --- The Tricorder (once the hub is upgraded) ---
+# --- The Tricorder (once the hub is upgraded); from here on each key detector is armed by
+# its prompt and stays deaf until then ---
 on built colony-hub-upgrade
   timer tricorder-1 3
 on timer tricorder-1
   say operations "Tab switches between the mini-map and the full-screen Tricorder, which takes over the main view from its corner." Tutor17
+  arm tab-1
   timer tricorder-2 12
 on timer tricorder-2
   say operations "It shows the world you are on as a relief map."
   signal tricorder-step
-# The next line needs both: Tab pressed, and the line above shown.
-on key 9
+# The next line needs both: Tab pressed, and the line above shown (the game's two-count relay).
+on key 9 as tab-1 dormant
   signal tricorder-step
 on signal tricorder-step*2
   timer tricorder-3 12
@@ -8724,79 +8777,85 @@ on timer tricorder-3
   timer tricorder-4 19
 on timer tricorder-4
   say operations "Press Tab again to go back to the normal camera." Tutor19
+  arm tab-2
 
 # --- The camera: each step waits for its key ---
-every key 9
-  signal key-tab
-on signal key-tab*2
+on key 9 as tab-2 dormant
   timer camera-1 3
 on timer camera-1
   say operations "This standard view is the bird's eye view. With NumLock on, numpad 4 and 6 turn the camera." Tutor20
   timer camera-2 10
 on timer camera-2
   say operations "Numpad 8 and 2 zoom in and out towards wherever the pointer is: targeted zoom."
-on key 104
+  arm numpad-8
+on key 104 as numpad-8 dormant
   timer camera-3 25
 on timer camera-3
   say operations "The four arrow keys move the camera forward, back, left and right." Tutor21
-on key 38
+  arm arrow-up
+on key 38 as arrow-up dormant
   timer camera-4 15
 on timer camera-4
   say operations "F2 lifts the camera much higher, to the sky view; the other controls stay the same." Tutor22
-every key 113
-  signal key-f2
-on key 113
+  arm f2-sky
+on key 113 as f2-sky dormant
   timer camera-5 26
 on timer camera-5
   say operations "There is also control zoom: hold Ctrl and left-click to zoom in on what the pointer is over." Tutor23
   timer camera-6 10
 on timer camera-6
   say operations "Ctrl with a right-click zooms back out."
-every key 17
-  signal key-ctrl
-on key 17
+  arm ctrl-zoom
+on key 17 as ctrl-zoom dormant
   timer camera-7 22
 on timer camera-7
   say operations "Now press F1 for the first-person view." Tutor24
-on key 112
+  arm f1-view
+on key 112 as f1-view dormant
   timer camera-8 5
 on timer camera-8
   say operations "Here the keys work a little differently: with NumLock on, 8 and 2 do targeted zoom, the arrows are unchanged and 4 and 6 turn the view." Tutor25
   timer camera-9 13
 on timer camera-9
   say operations "On the numpad, 7 and 1 raise and lower the camera."
-on key 103
+  arm numpad-7
+on key 103 as numpad-7 dormant
   timer camera-10 23
 on timer camera-10
   say operations "And 9 and 3 tip the camera forward and back." Tutor26
-on key 105
+  arm numpad-9
+on key 105 as numpad-9 dormant
   timer camera-11 23
 on timer camera-11
   say operations "In this view, double-clicking a building moves the camera in close and keeps it fixed on that building." Tutor27
   timer camera-12 7
 on timer camera-12
   say operations "In the locked view numpad 4 and 6 circle the building; a right-click unlocks it."
-on key 100
+  arm numpad-4
+on key 100 as numpad-4 dormant
   timer camera-13 26
 on timer camera-13
   say operations "Press F2 to get back to the sky view, then Shift+V to go straight to your vehicles." Tutor28
+  arm f2-back
 
 # --- Vehicles and battle groups ---
-on signal key-f2*2
+on key 113 as f2-back dormant
   timer group-1 10
 on timer group-1
   say operations "Drag a box over the vehicles with the left button and let go: the ones picked show in the details panel." Tutor29
   timer group-2 17
 on timer group-2
   say operations "Ctrl+1 makes them battle group 1 (the manual explains groups). Then press Home to go back to the hub." Tutor30
-on signal key-ctrl*2
+  arm ctrl-group
+on key 17 as ctrl-group dormant
   timer group-3 20
 on timer group-3
   say operations "Right-click to drop the vehicles and left-click the hub: the details panel now describes the colony." Tutor34
   timer group-4 19
 on timer group-4
   say operations "Press 1 to pick the battle group again; Shift+1 takes the camera to it." Tutor35
-on key 49
+  arm key-1
+on key 49 as key-1 dormant
   timer orders-1 19
 
 # --- Orders and the playbook; the Romulans start moving ---
@@ -8861,17 +8920,20 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (marked at once, told 5 s later, over at 15 s) ---
+on destroyed colony-hub
+  fail 17 15
+  timer fail-message 5
+on timer fail-message
+  say intelligence "Your colony hub is gone, and without it your training can't be finished." Tutor41
+
 # Not expressible yet:
-# - The fail: the game marks fail 17 when the hub is gone, says 5 s later (Intelligence,
-#   clip Tutor41) that without a hub the training can't be finished, and ends the mission
-#   at 15 s; `lose` ends it at once, so the message and delays are lost.
-# - Key detectors are armed by their prompt and ignore earlier presses; here a key counts
-#   whenever it is pressed. The second Tab, F2 and Ctrl steps are "the second press" of
-#   that key since the start (key-tab*2 ...), which can come early (Ctrl is pressed often
-#   during control zoom) or, in the walkthrough, not at all.
-# - The scout monitor is only armed 10 s after the "leave Engineering" line; the AND of
-#   "scout built" and "armed" is written as a two-signal count.
-# - rom-prepare-attack-a/b are unit path controllers (the two artillery units Rom_artillery
+# - An armed monitor tests the colony as it is, at once: the scout monitor (armed 10 s after
+#   the "leave Engineering" line) fires straight away if the scout was built earlier. Reluva's
+#   events come only when a count changes, so the step stays an AND of "scout built" and
+#   "watch started" (two signals), not a dormant handler.
+)",
+R"(# - rom-prepare-attack-a/b are unit path controllers (the two artillery units Rom_artillery
 #   and Rom_artillery_b drive to 370:270 and 370:266), not AI orders.
 # - The area detectors test unit classes: the Federation one wants units of class mask
 #   0x40000 (flags 0x38), the Romulan colony-gate one class 0x4000000 (flags 0x62, likely
@@ -8882,14 +8944,12 @@ on timer pass
 # --- C4 as F ----------------------------------------
 # C4 "Building" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
 # game's own graph (S/ghidra/scripts_out/C4.json). All lines come from Command, without
-)",
-R"(# voice clips. Upgrades by Reluva's names: construction-yard-upgrade / -advanced are the
+# voice clips. Upgrades by Reluva's names: construction-yard-upgrade / -advanced are the
 # improved and advanced yard (types 161, 162); processor-plant-a and processor-plant-b are
 # the resource processor's two kinds of plant (types 166, 167), built three of each.
 mission C4 F
 site colony 88 415
 objective 25
-lose 26 destroyed colony-hub
 
 # --- Opening instructions ---
 on start
@@ -8926,10 +8986,15 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 26 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   26, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The plant counts are exact (the game fires when exactly 1, then exactly 3, of each
 #   plant type stand); built-all means "at least".
 
@@ -8941,7 +9006,6 @@ mission C5 F
 site colony 88 415
 objective 34
 objective 35
-lose 36 destroyed colony-hub
 
 # --- Opening instructions ---
 on start
@@ -8984,10 +9048,15 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 36 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   36, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The mine counts are exact (exactly one, then exactly two stations standing).
 
 # --- C6 as F ----------------------------------------
@@ -8998,7 +9067,6 @@ on timer pass
 mission C6 F
 site colony 88 415
 objective 44
-lose 45 destroyed colony-hub
 
 # --- Opening instruction ---
 on start
@@ -9006,10 +9074,12 @@ on start
 on timer intro-1
   say command "To check your objectives, press Mission on this window to open Command."
 
-# --- Four generators use up the nitrium; mining must make up the fifth ---
+# --- Four generators use up the nitrium; mining must make up the fifth (the nitrium watch
+# only starts then: before, the stock is above 800 from the start) ---
 on built-all power-generator*4
   say command "There isn't enough nitrium left for the last generator. Set up mining to refill the colony's stores."
-on stock nitrium 800
+  arm nitrium-up
+on stock nitrium 800 as nitrium-up dormant
   say command "There is now enough nitrium for a fifth generator. Build it to finish this part of the tutorial."
 
 # --- Five generators: the objective ---
@@ -9024,13 +9094,15 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 45 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
-# - The nitrium watch (800) only starts once four generators stand; before that the stock
-#   is already above 800 (3950 at the start), so the game ignores it. Reluva's `stock`
-#   event can't be armed by another event.
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   45, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The generator counts are exact (exactly four, exactly five standing).
 
 # --- C7 as F ----------------------------------------
@@ -9043,7 +9115,6 @@ site colony 88 415
 objective 53
 objective 54
 objective 55
-lose 56 destroyed colony-hub
 
 # --- Opening instructions ---
 on start
@@ -9086,10 +9157,15 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 56 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   56, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The counts are exact: the game fires when exactly one security center / vehicle yard
 #   / yard upgrade, or exactly two tanks / artillery units, exist (a unit lost before the
 #   second is built keeps the count from reaching 2 at that moment).
@@ -9104,7 +9180,6 @@ site colony 88 415
 site klingon-colony 232 343
 objective 69
 objective 70
-lose 71 destroyed colony-hub
 
 # --- Opening instructions ---
 on start
@@ -9137,12 +9212,17 @@ on timer pass-message
 on timer pass
   win
 
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 71 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
 # Not expressible yet:
 # - The Klingons (slot 1) have three patrol orders round their colony (222:337, 222:345,
 #   230:345), started by the game itself, not by a script.
-# - The fail: on the hub's loss the game says "colony hub destroyed" at once, marks fail
-#   71, says 10 s later that the objectives weren't met and ends the mission at 20 s;
-#   `lose` ends it at once.
 # - The four buildings are counted as "exactly one standing" each, at the moment it's
 #   finished.
 
