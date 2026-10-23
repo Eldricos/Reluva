@@ -625,6 +625,16 @@ void testMissionScripts() {
     CHECK(fl.failing() && !fl.finished() && out.size() == 2 && out[0].kind == MissionRun::Output::Failing &&
           out[0].objective == 9 && out[1].text == "Gone.");
     CHECK(fl.advance(19).empty() && fl.advance(1).back().kind == MissionRun::Output::Lost && fl.finished() && !fl.won());
+    // A monitor armed late sees the state as it is.
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\nobjective 2\non start\n  arm rich\n  arm yard\n"
+                               "on stock nitrium 800 as rich dormant\n  complete 1\n"
+                               "on built construction-yard as yard dormant\n  complete 2\n", s));
+    MissionRun late(s[0], nullptr);
+    late.fire({"stock", {"nitrium", "900"}});
+    late.fire({"built", {"construction-yard"}});
+    CHECK(late.objectiveState(1) == MissionRun::State::Incomplete);
+    late.fire({"start", {}});
+    CHECK(late.objectiveState(1) == MissionRun::State::Complete && late.objectiveState(2) == MissionRun::State::Complete);
     CHECK(bool(parseMissionScripts("mission T F\non start\n  arm nothing\n", s))); // no such label
     CHECK(bool(parseMissionScripts("mission T F\non start dormant\n  win\n", s)));  // dormant needs a label
     CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
@@ -662,6 +672,31 @@ void testMissionScripts() {
             std::fprintf(stderr, "%s (%c) didn't win its walkthrough\n", m.mission.c_str(), m.side);
         CHECK(!(r.finished() && !r.won()));
         CHECK(!endsInWin || r.won());
+    }
+    // And each armed fail lost: in a fresh run, its event (as the
+    // walkthrough would give it) loses the mission within a minute.
+    for (const MissionScript& m : missionScripts()) {
+        if (&m == generic)
+            continue;
+        for (const MissionScript::Handler& h : m.handlers) {
+            const bool fails = std::any_of(h.actions.begin(), h.actions.end(),
+                                           [](const auto& a) { return a.verb == "lose" || a.verb == "fail"; });
+            if (!fails || h.dormant || h.event.kind == "timer" || h.event.kind == "signal" || h.event.kind == "built-all")
+                continue;
+            MissionRun r(m, generic);
+            ScriptEvent ev = h.event;
+            if (ev.kind == "count" && ev.args.size() == 3)
+                ev.args = {ev.args[0], ev.args[2]};
+            for (std::string& a : ev.args)
+                if (a == "*")
+                    a = "somewhere";
+            r.fire(ev);
+            for (double t = 0; !r.finished() && r.nextTimer() >= 0 && t < 60; t += r.nextTimer())
+                r.advance(r.nextTimer());
+            if (!(r.finished() && !r.won()))
+                std::fprintf(stderr, "%s (%c) line %d: its fail doesn't lose\n", m.mission.c_str(), m.side, h.line);
+            CHECK(r.finished() && !r.won());
+        }
     }
     // The generic rules speak for any mission.
     MissionRun f1(*findMissionScript("F1", 'F'), generic);

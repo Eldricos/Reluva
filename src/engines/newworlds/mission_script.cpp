@@ -332,6 +332,7 @@ std::string MissionRun::expand(const std::string& text, const ScriptEvent& ev) c
 
 void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std::vector<Output>& out) {
     std::vector<ScriptEvent> follow;
+    std::vector<const Rule*> armedNow;
     for (const MissionScript::Action& a : h.actions) {
         if (finished())
             break;
@@ -365,9 +366,12 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
         } else if (a.verb == "arm" || a.verb == "disarm") {
             for (Rule& r : rules_)
                 if (r.handler->label == a.args[0]) {
+                    const bool was = r.armed;
                     r.armed = a.verb == "arm";
                     if (r.armed)
                         r.fired = false;
+                    if (r.armed && !was)
+                        armedNow.push_back(&r);
                 }
         } else if (a.verb == "fail") {
             // Failing: lost when the delay runs out (the game says why, then
@@ -398,6 +402,39 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
         auto more = fire(f);
         out.insert(out.end(), more.begin(), more.end());
     }
+    // A monitor woken now looks at the state as it is (the game's monitors
+    // test the present, not changes).
+    for (const Rule* r : armedNow)
+        checkArmed(*r, out);
+}
+
+void MissionRun::checkArmed(const Rule& r, std::vector<Output>& out) {
+    if (finished())
+        return;
+    const ScriptEvent& want = r.handler->event;
+    if (want.kind == "built" && !want.args.empty()) {
+        if (auto it = built_.find(want.args[0]); it != built_.end() && it->second > 0) {
+            Rule& rule = const_cast<Rule&>(r);
+            rule.fired = true;
+            run(*r.handler, {"built", {want.args[0]}}, out);
+        }
+        return;
+    }
+    if (want.kind == "built-all") {
+        if (requirementsMet(want)) {
+            Rule& rule = const_cast<Rule&>(r);
+            rule.fired = true;
+            run(*r.handler, {"built", {}}, out);
+        }
+        return;
+    }
+    for (const auto& [key, ev] : state_)
+        if (ev.kind == want.kind && matches(want, ev)) {
+            Rule& rule = const_cast<Rule&>(r);
+            rule.fired = true;
+            run(*r.handler, ev, out);
+            return;
+        }
 }
 
 void MissionRun::checkAllCompleted(std::vector<Output>& out) {
@@ -427,6 +464,8 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
         ++built_[event.args[0]];
     if (event.kind == "signal" && !event.args.empty())
         ++signals_[event.args[0]];
+    if ((event.kind == "stock" || event.kind == "count" || event.kind == "colony-size") && !event.args.empty())
+        state_[event.kind + " " + (event.args.size() > 1 ? event.args[0] : std::string())] = event;
     for (Rule& r : rules_) {
         if (!r.armed || (r.fired && !r.handler->every) || !matches(r.handler->event, event))
             continue;
@@ -486,7 +525,8 @@ std::vector<ScriptEvent> MissionRun::walkthrough() const {
         // themselves (or shouldn't, in a walkthrough).
         if (h.every || e.kind == "completed" || e.kind == "all-completed" || e.kind == "timer" ||
             e.kind == "signal" || e.kind == "research-available" ||
-            (!h.actions.empty() && (h.actions[0].verb == "lose" || h.actions[0].verb == "fail")))
+            std::any_of(h.actions.begin(), h.actions.end(),
+                        [](const MissionScript::Action& a) { return a.verb == "lose" || a.verb == "fail"; }))
             continue;
         if (e.kind == "built-all") {
             for (const std::string& req : e.args) {

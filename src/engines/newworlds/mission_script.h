@@ -146,6 +146,10 @@ private:
     std::set<uint32_t> completed_, revealed_;
     std::map<std::string, double> timers_;
     std::map<std::string, int> signals_; // times each signal was raised
+    // The latest of each state report (stock, count, colony-size, by kind and
+    // what it's about), so a handler armed later sees the state as it is.
+    std::map<std::string, ScriptEvent> state_;
+    void checkArmed(const Rule& r, std::vector<Output>& out);
     uint32_t random_ = 12345;
     bool won_ = false, lost_ = false, allDone_ = false, failing_ = false;
     uint32_t failId_ = 0;
