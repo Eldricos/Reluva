@@ -199,6 +199,13 @@ placed); the game's playbook and officer cards are keys here.
   yard needs its crew before it works. Everyone on the planet costs life
   support, which the hub pays for in power (about 180 a tick for 150
   people) and farms help with. The NEW WORLDS panel shows CREW and POOL.
+- **Script effects** ([exe.md](exe.md#script-effects)): the scripts'
+  spawns, group damage, beam-ups, routes, meteor storms (30 damage to
+  what a meteor hits), lightning storms, the disease (among the crew),
+  stock given, taken and topped up are carried out on the map, and the
+  scripts hear who comes into or leaves their zones, what has stood how
+  long, beam-ups and the infection's spread. Meteors fall as streaks,
+  storms flash, beams shimmer.
 - **Research** as the executable has it ([exe.md](exe.md#research)): a
   script's `research <topic>` opens the mission's topic once it has been
   sent as many times as the game wants; R lists the open ones in the NEW
@@ -248,6 +255,6 @@ placed); the game's playbook and officer cards are keys here.
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
 groups, combat), `ai_sides.h` (the other sides and their orders),
 `ai_data.h` (what the executable gives for every side), `field_work.h`
-(scans, captures, officers), `research.h`, `economy.h` (stock, construction, power, mining, crew),
+(scans, captures, officers), `research.h`, `script_effects.h`, `economy.h` (stock, construction, power, mining, crew),
 `colony.h` (`ColonyLayout::spotAt`, where a building fits), the map view's game camera and picking (`viewers.h`,
 `MapViewer::gameKey`), and the missions page's play mode.

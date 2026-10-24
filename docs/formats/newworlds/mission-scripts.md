@@ -63,6 +63,17 @@ executable's raids: [game.md](game.md#the-other-sides-and-combat)). The
 capture events follow the raids: `entered` when the away team is in,
 `captured` when it has held the building long enough.
 
+The game's effect objects are written as actions and its area and
+build-and-hold monitors as events ([exe.md](exe.md#script-effects)):
+named rectangles (`zone`) watched with `inside` / `outside <who> <zone>`;
+`spawn` (attack groups beamed in, the containment device, F8's gift of
+tanks), `damage` and `beam-up` of a group, `move` along a route (Birds of
+Prey, the tractor, J8's Metar starship), `meteors` and `storm` over a
+zone (F2, R8; J2, K8, R1, R12), F2's `infect` / `cure` with its
+`infection` and `cured` events, `top-up`, and `standing <what> <seconds>`
+for the CFD missions' ten-minute holds. Counts of other sides' units and
+groups work too (`count klingon-disruptor-tank == 14`).
+
 Handlers can be switched: a label at the end of a handler's line (`on
 scanned science temple as temple-scan dormant`), `arm` and `disarm` to turn
 it on and off - the game's monitors that wake only after an earlier step,
