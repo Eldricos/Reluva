@@ -69,7 +69,8 @@ namespace reluva::newworlds {
 // count-th time it's raised); mine-exhausted, power-low, short-resources,
 // short-crew; and the game's monitors: count <what> <=|>=|== <n>, held
 // <what> <seconds>, seen <site>, colony-size <percent>, stock <material>
-// <amount>, key <code>; inside, outside <who> <zone> (a side's units, a
+// <amount>, key <code>; cell-scanned <site> (its block scanned in the fog);
+// inside, outside <who> <zone> (a side's units, a
 // unit kind of ours, a group, or "any"); beamed-up <group>; standing <what>
 // <seconds> (built and standing that long); infection <percent>, cured.
 // An argument "*" matches anything. In text,

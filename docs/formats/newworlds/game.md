@@ -199,6 +199,15 @@ placed); the game's playbook and officer cards are keys here.
   yard needs its crew before it works. Everyone on the planet costs life
   support, which the hub pays for in power (about 180 a tick for 150
   people) and farms help with. The NEW WORLDS panel shows CREW and POOL.
+- **Fog of war** as the executable has it ([exe.md](exe.md#fog-of-war)):
+  each block holds what each side covers now, from its objects' fog
+  classes, redone a sixty-fourth at a time; other sides' units and
+  buildings show (on the map, on the Tricorder, to click on) only where
+  the player's side sees. The scripts hear `seen <site>` when the
+  player's side first sees a site's block, and `cell-scanned <site>` when
+  its block is first scanned (a science vehicle or a building beside it);
+  K7's pod watches read the same mark. Not modelled: the camera kept to
+  seen blocks, shield fields, the mineral readout.
 - **Script effects** ([exe.md](exe.md#script-effects)): the scripts'
   spawns, group damage, beam-ups, routes, meteor storms (30 damage to
   what a meteor hits), lightning storms, the disease (among the crew),
@@ -214,8 +223,7 @@ placed); the game's playbook and officer cards are keys here.
   scripts hear `researched <topic>`.
 - **Officers** start where the mission posts them; the panel lists those
   aboard a selected vehicle.
-- **Sightings:** the scripts hear `seen <site>` when one of the player's
-  units comes within 2.5 blocks of a site, and `approach <who> <site>`
+- **Sightings:** the scripts hear `approach <who> <site>`
   when a unit is within 1.5 blocks (who: the unit's kind for the player's,
   its race for another side's), once each.
 
@@ -244,7 +252,7 @@ placed); the game's playbook and officer cards are keys here.
 | Target finding | the nearest enemy in range, every tick; AI colonies go only for colonies | Reluva's (F1's recordings for the last) |
 | An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
-| Sightings | seen within 2.5 blocks, approach within 1.5 | Reluva's |
+| Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
 | Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |
 | A lab's build time | 28 s | the training missions (21-35 s) |

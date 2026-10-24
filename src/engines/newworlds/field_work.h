@@ -4,6 +4,7 @@
 #pragma once
 
 #include "engines/newworlds/ai_data.h"
+#include "engines/newworlds/fog.h"
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/world.h"
 
@@ -88,6 +89,9 @@ public:
     std::vector<ScriptEvent> advance(double seconds, const std::function<bool(const ScriptEvent&)>& handled);
 
     static const char* kindName(Kind kind, bool strong); // "science", "strong-medical"
+    // The fog, for the watches on a group's block being scanned (the kind
+    // "cell": any scanner whose fog class marks it).
+    void setFog(const Fog* fog) { fog_ = fog; }
 
 private:
     struct ScanOrder {
@@ -140,6 +144,7 @@ private:
     std::map<int, std::vector<std::string>> heldNames_;
     double clock_ = 0;
     int tick_ = 0;
+    const Fog* fog_ = nullptr;
 };
 
 } // namespace reluva::newworlds

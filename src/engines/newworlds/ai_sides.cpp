@@ -104,7 +104,8 @@ void AiSides::start() {
                 built.insert({p->a, p->b});
         for (const SidePlacement* p : sidePlacements(mission_, slot)) {
             const CombatType* t = combatType(p->type);
-            if (!t || p->forWhom == 1 || isBee(*t) || (!*t->model && !*p->model))
+            // Without a model only what the scripts name is placed (unseen).
+            if (!t || p->forWhom == 1 || isBee(*t) || (!*t->model && !*p->model && !*p->label))
                 continue;
             auto [x, y] = worldAt(p->a, p->b);
             if (!t->building) {

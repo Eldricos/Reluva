@@ -39,7 +39,7 @@ int conditionOf(FieldWork::Kind kind, bool strong) { return 4 + int(kind) + (str
 std::string scanName(int condition) {
     static const char* kNames[] = {"science", "medical", "engineering", "strong-science", "strong-medical",
                                    "strong-engineering"};
-    return condition >= 4 && condition <= 9 ? kNames[condition - 4] : "";
+    return condition == 3 ? "cell" : condition >= 4 && condition <= 9 ? kNames[condition - 4] : "";
 }
 
 } // namespace
@@ -54,7 +54,7 @@ FieldWork::FieldWork(std::string_view mission, int playerSlot, World& world,
                      std::map<std::string, std::pair<int, int>> sites)
     : mission_(mission), player_(playerSlot), world_(world), sites_(std::move(sites)) {
     for (const Raid* r : raids(mission))
-        if (r->side == playerSlot && r->condition != 3) {
+        if (r->side == playerSlot) {
             Watch w;
             w.raid = r;
             w.condition = r->condition;
@@ -232,6 +232,10 @@ bool FieldWork::conditionMet(int condition, const std::string& label, int target
             continue;
         if (condition == 2) {
             if (heldBy(u.id) == player_)
+                return true;
+        } else if (condition == 3) {
+            // Its block marked scanned for us in the fog (any scanner).
+            if (fog_ && fog_->has(int(u.x / kBlock), int(u.y / kBlock), Fog::Scanned, player_))
                 return true;
         } else if (auto it = scanned_.find(u.id); it != scanned_.end() && it->second[size_t(condition)] >= tick_ - 1) {
             return true;

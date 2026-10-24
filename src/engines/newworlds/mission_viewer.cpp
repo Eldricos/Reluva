@@ -250,7 +250,7 @@ void MissionViewer::showColony() {
     shownBuildings_ = 0;
     if (world_)
         for (const Unit& u : world_->units())
-            if (u.building && u.slot != playerSlot_ && !u.kind.model.empty()) {
+            if (u.building && u.slot != playerSlot_ && !u.kind.model.empty() && visible(u)) {
                 buildings.push_back({u.kind.model, int(u.y / MapViewer::kBlockUnits * 8),
                                      int(u.x / MapViewer::kBlockUnits * 8), 0, 1, {}});
                 ++shownBuildings_;
@@ -374,6 +374,19 @@ void MissionViewer::startPlay() {
             world_->unit(world_->addUnit(side, at.kind, px, py, 3.1416f / 2))->slot = playerSlot_;
         }
     }
+    // The player's own named objects the colony doesn't cover (K7's escape
+    // pods): placed for the scripts, unseen where no model is known.
+    for (const SidePlacement* p : sidePlacements(level.shortName, playerSlot_))
+        if (const CombatType* t = combatType(p->type); t && *p->label && t->building && !buildingType(t->name))
+            spawnObject(*world_, playerSlot_, side, *t, float(p->b) / 8 * MapViewer::kBlockUnits,
+                        float(p->a) / 8 * MapViewer::kBlockUnits, p->label, p->model, true);
+    // The fog, marked for everyone placed.
+    fog_ = std::make_unique<Fog>(map_.blocksWide(), map_.blocksHigh());
+    fog_->refresh(*world_);
+    if (fieldWork_)
+        fieldWork_->setFog(fog_.get());
+    fogClock_ = 0;
+    scannedSites_.clear();
     playing_ = true;
     interface_ = true;
     briefing_ = false;
@@ -390,6 +403,7 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    fog_.reset();
     effects_.reset();
     research_.reset();
     fieldWork_.reset();
@@ -536,7 +550,7 @@ void MissionViewer::combatStep(std::vector<ScriptEvent>& happened) {
     }
     size_t others = 0;
     for (const Unit& u : world_->units())
-        others += u.building && u.slot != playerSlot_ && !u.kind.model.empty();
+        others += u.building && u.slot != playerSlot_ && !u.kind.model.empty() && visible(u);
     if (rebuild || others != shownBuildings_)
         showColony();
     if (!events.empty())
@@ -561,16 +575,21 @@ void MissionViewer::sightings(std::vector<ScriptEvent>& happened) {
                                                     missionSides(missions_[size_t(current_)].shortName)[size_t(side_)]);
     if (!script)
         return;
-    // Placeholders: how far a unit sees, and how near is near.
-    constexpr float kSee = 2.5f * MapViewer::kBlockUnits, kNear = 1.5f * MapViewer::kBlockUnits;
+    // A site is seen, or scanned, when the fog's channel has the player's
+    // mark on its block (the game's cell monitors). How near is near is
+    // a placeholder.
+    constexpr float kNear = 1.5f * MapViewer::kBlockUnits;
     for (const auto& [site, at] : script->sites) {
         const float sx = float(at.second) / 8 * MapViewer::kBlockUnits, sy = float(at.first) / 8 * MapViewer::kBlockUnits;
+        const int bx = at.second / 8, by = at.first / 8;
+        if (fog_ && fog_->has(bx, by, Fog::Seen, playerSlot_) && seenSites_.insert(site).second)
+            happened.push_back({"seen", {site}, at.first, at.second});
+        if (fog_ && fog_->has(bx, by, Fog::Scanned, playerSlot_) && scannedSites_.insert(site).second)
+            happened.push_back({"cell-scanned", {site}, at.first, at.second});
         for (const Unit& u : world_->units()) {
             if (u.building)
                 continue;
             const float d = std::hypot(u.x - sx, u.y - sy);
-            if (u.slot == playerSlot_ && d < kSee && seenSites_.insert(site).second)
-                happened.push_back({"seen", {site}, at.first, at.second});
             if (d < kNear) {
                 const std::string who = u.slot == playerSlot_ ? u.name : raceName(u.side);
                 if (!who.empty() && approached_.insert({who, site}).second)
@@ -699,11 +718,17 @@ void MissionViewer::drawCombat() {
     }
 }
 
+// Whether the player sees a thing: its own always, another side's on a
+// block its fog marks as seen (the game draws nothing else).
+bool MissionViewer::visible(const Unit& u) const {
+    return u.slot == playerSlot_ || !fog_ || fog_->seenAt(u.x, u.y, playerSlot_);
+}
+
 void MissionViewer::showUnits() {
     std::vector<MapViewer::UnitDraw> draw;
     if (world_)
         for (const Unit& u : world_->units())
-            if (!u.building && !u.kind.model.empty())
+            if (!u.building && !u.kind.model.empty() && visible(u))
                 draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.firing ? u.turretYaw : 0, 0});
     map_.setUnits(std::move(draw));
 }
@@ -1000,7 +1025,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                 const int d = (sx - ev.mouseX) * (sx - ev.mouseX) + (sy - ev.mouseY) * (sy - ev.mouseY);
                 if (u.slot == playerSlot_ && !u.building && d < bestD)
                     best = u.id, bestD = d;
-                else if (u.slot != playerSlot_ && d < (u.building ? 2 : 1) * otherD)
+                else if (u.slot != playerSlot_ && visible(u) && d < (u.building ? 2 : 1) * otherD)
                     other = u.id, otherD = u.building ? d / 2 : d;
             }
             float gx = 0, gy = 0;
@@ -1142,6 +1167,28 @@ void MissionViewer::update(uint64_t nowMs) {
             ai_->advance(std::min(dt, 0.25));
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
+        if (fog_) {
+            // The fog at the game's 20 ticks a second; what the player sees
+            // of the other sides follows it.
+            fogClock_ += std::min(dt, 0.25) * 20;
+            bool ticked = false;
+            while (fogClock_ >= 1) {
+                fogClock_ -= 1;
+                fog_->tick(*world_);
+                ticked = true;
+            }
+            if (ticked) {
+                std::set<int> others;
+                for (const Unit& u : world_->units())
+                    if (u.building && u.slot != playerSlot_ && visible(u))
+                        others.insert(u.id);
+                if (others != shownOthers_) {
+                    shownOthers_ = std::move(others);
+                    showColony();
+                }
+                showUnits();
+            }
+        }
         combatStep(happened);
         if (economy_ && world_)
             rollOut();
@@ -1640,6 +1687,8 @@ void MissionViewer::drawInterface() {
             // The player's own green, those hostile to it red, the rest yellow.
             if (world_)
                 for (const Unit& u : world_->units()) {
+                    if (!visible(u))
+                        continue;
                     int px = 0, py = 0;
                     map_.minimapPoint(u.x, u.y, x + 12, y + 14, w - 24, h - 30 - lh, px, py);
                     const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;

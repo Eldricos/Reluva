@@ -11,6 +11,7 @@
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/field_work.h"
+#include "engines/newworlds/fog.h"
 #include "engines/newworlds/research.h"
 #include "engines/newworlds/script_effects.h"
 #include "engines/newworlds/fif.h"
@@ -1422,6 +1423,43 @@ void testScriptEffects() {
     CHECK(fx.infection() == 0 && has("cured"));
 }
 
+void testFog() {
+    Terrain t;
+    t.width = t.height = 64;
+    t.moveClass.assign(64 * 64, 1);
+    World w(t);
+    Fog fog(32, 32);
+    auto count = [&](Fog::Channel c, int slot) {
+        int n = 0;
+        for (int by = 0; by < 32; ++by)
+            for (int bx = 0; bx < 32; ++bx)
+                n += fog.has(bx, by, c, slot);
+        return n;
+    };
+    const float block = 16384;
+    // A scout (class 5): a disc of 37 blocks seen and surveyed, nothing scanned.
+    const int scout = spawnObject(w, 0, 'F', *combatType(97), 10.5f * block, 10.5f * block, {}, {}, true);
+    fog.refresh(w);
+    CHECK(count(Fog::Seen, 0) == 37 && count(Fog::Surveyed, 0) == 37 && count(Fog::Scanned, 0) == 0);
+    CHECK(fog.has(10, 13, Fog::Seen, 0) && !fog.has(10, 14, Fog::Seen, 0) && fog.has(13, 10, Fog::Seen, 0) &&
+          !fog.has(13, 13, Fog::Seen, 0) && !fog.has(10, 10, Fog::Seen, 1));
+    // A Klingon tank (class 3): 21 blocks, for its own side.
+    spawnObject(w, 1, 'K', *combatType(10), 20.5f * block, 20.5f * block, {});
+    // A science vehicle (class 4): the 3 x 3 round it scanned too.
+    spawnObject(w, 0, 'F', *combatType(62), 25.5f * block, 5.5f * block, {}, {}, true);
+    fog.refresh(w);
+    CHECK(count(Fog::Seen, 1) == 21 && count(Fog::Scanned, 0) == 9 && fog.has(25, 5, Fog::Deep, 0));
+    // The marks are of now: moved away, the old blocks clear within the
+    // 64 ticks it takes to go round, a residue a tick.
+    w.unit(scout)->x = 2.5f * block, w.unit(scout)->y = 25.5f * block;
+    fog.tick(w);
+    CHECK(fog.has(10, 10, Fog::Seen, 0) || fog.has(10, 11, Fog::Seen, 0));
+    for (int i = 0; i < 64; ++i)
+        fog.tick(w);
+    CHECK(!fog.has(10, 10, Fog::Seen, 0) && fog.has(2, 25, Fog::Seen, 0) && fog.seenAt(2.5f * block, 25.5f * block, 0));
+    CHECK(count(Fog::Seen, 0) == 37 + 34); // three of the scout's blocks off the map's edge
+}
+
 void testResearch() {
     auto names = [](const std::vector<ScriptEvent>& ev) {
         std::vector<std::string> out;
@@ -1605,6 +1643,7 @@ int main() {
     testVehicleProduction();
     testCrew();
     testScriptEffects();
+    testFog();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

@@ -22,6 +22,7 @@
 #include "engines/newworlds/field_work.h"
 #include "engines/newworlds/research.h"
 #include "engines/newworlds/script_effects.h"
+#include "engines/newworlds/fog.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -651,6 +652,11 @@ private:
     std::unique_ptr<FieldWork> fieldWork_;
     std::unique_ptr<Research> research_; // the side's research, and its list shown (R)
     std::unique_ptr<ScriptEffects> effects_; // the script's effects in play
+    std::unique_ptr<Fog> fog_;  // the fog of war
+    double fogClock_ = 0;
+    std::set<int> shownOthers_;  // the other sides' buildings in sight
+    std::set<std::string> scannedSites_;
+    bool visible(const Unit& u) const;
     bool researchMenu_ = false;
     bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
     void rollOut();

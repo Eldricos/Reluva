@@ -516,6 +516,35 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+### Fog of war
+
+The map is a grid of one cell a block, each with six channels holding a
+bit for each side (slots 0-5). Every object marks cells round its own
+block for its side by its type's **fog class** (an 8 × 8 window; where it
+stands inside its block doesn't matter):
+
+| Class | Seen | Scanned | Surveyed | 3rd, 4th | Shield field | Types |
+|---|---|---|---|---|---|---|
+| 1 | disc 7 | | | | | |
+| 2 | disc 7 | | | | 3 × 3 | shield generators |
+| 3 | disc 5 | | | | | tanks, APCs, artillery |
+| 4 | disc 7 | 3 × 3 | disc 7 | disc 7 | | science vehicles, most buildings, the Klingon hub |
+| 5 | disc 7 | | disc 7 | | | scouts, the Federation and Romulan hubs, mines |
+| 6, 7 | disc 7 | | | | plus / one block | (none) |
+| 8 | | | | | | one native type: on its block, every other side's marks are wiped |
+
+(disc 7: 37 blocks in rows 3, 5, 7, 7, 7, 5, 3 wide; disc 5: 21 blocks.)
+The marks mean **covered now**: each tick the cells of one of the 64
+residues (x and y modulo 8) are cleared and marked again, so the whole
+map is redone every 64 ticks (3.2 s); nothing remembers what was once
+explored. Another side's units and buildings are drawn, and shown on the
+Tricorder, only on cells the player's side sees; the camera can't be
+moved onto a cell it doesn't see. The script's "cell seen" monitor reads
+the seen channel, "cell scanned" the scanned one (a science vehicle or a
+building next to the cell); the Tricorder's mineral readout reads the
+surveyed channel. The shield field channel changes how a building inside
+it takes damage. The other two channels' use wasn't found.
+
 ### Script effects
 
 The script objects that act on the world, as the game runs them (16
