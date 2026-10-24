@@ -83,6 +83,10 @@ public:
     // them all down into it. Returns how many moved.
     int board(int vehicle);
     int disembark(int vehicle);
+    // The officer chosen on the STAFF panel moved into one of the
+    // colony's buildings, or a vehicle that carries officers (16 at most);
+    // false if it can't take them.
+    bool moveOfficer(size_t officer, int into);
     std::vector<const Officer*> aboard(int vehicle) const;
     bool strong(int unit, Kind kind) const;
     // The best skill at a speciality among the officers in a building or

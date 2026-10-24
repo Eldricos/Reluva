@@ -53,9 +53,17 @@ bool GameUi::load(const Archives& archives, char side) {
     if (!loaded_)
         return false;
     loadPicture(archives, base + "wallpapr.lbp", wallpaper_);
-    for (const char* n : {"logo32", "shldicon", "pwricon", "popnicon", "closebut", "vcr"}) {
+    // The panels' icons, and the playbook's (its orders: pbattack, ...;
+    // the scans' from the shared folder).
+    for (const char* n : {"logo32", "shldicon", "pwricon", "popnicon", "closebut", "vcr", "pbattack", "pbbombrd",
+                          "pbcaptre", "pbdefend", "pbmove", "pbprohre", "pbprotct", "pbreturn"}) {
         Texture t;
         if (loadPicture(archives, base + n + ".lbp", t))
+            icons_[n] = std::move(t);
+    }
+    for (const char* n : {"science", "medical", "engine"}) {
+        Texture t;
+        if (loadPicture(archives, std::string("lbp/gui/") + n + ".lbp", t))
             icons_[n] = std::move(t);
     }
     // Crew portraits: f_c1, k_c1, r_c1 ... (the large ones, 64 x 60).

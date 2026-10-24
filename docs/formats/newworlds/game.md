@@ -21,6 +21,9 @@ As the first tutorial teaches them:
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
+| Double click (units selected) on the ground, another side's object, or one of the colony's buildings | the **playbook**: a column of the game's order icons left of the Tricorder (the pointer over one names it); a click gives that order: on the ground attack en route, protect from location, move without attacking, return to the rally point; on another side's object follow and attack, assault, capture (armed APCs on a building), or the three scans (scouts and science vehicles alone); protect area (mobile shield generators on the colony's building). Any other click or Escape puts it away |
+| A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it) |
+| A click on an officer's card (STAFF), then on one of the colony's buildings or a vehicle that carries officers | moves the officer there |
 | A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
 | P, then a click on the ground / on one of the colony's buildings | protect from location: hold the spot, go after whoever attacks the colony, come back; with a building, mobile shield generators guard it ("protect area") and the rest hold beside it |
 | Y | the selected armed vehicles drive back to the rally point |
@@ -54,10 +57,9 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: the playbook (a double click with units selected; its orders
-are the keys A, P, Y, S, M, E and C here), selecting
-buildings, units building (here a building goes up by itself once
-placed); the game's playbook and officer cards are keys here.
+modelled: bees building (here a building goes up by itself once placed),
+the officers' training, DEMOLISH and the hub's colony overview. The keys
+A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
 
@@ -190,6 +192,14 @@ placed); the game's playbook and officer cards are keys here.
   COVERAGE; storage and the construction yard the stock; the resource
   processor its raw ores. The game's buttons (BUILD, DEMOLISH, the hub's
   overview and roster) are keys here or not yet made.
+- **The officers** (the hub's STAFF): a card each, with a portrait (the
+  section's), rank and name, section (Engineering, Security, Medical,
+  Science, Operations) and skill (BASIC 0.25, SKILLED 0.5, HIGHLY
+  SKILLED 0.75 and up), and where they are; a card picked, the next of
+  the colony's buildings or carrying vehicles clicked takes the officer
+  (O and Shift+O still board and land a vehicle's). A building's crew
+  can be set below its slots (- CREW): those over go back to the hub's
+  pool; raised again, they walk over.
 - **Orders** as the executable gives them ([exe.md](exe.md#orders)): a
   move fires on the way without stopping; attack en route does the same,
   cloaking units included; an assault fires from where the units stand,
@@ -337,6 +347,9 @@ built, to be put back at the end so play feels as the game's does:
 | A repair pool at the start | empty | Reluva's |
 | Your own cloaked units | drawn as usual | the game draws them see-through |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
+| Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
+| Officers' ranks | Ens. below SKILLED, Lt. above | C8's three officers |
+| Officers' portraits | the section's face (as the messages use) | which face is whose isn't known |
 | What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
 | Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |

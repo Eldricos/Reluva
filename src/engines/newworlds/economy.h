@@ -115,6 +115,7 @@ struct ColonyStructure {
     int crew = 0;        // at work in it
     int pool = 0;        // housed in it (hub, accommodation)
     int wanted = 0;      // crew asked for and not yet sent
+    int target = -1;     // the crew the player wants in it (-1: all its slots)
     // People on their way to it: how many, and seconds still to walk.
     std::vector<std::pair<int, double>> coming;
 };
@@ -201,6 +202,10 @@ public:
     // power, 16 units a person a tick; farms add to it.
     float lifeSupport() const { return float(life_ / kLifeCap); }
     float lifeSupportPower() const { return lifeDraw_; } // power a tick it took
+    // The crew the player wants in a building (the panel's assign
+    // control, 0 to its slots): more are asked for, those over it go back
+    // to the hub's pool.
+    void setCrewTarget(int structure, int n);
     // A building's hit points' share (its health term), from the map.
     void setHealth(int structure, float share);
     // A building's efficiency, as the game's: 0.4 x (health + power fill

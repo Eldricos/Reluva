@@ -898,6 +898,12 @@ bool MissionViewer::playEvent(const Event& ev) {
     }
     switch (ev.type) {
     case EventType::KeyDown:
+        if (ev.key == key::Escape && (!playbook_.empty() || staffView_ || pickedOfficer_ >= 0)) {
+            playbook_.clear();
+            staffView_ = false;
+            pickedOfficer_ = -1;
+            break;
+        }
         if (ev.key == key::Escape && (researchMenu_ || vehicleMenu_)) {
             researchMenu_ = vehicleMenu_ = false;
             break;
@@ -1001,14 +1007,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             break;
         }
         if (ev.key == 'y' && !world_->selection().empty()) {
-            float hx = 0, hy = 0;
-            if (hubPosition(hx, hy))
-                for (int id : world_->selection())
-                    if (const Unit* u = world_->unit(id); u && u->weapon.kind != WeaponKind::None) {
-                        const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
-                        const auto [px, py] = world_->openSpot(rx, ry);
-                        world_->rally(id, px, py);
-                    }
+            rallySelected();
             break;
         }
         if (ev.key == 'o' && fieldWork_) {
@@ -1033,6 +1032,20 @@ bool MissionViewer::playEvent(const Event& ev) {
             }
             break;
         }
+        // The playbook open: a click on one of its icons gives that order;
+        // any other click (or the right button) puts it away.
+        if (!playbook_.empty()) {
+            constexpr int kIcon = 32, kGap = 4;
+            const int i = (ev.mouseY - playbookAt_[1]) / (kIcon + kGap);
+            if (ev.button == MouseButton::Left && ev.mouseX >= playbookAt_[0] && ev.mouseX < playbookAt_[0] + kIcon &&
+                ev.mouseY >= playbookAt_[1] && i < int(playbook_.size()) && (ev.mouseY - playbookAt_[1]) % (kIcon + kGap) < kIcon)
+                playbookOrder(playbook_[size_t(i)].order);
+            playbook_.clear();
+            redraw();
+            break;
+        }
+        if (ev.button == MouseButton::Left && interface_ && pressButton(ev.mouseX, ev.mouseY))
+            break;
         if (ev.button == MouseButton::Left && interface_ && !ctrl && tricorder_[2] > 0 &&
             ev.mouseX >= tricorder_[0] && ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
             ev.mouseY < tricorder_[1] + tricorder_[3]) {
@@ -1129,9 +1142,34 @@ bool MissionViewer::playEvent(const Event& ev) {
                     if (d < buildingD)
                         building = u.id, buildingD = d;
                 }
+            // An officer picked on the STAFF panel: the building or vehicle
+            // clicked takes them.
+            if (pickedOfficer_ >= 0 && fieldWork_) {
+                const int into = best >= 0 ? best
+                                 : building >= 0 && world_->unit(building)->slot == playerSlot_ ? building
+                                                                                                 : -1;
+                if (into >= 0) {
+                    walkNote_ = fieldWork_->moveOfficer(size_t(pickedOfficer_), into) ? "officer moved"
+                                                                                        : "can't take an officer";
+                    pickedOfficer_ = -1;
+                    showUnits();
+                    break;
+                }
+            }
+            // A double click with units selected: the playbook, for what
+            // was clicked (another side's object, one of the colony's
+            // buildings, or the ground).
+            if (ev.clicks >= 2 && !world_->selection().empty() && best < 0) {
+                float px = 0, py = 0;
+                map_.screenToGround(ev.mouseX, ev.mouseY, px, py);
+                const int target = other >= 0 ? other
+                                   : building >= 0 && world_->unit(building)->slot == playerSlot_ ? building
+                                                                                                   : 0;
+                openPlaybook(target, px, py);
+                break;
+            }
             const bool ordering = !world_->selection().empty() && other >= 0 && building == other;
-            if (building >= 0 && best < 0 && !ordering && (world_->selection().empty() ||
-                                                           world_->unit(building)->slot == playerSlot_)) {
+            if (building >= 0 && best < 0 && !ordering && world_->selection().empty()) {
                 world_->clearSelection();
                 selectedBuilding_ = building;
                 // A double click locks the camera on it (the tutorial's).
@@ -1632,6 +1670,188 @@ void MissionViewer::drawMinerals(int x, int y, int w, int h) {
         }
 }
 
+// The playbook a double click opens (exe.md#orders): for another side's
+// object, the attack orders (and capture, for armed APCs on a building),
+// or the scans when the selection is all scouts and science vehicles; for
+// one of the colony's buildings with mobile shield generators selected,
+// protect area; otherwise, on the ground, the move orders.
+void MissionViewer::openPlaybook(int target, float gx, float gy) {
+    playbook_.clear();
+    const std::vector<int> sel = world_->selection();
+    if (sel.empty())
+        return;
+    bool scanners = true, apcs = false, shields = false;
+    for (int id : sel)
+        if (const Unit* u = world_->unit(id)) {
+            scanners = scanners && FieldWork::canScan(*u);
+            apcs = apcs || FieldWork::canCapture(*u);
+            shields = shields || u->name == "mobile-shield-generator";
+        }
+    const Unit* t = target ? world_->unit(target) : nullptr;
+    if (t && t->slot != playerSlot_) {
+        if (scanners)
+            playbook_ = {{"science", "SCIENCE SCAN", 's'}, {"medical", "MEDICAL SCAN", 'm'}, {"engine", "ENGINEERING SCAN", 'e'}};
+        else
+            playbook_ = {{"pbattack", "FOLLOW AND ATTACK ENEMY", 'f'}, {"pbbombrd", "ASSAULT ENEMY/LOCATION", 'b'}};
+        if (!scanners && apcs && t->building)
+            playbook_.push_back({"pbcaptre", "CAPTURE BUILDING", 'c'});
+    } else if (t && t->building && shields) {
+        playbook_ = {{"pbprotct", "PROTECT AREA", 'a'}};
+    } else {
+        t = nullptr;
+        playbook_ = {{"pbdefend", "ATTACK EN ROUTE", 'r'},
+                     {"pbprohre", "PROTECT FROM LOCATION", 'l'},
+                     {"pbmove", "MOVE WITHOUT ATTACKING", 'v'},
+                     {"pbreturn", "RETURN TO VEHICLE RALLY POINT", 'y'}};
+    }
+    playbookTarget_ = t ? t->id : 0;
+    playbookX_ = gx, playbookY_ = gy;
+}
+
+void MissionViewer::playbookOrder(char order) {
+    const int target = playbookTarget_;
+    playbook_.clear();
+    if (!world_ || world_->selection().empty())
+        return;
+    switch (order) {
+    case 'f':
+    case 'b':
+    case 'c':
+    case 's':
+    case 'm':
+    case 'e':
+        if (world_->unit(target)) {
+            pendingOrder_ = order == 'f' ? 0 : order == 'b' ? 'a' : order;
+            orderOn(target);
+        }
+        break;
+    case 'a': {
+        std::vector<int> shields;
+        for (int id : world_->selection())
+            if (const Unit* u = world_->unit(id); u && u->name == "mobile-shield-generator")
+                shields.push_back(id);
+        world_->protect(shields, {target});
+        break;
+    }
+    case 'y': rallySelected(); break;
+    default:
+        for (int id : world_->selection())
+            if (fieldWork_)
+                fieldWork_->cancel(id);
+        world_->moveSelected(playbookX_, playbookY_, order == 'r'   ? UnitOrder::EnRoute
+                                                     : order == 'l' ? UnitOrder::Protect
+                                                                    : UnitOrder::Move);
+        if (order == 'l')
+            world_->protect(world_->selection());
+    }
+    showUnits();
+}
+
+// The selected armed vehicles back to the rally point.
+void MissionViewer::rallySelected() {
+    float hx = 0, hy = 0;
+    if (!hubPosition(hx, hy))
+        return;
+    for (int id : world_->selection())
+        if (const Unit* u = world_->unit(id); u && u->weapon.kind != WeaponKind::None) {
+            const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
+            const auto [px, py] = world_->openSpot(rx, ry);
+            world_->rally(id, px, py);
+        }
+}
+
+// The playbook: its icons in a column left of the Tricorder; the one
+// under the pointer named in a bar beside it.
+void MissionViewer::drawPlaybook() {
+    if (playbook_.empty())
+        return;
+    constexpr int kIcon = 32, kGap = 4;
+    const int n = int(playbook_.size());
+    const int x = screen_.w - sideW_ - kIcon - 8, y0 = screen_.h - n * (kIcon + kGap) - 4;
+    playbookAt_ = {x, y0};
+    for (int i = 0; i < n; ++i) {
+        const int y = y0 + i * (kIcon + kGap);
+        if (const Texture* t = ui_.icon(playbook_[size_t(i)].icon))
+            ui_.drawPicture(screen_, *t, x, y, kIcon, kIcon);
+        else
+            ui_.drawSmall(screen_, x, y + kIcon / 2, std::string(1, playbook_[size_t(i)].order), ui_.brightColor());
+        if (mouseX_ >= x && mouseX_ < x + kIcon && mouseY_ >= y && mouseY_ < y + kIcon) {
+            const std::string name = playbook_[size_t(i)].name;
+            const int w = ui_.smallWidth(name) + 10, bx = x - w - 4, by = y + kIcon / 2 - ui_.smallHeight() / 2 - 3;
+            for (int yy = by; yy < by + ui_.smallHeight() + 6; ++yy)
+                for (int xx = std::max(0, bx); xx < bx + w && xx < screen_.w; ++xx) {
+                    uint8_t* p = screen_.row(yy) + xx * 4;
+                    p[0] = 30, p[1] = 120, p[2] = 40;
+                }
+            ui_.drawSmall(screen_, bx + 5, by + 3, name, Color{220, 255, 220});
+        }
+    }
+}
+
+// A click on a panel's button: true if one was hit.
+bool MissionViewer::pressButton(int x, int y) {
+    for (const PanelButton& b : buttons_) {
+        if (x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h)
+            continue;
+        const Unit* u = selectedBuilding_ && world_ ? world_->unit(selectedBuilding_) : nullptr;
+        if (b.action == "staff") {
+            staffView_ = !staffView_;
+            pickedOfficer_ = -1;
+        } else if (b.action == "build") {
+            buildMenu_ = !(u && u->name == "vehicle-yard");
+            vehicleMenu_ = u && u->name == "vehicle-yard";
+        } else if (b.action == "research") {
+            researchMenu_ = true;
+        } else if ((b.action == "crew-" || b.action == "crew+") && u && economy_) {
+            for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+                if (colonyObjects_[i] == u->id)
+                    for (const ColonyStructure& c : economy_->structures())
+                        if (c.id == structureIds_[i]) {
+                            const BuildingType* t = buildingType(c.type);
+                            const int now = c.target < 0 ? (t ? t->crewSlots : 0) : c.target;
+                            economy_->setCrewTarget(c.id, now + (b.action == "crew+" ? 1 : -1));
+                        }
+        } else if (b.action.rfind("officer", 0) == 0) {
+            pickedOfficer_ = std::atoi(b.action.c_str() + 7);
+        }
+        redraw();
+        return true;
+    }
+    return false;
+}
+
+// The STAFF panel: a card for each of the side's officers: rank and name,
+// section and skill, where they are.
+std::vector<std::string> MissionViewer::staffCards() const {
+    std::vector<std::string> out;
+    if (!fieldWork_)
+        return out;
+    for (const FieldWork::OfficerAt& o : fieldWork_->officers()) {
+        const float skill = o.officer->skill;
+        // (The recordings' ranks: Ens. at the basic skill, Lt. above.)
+        std::string name = std::string(skill < 0.5f ? "ENS. " : "LT. ") + o.officer->name;
+        for (char& c : name)
+            c = char(std::toupper(static_cast<unsigned char>(c)));
+        const int sp = o.officer->speciality;
+        const char* section = sp == 1   ? "ENGINEERING"
+                              : sp == 2 ? "SECURITY"
+                              : sp == 3 ? "MEDICAL"
+                              : sp == 4 ? "SCIENCE"
+                              : sp == 7 ? "OPERATIONS"
+                                        : "COLONY";
+        const char* level = skill >= 0.75f ? "HIGHLY SKILLED" : skill >= 0.5f ? "SKILLED" : "BASIC";
+        std::string where = "IN ORBIT";
+        if (const Unit* u = o.in > 0 && world_ ? world_->unit(o.in) : nullptr) {
+            const BuildingType* t = u->building ? buildingType(u->name) : nullptr;
+            where = t ? t->panel : u->kind.name;
+        }
+        out.push_back(name);
+        out.push_back(std::string(section) + ", " + level);
+        out.push_back(where);
+    }
+    return out;
+}
+
 // A selected object's panel, as the game's: its name; its side (the
 // holder's, when captured); its state (OPERATIONAL or INCOMPLETE, CAPTURED,
 // DESTROYED; a vehicle READY or EN ROUTE); its shield cover (HIGH inside a
@@ -1817,8 +2037,10 @@ void MissionViewer::drawInterface() {
     // The right-hand panels are about 100 pixels wide in the recordings;
     // wide enough here for their longest lines in the font we have.
     const int sideW = std::max({100, ui_.smallWidth("COLONY SIZE = 20/50"), ui_.smallWidth("TRANSALUMIN = 5000"),
-                                ui_.smallWidth("TERRAIN AT <000:000>")}) +
+                                ui_.smallWidth("TERRAIN AT <000:000>"), ui_.smallWidth("ENGINEERING, HIGHLY SKILLED") + 24}) +
                       22;
+    sideW_ = sideW;
+    buttons_.clear();
 
     // The compass strip along the top: a tick every 5 degrees, a label
     // every 10, N E S W at the quarters, centred on the camera's heading.
@@ -1852,10 +2074,28 @@ void MissionViewer::drawInterface() {
         if (!picked && world_ && world_->selection().size() == 1 && !buildMenu_ && !researchMenu_ && !vehicleMenu_)
             picked = world_->unit(world_->selection()[0]);
         const std::vector<std::string> info = picked ? objectPanel(*picked) : std::vector<std::string>{};
+        // The building's buttons, as the game's (BUILD, STAFF on the hub,
+        // the labs' research, the crew assigned).
+        std::vector<std::pair<std::string, std::string>> actions; // label, action
+        if (picked && picked->building && picked->slot == playerSlot_ && picked->built >= 1) {
+            const BuildingType* bt = buildingType(picked->name);
+            if (picked->name == "colony-hub")
+                actions.push_back({"STAFF", "staff"});
+            if (picked->name == "colony-hub" || picked->name == "construction-yard" || picked->name == "vehicle-yard")
+                actions.push_back({"BUILD", "build"});
+            if (picked->name == "science-station" || picked->name == "sickbay")
+                actions.push_back({"RESEARCH", "research"});
+            if (bt && bt->crewSlots > 0) {
+                actions.push_back({"- CREW", "crew-"});
+                actions.push_back({"+ CREW", "crew+"});
+            }
+        }
+        const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
         const int lines = buildMenu_      ? int(menu.size()) + 1
                           : researchMenu_ ? std::max(2, int(offered.size()) + 1)
                           : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
-                          : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0)
+                          : staffView_    ? int(cards.size()) + 2
+                          : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0) + (actions.empty() ? 0 : 2)
                                           : economy_ ? 8 : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
@@ -1926,6 +2166,28 @@ void MissionViewer::drawInterface() {
                     ui_.drawSmall(screen_, x + 10, ty + lh * line++,
                                   std::string(materialName(m)) + " = " + std::to_string(placing->costFor(side)[size_t(m)]),
                                   economy_->stock()[size_t(m)] >= placing->costFor(side)[size_t(m)] ? text : Color{255, 80, 60});
+        } else if (staffView_) {
+            // The officers' cards: a portrait by their section, then rank
+            // and name, section and skill, and where they are. A click picks
+            // one: the next of the colony's buildings or vehicles clicked
+            // takes them.
+            ui_.drawSmall(screen_, x + 10, ty, pickedOfficer_ >= 0 ? "STAFF: CLICK WHERE TO" : "STAFF", bright);
+            for (size_t i = 0; i * 3 < cards.size(); ++i) {
+                const int cy = ty + lh * int(1 + i * 3);
+                const auto& o = fieldWork_->officers()[i];
+                const int sp = o.officer->speciality;
+                if (const Texture* face = ui_.portraitFor(sp == 1   ? "Engineering"
+                                                          : sp == 2 ? "Security"
+                                                          : sp == 3 ? "Medical"
+                                                          : sp == 4 ? "Science"
+                                                                    : "Operations",
+                                                          {}))
+                    ui_.drawPicture(screen_, *face, x + 8, cy, lh * 3 - 2, lh * 3 - 2);
+                for (int k = 0; k < 3; ++k)
+                    ui_.drawSmall(screen_, x + 12 + lh * 3, cy + lh * k, cards[i * 3 + size_t(k)],
+                                  int(i) == pickedOfficer_ ? bright : k == 0 ? ui_.titleColor() : text);
+                buttons_.push_back({x + 6, cy, w - 12, lh * 3, "officer" + std::to_string(i)});
+            }
         } else if (picked) {
             // One object, a unit or a building: the game's panel, with its
             // hit points as a bar under it.
@@ -1943,6 +2205,22 @@ void MissionViewer::drawInterface() {
                 }
             if (pendingOrder_)
                 ui_.drawSmall(screen_, x + 10, by + 6, pendingOrderName(), bright);
+            // Its buttons, in a row (wrapping) under the bar.
+            int bx = x + 10, byy = by + 8;
+            for (const auto& [label, action] : actions) {
+                const int bw = ui_.smallWidth(label) + 8;
+                if (bx + bw > x + w - 6)
+                    bx = x + 10, byy += lh + 4;
+                for (int xx = bx; xx < bx + bw; ++xx)
+                    for (int yy : {byy - 2, byy + lh + 1})
+                        if (yy >= 0 && yy < screen_.h && xx < screen_.w) {
+                            uint8_t* p = screen_.row(yy) + xx * 4;
+                            p[0] = text.r, p[1] = text.g, p[2] = text.b;
+                        }
+                ui_.drawSmall(screen_, bx + 4, byy, label, bright);
+                buttons_.push_back({bx, byy - 2, bw, lh + 4, action});
+                bx += bw + 4;
+            }
         } else if (sel.size() > 1) {
             ui_.drawSmall(screen_, x + 10, ty, "MULTISELECTION", bright);
             for (size_t i = 0; i < sel.size() && i < 6; ++i)
@@ -2060,6 +2338,7 @@ void MissionViewer::drawInterface() {
         for (size_t i = 0; i < lines.size(); ++i)
             ui_.drawSmall(screen_, 12, 15 + int(i) * lh, lines[i].first, lines[i].second);
     }
+    drawPlaybook();
 }
 
 void MissionViewer::stepScript() {

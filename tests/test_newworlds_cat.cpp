@@ -1467,6 +1467,21 @@ void testCrew() {
         if (s.type == "sickbay")
             sickbayCrew = s.crew;
     CHECK(sickbayCrew == 1);
+    // The crew assigned: the yard cut to one sends two back to the hub's
+    // pool; raised again, it asks for them (they walk over).
+    const int poolBefore = e.pool();
+    e.setCrewTarget(yard, 1);
+    auto yardCrew = [&] {
+        for (const ColonyStructure& s : e.structures())
+            if (s.id == yard)
+                return s.crew;
+        return -1;
+    };
+    CHECK(yardCrew() == 1 && e.pool() == poolBefore + 2);
+    e.setCrewTarget(yard, 9); // (held to its 3 slots)
+    CHECK(e.pool() == poolBefore);
+    run(e, 21);
+    CHECK(yardCrew() == 3);
     // Life support: 150 people at 16 a tick, bought back by the hub at
     // 16.384 a unit of power, divided by its efficiency (0.8): 183 a tick.
     CHECK(e.lifeSupportPower() > 170 && e.lifeSupportPower() < 190);

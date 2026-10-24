@@ -558,7 +558,8 @@ void Economy::requestCrew(ColonyStructure& s) {
     int have = s.crew;
     for (const auto& c : s.coming)
         have += std::max(0, c.first);
-    const int need = t->crewSlots - have;
+    const int slots = s.target < 0 ? t->crewSlots : std::min(s.target, t->crewSlots);
+    const int need = slots - have;
     if (need <= 0) {
         s.wanted = 0;
         return;
@@ -575,6 +576,28 @@ void Economy::requestCrew(ColonyStructure& s) {
         orbit_ -= need;
         s.coming.push_back({need, kCrewWalk});
         s.wanted = 0;
+    }
+}
+
+void Economy::setCrewTarget(int structure, int n) {
+    for (ColonyStructure& s : structures_) {
+        if (s.id != structure)
+            continue;
+        const BuildingType* t = buildingType(s.type);
+        if (!t || t->crewSlots == 0)
+            return;
+        s.target = std::clamp(n, 0, t->crewSlots);
+        // Those over it go back to the hub's pool.
+        if (s.crew > s.target)
+            for (ColonyStructure& h : structures_)
+                if (h.type == "colony-hub" && h.progress >= 1) {
+                    h.pool += s.crew - s.target;
+                    s.crew = s.target;
+                    break;
+                }
+        if (s.progress >= 1)
+            requestCrew(s);
+        return;
     }
 }
 

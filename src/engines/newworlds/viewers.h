@@ -570,6 +570,12 @@ private:
     // A selected object's panel lines, as the game's (exe.md#the-selection-panel),
     // and its hit points' share for the bar under them.
     std::vector<std::string> objectPanel(const Unit& u) const;
+    void openPlaybook(int target, float gx, float gy);
+    void playbookOrder(char order);
+    void drawPlaybook();
+    void rallySelected();
+    bool pressButton(int x, int y);
+    std::vector<std::string> staffCards() const;
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
@@ -649,6 +655,30 @@ private:
     int housed_ = 0;                // vehicles the mission starts inside the hub
     std::map<std::string, int> beesHoused_; // of those, the bees by kind ("worker-bee")
     int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
+    // The playbook (exe.md#orders): the orders a double click offers for
+    // the selection and what was clicked, as a column of icons beside the
+    // Tricorder. Each entry: its icon, its name, and the order (f follow
+    // and attack, b assault, c capture, s/m/e scans, r attack en route,
+    // l protect from location, v move without attacking, y back to the
+    // rally point, a protect area).
+    struct PlaybookEntry {
+        const char* icon;
+        const char* name;
+        char order;
+    };
+    std::vector<PlaybookEntry> playbook_;
+    int playbookTarget_ = 0;            // what it was opened on (0: the ground)
+    float playbookX_ = 0, playbookY_ = 0;
+    std::array<int, 2> playbookAt_{};   // its column's top-left
+    // Buttons drawn on the panels this frame: where, and what they do.
+    struct PanelButton {
+        int x, y, w, h;
+        std::string action;
+    };
+    std::vector<PanelButton> buttons_;
+    bool staffView_ = false;            // the STAFF panel: the officers' cards
+    int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
+    int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the

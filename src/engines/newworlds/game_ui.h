@@ -43,7 +43,7 @@ public:
     // side's first portraits in turn), the natives'
     // for an incoming message, the side's emblem otherwise.
     const Texture* portraitFor(std::string_view sender, std::string_view natives) const;
-    const Texture* icon(std::string_view name) const; // "logo32", "shldicon", ...
+    const Texture* icon(std::string_view name) const; // "logo32", "shldicon", "pbattack", "science", ...
 
     // Colours: the panel titles, ordinary text, highlighted text.
     Color titleColor() const { return title_; }
