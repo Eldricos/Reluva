@@ -57,6 +57,12 @@ struct BuildingType {
     std::array<float, 3> output{};
     float bufferCap = 0, intake = 0, demand = 0;
     int capacity = 0;         // colony capacity it adds once built
+    // Its efficiency's terms (exe.md#crew-and-efficiency): the officer
+    // speciality it wants (0 none: the officer term is then whole) and
+    // whether its crew counts (generators, hubs, pads, housing, farms and
+    // defences work whole without).
+    int speciality = 0;
+    bool crewless = true;
     double buildSeconds = 40; // order to finished
     const Stock& costFor(char side) const;
     const std::vector<std::string>& needsFor(char side) const;
@@ -96,6 +102,8 @@ struct ColonyStructure {
     int blockX = -1, blockY = -1; // a mine's block
     bool exhausted = false;
     float stored = 0;    // its power buffer
+    float fill = 1;      // the buffer's fill, averaged (for efficiency)
+    float health = 1;    // its hit points' share, 0-1
 };
 
 class Economy {
@@ -154,8 +162,11 @@ public:
     // A building's best officer skill at its speciality (0 none): the
     // officer term of its efficiency.
     void setOfficer(int structure, float skill);
+    // A building's hit points' share (its health term), from the map.
+    void setHealth(int structure, float share);
     // A building's efficiency, as the game's: 0.4 x (health + power fill
-    // + officer) x crew (health and crew whole here).
+    // + officer) x crew. Health is a step table (whole from 75 %), the
+    // power fill its buffer's (whole for generators and the hub).
     float efficiency(const ColonyStructure& s) const;
 
     // Moves time on: construction, power, mining and refining. Returns what
@@ -167,6 +178,7 @@ private:
     static constexpr double kReserveCap = 640000;
     void tick(std::vector<ScriptEvent>& out);
     void produce(std::vector<ScriptEvent>& out);
+    float crewShare(const ColonyStructure& s) const;
     int sideIndex() const;
     bool mineTake(ColonyStructure& mine); // one mining take; false when dry
 

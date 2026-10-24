@@ -34,7 +34,6 @@ constexpr int64_t kRefinePerVisit = 250;
 constexpr float kPowerLow = 0.75f;
 // - generators and the hub run at 1.2 efficiency when whole, powered and
 //   staffed (the panel's 120 %);
-constexpr float kGeneratorEfficiency = 1.2f;
 // - the colony's capacity never passes 90.
 constexpr int kCapacityCap = 90;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
@@ -45,6 +44,9 @@ constexpr int kCapacityCap = 90;
 constexpr double kWorkPerValue = 300;
 constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
 constexpr double kRollout = 8;
+// How fast a buffer's averaged fill follows it, a tick (a placeholder: how
+// the game keeps its average wasn't found).
+constexpr float kFillAverage = 0.05f;
 
 constexpr int sideOf(char side) { return side == 'K' ? 1 : side == 'R' ? 2 : 0; }
 
@@ -197,6 +199,22 @@ const std::vector<BuildingType>& buildingTypes() {
         lab("infiltration-lab", "INFILTRATION LAB", {false, false, true}, fedLab, kliLab, romLab);
         lab("lab-308", "LAB (308)", {false, false, true}, fedLab, kliLab, romLab);
         lab("lab-309", "LAB (309)", {false, false, true}, fedLab, kliLab, romLab);
+        // The officers each wants, and whether its crew counts.
+        for (BuildingType& b : t) {
+            const std::string& id = b.upgradeOf.empty() ? b.id : b.upgradeOf;
+            b.speciality = id == "construction-yard" || id == "vehicle-yard"            ? 1
+                           : id == "security-center"                                    ? 2
+                           : id == "sickbay"                                            ? 3
+                           : id == "science-station"                                    ? 4
+                           : id == "mining-station" || id == "resource-processor"       ? 6
+                           : id == "colony-hub"                                         ? 7
+                           : id == "storage-facility"                                   ? 8
+                           : id == "accommodation"                                      ? 9
+                                                                                        : 0;
+            b.crewless = !(id == "construction-yard" || id == "vehicle-yard" || id == "security-center" ||
+                           id == "sickbay" || id == "science-station" || id == "mining-station" ||
+                           id == "resource-processor" || id == "storage-facility");
+        }
         return t;
     }();
     return kTypes;
@@ -322,7 +340,7 @@ float Economy::powerSupply() const {
     float p = 0;
     for (const ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1)
-            p += t->output[size_t(sideIndex())] * kGeneratorEfficiency;
+            p += t->output[size_t(sideIndex())] * efficiency(s);
     return p;
 }
 
@@ -416,12 +434,38 @@ std::vector<std::pair<int, int>> Economy::takeVehicles() {
 
 void Economy::setOfficer(int structure, float skill) { officers_[structure] = skill; }
 
+float Economy::crewShare(const ColonyStructure& s) const {
+    (void)s;
+    return 1; // crew: to come
+}
+
+void Economy::setHealth(int structure, float share) {
+    for (ColonyStructure& s : structures_)
+        if (s.id == structure)
+            s.health = std::clamp(share, 0.0f, 1.0f);
+}
+
 float Economy::efficiency(const ColonyStructure& s) const {
     const BuildingType* t = buildingType(s.type);
-    const float fill = t && t->bufferCap > 0 ? (s.stored >= t->bufferCap * 0.99f ? 1.0f : s.stored / t->bufferCap) : 1.0f;
-    auto it = officers_.find(s.id);
-    const float officer = it == officers_.end() ? 0 : it->second;
-    return 0.4f * (1 + fill + officer);
+    if (!t)
+        return 0;
+    // Health: 0-0.5 in tenths below 30 %, then 0.55-0.95 in twentieths, whole
+    // from 75 %.
+    const int step = std::clamp(int(s.health * 20), 0, 20);
+    const float health = step >= 15 ? 1.0f : step <= 5 ? 0.1f * float(step) : 0.5f + 0.05f * float(step - 5);
+    // The buffer's fill, its average weighted four to one (whole above 99 %).
+    float fill = 1;
+    if (t->bufferCap > 0) {
+        fill = (4 * s.fill + s.stored / t->bufferCap) / 5;
+        if (fill > 0.99f)
+            fill = 1;
+    }
+    float officer = 1;
+    if (t->speciality) {
+        auto it = officers_.find(s.id);
+        officer = it == officers_.end() ? 0 : it->second;
+    }
+    return 0.4f * (health + fill + officer) * crewShare(s);
 }
 
 void Economy::produce(std::vector<ScriptEvent>& out) {
@@ -520,6 +564,7 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0) {
             const float want = std::min(t->intake, t->bufferCap - s.stored + t->demand);
             s.stored = std::clamp(s.stored + want * met_ - t->demand, 0.0f, t->bufferCap);
+            s.fill += (s.stored / t->bufferCap - s.fill) * kFillAverage;
         }
     if (met_ < kPowerLow && clock_ - lastPowerWarning_ >= kWarnEvery) {
         out.push_back({"power-low", {}});

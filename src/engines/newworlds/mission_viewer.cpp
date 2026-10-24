@@ -438,6 +438,8 @@ void MissionViewer::rollOut() {
                 if (o.in == colonyObjects_[i] && o.in > 0 && o.officer->speciality == wanted)
                     best = std::max(best, o.officer->skill);
             economy_->setOfficer(structureIds_[i], best);
+            if (const Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
+                economy_->setHealth(structureIds_[i], u->hp / u->maxHp);
         }
     }
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
