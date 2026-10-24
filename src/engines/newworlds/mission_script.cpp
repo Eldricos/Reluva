@@ -364,6 +364,7 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
         } else if (a.verb == "timer") {
             timers_[a.args[0]] = std::atof(a.args[1].c_str());
         } else if (a.verb == "research") {
+            out.push_back({Output::Research, {}, a.args[0], 0, {}});
             follow.push_back({"research-available", {a.args[0]}});
         } else if (a.verb == "stop") {
             timers_.erase(a.args[0]);

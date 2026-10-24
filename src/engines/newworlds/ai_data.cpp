@@ -6076,7 +6076,48 @@ constexpr Officer kOfficers[] = {
     {"R9", 2, "Kensal", 128, 4, 0.5f},
 };
 
+// Mission, slot, topic (its name without the side and "research"), field, points, a flag.
+constexpr ResearchTopic kTopics[] = {
+    {"CD1", 0, "metar-biodata", 4, 150000, 0},
+    {"CD2", 0, "metar-biodata", 4, 150000, 0},
+    {"F1", 0, "taubat-colony", 1, 150000, 1},
+    {"F12", 0, "cfd", 3, 100000, 1},
+    {"F2", 0, "crash-site", 3, 150000, 1},
+    {"F2", 0, "disease", 1, 50000, 1},
+    {"F3", 0, "romulan", 3, 100000, 1},
+    {"F8", 0, "dormant-metar", 2, 10000, 1},
+    {"J6", 0, "metar-biodata", 1, 10000, 2},
+    {"J6", 1, "metar-biodata", 1, 10000, 2},
+    {"J6", 2, "metar-biodata", 1, 10000, 2},
+    {"J8", 0, "anomaly-device", 3, 100000, 0},
+    {"J8", 1, "anomaly-device", 3, 100000, 0},
+    {"J8", 2, "anomaly-device", 3, 100000, 0},
+    {"J9", 0, "anomaly-device", 3, 100000, 1},
+    {"J9", 1, "anomaly-device", 3, 100000, 1},
+    {"J9", 2, "anomaly-device", 3, 100000, 1},
+    {"K1", 1, "fortress", 3, 100000, 1},
+    {"K12", 1, "cfd", 3, 100000, 1},
+    {"K2", 1, "allied-taubat-temple", 3, 150000, 1},
+    {"MarkL1", 0, "taubat-colony", 1, 150000, 1},
+    {"R1", 2, "portal", 3, 100000, 1},
+    {"R1", 2, "temple", 3, 100000, 1},
+    {"R1", 2, "rival-base", 3, 100000, 1},
+    {"R12", 2, "cfd", 3, 100000, 1},
+    {"R9", 2, "bgd", 3, 100000, 1},
+};
+
 } // namespace
+
+const ResearchTopic* researchTopic(std::string_view mission, int slot, std::string_view topic) {
+    // The scripts may add "-research" or "-research-topic".
+    for (std::string_view suffix : {"-research-topic", "-research"})
+        if (topic.size() > suffix.size() && topic.substr(topic.size() - suffix.size()) == suffix)
+            topic.remove_suffix(suffix.size());
+    for (const ResearchTopic& t : kTopics)
+        if (mission == t.mission && t.slot == slot && topic == t.topic)
+            return &t;
+    return nullptr;
+}
 
 std::vector<const Raid*> raids(std::string_view mission) {
     std::vector<const Raid*> out;

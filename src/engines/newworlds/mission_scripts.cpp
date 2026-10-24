@@ -5820,11 +5820,11 @@ on seen ruins-se
 on signal ruins-sighted as first-find
   disarm first-find
   say intelligence "Strange ruins at {site:ruins}. We should research what they were for."
-  research ruins
+  research portal
 on researched temple
   say science "The Taubat temple seems to feed a stasis field lying under the four groups of ruins to the north."
   complete 17
-on researched ruins
+on researched portal
   say science "Under the four clusters of ruins there's a stasis field, drawing power from the Taubat temple further south."
   complete 17
 
@@ -7064,12 +7064,12 @@ on held federation-science-block 2
 on held federation-science-block 22
   say intelligence "We have the device data, sir. Sending it now."
   complete 12
-  research bad-guy-device
+  research bgd
 
 # Objective 14: the study done wakes three watches: a vehicle yard (7 s
 # after one stands, the device is sent on its way to the Klingon colony),
 # the device's arrival there, and the device being made.
-on researched bad-guy-device
+on researched bgd
   say engineering "The device study is finished. We've asked for one to be built."
   arm yard-check
   arm device-route
@@ -7829,11 +7829,11 @@ on signal infrastructure*2
   say engineering "Sir, the colony can now support building the containment device. One last round of research diagnostics is needed."
 )",
 R"(  complete 12
-  research containment-device
+  research cfd
 
 # The device: made 10 s after the research and beamed to the site the
 # Hubrin marked; once it stands, the Metar go for it and a Hubrin turns up.
-on researched containment-device
+on researched cfd
   timer device-made 10
 on timer device-made
   say engineering "It's built. We're taking the device to the site the Hubrin marked, to the south."

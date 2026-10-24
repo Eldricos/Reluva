@@ -106,7 +106,8 @@ public:
         // text = the stance, the order, or the material and amount).
         // Failing: the mission will be lost (objective = the fail string)
         // when its delay runs out.
-        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock } kind;
+        // Research: a topic made available (text = the topic).
+        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock, Research } kind;
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
         std::string clip;          // a message's voice clip (a media stem), if any
