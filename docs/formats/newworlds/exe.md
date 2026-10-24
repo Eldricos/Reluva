@@ -779,6 +779,35 @@ Types 35 (and 272), 229, 230, 200 and 149 carry a cloaking device:
 - Its "attack en route" move only turns its turrets home, so it drives
   without fighting and stays cloaked.
 
+### Orders
+
+The playbook's entries and what they give (a group commander for the
+selection; each unit staggers its start by 0-11 ticks):
+
+| Menu entry | Order | Behaviour |
+|---|---|---|
+| Follow and attack enemy (and a plain click on an enemy) | target kind 1 | engages if it can, else paths to a firing position (up to 37 random points, the radius growing 1.25 times each round), firing at others on the way; re-plans after 20 ticks without a shot or about every 7 ticks; chases without limit |
+| Assault enemy/location | target kind 2 | brakes and fires at the targets from where it stands; no approach |
+| Attack en route | location kind 2 | moves, and every 8-11 ticks each turret picks the nearest hostile, seen, uncloaked target within the unit's weapon range (or its attacker); never stops or chases |
+| Move without attacking (and a plain click on the ground) | location kind 1 | the same, except that cloaking types (35, 149, 200, 229, 230) don't fire |
+| Protect from location (limited range) | location kind 4 | drives to the spot and holds, firing within weapon range; every 8 ticks, if anything of the side has a live attacker, chases the nearest, then returns |
+| Protect area (mobile shield generator) | target kind 5 | guards the clicked buildings from where it stands; when one is attacked it drives to the attacker, its field with it, and returns; it never fires |
+| Return to vehicle rally point | no order | the unit is handed to the side's field marshal |
+
+Units with nothing to do fire from where they stand at hostiles within
+weapon range, retaliate when they can reach the attacker, and neither
+chase nor return; after an order a group holds like this for 2000 ticks
+at a time.
+
+**The rally point.** New vehicles and those sent back go to the side's
+field marshal, which gives them to an AI request that wants them, else
+to a group that takes them (a lager takes up to 16 armed units), else
+starts a new lager. A lager stands at the colony hub, snapped to the
+corner of its block, with 16 parking places 4096 apart from 2560 inside
+that corner (4 x 4). There is one for the side, not one per yard, and
+nothing found moves it. A unit within 4096 of its place stands and
+fires; one that can't get there tries again after 320-816 ticks.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast

@@ -50,6 +50,15 @@ struct UnitKind {
 // with are of one kind (F1, R1; which kind isn't known).
 UnitKind groundScout(char side);
 
+// What a unit was last told to do (exe.md#orders), for how it fights:
+// a move fires on the way (but a cloaking unit doesn't); attack en route
+// too, cloaking units included; an assault fires from where the unit
+// stands; protecting holds a spot and goes after whoever attacks the
+// side (or, protecting an area, the buildings named), then comes back;
+// parked at the rally point it holds there. None: it fights from where
+// it stands (as after any order once it's done).
+enum class UnitOrder { None, Move, EnRoute, Assault, Protect, ProtectArea, Rally };
+
 // Something on the map that can fight or be fought: a vehicle, or a
 // building or turret (which doesn't move).
 struct Unit {
@@ -88,6 +97,11 @@ struct Unit {
     int cloakClock = 0;  // ticks seen since it last decloaked
     int fading = 0;      // ticks of a fade left
     bool cloaking = false; // the fade's way: out of sight (else back)
+    UnitOrder order = UnitOrder::None;
+    float holdX = 0, holdY = 0; // a protecting unit's spot
+    std::vector<int> protects;  // protecting an area: the buildings
+    int chasing = 0;            // protecting: the attacker it's gone after
+    int attackedTick = -100000; // when it was last hit
 };
 
 // What combat did in a step: a shot (from, to, its ends) or something
@@ -135,6 +149,13 @@ public:
     void attack(const std::vector<int>& ids, int target);
     // Units sent somewhere: they drop an ordered target.
     void moveTo(int id, float x, float y);
+    // Orders from the playbook (exe.md#orders), for the units named: an
+    // assault on a target (firing from where they stand); protecting the
+    // spot each stands on, or (a mobile shield generator) the buildings
+    // named; sent to a spot at the rally point.
+    void assault(const std::vector<int>& ids, int target);
+    void protect(const std::vector<int>& ids, const std::vector<int>& buildings = {});
+    void rally(int id, float x, float y);
 
     // Selection, as the game's: a click selects one unit (or none), a box
     // the units inside it; right-click drops it.
@@ -143,7 +164,7 @@ public:
     std::vector<int> selection() const;
     // Orders the selected units to a point: each finds its own path to a
     // spot round it, so they don't all pile onto one.
-    void moveSelected(float x, float y);
+    void moveSelected(float x, float y, UnitOrder order = UnitOrder::Move);
 
     // Battle groups 1-9: Ctrl+N makes the selection group N, N selects it.
     void setGroup(int n);
@@ -164,6 +185,7 @@ private:
     int tileOf(float v) const { return int(v / kTile); }
     void combatTick();
     void fire(Unit& u, Unit& t);
+    void protectTick(Unit& u);
     // Whom a unit fires at unprovoked: those its side is hostile to (and,
     // for the player's own, those hostile to the player).
     bool hostile(const Unit& u, const Unit& v) const {

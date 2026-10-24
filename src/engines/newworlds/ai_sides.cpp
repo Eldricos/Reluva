@@ -34,6 +34,12 @@ std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, f
 
 bool isBee(const CombatType& t) { return std::string_view(t.name).find("bee") != std::string_view::npos; }
 
+std::pair<float, float> rallySpot(float hubX, float hubY, int n) {
+    const float cx = std::floor(hubX / kBlock) * kBlock, cy = std::floor(hubY / kBlock) * kBlock;
+    n %= 16;
+    return {cx + 2560 + 4096 * float(n % 4), cy + 2560 + 4096 * float(n / 4)};
+}
+
 std::pair<float, float> parkingSpot(int n, float x, float y, bool building) {
     const float clear = building ? kHubClear : 0;
     if (n == 0 && clear == 0)
@@ -320,12 +326,23 @@ void AiSides::colonies(double seconds) {
                     x = s.x, y = s.y - 1.2f * kTile;
             const auto [px, py] = openSpot(x, y);
             const int id = spawnObject(world_, slot, raceOf(slot), *t, px, py, {});
+            bool asked = false;
             for (Running& r : running_)
                 if (!r.done && r.awaited > 0 && r.order->slot == slot && r.order->type == type) {
                     --r.awaited;
                     r.units.push_back(id);
+                    asked = true;
                     break;
                 }
+            // One no order asked for (a group gone meanwhile) parks at the
+            // side's rally point, armed.
+            if (!asked && t->weapon.kind != WeaponKind::None)
+                for (const ColonyStructure& s : c.economy->structures())
+                    if (s.type == "colony-hub") {
+                        const auto [rx, ry] = rallySpot(s.x, s.y, rallied_[slot]++);
+                        world_.rally(id, rx, ry);
+                        break;
+                    }
         }
     }
 }

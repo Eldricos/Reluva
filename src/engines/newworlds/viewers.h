@@ -656,6 +656,7 @@ private:
     std::unique_ptr<ScriptEffects> effects_; // the script's effects in play
     std::unique_ptr<Fog> fog_;  // the fog of war
     std::unique_ptr<Repairs> repairs_;
+    int rallied_ = 0; // vehicles sent to the rally point so far (its parking places in turn)
     double fogClock_ = 0;
     std::set<int> shownOthers_;  // the other sides' buildings in sight
     std::set<std::string> scannedSites_;

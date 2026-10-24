@@ -28,6 +28,11 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
 // it (the game parks a colony's vehicles round its hub).
 std::pair<float, float> parkingSpot(int n, float x, float y, bool building);
 bool isBee(const CombatType& type);
+// A side's vehicle rally point (exe.md#orders): the n-th of its 16 parking
+// places, a 4 x 4 grid 4096 apart from 2560 inside the corner of the
+// block its hub stands on. New armed vehicles drive there, and so do
+// those sent back to it.
+std::pair<float, float> rallySpot(float hubX, float hubY, int n);
 
 // The names the scripts know an object by, for the player playing slot
 // playerSlot: its own side's by type ("colony-hub", "phaser-tank"), other
@@ -128,6 +133,7 @@ private:
     std::vector<Running> running_;
     std::map<int, Colony> colonies_;
     std::map<int, double> nativeSites_; // a building going up without an economy: seconds put in
+    std::map<int, int> rallied_;         // per slot: vehicles sent to its rally point so far
     ColonyMap ground_;
     std::map<std::string, int> counts_;
     double clock_ = 0;

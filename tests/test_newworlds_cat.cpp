@@ -1614,6 +1614,93 @@ void testRepairsShieldsCloaking() {
     }
 }
 
+void testOrders() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    auto shotsFrom = [](World& w, int id, bool& whileMoving) {
+        int n = 0;
+        for (const WorldEvent& e : w.takeEvents())
+            if (e.kind == WorldEvent::Shot && e.from == id) {
+                ++n;
+                whileMoving = whileMoving || w.unit(id)->moving();
+            }
+        return n;
+    };
+    // A move fires on the way and keeps going; a cloaking unit's move
+    // doesn't fire, its attack en route does.
+    {
+        World w(t);
+        w.setStance(1, 0, 3);
+        const int tank = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {}, {}, true);
+        spawnObject(w, 1, 'K', *combatType(46), 100000, 112000, {}); // a bee: unarmed, fired on
+        w.select({tank});
+        w.moveSelected(100000, 400000);
+        bool moving = false;
+        int shots = 0;
+        for (int i = 0; i < 40; ++i) {
+            w.advance(0.05);
+            shots += shotsFrom(w, tank, moving);
+        }
+        CHECK(shots > 0 && moving && w.unit(tank)->y > 100500);
+    }
+    auto cloakedShots = [&](UnitOrder order) {
+        World w(t);
+        w.setStance(0, 2, 3);
+        const int rom = spawnObject(w, 2, 'R', *combatType(35), 100000, 100000, {}, {}, true);
+        spawnObject(w, 0, 'F', *combatType(12), 100000, 112000, {});
+        w.select({rom});
+        w.moveSelected(100000, 400000, order);
+        bool moving = false;
+        int shots = 0;
+        for (int i = 0; i < 200; ++i) {
+            w.advance(0.05);
+            shots += shotsFrom(w, rom, moving);
+        }
+        return shots;
+    };
+    CHECK(cloakedShots(UnitOrder::Move) == 0 && cloakedShots(UnitOrder::EnRoute) > 0);
+    // An assault fires from where the unit stands: out of range, it waits.
+    {
+        World w(t);
+        w.setStance(0, 1, 3);
+        const int tank = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {}, {}, true);
+        const int far = spawnObject(w, 1, 'K', *combatType(46), 100000, 160000, {});
+        w.assault({tank}, far);
+        w.advance(2);
+        CHECK(w.unit(tank)->y == 100000 && w.unit(tank)->target == far);
+    }
+    // Protecting a spot: after whoever attacks the side, then back.
+    {
+        World w(t);
+        w.setStance(1, 0, 3);
+        w.setStance(0, 1, 3);
+        const int guard = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {}, {}, true);
+        const int hub = spawnObject(w, 0, 'F', *combatType(23), 300000, 100000, {}, {}, true);
+        w.protect({guard});
+        const int raider = spawnObject(w, 1, 'K', *combatType(37), 300000, 115000, {}); // a scout
+        w.unit(raider)->weapon = combatType(8)->weapon; // armed (weakly), to provoke
+        w.unit(raider)->weapon.damage = 1;
+        w.unit(raider)->hp = w.unit(raider)->maxHp = 6;
+        bool left = false;
+        for (int i = 0; i < 4000 && w.unit(raider); ++i) {
+            w.advance(0.05);
+            w.takeEvents();
+            left = left || std::hypot(w.unit(guard)->x - 100000, w.unit(guard)->y - 100000) > 40000;
+        }
+        CHECK(left && !w.unit(raider) && w.unit(hub));
+        for (int i = 0; i < 4000 && std::hypot(w.unit(guard)->x - 100000, w.unit(guard)->y - 100000) > 9000; ++i)
+            w.advance(0.05);
+        CHECK(std::hypot(w.unit(guard)->x - 100000, w.unit(guard)->y - 100000) <= 9000);
+    }
+    // The rally point: a 4 x 4 grid in the hub's block.
+    {
+        const auto [x0, y0] = rallySpot(20000, 40000, 0);
+        const auto [x5, y5] = rallySpot(20000, 40000, 5);
+        CHECK(x0 == 16384 + 2560 && y0 == 32768 + 2560 && x5 == x0 + 4096 && y5 == y0 + 4096);
+    }
+}
+
 void testFog() {
     Terrain t;
     t.width = t.height = 64;
@@ -1836,6 +1923,7 @@ int main() {
     testScriptEffects();
     testFog();
     testRepairsShieldsCloaking();
+    testOrders();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

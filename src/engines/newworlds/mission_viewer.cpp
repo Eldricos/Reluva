@@ -454,6 +454,8 @@ const char* MissionViewer::pendingOrderName() const {
     case 'm': return "> MEDICAL SCAN";
     case 'e': return "> ENGINEERING SCAN";
     case 'c': return "> CAPTURE BUILDING";
+    case 'a': return "> ATTACK EN ROUTE / ASSAULT";
+    case 'p': return "> PROTECT";
     default: return "";
     }
 }
@@ -501,6 +503,12 @@ void MissionViewer::rollOut() {
         const auto [px, py] = world_->openSpot(x, y);
         const int id = spawnObject(*world_, playerSlot_, side, *ct, px, py, {}, t->model, true);
         world_->unit(id)->kind = UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f};
+        // An armed one drives on to the rally point.
+        if (float hx = 0, hy = 0; ct->weapon.kind != WeaponKind::None && hubPosition(hx, hy)) {
+            const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
+            const auto [qx, qy] = world_->openSpot(rx, ry);
+            world_->rally(id, qx, qy);
+        }
         showUnits();
     }
 }
@@ -525,7 +533,9 @@ void MissionViewer::orderOn(int target) {
             continue;
         attackers.push_back(id);
     }
-    if (!attackers.empty() && pendingOrder_ != 's' && pendingOrder_ != 'm' && pendingOrder_ != 'e')
+    if (!attackers.empty() && pendingOrder_ == 'a')
+        world_->assault(attackers, target);
+    else if (!attackers.empty() && pendingOrder_ != 's' && pendingOrder_ != 'm' && pendingOrder_ != 'e')
         world_->attack(attackers, target);
     pendingOrder_ = 0;
 }
@@ -975,8 +985,24 @@ bool MissionViewer::playEvent(const Event& ev) {
         // engineering scan and C a capture (on the next unit or building
         // clicked); O takes aboard the officers of the building beside it
         // (Shift+O puts them down).
-        if ((ev.key == 's' || ev.key == 'm' || ev.key == 'e' || ev.key == 'c') && !world_->selection().empty()) {
+        // The playbook's orders (exe.md#orders): A attack en route (on the
+        // ground) or assault (on a target), P protect a spot (or, mobile
+        // shield generators, the building clicked), Y back to the rally
+        // point.
+        if ((ev.key == 's' || ev.key == 'm' || ev.key == 'e' || ev.key == 'c' || ev.key == 'a' || ev.key == 'p') &&
+            !world_->selection().empty()) {
             pendingOrder_ = pendingOrder_ == char(ev.key) ? 0 : char(ev.key);
+            break;
+        }
+        if (ev.key == 'y' && !world_->selection().empty()) {
+            float hx = 0, hy = 0;
+            if (hubPosition(hx, hy))
+                for (int id : world_->selection())
+                    if (const Unit* u = world_->unit(id); u && u->weapon.kind != WeaponKind::None) {
+                        const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
+                        const auto [px, py] = world_->openSpot(rx, ry);
+                        world_->rally(id, px, py);
+                    }
             break;
         }
         if (ev.key == 'o' && fieldWork_) {
@@ -1070,7 +1096,34 @@ bool MissionViewer::playEvent(const Event& ev) {
                     other = u.id, otherD = u.building ? d / 2 : d;
             }
             float gx = 0, gy = 0;
-            if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
+            // Protecting one of the colony's buildings: mobile shield
+            // generators guard it (the game's "protect area"), the rest
+            // hold the spot.
+            int ownBuilding = -1, ownD = 30 * 30;
+            if (pendingOrder_ == 'p')
+                for (const Unit& u : world_->units()) {
+                    int sx = 0, sy = 0;
+                    if (u.slot != playerSlot_ || !u.building ||
+                        !map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y) + 1500, sx, sy))
+                        continue;
+                    const int d = (sx - ev.mouseX) * (sx - ev.mouseX) + (sy - ev.mouseY) * (sy - ev.mouseY);
+                    if (d < ownD)
+                        ownBuilding = u.id, ownD = d;
+                }
+            if (ownBuilding >= 0 && !world_->selection().empty()) {
+                const Unit& b = *world_->unit(ownBuilding);
+                const std::vector<int> chosen = world_->selection();
+                std::vector<int> shields, others;
+                for (int id : chosen)
+                    if (const Unit* u = world_->unit(id))
+                        (u->name == "mobile-shield-generator" ? shields : others).push_back(id);
+                world_->protect(shields, {ownBuilding});
+                world_->select(others);
+                world_->moveSelected(b.x, b.y - 1.2f * kTile, UnitOrder::Protect);
+                world_->protect(others);
+                world_->select(chosen);
+                pendingOrder_ = 0;
+            } else if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
                 orderOn(other);
             else if (best >= 0)
                 world_->select({best});
@@ -1079,7 +1132,15 @@ bool MissionViewer::playEvent(const Event& ev) {
                     for (int id : world_->selection())
                         if (fieldWork_)
                             fieldWork_->cancel(id);
-                    world_->moveSelected(gx, gy);
+                    // A move fires on the way (cloaking units hold fire);
+                    // attack en route fires, cloaked or not; protect holds
+                    // the spot.
+                    world_->moveSelected(gx, gy, pendingOrder_ == 'a'   ? UnitOrder::EnRoute
+                                                 : pendingOrder_ == 'p' ? UnitOrder::Protect
+                                                                        : UnitOrder::Move);
+                    if (pendingOrder_ == 'p')
+                        world_->protect(world_->selection());
+                    pendingOrder_ = 0;
                 }
                 else if (ev.clicks >= 2)
                     map_.lockOn(gx, gy);

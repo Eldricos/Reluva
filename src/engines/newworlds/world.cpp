@@ -23,6 +23,18 @@ constexpr float kBuildingReach = 6000;
 constexpr int kBurstGap = 3;
 // Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
 constexpr int kCloakAfter = 300, kCloakFade = 63;
+// Protecting (exe.md#orders): how often it looks for an attack on the
+// side, and how lately an object must have been hit to count (Reluva's:
+// the game asks whether its attacker is still about).
+constexpr int kProtectEvery = 8, kUnderAttack = 100;
+
+// Whether a unit keeps driving while it fires: one moving on the
+// player's move or attack-en-route order (a cloaking unit not on a move).
+bool firesOnTheMove(const Unit& u) {
+    return !u.ai && u.moving() &&
+           ((u.order == UnitOrder::Move && !u.cloaks) || u.order == UnitOrder::EnRoute ||
+            u.order == UnitOrder::Protect || u.order == UnitOrder::Rally);
+}
 
 } // namespace
 
@@ -243,8 +255,35 @@ void World::attack(const std::vector<int>& ids, int target) {
         if (Unit* u = unit(id); u && u->id != target && u->weapon.kind != WeaponKind::None) {
             u->target = target;
             u->ordered = true;
+            u->order = UnitOrder::None;
             u->path.clear();
         }
+}
+
+void World::assault(const std::vector<int>& ids, int target) {
+    attack(ids, target);
+    for (int id : ids)
+        if (Unit* u = unit(id); u && u->target == target)
+            u->order = UnitOrder::Assault;
+}
+
+void World::protect(const std::vector<int>& ids, const std::vector<int>& buildings) {
+    for (int id : ids)
+        if (Unit* u = unit(id); u && !u->building) {
+            u->order = buildings.empty() ? UnitOrder::Protect : UnitOrder::ProtectArea;
+            u->protects = buildings;
+            u->chasing = 0;
+            // The spot: where it's going (protecting a location), or where
+            // it stands (protecting an area).
+            const auto [hx, hy] = u->path.empty() || !buildings.empty() ? std::pair{u->x, u->y} : u->path.back();
+            u->holdX = hx, u->holdY = hy;
+        }
+}
+
+void World::rally(int id, float x, float y) {
+    moveTo(id, x, y);
+    if (Unit* u = unit(id))
+        u->order = UnitOrder::Rally;
 }
 
 void World::moveTo(int id, float x, float y) {
@@ -274,7 +313,7 @@ std::vector<int> World::selection() const {
     return out;
 }
 
-void World::moveSelected(float x, float y) {
+void World::moveSelected(float x, float y, UnitOrder order) {
     std::vector<Unit*> sel;
     for (Unit& u : units_)
         if (u.selected)
@@ -286,6 +325,7 @@ void World::moveSelected(float x, float y) {
         const float ox = (float(i % cols) - float(cols - 1) / 2) * kSpread;
         const float oy = (float(i / cols) - float((n - 1) / cols) / 2) * kSpread;
         moveTo(sel[size_t(i)]->id, x + ox, y + oy);
+        sel[size_t(i)]->order = order;
     }
 }
 
@@ -332,7 +372,7 @@ bool World::advance(double seconds) {
         any = true;
     }
     for (Unit& u : units_) {
-        if (u.firing || u.building)
+        if ((u.firing && !firesOnTheMove(u)) || u.building)
             continue;
         float left = u.kind.speed * float(seconds);
         while (left > 0 && !u.path.empty()) {
@@ -381,6 +421,9 @@ void World::combatTick() {
                 u.fading = kCloakFade, u.cloaking = true;
             }
         }
+        if ((u.order == UnitOrder::Protect || u.order == UnitOrder::ProtectArea) && u.hp > 0 &&
+            (tick_ + u.id) % kProtectEvery == 0)
+            protectTick(u);
         if (u.weapon.kind == WeaponKind::None || u.hp <= 0 || u.holdFire || u.built < 1)
             continue;
         if (u.cooldown > 0)
@@ -396,8 +439,11 @@ void World::combatTick() {
         // Finding one: the nearest enemy in range (a unit driving on its
         // player's orders doesn't stop to look; an AI's goes for its prey);
         // or whoever fired at it.
-        // (A cloaking unit doesn't look on the move: it stays cloaked.)
-        const bool looks = (u.ai || u.building || !u.moving()) && !(u.cloaks && u.moving());
+        // (A cloaking unit doesn't look on the move, so it stays cloaked,
+        // unless it's attacking en route.)
+        const bool onTheMove = firesOnTheMove(u);
+        const bool looks = (u.ai || u.building || !u.moving() || onTheMove) &&
+                           !(u.cloaks && u.moving() && !(onTheMove && u.order == UnitOrder::EnRoute));
         if (!t && looks) {
             float best = 1e30f;
             for (Unit& v : units_)
@@ -414,14 +460,20 @@ void World::combatTick() {
         }
         u.target = t->id;
         if (!inRange(u, *t)) {
-            // Told to attack it: drive after it.
+            // Told to attack it: drive after it (an assault doesn't: it
+            // fires from where it stands).
             u.firing = false;
+            if (u.order == UnitOrder::Assault) {
+                u.path.clear();
+                continue;
+            }
             if (!u.building && (u.path.empty() || (tick_ + u.id) % 20 == 0))
                 u.path = u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y);
             continue;
         }
         u.firing = true;
-        u.path.clear();
+        if (!onTheMove)
+            u.path.clear();
         u.turretYaw = std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading);
         // Cloaked, it decloaks to fire; it can't while fading either way.
         if (u.cloaks && (u.cloaked || u.fading > 0)) {
@@ -459,12 +511,51 @@ void World::combatTick() {
     }
 }
 
+// A protecting unit, every few ticks: after the nearest attacker of its
+// side (or of the buildings it guards) while one is about; back to its
+// spot once none is.
+void World::protectTick(Unit& u) {
+    if (Unit* c = u.chasing ? unit(u.chasing) : nullptr; c && c->hp > 0 && !c->cloaked) {
+        if (u.weapon.kind == WeaponKind::None && (u.path.empty() || std::hypot(u.path.back().first - c->x,
+                                                                               u.path.back().second - c->y) > kTile))
+            u.path = findPath(u.x, u.y, c->x, c->y); // a shield generator brings its field along
+        return;
+    }
+    u.chasing = 0;
+    const Unit* nearest = nullptr;
+    float best = 1e30f;
+    for (const Unit& v : units_) {
+        if (v.slot != u.slot || v.hp <= 0 || tick_ - v.attackedTick > kUnderAttack)
+            continue;
+        if (u.order == UnitOrder::ProtectArea && std::find(u.protects.begin(), u.protects.end(), v.id) == u.protects.end())
+            continue;
+        if (const Unit* a = unit(v.lastAttacker); a && a->hp > 0 && !a->cloaked && a->slot != u.slot)
+            if (const float d = std::hypot(a->x - u.x, a->y - u.y); d < best)
+                best = d, nearest = a;
+    }
+    if (nearest) {
+        u.chasing = nearest->id;
+        if (u.weapon.kind != WeaponKind::None) {
+            u.target = nearest->id;
+            u.ordered = true;
+        } else {
+            u.path = findPath(u.x, u.y, nearest->x, nearest->y);
+        }
+        return;
+    }
+    if (!u.moving() && !u.firing && std::hypot(u.x - u.holdX, u.y - u.holdY) > kTile) {
+        u.target = 0, u.ordered = false;
+        u.path = findPath(u.x, u.y, u.holdX, u.holdY);
+    }
+}
+
 void World::fire(Unit& u, Unit& t) {
     // (A building still going up takes no harm.)
     const float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
     if (t.built >= 1)
         t.hp -= damage_ ? damage_(t, damage) : damage;
     t.lastAttacker = u.id;
+    t.attackedTick = tick_;
     WorldEvent e;
     e.kind = WorldEvent::Shot;
     e.from = u.id, e.to = t.id;

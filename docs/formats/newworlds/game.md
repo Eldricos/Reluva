@@ -18,8 +18,11 @@ As the first tutorial teaches them:
 |---|---|
 | Left click on a unit | selects it |
 | Left drag | selects the side's units inside the box |
-| Left click on the ground | sends the selected units there |
-| Left click on another side's unit or building (units selected) | sends them to attack it (scouts and science vehicles scan it instead: a science scan) |
+| Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
+| Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
+| A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
+| P, then a click on the ground / on one of the colony's buildings | protect from location: hold the spot, go after whoever attacks the colony, come back; with a building, mobile shield generators guard it ("protect area") and the rest hold beside it |
+| Y | the selected armed vehicles drive back to the rally point |
 | S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
 | C, then a click on a building | the selected armed APCs capture it |
 | U, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
@@ -50,7 +53,8 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: the playbook (a double click with units selected), selecting
+modelled: the playbook (a double click with units selected; its orders
+are the keys A, P, Y, S, M, E and C here), selecting
 buildings, units building (here a building goes up by itself once
 placed); the game's playbook and officer cards are keys here.
 
@@ -172,6 +176,17 @@ placed); the game's playbook and officer cards are keys here.
   colonies, and fights natives only when they fire on it: F1's Klingons,
   hostile to every slot, pass the Taubat by as the recordings show. A
   script's stance action turns the side named towards the player.
+- **Orders** as the executable gives them ([exe.md](exe.md#orders)): a
+  move fires on the way without stopping; attack en route does the same,
+  cloaking units included; an assault fires from where the units stand,
+  never closing in; protecting holds a spot, checks every 8 ticks for
+  anything of the side under attack and goes after the nearest attacker,
+  then comes back (a mobile shield generator, which can't fire, drives
+  its field up to the attacker of the building it guards). Units with
+  nothing to do fire from where they stand. New armed vehicles drive to
+  the side's **rally point**, a 4 x 4 grid of parking places in the
+  hub's block, and so do those sent back with Y; the AI's vehicles no
+  order asked for park at theirs.
 - **Repairs, shields and cloaking** as the executable has them
   ([exe.md](exe.md#repairs)): vehicles mend a point at a time (faster
   with an engineer aboard); the colonies' buildings draw on a repair pool
@@ -298,6 +313,8 @@ built, to be put back at the end so play feels as the game's does:
 | A repair pool at the start | empty | Reluva's |
 | Your own cloaked units | drawn as usual | the game draws them see-through |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
+| What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
+| Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
