@@ -74,6 +74,7 @@ struct Unit {
     bool ordered = false;
     bool ai = false;     // run by a side's AI: it stops to fight what it meets
     bool holdFire = false; // fires at nothing (an APC sending its away team in)
+    bool flies = false;    // a craft (a Bird of Prey): straight over everything
     int cooldown = 0, burstLeft = 0, burstGap = 0; // ticks
     bool firing = false; // stopped to shoot
     float turretYaw = 0; // from straight ahead, anticlockwise

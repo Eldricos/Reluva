@@ -48,12 +48,14 @@ namespace reluva::newworlds {
 //                                    order, a patrol (named as the game does)
 //     give|take <material> <amount>  stock in or out (panel units)
 //     top-up <material> <amount>...  keep the stock up to these (off: stop)
-//     damage <group> <percent>|all   the group's units lose that share of
-//                                    their hit points (all: destroyed)
+//     damage <group> <percent>|all [<side>]  the group's units (of that side
+//                                    only, if named) lose that share of their
+//                                    full strength (all: destroyed)
 //     beam-up <group>                the group beamed off the map
 //     spawn <side> <type> <count> <a> <b> [<group>]  units beamed in
 //     move <group> <a> <b>... [loop] the group driven (flown) along points
 //     meteors <zone> <seconds>|off   meteors fall in the zone that often
+//                                    (seconds may be fractional: 1.5)
 //     storm <zone>                   a storm's flashes over the zone
 //     infect | cure                  the disease spreads / is cured
 //

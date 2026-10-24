@@ -72,10 +72,13 @@ void ScriptEffects::apply(const std::string& verb, const std::string& args) {
         for (size_t i = 0; toppingUp_ && i + 1 < a.size(); i += 2)
             if (const int m = materialNamed(a[i]); m >= 0)
                 topUp_[size_t(m)] = std::atoi(a[i + 1].c_str());
-    } else if (verb == "damage" && a.size() == 2) {
-        // A share of each unit's full strength (all: destroyed).
+    } else if (verb == "damage" && (a.size() == 2 || a.size() == 3)) {
+        // A share of each unit's full strength (all: destroyed), of the
+        // side named if there is one. A group is its label, or a type
+        // name.
+        const int only = a.size() == 3 ? slotNamed(a[2]) : -2;
         for (const Unit& u : world_.units())
-            if (u.label == a[0])
+            if ((u.label == a[0] || u.name == a[0]) && (only == -2 || u.slot == only))
                 if (Unit* v = world_.unit(u.id))
                     v->hp = a[1] == "all" ? 0 : v->hp - v->maxHp * float(std::atoi(a[1].c_str())) / 100;
     } else if (verb == "beam-up" && a.size() == 1) {

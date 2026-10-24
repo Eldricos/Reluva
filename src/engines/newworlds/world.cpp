@@ -247,7 +247,7 @@ void World::attack(const std::vector<int>& ids, int target) {
 
 void World::moveTo(int id, float x, float y) {
     if (Unit* u = unit(id); u && !u->building) {
-        u->path = findPath(u->x, u->y, x, y);
+        u->path = u->flies ? std::vector<std::pair<float, float>>{{x, y}} : findPath(u->x, u->y, x, y);
         u->ordered = false;
         u->target = 0;
         u->firing = false;
@@ -400,7 +400,7 @@ void World::combatTick() {
             // Told to attack it: drive after it.
             u.firing = false;
             if (!u.building && (u.path.empty() || (tick_ + u.id) % 20 == 0))
-                u.path = findPath(u.x, u.y, t->x, t->y);
+                u.path = u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y);
             continue;
         }
         u.firing = true;

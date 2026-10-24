@@ -216,8 +216,8 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                     if (!(a.args.size() == 1 && a.args[0] == "off") && (a.args.empty() || a.args.size() % 2 != 0))
                         return bad("expected: top-up <material> <amount>... | top-up off");
                 } else if (a.verb == "damage") {
-                    if (a.args.size() != 2 || (a.args[1] != "all" && !toInt(a.args[1], n)))
-                        return bad("expected: damage <group> <percent>|all");
+                    if (a.args.size() < 2 || a.args.size() > 3 || (a.args[1] != "all" && !toInt(a.args[1], n)))
+                        return bad("expected: damage <group> <percent>|all [<side>]");
                 } else if (a.verb == "beam-up") {
                     if (a.args.size() != 1)
                         return bad("expected: beam-up <group>");
@@ -230,8 +230,10 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                     if (a.args.size() < 3 || points % 2 != 0)
                         return bad("expected: move <group> <a> <b>... [loop]");
                 } else if (a.verb == "meteors" || a.verb == "storm") {
+                    char* end = nullptr;
                     if (a.args.empty() || !m.zones.count(a.args[0]) ||
-                        (a.verb == "meteors" && (a.args.size() != 2 || (a.args[1] != "off" && !toInt(a.args[1], n)))))
+                        (a.verb == "meteors" && (a.args.size() != 2 ||
+                                                 (a.args[1] != "off" && (std::strtod(a.args[1].c_str(), &end) <= 0 || *end)))))
                         return bad("expected: " + a.verb + " <zone>" + (a.verb == "meteors" ? " <seconds>|off" : ""));
                 } else if (a.verb == "infect" || a.verb == "cure") {
                     if (!a.args.empty())

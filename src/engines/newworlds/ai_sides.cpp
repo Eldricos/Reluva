@@ -42,6 +42,7 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     u.hp = u.maxHp = float(std::max(1, type.hp)) * tough;
     u.weapon = type.weapon;
     u.ai = !player;
+    u.flies = std::string_view(type.name) == "bird-of-prey";
     return id;
 }
 
