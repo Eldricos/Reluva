@@ -30,9 +30,18 @@ constexpr double kOtherBuildSeconds = 40;
 
 std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, float(a) / 8 * kBlock}; }
 
+} // namespace
+
 bool isBee(const CombatType& t) { return std::string_view(t.name).find("bee") != std::string_view::npos; }
 
-} // namespace
+std::pair<float, float> parkingSpot(int n, float x, float y, bool building) {
+    const float clear = building ? kHubClear : 0;
+    if (n == 0 && clear == 0)
+        return {x, y};
+    const float ring = float(n / 8), angle = float(n % 8) * 0.785f + ring * 0.4f;
+    const float r = clear + (ring + (clear > 0 ? 0 : 1)) * kSpacing;
+    return {x + std::cos(angle) * r, y + std::sin(angle) * r};
+}
 
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model, bool player) {
@@ -134,13 +143,7 @@ void AiSides::start() {
                 // Several on a spot stand round it, ring by ring (round
                 // the building, where one stands there: the game parks
                 // them by the hub).
-                const int n = onSpot[{p->a, p->b}]++;
-                const float clear = built.count({p->a, p->b}) ? kHubClear : 0;
-                if (n > 0 || clear > 0) {
-                    const float ring = float(n / 8), angle = float(n % 8) * 0.785f + ring * 0.4f;
-                    x += std::cos(angle) * (clear + (ring + (clear > 0 ? 0 : 1)) * kSpacing);
-                    y += std::sin(angle) * (clear + (ring + (clear > 0 ? 0 : 1)) * kSpacing);
-                }
+                std::tie(x, y) = parkingSpot(onSpot[{p->a, p->b}]++, x, y, built.count({p->a, p->b}) > 0);
                 std::tie(x, y) = openSpot(x, y);
             }
             const int id = spawnObject(world_, slot, race, *t, x, y, p->label, p->model);
@@ -257,8 +260,15 @@ void AiSides::build(Running& r) {
         return;
     const auto [x, y] = wayPoint(o, 0);
     for (const Unit& u : world_.units())
-        if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear)
+        if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear) {
+            // Its own building already there (placed at the start): kept.
+            if (u.slot == o.slot && u.type == o.type) {
+                r.site = u.id;
+                if (o.task == 3)
+                    r.done = true;
+            }
             return;
+        }
     int structure = 0;
     auto colony = colonies_.find(o.slot);
     const BuildingType* b = buildingType(t->name);
@@ -296,8 +306,10 @@ void AiSides::colonies(double seconds) {
         for (const ColonyStructure& s : c.economy->structures())
             for (const auto& [id, structure] : c.structureOf)
                 if (structure == s.id)
-                    if (Unit* u = world_.unit(id))
+                    if (Unit* u = world_.unit(id)) {
                         u->built = s.progress;
+                        u->efficiency = c.economy->efficiency(s);
+                    }
         for (const auto& [type, yard] : c.economy->takeVehicles()) {
             const CombatType* t = combatType(type);
             if (!t)
@@ -482,6 +494,24 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
         if (!counts.count(n))
             out.push_back({"count", {n, "0"}});
     counts_ = std::move(counts);
+    return out;
+}
+
+std::vector<AiSides::OrderStatus> AiSides::status() const {
+    std::vector<OrderStatus> out;
+    for (const Running& r : running_) {
+        if (r.done)
+            continue;
+        int blocker = 0;
+        if ((r.order->task == 3 || r.order->task == 9) && r.order->ways > 0 && !r.site) {
+            const auto [x, y] = wayPoint(*r.order, 0);
+            for (const Unit& u : world_.units())
+                if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear)
+                    blocker = u.id;
+        }
+        out.push_back({r.order, r.started, r.gathered, r.hunting, int(r.units.size()), r.awaited, r.leg,
+                       r.gathered ? r.legClock : r.clock, r.site, blocker, r.units});
+    }
     return out;
 }
 

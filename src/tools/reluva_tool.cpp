@@ -34,6 +34,8 @@
 //                                                  views each (-l: larger, four; -t: eight round it)
 //   reluva-tool gmf-info <file.gmf> [record]       walk a map's records, summarise them, and dump
 //                                                  one record (or where the walk stops)
+//   reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...  play missions without a
+//                                                  screen and report what gets stuck (game.md#headless-runs)
 //   reluva-tool geo-faces <file.geo>               walk a model's faces, showing each header and
 //                                                  corner, and dump the bytes where the walk stops
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
@@ -51,6 +53,8 @@
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/mission_sim.h"
+#include "engines/newworlds/ground.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/model_render.h"
 #include "common/font.h"
@@ -2372,6 +2376,82 @@ int cmdGeoSurvey(int argc, char** argv) {
 
 } // namespace
 
+// Plays missions without a screen (mission_sim.h) on their real maps for
+// a while, the player's colony left to itself, and prints what looks
+// stuck: units, AI groups, builds. "all" plays every map the archives
+// hold, from each side it's played from.
+int cmdPlayCheck(int argc, char** argv) {
+    namespace nw = reluva::newworlds;
+    bool verbose = false;
+    std::string onlySide;
+    int first = 2;
+    while (first < argc && argv[first][0] == '-') {
+        if (std::strcmp(argv[first], "-v") == 0)
+            verbose = true;
+        else if (std::strcmp(argv[first], "-s") == 0 && first + 1 < argc)
+            onlySide = argv[++first];
+        ++first;
+    }
+    if (argc - first < 3) {
+        std::fprintf(stderr, "usage: reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...\n");
+        return 2;
+    }
+    const std::string which = argv[first];
+    const double seconds = std::strtod(argv[first + 1], nullptr);
+    nw::Archives archives;
+    for (int i = first + 2; i < argc; ++i) {
+        auto cat = std::make_unique<nw::CatArchive>();
+        if (reluva::Error err = cat->open(argv[i])) {
+            std::fprintf(stderr, "%s: %s\n", argv[i], err.message.c_str());
+            return 1;
+        }
+        archives.push_back(std::move(cat));
+    }
+    std::vector<std::string> missions;
+    for (const auto& a : archives)
+        for (const auto& e : a->entries()) {
+            std::string folder, stem, ext;
+            nw::splitName(e.name, folder, stem, ext);
+            std::transform(stem.begin(), stem.end(), stem.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+            if (e.tag == nw::cattag::Gmf && (which == "all" || stem == which) &&
+                std::find(missions.begin(), missions.end(), stem) == missions.end())
+                missions.push_back(stem);
+        }
+    std::sort(missions.begin(), missions.end());
+    if (missions.empty()) {
+        std::fprintf(stderr, "no map for %s in those archives\n", which.c_str());
+        return 1;
+    }
+    int troubled = 0;
+    for (const std::string& m : missions) {
+        nw::Ground ground;
+        std::string lower = m;
+        std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+        if (reluva::Error err = ground.load(archives, "map/" + lower + ".gmf")) {
+            std::printf("%s: %s\n", m.c_str(), err.message.c_str());
+            continue;
+        }
+        for (char side : nw::missionSides(m)) {
+            if (!onlySide.empty() && onlySide[0] != side)
+                continue;
+            nw::MissionSim sim(m, side, ground);
+            sim.advance(seconds);
+            const auto problems = sim.problems();
+            const auto stuck = size_t(std::count_if(problems.begin(), problems.end(),
+                                                    [](const std::string& p) { return p.rfind("stuck", 0) == 0; }));
+            troubled += stuck > 0;
+            std::printf("== %s (%c): %s; %zu stuck, %zu waiting\n", m.c_str(), side,
+                        sim.won() ? "won" : sim.lost() ? "lost" : "running", stuck, problems.size() - stuck);
+            if (verbose)
+                for (const std::string& l : sim.log())
+                    std::printf("   %s\n", l.c_str());
+            for (const std::string& p : problems)
+                std::printf("   %s\n", p.c_str());
+        }
+    }
+    return troubled ? 3 : 0;
+}
+
 // Reads a mission script file (Reluva's format, mission_script.h), plays
 // each mission in it through its walkthrough with the generic rules, and
 // prints what it says and how it ends.
@@ -2464,6 +2544,8 @@ int main(int argc, char** argv) {
         return cmdGeoTextures(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "script-check") == 0)
         return cmdScriptCheck(argc, argv);
+    if (argc >= 2 && std::strcmp(argv[1], "play-check") == 0)
+        return cmdPlayCheck(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "mdl-info") == 0)
         return cmdMdlInfo(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "wav-info") == 0)
@@ -2503,6 +2585,7 @@ int main(int argc, char** argv) {
                  "  reluva-tool geo-textures [-a] <file.cat>...\n"
                  "  reluva-tool mdl-info <file.mdl | file.cat>\n"
                  "  reluva-tool script-check <script file>\n"
+                 "  reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...\n"
                  "  reluva-tool wav-info <file.wav | file.mp3 | file.cat>\n"
                  "  reluva-tool wav-decode <in.wav | in.mp3> <out.wav>\n"
                  "  reluva-tool fif-info <file.fif | file.cat>\n"

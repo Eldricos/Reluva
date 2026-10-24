@@ -26,7 +26,7 @@ constexpr ObjectType kTypes[] = {
     {26, true, "resource-processor", "geo/fed/frps_a.geo", 0},
     {27, true, "transporter-pad", "geo/fed/landpad.geo", 0},
     {28, true, "colony-hub", "geo/kln/kch.geo", 0},
-    {29, true, "shield-generator", "", 0},
+    {29, true, "shield-generator", "geo/kln/ksg.geo", 0},
     {30, true, "power-generator", "geo/kln/kpgs.geo", 0},
     {31, true, "vehicle-yard", "geo/kln/kvy.geo", 0},
     {32, true, "storage-facility", "geo/kln/ksf.geo", 0},

@@ -23,6 +23,12 @@ namespace reluva::newworlds {
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model = {}, bool player = false);
 
+// Where the n-th of the units a mission places on one spot stands: round
+// the spot ring by ring (eight to a ring), clear of a building standing on
+// it (the game parks a colony's vehicles round its hub).
+std::pair<float, float> parkingSpot(int n, float x, float y, bool building);
+bool isBee(const CombatType& type);
+
 // The names the scripts know an object by, for the player playing slot
 // playerSlot: its own side's by type ("colony-hub", "phaser-tank"), other
 // colonies' with their race ("klingon-colony-hub", "klingon-hub"), the
@@ -78,6 +84,18 @@ public:
 
     // Running orders, for tests and the title: by name ("" for unnamed).
     std::vector<std::string> running() const;
+    // Each order not yet over, as a headless run reports it.
+    struct OrderStatus {
+        const NpcOrder* order;
+        bool started, gathered, hunting;
+        int units, awaited; // its units now, those asked of the yards
+        int leg;
+        double legSeconds;  // since its leg began (since it started, while gathering)
+        int site;           // a build's building, once put up (its unit id)
+        int blocker;        // a build's: what stands on its spot instead (unit id; 0 none)
+        std::vector<int> ids; // its units
+    };
+    std::vector<OrderStatus> status() const;
 
 private:
     struct Running {

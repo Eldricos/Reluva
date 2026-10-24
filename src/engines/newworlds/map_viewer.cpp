@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/ground.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/view3d.h"
 #include "engines/newworlds/viewers.h"
@@ -303,27 +304,7 @@ float MapViewer::groundHeight(float x, float y) {
         lx = ly;
         ly = -t0;
     }
-    bool found = false;
-    float best = 0;
-    for (const auto& face : m.geo.faces) {
-        const auto& verts = m.geo.parts[face.part].vertices;
-        const auto& a = verts[face.corners[0].vertex];
-        for (size_t i = 1; i + 1 < face.corners.size(); ++i) {
-            const auto& b = verts[face.corners[i].vertex];
-            const auto& c = verts[face.corners[i + 1].vertex];
-            const float d = (b.x - a.x) * (c.y - a.y) - (c.x - a.x) * (b.y - a.y);
-            if (std::fabs(d) < 1e-3f)
-                continue;
-            const float u = ((lx - a.x) * (c.y - a.y) - (c.x - a.x) * (ly - a.y)) / d;
-            const float v = ((b.x - a.x) * (ly - a.y) - (lx - a.x) * (b.y - a.y)) / d;
-            if (u < -1e-4f || v < -1e-4f || u + v > 1 + 1e-4f)
-                continue;
-            const float z = a.z + u * (b.z - a.z) + v * (c.z - a.z);
-            if (!found || z > best)
-                best = z, found = true;
-        }
-    }
-    return best;
+    return geoGroundHeight(m.geo, lx, ly);
 }
 
 // The ground under tiles drawn over something (hole_02's texture is
@@ -576,19 +557,7 @@ constexpr ViewShape kFirstPerson{0.6f * kBlockSize, 6.0f * kPi / 180.0f};
 } // namespace
 
 Terrain MapViewer::terrain() {
-    Terrain t;
-    if (map_.width <= 0)
-        return t;
-    t.width = map_.width * 2;
-    t.height = map_.height * 2;
-    t.moveClass.resize(size_t(t.width) * size_t(t.height));
-    for (int ty = 0; ty < t.height; ++ty)
-        for (int tx = 0; tx < t.width; ++tx) {
-            const int r = tileAt(tx, ty);
-            t.moveClass[size_t(ty) * size_t(t.width) + size_t(tx)] = r < 0 ? 0 : int((map_.tiles[size_t(r)].flags >> 16) & 3);
-        }
-    t.heightAt = [this](float x, float y) { return groundHeight(x, y); };
-    return t;
+    return terrainOf(map_, [this](float x, float y) { return groundHeight(x, y); });
 }
 
 void MapViewer::setView(View v) {

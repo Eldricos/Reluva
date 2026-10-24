@@ -6,6 +6,7 @@
 #include "engines/newworlds/ai_data.h"
 
 #include <cstdlib>
+#include <string_view>
 
 namespace reluva::newworlds {
 
@@ -47,7 +48,13 @@ constexpr Shape kClasses[9][Fog::kChannels] = {
 
 int fogClass(const Unit& u) {
     const CombatType* t = combatType(u.type);
-    return t && t->fog >= 0 && t->fog <= 8 ? t->fog : 0;
+    if (!t || t->fog < 0 || t->fog > 8)
+        return 0;
+    // A shield generator's field follows its efficiency: 3 x 3 above 0.6,
+    // a plus above 0.2, else its own block (exe.md#shields).
+    if (t->building && std::string_view(t->name) == "shield-generator")
+        return u.efficiency > 0.6f ? 2 : u.efficiency > 0.2f ? 6 : 7;
+    return t->fog;
 }
 
 } // namespace

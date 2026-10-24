@@ -356,19 +356,23 @@ void MissionViewer::startPlay() {
     std::vector<Start> start;
     std::map<std::pair<int, int>, int> onSpot;
     housed_ = 0;
+    auto onHub = [&](const StartPlacement& p) {
+        return colony_ && !colony_->buildings().empty() && p.a == colony_->buildings()[0].a &&
+               p.b == colony_->buildings()[0].b;
+    };
+    auto bee = [](int type) {
+        const CombatType* ct = combatType(type);
+        return ct && isBee(*ct);
+    };
     for (const StartPlacement& p : startPlacements(level.shortName, side))
-        if (const ObjectType* t = objectType(p.type); t && !t->building && colony_ && !colony_->buildings().empty() &&
-                                                       p.a == colony_->buildings()[0].a && p.b == colony_->buildings()[0].b)
+        if (const ObjectType* t = objectType(p.type); t && !t->building && onHub(p) && bee(p.type))
             ++housed_;
-    // Those placed on the hub itself stay inside it (its panel counts its
-    // bees and transports).
+    // Bees placed on the hub itself stay inside it (its panel counts
+    // them); other vehicles there park round it, as the game spreads them.
     for (const StartPlacement& p : startPlacements(level.shortName, side))
-        if (const ObjectType* t = objectType(p.type);
-            t && !t->building && *t->model && !(colony_ && !colony_->buildings().empty() &&
-                                                 p.a == colony_->buildings()[0].a && p.b == colony_->buildings()[0].b)) {
-            const int n = onSpot[{p.a, p.b}]++;
-            const float x = float(p.b) / 8 * MapViewer::kBlockUnits + float(n % 3 - 1) * 2500;
-            const float y = float(p.a) / 8 * MapViewer::kBlockUnits + float(n / 3) * 2500;
+        if (const ObjectType* t = objectType(p.type); t && !t->building && *t->model && !(onHub(p) && bee(p.type))) {
+            const auto [x, y] = parkingSpot(onSpot[{p.a, p.b}]++, float(p.b) / 8 * MapViewer::kBlockUnits,
+                                            float(p.a) / 8 * MapViewer::kBlockUnits, onHub(p));
             start.push_back({UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f}, x, y, p.type});
         }
     if (start.empty())
@@ -843,8 +847,10 @@ void MissionViewer::showProgress() {
         for (const ColonyStructure& c : all)
             if (c.id == structureIds_[i]) {
                 map_.setBuildingProgress(i, c.progress);
-                if (Unit* u = world_ && i < colonyObjects_.size() && colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
+                if (Unit* u = world_ && i < colonyObjects_.size() && colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr) {
                     u->built = c.progress;
+                    u->efficiency = economy_->efficiency(c);
+                }
             }
 }
 

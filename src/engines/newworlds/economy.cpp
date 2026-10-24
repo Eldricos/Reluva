@@ -174,6 +174,30 @@ const std::vector<BuildingType>& buildingTypes() {
                        {"construction-yard-upgrade", "colony-hub-upgrade"}}},
                      83),
                  34000, 425, 340);
+        // Defences: the shield generator (its field halves the colony's
+        // damage; exe.md#shields) and the two turrets. No build times were
+        // timed: 40 s.
+        consumer(add("shield-generator", "SHIELD GENERATOR",
+                     {Stock{20, 2, 40, 0, 0, 800}, Stock{20, 2, 20, 0, 0, 800}, Stock{20, 2, 20, 0, 0, 800}},
+                     {{{"construction-yard-upgrade", "shield-buffer-lab", "security-center"},
+                       {"construction-yard-upgrade", "security-center", "shield-buffer-lab"},
+                       {"construction-yard-upgrade", "science-station", "shield-buffer-lab"}}},
+                     40),
+                 64000, 550, 640);
+        consumer(add("defensive-weapon", "DEFENSIVE WEAPON",
+                     {Stock{0, 0, 92, 12, 0, 500}, Stock{0, 0, 92, 12, 0, 500}, Stock{0, 0, 92, 12, 0, 500}},
+                     {{{"construction-yard-upgrade", "colony-hub-upgrade", "shield-generator"},
+                       {"construction-yard-upgrade", "shield-generator", "disruptor-matrix", "security-center"},
+                       {"construction-yard-upgrade", "security-center", "shield-generator"}}},
+                     40),
+                 64000, 550, 160);
+        consumer(add("defensive-artillery", "DEFENSIVE ARTILLERY",
+                     {Stock{0, 0, 93, 13, 250, 500}, Stock{0, 0, 93, 11, 250, 500}, Stock{0, 0, 93, 11, 250, 500}},
+                     {{{"construction-yard-advanced", "colony-hub-advanced", "security-center"},
+                       {"construction-yard-advanced", "shield-generator", "tracking-systems"},
+                       {"construction-yard-upgrade", "colony-hub-advanced", "security-center", "energy-lab"}}},
+                     40),
+                 64000, 550, 160);
         // Upgrades: fitted to their building, no placing. An advanced one
         // follows the improved one.
         auto upgrade = [&](const char* id, const char* panel, const char* of, Stock f, Stock k, Stock r,
@@ -423,7 +447,9 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     s.progress = 0;
     if (t->onDeposit) {
         s.blockX = tx / 2, s.blockY = ty / 2;
-        if (!map_.depositKind || map_.depositKind(s.blockX, s.blockY) == 0)
+        // (An AI's build order skips this: its mines' spots aren't all on
+        // a deposit as Reluva reads the map; they dig what's in reach.)
+        if (!free_ && (!map_.depositKind || map_.depositKind(s.blockX, s.blockY) == 0))
             return 0;
     }
     const Stock& c = t->costFor(side_);

@@ -90,6 +90,11 @@ constexpr ModelEntry kModels[] = {
     {"photon-turret", "fpdt", "", ""},
     {"disruptor-turret", "", "KSG", ""},
     {"static-disruptor", "", "kdws", "RDDS"},
+    // The economy's defences, by the models the game's tables give their
+    // types (the Klingon shield generator's is likely: ksg pairs with fsg).
+    {"shield-generator", "fsg", "ksg", "rcss"},
+    {"defensive-weapon", "fpdt", "kdws", "rdds"},
+    {"defensive-artillery", "fpds", "kdwsp", "rpds"},
 };
 
 constexpr std::pair<const char*, const char*> kUpgrades[] = {

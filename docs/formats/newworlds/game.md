@@ -205,8 +205,15 @@ placed); the game's playbook and officer cards are keys here.
   300 power a tick from its buffer, times its efficiency (0.8 without an
   officer, 1 with one of skill 0.5), into the build value × 300, then the
   vehicle rolls out beside it (8 s) - bees into the hub. Officers posted
-  in a building raise its efficiency. Not yet buildable: defensive
-  weapons and artillery, so the vehicles that need them aren't offered.
+  in a building raise its efficiency.
+- **Defences**: the shield generator, defensive weapon and defensive
+  artillery, with the executable's costs, prerequisites and power
+  (64000 buffer, 550 intake; 640 a tick for the generator, 160 for the
+  turrets), so the vehicles that need them (the mobile shield generator,
+  the Klingons' battery and cloaked tank, the Romulans' cloaked APC) are
+  offered too. A shield generator's field shrinks with its efficiency:
+  the 3 x 3 blocks round it above 0.6, a plus above 0.2, else its own
+  block ([exe.md](exe.md#shields)).
 - **Crew and efficiency** as the executable has them
   ([exe.md](exe.md#crew-and-efficiency)): every building works at 0.4 ×
   (health + power fill + officer) × crew; generators and the hub give
@@ -271,7 +278,9 @@ placed); the game's playbook and officer cards are keys here.
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
 | A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
 | Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
-| A shield generator's field | always 3 x 3 blocks | the executable's rule shrinks it with efficiency, but the economy has no shield generators yet |
+| Defences' build time | 40 s | Reluva's: not timed |
+| The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
+| An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
 | Your own cloaked units | drawn as usual | the game draws them see-through |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
@@ -289,3 +298,48 @@ groups, combat), `ai_sides.h` (the other sides and their orders),
 (scans, captures, officers), `research.h`, `script_effects.h`, `economy.h` (stock, construction, power, mining, crew),
 `colony.h` (`ColonyLayout::spotAt`, where a building fits), the map view's game camera and picking (`viewers.h`,
 `MapViewer::gameKey`), and the missions page's play mode.
+
+## Headless runs
+
+`reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...`
+plays missions on their real maps without a screen (`mission_sim.h`):
+the player's colony as the mission places it, left to itself, the other
+sides with their AI and economies, the fog, repairs, field work,
+research, the script's effects and the mission script. It then prints
+what looks wrong, as `stuck:` (a fault worth a look) or `waits:` (as
+the game would):
+
+- **stuck:** a unit placed on ground it can't move on; one that hasn't
+  got a block nearer its destination in 30 s; a group idle on a leg for
+  4 minutes; a build whose spot isn't clear after 2 minutes (naming what
+  stands there); a unit that has fired at one target for 2 minutes
+  without harming it.
+- **waits:** a group still gathering after 3 minutes, for a vehicle yard
+  its side doesn't have, its yards' queue, or yards standing idle (no
+  crew once the hub is gone, too little power).
+
+`-v` adds the run's log: the script's AI orders, losses, won or lost.
+`all` plays every map in the archives from each side it's played from;
+the tutorials, played on other maps, aren't covered. 15 minutes of
+every mission take about a minute and a half.
+
+What the first runs found (fixed): vehicles the mission places on the
+hub's spot (R1's four tanks) were all kept inside it like bees, leaving
+the colony undefended (only bees go in now; the rest park round the
+hub); AI build orders waited forever for a spot their own starting
+building already held; AI mines' spots aren't all on a deposit. What they still show, all from the data or
+placeholders:
+
+- F3's Klingon construction yard is ordered a quarter block from their
+  hub, and J2's Klingon defensive artillery onto their construction
+  yard's spot; neither is placed (the game's placement test may refuse
+  them too).
+- In J6, K8 and R9 the Metar fire at hubs whose repairs outpace them.
+  Their bursts do 6 a shot after Reluva's divide-by-three reading of the
+  burst damage, which shields and security officers cut to 1-2.
+- A colony left to itself loses F1, F2, F3, R1, R2 and several joint
+  missions within 15 minutes; in F1 to the first assault: a Klingon disruptor tank's 40-point shot kills a phaser tank
+  outright, against the phaser's four 6-point shots (that reading again).
+- Groups in the joint missions wait minutes for their yards: the random
+  assaults order tanks faster than one yard makes them (about one every
+  48 s).

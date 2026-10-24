@@ -62,6 +62,7 @@ struct Unit {
     std::string label; // the mission's name for it ("taubat-colony"), if any
     bool building = false;
     float built = 1;   // a building's share put up: below 1 a site, which neither fights nor is harmed
+    float efficiency = 1; // a colony building's (its economy's figure; a shield generator's field follows it)
     float x = 0, y = 0;
     float heading = 0; // radians anticlockwise from east
     std::vector<std::pair<float, float>> path; // waypoints still to reach

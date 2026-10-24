@@ -1162,6 +1162,31 @@ void testAiSides() {
         off = off || (u.slot == 1 && u.type == 10 && u.moving());
     CHECK(off);
 
+    // A named build whose own building already stands on its spot keeps
+    // it rather than building another, and rebuilds it once it's gone.
+    {
+        World w3(t);
+        AiSides ai3("F1", 0, w3);
+        ai3.start();
+        const int yard = spawnObject(w3, 1, 'K', *combatType(53), 181.0f / 8 * 16384, 186.0f / 8 * 16384, {});
+        for (int i = 0; i < 62; ++i)
+            ai3.advance(1.0);
+        int yards = 0;
+        for (const Unit& u : w3.units())
+            yards += u.slot == 1 && u.name == "construction-yard";
+        CHECK(yards == 1 && w3.unit(yard));
+        WorldEvent gone;
+        gone.kind = WorldEvent::Destroyed;
+        gone.what = *w3.unit(yard);
+        w3.remove(yard);
+        ai3.observe({gone});
+        ai3.advance(2.0);
+        yards = 0;
+        for (const Unit& u : w3.units())
+            yards += u.slot == 1 && u.name == "construction-yard";
+        CHECK(yards == 1);
+    }
+
     // The first assault reaches the Federation colony and fights it: shots
     // both ways, the losses reported as the scripts name them.
     World w2(t);
@@ -1534,6 +1559,27 @@ void testRepairsShieldsCloaking() {
         CHECK(shieldedDamage(*w.unit(bee), 40, &fog, 0) == 40);
         CHECK(shieldedDamage(*w.unit(fed), 40, &fog, 0) == 40);
         CHECK(shieldedDamage(*w.unit(far), 40, &fog, 0) == 40);
+        // A weak generator's field shrinks to a plus: the corner blocks are out.
+        for (const Unit& u : w.units())
+            if (u.name == "shield-generator")
+                w.unit(u.id)->efficiency = 0.5f;
+        fog.refresh(w);
+        CHECK(fog.has(10, 11, Fog::Shielded, 1) && !fog.has(11, 11, Fog::Shielded, 1));
+    }
+    // The economy offers the defences once what they need stands.
+    {
+        Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, ColonyMap{});
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        const BuildingType& shield = *buildingType("shield-generator");
+        const BuildingType& turret = *buildingType("defensive-weapon");
+        CHECK(!e.available(shield) && !e.available(turret));
+        for (const char* b : {"construction-yard-upgrade", "security-center", "science-station", "shield-buffer-lab",
+                              "colony-hub-upgrade"})
+            e.addBuilt(b, 0, 0);
+        CHECK(e.available(shield) && !e.available(turret));
+        e.addBuilt("shield-generator", 40000, 0);
+        CHECK(e.available(turret));
     }
 
     // Cloaking: 300 ticks seen, a 63-tick fade, then out of everyone's
