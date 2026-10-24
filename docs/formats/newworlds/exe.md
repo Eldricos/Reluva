@@ -516,6 +516,45 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+### Crew and efficiency
+
+A building's **efficiency** is 0.4 × (health + power + officer) × crew:
+- health: by its hit points' share in twentieths: 0-0.5 in tenths up to
+  30 %, then 0.55-0.95, whole from 75 %;
+- power: its buffer's fill, (4 × average + now) / (4 × capacity), whole
+  above 99 %; the average is halved towards the fill at each refill.
+  Generators and the hub count it whole;
+- officer: the best skill among the officers posted there at the
+  building's speciality (1 the yards, 2 security, 3 sickbay, 4 science,
+  6 mines and processor, 7 the hub, 8 storage, 9 accommodation); whole
+  for a building with none (generators);
+- crew: its crew over its crew slots, at most 1; a building with less
+  than the crew it requires does nothing. Generators, hubs, pads,
+  housing, farms, shields and defences count it whole.
+
+So a healthy generator runs at 1.2 (500 × 1.2 = 600 a tick) and the hub
+without a command officer at 0.8 (400).
+
+**People.** Each race has a roster of **150** named people, the
+mission's officers among them. The hub takes everyone still in orbit
+into its pool (150 places; accommodation 200 more). A building asks for
+its crew slots (1 for most, 3 for the vehicle yard, 8 for accommodation)
+when it's put up or finished: the first hub or accommodation block with
+that many in its pool sends them all, and they walk over; else a
+transporter pad beams them down from orbit; else the request waits until
+a pool takes people in. A new accommodation block fills its pool ten at
+a time from the hub's pool, then from orbit. Nobody is born and no time
+adds people; they die only with what they're in. The vehicle yard won't
+build without crew ("not enough crew"). C7's hub pool of 128 is the 150
+less the five officers and the crews of the starting buildings and
+vehicles.
+
+**Life support.** Everyone on the planet uses 16 units a tick of a
+life-support pool (655360); farms add 2048 × their efficiency; the hub
+buys the rest back with power before any other building, (what's
+missing) / 16.384 / its efficiency. An empty pool was not seen to do
+anything.
+
 ### Vehicle production
 
 A vehicle yard makes one vehicle at a time. An order takes the cost at

@@ -1280,6 +1280,60 @@ void testVehicleProduction() {
     CHECK(!full.orderVehicle(*apc));
 }
 
+void testCrew() {
+    auto run = [](Economy& e, double seconds) {
+        std::vector<ScriptEvent> all;
+        for (double t = 0; t < seconds - 1e-9; t += 0.25)
+            for (ScriptEvent& x : e.advance(0.25))
+                all.push_back(std::move(x));
+        return all;
+    };
+    ColonyMap map;
+    // The roster of 150, five of them officers: the hub takes in the other
+    // 145; buildings standing at the start have their crew from it.
+    Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
+    e.setOfficers(5);
+    e.addBuilt("colony-hub", 0, 0);
+    CHECK(e.pool() == 145 && e.inOrbit() == 0 && e.people() == 150);
+    e.addBuilt("construction-yard", 20000, 0);
+    const int yard = e.addBuilt("vehicle-yard", 0, 20000);
+    CHECK(e.crew() == 4 && e.pool() == 141);
+    for (const ColonyStructure& s : e.structures())
+        if (s.id == yard)
+            CHECK(s.crew == 3 && e.efficiency(s) > 0.79f && e.efficiency(s) < 0.81f);
+    // A sickbay ordered: its crew walk over once it's built (20 s).
+    CHECK(e.order("sickbay", 30000, 0, 0, 0) != 0);
+    run(e, 41);
+    CHECK(e.has("sickbay") && e.pool() == 140);
+    int sickbayCrew = -1;
+    for (const ColonyStructure& s : e.structures())
+        if (s.type == "sickbay")
+            sickbayCrew = s.crew;
+    CHECK(sickbayCrew == 0);
+    run(e, 21);
+    for (const ColonyStructure& s : e.structures())
+        if (s.type == "sickbay")
+            sickbayCrew = s.crew;
+    CHECK(sickbayCrew == 1);
+    // Life support: 150 people at 16 a tick, bought back by the hub at
+    // 16.384 a unit of power, divided by its efficiency (0.8): 183 a tick.
+    CHECK(e.lifeSupportPower() > 170 && e.lifeSupportPower() < 190);
+    // Too few people: the yard waits for its crew, works at nothing, and
+    // an order for a vehicle tells the colony it's short of crew.
+    Economy few('F', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
+    few.setOfficers(148);
+    few.addBuilt("colony-hub", 0, 0);
+    const int empty = few.addBuilt("vehicle-yard", 0, 0);
+    for (const ColonyStructure& s : few.structures())
+        if (s.id == empty)
+            CHECK(s.crew == 0 && s.wanted == 3 && few.efficiency(s) == 0);
+    CHECK(few.orderVehicle(*vehicleType(97)));
+    const auto told = run(few, 1);
+    CHECK(std::any_of(told.begin(), told.end(), [](const ScriptEvent& ev) { return ev.kind == "short-crew"; }));
+    run(few, 30);
+    CHECK(few.takeVehicles().empty());
+}
+
 void testResearch() {
     auto names = [](const std::vector<ScriptEvent>& ev) {
         std::vector<std::string> out;
@@ -1461,6 +1515,7 @@ int main() {
     testFieldWork();
     testResearch();
     testVehicleProduction();
+    testCrew();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

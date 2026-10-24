@@ -290,6 +290,7 @@ void MissionViewer::startPlay() {
     ColonyMap ground{[this](int bx, int by) { return map_.depositAt(bx, by); },
                      [this](int bx, int by) { return map_.depositAmount(bx, by); }};
     economy_ = std::make_unique<Economy>(side, stock, 50, std::move(ground));
+    economy_->setOfficers(int(officers(level.shortName, side == 'K' ? 1 : side == 'R' ? 2 : 0).size()));
     structureIds_.clear();
     if (colony_)
         for (const ColonyBuilding& c : colony_->buildings())
@@ -1487,7 +1488,7 @@ void MissionViewer::drawInterface() {
         const int lines = buildMenu_      ? int(menu.size()) + 1
                           : researchMenu_ ? std::max(2, int(offered.size()) + 1)
                           : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
-                                          : 7;
+                                          : economy_ ? 8 : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
@@ -1590,6 +1591,11 @@ void MissionViewer::drawInterface() {
                 ty += lh;
                 ui_.drawSmall(screen_, x + 10, ty, std::string(name) + " = " + std::to_string(n), text);
             }
+            // The colony's people: at work, and waiting in the pools.
+            if (economy_)
+                ui_.drawSmall(screen_, x + 10, ty + lh,
+                              "CREW " + std::to_string(economy_->crew()) + " POOL " + std::to_string(economy_->pool()),
+                              text);
         }
     }
 

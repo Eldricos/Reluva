@@ -4,6 +4,7 @@
 #include "engines/newworlds/economy.h"
 
 #include <algorithm>
+#include <numeric>
 #include <set>
 #include <cmath>
 
@@ -44,9 +45,14 @@ constexpr int kCapacityCap = 90;
 constexpr double kWorkPerValue = 300;
 constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
 constexpr double kRollout = 8;
-// How fast a buffer's averaged fill follows it, a tick (a placeholder: how
-// the game keeps its average wasn't found).
-constexpr float kFillAverage = 0.05f;
+// People (exe.md#crew-and-efficiency): a race's roster, an accommodation
+// block's batches, life support's use a person a tick and its rate of
+// exchange with power, a farm's output. How long crew take to walk to
+// their building is a placeholder: C8's yard was crewed about 20 s after
+// the "not enough crew" message.
+constexpr int kRoster = 150, kBatch = 10;
+constexpr double kLifePerPerson = 16, kLifePerPower = 16.384, kFarmLife = 2048;
+constexpr double kCrewWalk = 20;
 
 constexpr int sideOf(char side) { return side == 'K' ? 1 : side == 'R' ? 2 : 0; }
 
@@ -214,6 +220,17 @@ const std::vector<BuildingType>& buildingTypes() {
             b.crewless = !(id == "construction-yard" || id == "vehicle-yard" || id == "security-center" ||
                            id == "sickbay" || id == "science-station" || id == "mining-station" ||
                            id == "resource-processor" || id == "storage-facility");
+            // Upgrades bring no people of their own.
+            if (!b.upgradeOf.empty())
+                continue;
+            if (!b.crewless || id == "farm")
+                b.required = 1, b.crewSlots = 1;
+            if (id == "vehicle-yard")
+                b.crewSlots = 3;
+            if (id == "accommodation")
+                b.required = 8, b.crewSlots = 8, b.poolSlots = 200;
+            if (id == "colony-hub")
+                b.poolSlots = 150;
         }
         return t;
     }();
@@ -352,8 +369,27 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
     if (const BuildingType* t = buildingType(type)) {
         s.stored = t->bufferCap;
         capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
+        // The hub takes in everyone still in orbit; accommodation standing
+        // at the start takes people straight from the hub.
+        if (type == "colony-hub") {
+            s.pool = std::min(t->poolSlots, orbit_);
+            orbit_ -= s.pool;
+        } else if (type == "accommodation") {
+            for (ColonyStructure& h : structures_)
+                if (h.type == "colony-hub") {
+                    const int m = std::min(h.pool, t->poolSlots);
+                    h.pool -= m, s.pool += m;
+                }
+        }
     }
     structures_.push_back(s);
+    // A building standing at the start has its crew at once.
+    requestCrew(structures_.back());
+    for (auto& c : structures_.back().coming)
+        c.second = 0;
+    structures_.back().crew += std::accumulate(structures_.back().coming.begin(), structures_.back().coming.end(), 0,
+                                               [](int n, const auto& c) { return n + c.first; });
+    structures_.back().coming.clear();
     return s.id;
 }
 
@@ -421,6 +457,9 @@ bool Economy::orderVehicle(const VehicleType& v) {
         return false;
     for (int m = 0; m < kMaterials; ++m)
         units_[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
+    for (const ColonyStructure& s : structures_)
+        if (s.id == yard && s.crew < 1)
+            pendingShort_.push_back({"short-crew", {}});
     const double work = double(v.value) * kWorkPerValue;
     jobs_.push_back({v.type, yard, work, work, -1});
     return true;
@@ -435,8 +474,113 @@ std::vector<std::pair<int, int>> Economy::takeVehicles() {
 void Economy::setOfficer(int structure, float skill) { officers_[structure] = skill; }
 
 float Economy::crewShare(const ColonyStructure& s) const {
-    (void)s;
-    return 1; // crew: to come
+    const BuildingType* t = buildingType(s.type);
+    if (!t || t->crewless || t->crewSlots == 0)
+        return 1;
+    // Below the crew it needs it doesn't work at all.
+    if (s.crew < t->required)
+        return 0;
+    return std::min(1.0f, float(s.crew) / float(t->crewSlots));
+}
+
+void Economy::setOfficers(int n) {
+    officersDown_ = n;
+    orbit_ = std::max(0, kRoster - n);
+}
+
+int Economy::pool() const {
+    int n = 0;
+    for (const ColonyStructure& s : structures_)
+        n += s.pool;
+    return n;
+}
+
+int Economy::crew() const {
+    int n = 0;
+    for (const ColonyStructure& s : structures_) {
+        n += s.crew;
+        for (const auto& c : s.coming)
+            n += std::abs(c.first); // on their way, to work or to a pool
+    }
+    return n;
+}
+
+int Economy::people() const { return pool() + crew() + officersDown_; }
+
+// A building's request for its crew (its slots less those it has or has
+// coming): all from the first hub or accommodation with enough in its pool,
+// else beamed down from orbit by a transporter pad, else it waits.
+void Economy::requestCrew(ColonyStructure& s) {
+    const BuildingType* t = buildingType(s.type);
+    if (!t || t->crewSlots == 0)
+        return;
+    int have = s.crew;
+    for (const auto& c : s.coming)
+        have += std::max(0, c.first);
+    const int need = t->crewSlots - have;
+    if (need <= 0) {
+        s.wanted = 0;
+        return;
+    }
+    s.wanted = need;
+    for (ColonyStructure& from : structures_)
+        if (from.progress >= 1 && from.pool >= need && from.id != s.id) {
+            from.pool -= need;
+            s.coming.push_back({need, kCrewWalk});
+            s.wanted = 0;
+            return;
+        }
+    if (has("transporter-pad") && orbit_ >= need) {
+        orbit_ -= need;
+        s.coming.push_back({need, kCrewWalk});
+        s.wanted = 0;
+    }
+}
+
+// The requests still waiting are tried again when a pool has taken
+// people in (the game has no timer for them).
+void Economy::retryCrew() {
+    for (ColonyStructure& s : structures_)
+        if (s.wanted > 0 && s.progress >= 1)
+            requestCrew(s);
+}
+
+// People arriving; an accommodation block filling its pool ten at a time,
+// from the hub's pool or, once that's empty, beamed down.
+void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
+    (void)out;
+    bool arrived = false;
+    for (auto& c : s.coming)
+        if ((c.second -= 1 / kTicksPerSecond) <= 0) {
+            const BuildingType* t = buildingType(s.type);
+            if (t && t->poolSlots > 0 && s.type == "accommodation" && c.first < 0)
+                s.pool += -c.first;
+            else
+                s.crew += c.first;
+            arrived = true;
+        }
+    s.coming.erase(std::remove_if(s.coming.begin(), s.coming.end(), [](const auto& c) { return c.second <= 0; }),
+                   s.coming.end());
+    const BuildingType* t = buildingType(s.type);
+    if (t && s.type == "accommodation" && s.progress >= 1 &&
+        std::none_of(s.coming.begin(), s.coming.end(), [](const auto& c) { return c.first < 0; })) {
+        int hubPool = 0;
+        ColonyStructure* hub = nullptr;
+        for (ColonyStructure& h : structures_)
+            if (h.type == "colony-hub" && h.progress >= 1)
+                hubPool += h.pool, hub = hub ? hub : &h;
+        const int room = t->poolSlots - s.pool;
+        const int m = std::min({kBatch, room, hubPool > 0 ? hubPool : (has("transporter-pad") ? orbit_ : 0)});
+        if (m > 0) {
+            if (hubPool > 0)
+                hub->pool -= m;
+            else
+                orbit_ -= m;
+            s.coming.push_back({-m, kCrewWalk}); // negative: for its pool
+        }
+    }
+    if (arrived)
+        retryCrew();
 }
 
 void Economy::setHealth(int structure, float share) {
@@ -453,10 +597,11 @@ float Economy::efficiency(const ColonyStructure& s) const {
     // from 75 %.
     const int step = std::clamp(int(s.health * 20), 0, 20);
     const float health = step >= 15 ? 1.0f : step <= 5 ? 0.1f * float(step) : 0.5f + 0.05f * float(step - 5);
-    // The buffer's fill, its average weighted four to one (whole above 99 %).
+    // The buffer's fill: (4 x its average + now) / (4 x capacity), whole
+    // above 99 %.
     float fill = 1;
     if (t->bufferCap > 0) {
-        fill = (4 * s.fill + s.stored / t->bufferCap) / 5;
+        fill = (4 * s.fill + s.stored / t->bufferCap) / 4;
         if (fill > 0.99f)
             fill = 1;
     }
@@ -476,6 +621,10 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
         busy.insert(j.yard);
         auto s = std::find_if(structures_.begin(), structures_.end(), [&](const ColonyStructure& c) { return c.id == j.yard; });
         if (s == structures_.end())
+            continue;
+        // No crew, no work (the colony told, as the game's, when it's
+        // ordered).
+        if (s->crew < 1)
             continue;
         if (j.work > 0) {
             // Running above 0.35, stopped below 0.2 (and between, as it was).
@@ -540,8 +689,11 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             s.stored = t->bufferCap;
             capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
             out.push_back({"built", {s.type}});
+            requestCrew(s);
         }
     }
+    for (ColonyStructure& s : structures_)
+        staff(s, out);
     // Power: each built consumer asks to fill its buffer, at most its
     // intake a tick; the supply (with the reserve behind it) is shared out
     // in proportion; then each uses its standing demand from its buffer.
@@ -549,7 +701,31 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
     for (ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0)
             asked += std::min(t->intake, t->bufferCap - s.stored + t->demand);
-    const double supply = powerSupply();
+    // Life support first: everyone on the planet uses 16 a tick; farms add
+    // to it; the hub buys back what's used with power, before any other
+    // building (its request divided by its efficiency).
+    life_ -= kLifePerPerson * people();
+    float hubEff = 0;
+    for (const ColonyStructure& s : structures_)
+        if (s.progress >= 1) {
+            if (s.type == "farm")
+                life_ += kFarmLife * efficiency(s);
+            else if (s.type == "colony-hub")
+                hubEff = std::max(hubEff, efficiency(s));
+        }
+    life_ = std::clamp(life_, 0.0, kLifeCap);
+    double supply = powerSupply();
+    if (hubEff > 0) {
+        const double ask = (kLifeCap - life_) / kLifePerPower / hubEff;
+        const double grant = std::min(ask, supply + reserve_);
+        life_ = std::min(kLifeCap, life_ + grant * kLifePerPower);
+        supply -= grant;
+        if (supply < 0) {
+            reserve_ += supply;
+            supply = 0;
+        }
+        lifeDraw_ = float(grant);
+    }
     double give = supply;
     if (asked > supply) {
         const double draw = std::min(reserve_, double(asked) - supply);
@@ -564,7 +740,7 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0) {
             const float want = std::min(t->intake, t->bufferCap - s.stored + t->demand);
             s.stored = std::clamp(s.stored + want * met_ - t->demand, 0.0f, t->bufferCap);
-            s.fill += (s.stored / t->bufferCap - s.fill) * kFillAverage;
+            s.fill = (s.stored / t->bufferCap + s.fill) * 0.5f; // the game's average, kept at each refill
         }
     if (met_ < kPowerLow && clock_ - lastPowerWarning_ >= kWarnEvery) {
         out.push_back({"power-low", {}});

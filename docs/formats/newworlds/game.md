@@ -189,6 +189,16 @@ placed); the game's playbook and officer cards are keys here.
   vehicle rolls out beside it (8 s) - bees into the hub. Officers posted
   in a building raise its efficiency. Not yet buildable: defensive
   weapons and artillery, so the vehicles that need them aren't offered.
+- **Crew and efficiency** as the executable has them
+  ([exe.md](exe.md#crew-and-efficiency)): every building works at 0.4 ×
+  (health + power fill + officer) × crew; generators and the hub give
+  their output times it (a hub without a command officer 400 a tick).
+  The side's 150 people (the officers among them) start in the hub's
+  pool; each building's crew walk over from a pool when it's built
+  (20 s), or are beamed down by a transporter pad, or wait; the vehicle
+  yard needs its crew before it works. Everyone on the planet costs life
+  support, which the hub pays for in power (about 180 a tick for 150
+  people) and farms help with. The NEW WORLDS panel shows CREW and POOL.
 - **Research** as the executable has it ([exe.md](exe.md#research)): a
   script's `research <topic>` opens the mission's topic once it has been
   sent as many times as the game wants; R lists the open ones in the NEW
@@ -228,6 +238,7 @@ placed); the game's playbook and officer cards are keys here.
 | An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Sightings | seen within 2.5 blocks, approach within 1.5 | Reluva's |
+| Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
 | Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |
 | A lab's build time | 28 s | the training missions (21-35 s) |
 | Scans, captures, officers | ranges, flags, strength, 80 %, 16.8 s, 16 seats, 1414 units | the executable (exe.md#scans-and-captures) |

@@ -63,6 +63,10 @@ struct BuildingType {
     // defences work whole without).
     int speciality = 0;
     bool crewless = true;
+    // People: the crew it needs to work at all, the crew it takes (its
+    // slots), and the people it can house in its pool (hub 150,
+    // accommodation 200).
+    int required = 0, crewSlots = 0, poolSlots = 0;
     double buildSeconds = 40; // order to finished
     const Stock& costFor(char side) const;
     const std::vector<std::string>& needsFor(char side) const;
@@ -104,6 +108,11 @@ struct ColonyStructure {
     float stored = 0;    // its power buffer
     float fill = 1;      // the buffer's fill, averaged (for efficiency)
     float health = 1;    // its hit points' share, 0-1
+    int crew = 0;        // at work in it
+    int pool = 0;        // housed in it (hub, accommodation)
+    int wanted = 0;      // crew asked for and not yet sent
+    // People on their way to it: how many, and seconds still to walk.
+    std::vector<std::pair<int, double>> coming;
 };
 
 class Economy {
@@ -162,6 +171,18 @@ public:
     // A building's best officer skill at its speciality (0 none): the
     // officer term of its efficiency.
     void setOfficer(int structure, float skill);
+    // People (exe.md#crew-and-efficiency): the side's roster of 150, of
+    // whom the officers are some; those not yet on the planet are in
+    // orbit. Call before the colony's buildings are added.
+    void setOfficers(int n);
+    int inOrbit() const { return orbit_; }
+    int people() const;  // on the planet: pools, crews and officers
+    int pool() const;    // in the hub's and accommodation's pools
+    int crew() const;    // at work in the buildings
+    // The life-support pool's share full (0-1): the hub keeps it up with
+    // power, 16 units a person a tick; farms add to it.
+    float lifeSupport() const { return float(life_ / kLifeCap); }
+    float lifeSupportPower() const { return lifeDraw_; } // power a tick it took
     // A building's hit points' share (its health term), from the map.
     void setHealth(int structure, float share);
     // A building's efficiency, as the game's: 0.4 x (health + power fill
@@ -176,6 +197,10 @@ public:
 
 private:
     static constexpr double kReserveCap = 640000;
+    static constexpr double kLifeCap = 655360;
+    void requestCrew(ColonyStructure& s);
+    void staff(ColonyStructure& s, std::vector<ScriptEvent>& out);
+    void retryCrew();
     void tick(std::vector<ScriptEvent>& out);
     void produce(std::vector<ScriptEvent>& out);
     float crewShare(const ColonyStructure& s) const;
@@ -199,6 +224,10 @@ private:
     std::vector<std::pair<int, int>> finished_;
     std::map<int, float> officers_;
     std::map<int, bool> yardRunning_;
+    int orbit_ = 150, officersDown_ = 0;
+    double life_ = kLifeCap;
+    float lifeDraw_ = 0; // power the hub put into life support last tick
+    double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
 };
 
