@@ -231,8 +231,13 @@ placed); the game's playbook and officer cards are keys here.
   the player's side sees. The scripts hear `seen <site>` when the
   player's side first sees a site's block, and `cell-scanned <site>` when
   its block is first scanned (a science vehicle or a building beside it);
-  K7's pod watches read the same mark. Not modelled: the camera kept to
-  seen blocks, the mineral readout.
+  K7's pod watches read the same mark. The camera isn't kept to seen
+  blocks (see [Left out for now](#left-out-for-now-to-restore-later)).
+- **The Tricorder's ores**: blocks the side has surveyed (scouts, hubs,
+  mines, science vehicles and most buildings survey round themselves)
+  show their deposits in colour, by ore, on both Tricorders, and the
+  readout names the ore under the camera ("DILITHIUM AT <row:col>"; else
+  "TERRAIN AT"). Only what the side sees is marked on the Tab Tricorder.
 - **Script effects** ([exe.md](exe.md#script-effects)): the scripts'
   spawns, group damage, beam-ups, routes, meteor storms (30 damage to
   what a meteor hits), lightning storms, the disease (among the crew),
@@ -251,6 +256,15 @@ placed); the game's playbook and officer cards are keys here.
 - **Sightings:** the scripts hear `approach <who> <site>`
   when a unit is within 1.5 blocks (who: the unit's kind for the player's,
   its race for another side's), once each.
+
+## Left out for now, to restore later
+
+Differences from the original kept on purpose while Reluva is being
+built, to be put back at the end so play feels as the game's does:
+
+- **The camera kept to seen blocks.** The game won't move the camera
+  onto blocks the player's side can't see (exe.md#fog-of-war); Reluva
+  lets it go anywhere, which helps when checking a map.
 
 ## Placeholders
 
@@ -283,6 +297,7 @@ placed); the game's playbook and officer cards are keys here.
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
 | Your own cloaked units | drawn as usual | the game draws them see-through |
+| The Tricorder's ore colours | Reluva's | not found in the executable |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |

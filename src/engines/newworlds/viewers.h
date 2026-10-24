@@ -566,6 +566,7 @@ private:
     void updateGhost();
     void placeBuilding();
     void showProgress();
+    void drawMinerals(int x, int y, int w, int h);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();

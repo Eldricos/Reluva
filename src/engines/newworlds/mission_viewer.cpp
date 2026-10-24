@@ -1517,6 +1517,33 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
     return sound;
 }
 
+// The deposits the side has surveyed, coloured on a Tricorder map by ore
+// (the game's "mineral deposits appear as colored areas"; its colours
+// aren't known: these are Reluva's).
+void MissionViewer::drawMinerals(int x, int y, int w, int h) {
+    if (!fog_)
+        return;
+    static constexpr uint8_t kOre[6][3] = {{255, 70, 200}, {255, 200, 40}, {170, 170, 190},
+                                           {80, 220, 90},  {230, 110, 40}, {80, 200, 255}};
+    for (int by = 0; by < map_.blocksHigh(); ++by)
+        for (int bx = 0; bx < map_.blocksWide(); ++bx) {
+            const int kind = map_.depositAt(bx, by);
+            if (kind < 1 || kind > 6 || map_.depositAmount(bx, by) <= 0 || !fog_->has(bx, by, Fog::Surveyed, playerSlot_))
+                continue;
+            int px0 = 0, py0 = 0, px1 = 0, py1 = 0;
+            map_.minimapPoint(float(bx) * MapViewer::kBlockUnits, float(by) * MapViewer::kBlockUnits, x, y, w, h, px0, py0);
+            map_.minimapPoint(float(bx + 1) * MapViewer::kBlockUnits, float(by + 1) * MapViewer::kBlockUnits, x, y, w, h, px1,
+                              py1);
+            for (int py = std::min(py0, py1); py <= std::max(py0, py1); ++py)
+                for (int px = std::min(px0, px1); px <= std::max(px0, px1); ++px)
+                    if (px >= x && py >= y && px < x + w && py < y + h && px < screen_.w && py < screen_.h) {
+                        uint8_t* p = screen_.row(py) + px * 4;
+                        for (int c = 0; c < 3; ++c)
+                            p[c] = uint8_t((p[c] + 2 * kOre[kind - 1][c]) / 3);
+                    }
+        }
+}
+
 // What play adds over the map: the full-screen Tricorder (Tab), with the
 // units on it, and the box a left drag draws.
 void MissionViewer::drawPlay() {
@@ -1529,15 +1556,24 @@ void MissionViewer::drawPlay() {
                 row[0] = uint8_t(row[0] / 4), row[1] = uint8_t(row[1] / 4), row[2] = uint8_t(row[2] / 4);
         }
         map_.drawMinimap(screen_, x0, y0, size, size);
+        drawMinerals(x0, y0, size, size);
+        // What the side sees: its own green (selected orange), those
+        // hostile to it red, the rest yellow.
         if (world_)
             for (const Unit& u : world_->units()) {
+                if (!visible(u))
+                    continue;
                 int px = 0, py = 0;
                 map_.minimapPoint(u.x, u.y, x0, y0, size, size, px, py);
+                const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
+                const uint8_t r = u.selected ? 255 : own ? 120 : 255;
+                const uint8_t g = u.selected ? 150 : own ? 255 : enemy ? 70 : 230;
+                const uint8_t b = u.selected ? 30 : own ? 120 : 60;
                 for (int dy = -2; dy <= 2; ++dy)
                     for (int dx = -2; dx <= 2; ++dx)
                         if (px + dx >= 0 && py + dy >= 0 && px + dx < screen_.w && py + dy < screen_.h) {
                             uint8_t* p = screen_.row(py + dy) + (px + dx) * 4;
-                            p[0] = u.selected ? 255 : 120, p[1] = u.selected ? 150 : 255, p[2] = u.selected ? 30 : 120;
+                            p[0] = r, p[1] = g, p[2] = b;
                         }
             }
     }
@@ -1727,6 +1763,7 @@ void MissionViewer::drawInterface() {
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
         if (hasMap_) {
             map_.drawMinimap(screen_, x + 12, y + 14, w - 24, h - 30 - lh);
+            drawMinerals(x + 12, y + 14, w - 24, h - 30 - lh);
             tricorder_ = {x + 12, y + 14, w - 24, h - 30 - lh};
             // The player's own green, those hostile to it red, the rest yellow.
             if (world_)
@@ -1749,7 +1786,16 @@ void MissionViewer::drawInterface() {
                 std::string s = std::to_string(v);
                 return std::string(s.size() < 3 ? 3 - s.size() : 0, '0') + s;
             };
-            ui_.drawSmall(screen_, x + 10, y + h - 12 - lh, "TERRAIN AT <" + pad(a) + ":" + pad(b) + ">", text);
+            // The ore under it once the side has surveyed the block (the
+            // game's readout names it), else just the terrain.
+            std::string what = "TERRAIN";
+            if (fog_ && fog_->has(b / 8, a / 8, Fog::Surveyed, playerSlot_) && map_.depositAmount(b / 8, a / 8) > 0)
+                if (const int kind = map_.depositAt(b / 8, a / 8)) {
+                    what = kind == 5 ? "MAGNESITE ORE" : oreName(kind);
+                    std::transform(what.begin(), what.end(), what.begin(),
+                                   [](unsigned char c) { return char(std::toupper(c)); });
+                }
+            ui_.drawSmall(screen_, x + 10, y + h - 12 - lh, what + " AT <" + pad(a) + ":" + pad(b) + ">", text);
         }
     }
 
