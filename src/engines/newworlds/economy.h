@@ -29,6 +29,9 @@ namespace reluva::newworlds {
 enum Material { Dilithium, Polycomp, Thermoconc, Transalumin, Nitrium, Duranium, kMaterials };
 using Stock = std::array<int, kMaterials>;
 const char* materialName(int m); // "DILITHIUM", ...
+// A material by a script's name for it ("dilithium", "polycomposite",
+// "polycomp", "transalumin", ...); -1 if none.
+int materialNamed(std::string_view name);
 // The stock counts dilithium to trans al in thousands of the game's units
 // and nitrium and duranium in hundreds (so a tonne of ore raises nitrium
 // ten times as much as polycomp).
@@ -148,6 +151,9 @@ public:
     // (short-resources). tx, ty: the tile under its middle.
     int order(const std::string& type, float x, float y, int tx, int ty);
     bool has(const std::string& type) const; // built
+    // Stock given (or taken, negative) by the mission, in panel units;
+    // never below nothing.
+    void give(int material, int amount);
     // A building destroyed: it no longer counts, works or draws power.
     void remove(int id);
 

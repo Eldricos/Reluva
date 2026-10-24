@@ -119,6 +119,11 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
             if (t.size() != 4 || !toInt(t[2], a) || !toInt(t[3], b))
                 return fail("expected: site <name> <a> <b>");
             m.sites[t[1]] = {a, b};
+        } else if (t[0] == "zone") {
+            int a0, b0, a1, b1;
+            if (t.size() != 6 || !toInt(t[2], a0) || !toInt(t[3], b0) || !toInt(t[4], a1) || !toInt(t[5], b1))
+                return fail("expected: zone <name> <a> <b> <a2> <b2>");
+            m.zones[t[1]] = {std::min(a0, a1), std::min(b0, b1), std::max(a0, a1), std::max(b0, b1)};
         } else if (t[0] == "objective") {
             int id;
             if (t.size() < 2 || !toInt(t[1], id))
@@ -207,6 +212,30 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                 } else if (a.verb == "give" || a.verb == "take") {
                     if (a.args.size() != 2 || !toInt(a.args[1], n))
                         return bad("expected: " + a.verb + " <material> <amount>");
+                } else if (a.verb == "top-up") {
+                    if (!(a.args.size() == 1 && a.args[0] == "off") && (a.args.empty() || a.args.size() % 2 != 0))
+                        return bad("expected: top-up <material> <amount>... | top-up off");
+                } else if (a.verb == "damage") {
+                    if (a.args.size() != 2 || (a.args[1] != "all" && !toInt(a.args[1], n)))
+                        return bad("expected: damage <group> <percent>|all");
+                } else if (a.verb == "beam-up") {
+                    if (a.args.size() != 1)
+                        return bad("expected: beam-up <group>");
+                } else if (a.verb == "spawn") {
+                    if (a.args.size() < 5 || a.args.size() > 6 || !toInt(a.args[2], n) || !toInt(a.args[3], n) ||
+                        !toInt(a.args[4], n))
+                        return bad("expected: spawn <side> <type> <count> <a> <b> [<group>]");
+                } else if (a.verb == "move") {
+                    const size_t points = a.args.size() - 1 - (a.args.back() == "loop" ? 1 : 0);
+                    if (a.args.size() < 3 || points % 2 != 0)
+                        return bad("expected: move <group> <a> <b>... [loop]");
+                } else if (a.verb == "meteors" || a.verb == "storm") {
+                    if (a.args.empty() || !m.zones.count(a.args[0]) ||
+                        (a.verb == "meteors" && (a.args.size() != 2 || (a.args[1] != "off" && !toInt(a.args[1], n)))))
+                        return bad("expected: " + a.verb + " <zone>" + (a.verb == "meteors" ? " <seconds>|off" : ""));
+                } else if (a.verb == "infect" || a.verb == "cure") {
+                    if (!a.args.empty())
+                        return bad("expected: " + a.verb);
                 } else if (a.verb != "win") {
                     return bad("unknown action " + a.verb);
                 }
@@ -263,6 +292,15 @@ bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) const 
     // The game's monitors compare: stock <material> <at least>; count <what>
     // <op> <n> against count <what> <now>; colony-size [<side>] <percent>,
     // reached growing (over 100) or shrinking (to 100 or under).
+    if (want.kind == got.kind && (want.kind == "infection" || want.kind == "standing")) {
+        // infection <percent>, standing <what> <seconds>: reached.
+        if (want.args.empty() || want.args.size() != got.args.size())
+            return false;
+        for (size_t i = 0; i + 1 < want.args.size(); ++i)
+            if (want.args[i] != got.args[i])
+                return false;
+        return std::atof(got.args.back().c_str()) >= std::atof(want.args.back().c_str());
+    }
     if (want.kind == got.kind && (want.kind == "stock" || want.kind == "count" || want.kind == "colony-size")) {
         auto num = [](const std::string& v, double& out) {
             char* end = nullptr;
@@ -401,6 +439,13 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
             out.push_back({Output::Ai, a.args[0], order, 0, {}});
         } else if (a.verb == "give" || a.verb == "take") {
             out.push_back({Output::Stock, a.verb, a.args[0] + " " + a.args[1], 0, {}});
+        } else if (a.verb == "top-up" || a.verb == "damage" || a.verb == "beam-up" || a.verb == "spawn" ||
+                   a.verb == "move" || a.verb == "meteors" || a.verb == "storm" || a.verb == "infect" ||
+                   a.verb == "cure") {
+            std::string text;
+            for (size_t i = 0; i < a.args.size(); ++i)
+                text += (i ? " " : "") + a.args[i];
+            out.push_back({Output::Effect, a.verb, text, 0, {}});
         }
     }
     for (const ScriptEvent& f : follow) {

@@ -2959,9 +2959,9 @@ on seen landing
   say operations "Taal welcomes you, commander. Serving your house is an honour."
 
 # Objective 15: the first vehicle yard, construction yard, generator, processor and mine.
+on built-all vehicle-yard construction-yard power-generator resource-processor mining-station
 )",
-R"(on built-all vehicle-yard construction-yard power-generator resource-processor mining-station
-  say engineering "Every building we needed is up, sir."
+R"(  say engineering "Every building we needed is up, sir."
   complete 15
   signal objective
 
@@ -3348,11 +3348,11 @@ objective 22 hidden
 # each; two Romulan assaults at 900 s; and when we field 14 disruptor tanks
 # the Federation answers with two assaults of its own.
 on start
-)",
-R"(  timer rom-assault-klingons 900
+  timer rom-assault-klingons 900
   timer fed-raids-on-kli 480
   timer rom-raids-on-kli 480
-  timer tau-raids-on-kli 480
+)",
+R"(  timer tau-raids-on-kli 480
 on timer rom-assault-klingons
   ai romulan rom-assault-klingons-1
   ai romulan rom-assault-klingons-2
@@ -3677,11 +3677,11 @@ objective 11
 objective 12 hidden
 objective 13 hidden
 
-)",
-R"(# --- Greeting ---------------------------------------------------------------
+# --- Greeting ---------------------------------------------------------------
 on start
   timer greeting 10
-  timer rom-assault-klingons 80
+)",
+R"(  timer rom-assault-klingons 80
   timer fed-raids-on-kli 420
   timer fed-heavy-raids-on-kli 600
   timer rom-raids-on-kli 420
@@ -4033,12 +4033,12 @@ every signal taubat-raid-2
 every signal taubat-raid-3
   ai taubat taubat-assault-kli-random3
 every signal taubat-raid-4
-)",
-R"(  ai taubat taubat-assault-kli-random4
+  ai taubat taubat-assault-kli-random4
 every signal taubat-raid-5
   ai taubat taubat-assault-kli-random5
 every signal taubat-raid-6
-  ai taubat taubat-assault-kli-random6
+)",
+R"(  ai taubat taubat-assault-kli-random6
 every signal taubat-raid-7
   ai taubat taubat-assault-kli-random7
 every signal taubat-raid-8
@@ -4422,11 +4422,11 @@ on timer alien-device
   say command "Commander, some alien contraption has turned up in the great hall. Orders?"
 
 # Scans of anything else
-)",
-R"(every scanned-nothing science
+every scanned-nothing science
   say science "Routine scan: nothing."
 every scanned-nothing strong-science
-  say science "Close scan complete. Nothing worth reporting."
+)",
+R"(  say science "Close scan complete. Nothing worth reporting."
 every scanned-nothing medical
   say medical "Routine medical scan: all clear."
 every scanned-nothing strong-medical
@@ -4821,12 +4821,12 @@ every timer tau-raid-rom
   timer tau-raid-rom 60
   random tau-raid-rom-1 tau-raid-rom-2 tau-raid-rom-3 tau-raid-rom-4 tau-raid-rom-5 tau-raid-rom-6 tau-raid-rom-7 tau-raid-rom-8
 every signal tau-raid-rom-1
-)",
-R"(  ai taubat taubat-assault-rom-random1
+  ai taubat taubat-assault-rom-random1
 every signal tau-raid-rom-2
   ai taubat taubat-assault-rom-random2
 every signal tau-raid-rom-3
-  ai taubat taubat-assault-rom-random3
+)",
+R"(  ai taubat taubat-assault-rom-random3
 every signal tau-raid-rom-4
   ai taubat taubat-assault-rom-random4
 every signal tau-raid-rom-5
@@ -5215,12 +5215,12 @@ every signal rom-raid-fed-6
 every signal rom-raid-fed-7
   ai romulan rom-assault-fed-random7
 every signal rom-raid-fed-8
-)",
-R"(  ai romulan rom-assault-fed-random8
+  ai romulan rom-assault-fed-random8
 
 # Romulan raids on the Klingons: one of eight attacks every 30 s, the first at 90 s
 every timer rom-raid-kli
-  timer rom-raid-kli 30
+)",
+R"(  timer rom-raid-kli 30
   random rom-raid-kli-1 rom-raid-kli-2 rom-raid-kli-3 rom-raid-kli-4 rom-raid-kli-5 rom-raid-kli-6 rom-raid-kli-7 rom-raid-kli-8
 every signal rom-raid-kli-1
   ai romulan rom-assault-kli-random1
@@ -5618,12 +5618,12 @@ every signal met-raid-kli-3
 every signal met-raid-kli-4
   ai metar metar-assault-kli-random4
 every signal met-raid-kli-5
-)",
-R"(  ai metar metar-assault-kli-random5
+  ai metar metar-assault-kli-random5
 every signal met-raid-kli-6
   ai metar metar-assault-kli-random6
 every signal met-raid-kli-7
-  ai metar metar-assault-kli-random7
+)",
+R"(  ai metar metar-assault-kli-random7
 every signal met-raid-kli-8
   ai metar metar-assault-kli-random8
 
@@ -6007,12 +6007,12 @@ on held taubat-hangar-one 10
 # Objective 14: five steps - the temple, both factories (each reported once
 # it has been gone 10 s), the houses and every fighting unit (watched from
 # the first factory's report on).
-)",
-R"(on destroyed taubat-temple
+on destroyed taubat-temple
   say intelligence "The Taubat temple is destroyed."
   signal orion-step
 on destroyed taubat-hangar-one
-  timer hangar-one-gone 10
+)",
+R"(  timer hangar-one-gone 10
 on timer hangar-one-gone
   say intelligence "One of the vehicle factories the Orions hold is destroyed."
   signal orion-step
@@ -6365,12 +6365,12 @@ every signal kli-assault-rom-random4
 every signal kli-assault-rom-random5
   ai klingon kli-assault-rom-random5
 every signal kli-assault-rom-random6
-)",
-R"(  ai klingon kli-assault-rom-random6
+  ai klingon kli-assault-rom-random6
 every signal kli-assault-rom-random7
   ai klingon kli-assault-rom-random7
 every signal kli-assault-rom-random8
-  ai klingon kli-assault-rom-random8
+)",
+R"(  ai klingon kli-assault-rom-random8
 every timer hubrin-raids-on-rom
   random hubrin-assault-rom-random1 hubrin-assault-rom-random2 hubrin-assault-rom-random3 hubrin-assault-rom-random4 hubrin-assault-rom-random5 hubrin-assault-rom-random6 hubrin-assault-rom-random7 hubrin-assault-rom-random8
   timer hubrin-raids-on-rom 120
@@ -6693,12 +6693,12 @@ on signal pass-step*3
 on timer pass
   win
 
-)",
-R"(# --- Fails: the cause at once, the mission lost 10 s later ----------------
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
 on count colony-hub == 0
   fail 14 10
   say operations "Our colony hub is gone. The mission has failed."
-# The focal point destroyed before we scanned it (fail 16); our scan switches this
+)",
+R"(# The focal point destroyed before we scanned it (fail 16); our scan switches this
 # off.
 on destroyed metar-scan-building as core-watch
   fail 16 10
@@ -7041,14 +7041,14 @@ objective 14
 objective 16
 
 # Opening: the Federation, the Klingons and the Metar each start random
-)",
-R"(# raids on us after 3 minutes, then one every 2 minutes.
+# raids on us after 3 minutes, then one every 2 minutes.
 on start
   timer federation-raids 180
   timer klingon-raids 180
   timer metar-raids 180
 
-# Ambushes: Romulan units entering these areas spring the waiting groups.
+)",
+R"(# Ambushes: Romulan units entering these areas spring the waiting groups.
 on approach romulan federation-ambush-south
   ai federation trigger fed-pouncer-0
 on approach romulan federation-ambush-north
@@ -7431,13 +7431,13 @@ every signal met-raid-kli-1
 every signal met-raid-kli-2
   ai metar metar-assault-kli-random2
 every signal met-raid-kli-3
-)",
-R"(  ai metar metar-assault-kli-random3
+  ai metar metar-assault-kli-random3
 every signal met-raid-kli-4
   ai metar metar-assault-kli-random4
 every signal met-raid-kli-5
   ai metar metar-assault-kli-random5
-every signal met-raid-kli-6
+)",
+R"(every signal met-raid-kli-6
   ai metar metar-assault-kli-random6
 every signal met-raid-kli-7
   ai metar metar-assault-kli-random7
@@ -7827,12 +7827,12 @@ on colony-size 300
   signal infrastructure
 on signal infrastructure*2
   say engineering "Sir, the colony can now support building the containment device. One last round of research diagnostics is needed."
-)",
-R"(  complete 12
+  complete 12
   research cfd
 
 # The device: made 10 s after the research and beamed to the site the
-# Hubrin marked; once it stands, the Metar go for it and a Hubrin turns up.
+)",
+R"(# Hubrin marked; once it stands, the Metar go for it and a Hubrin turns up.
 on researched cfd
   timer device-made 10
 on timer device-made
@@ -8213,12 +8213,12 @@ on timer metar-romulan-attack
 #   arrives, together with 17; the game words it as its own objective but
 #   checks nothing else.
 
-)",
-R"(# --- R14 as R ----------------------------------------
+# --- R14 as R ----------------------------------------
 # R14 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
 mission R14 R
 site metar-core 82 269
-objective 12
+)",
+R"(objective 12
 objective 14
 
 # Opening: Taubat raids every 30 s from the first 30 s; Metar raids every
@@ -8598,15 +8598,15 @@ every scan-started medical temple
 every scan-lost medical temple
   say operations "The ambassador has slipped out of our transporter lock. Another scan is required."
 on scanned medical temple
-)",
-R"(  timer ambassador-aboard 1
+  timer ambassador-aboard 1
   timer narok-crush 5
 on timer ambassador-aboard
   say operations "The ambassador is in our hands!"
   complete 84
   signal objective-met
 on timer narok-crush
-  say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
+)",
+R"(  say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
   reveal 85
 
 # --- The Orion-Taubat colony razed: temple, houses, hangars and guns all gone ---
@@ -8932,10 +8932,10 @@ on timer fail-message
 #   the "leave Engineering" line) fires straight away if the scout was built earlier. Reluva's
 #   events come only when a count changes, so the step stays an AND of "scout built" and
 #   "watch started" (two signals), not a dormant handler.
-)",
-R"(# - rom-prepare-attack-a/b are unit path controllers (the two artillery units Rom_artillery
+# - rom-prepare-attack-a/b are unit path controllers (the two artillery units Rom_artillery
 #   and Rom_artillery_b drive to 370:270 and 370:266), not AI orders.
-# - The area detectors test unit classes: the Federation one wants units of class mask
+)",
+R"(# - The area detectors test unit classes: the Federation one wants units of class mask
 #   0x40000 (flags 0x38), the Romulan colony-gate one class 0x4000000 (flags 0x62, likely
 #   the scout), the attack-front one class 0x100 (flags 0x57); "approach <side>" can't say
 #   which kind of unit.

@@ -317,6 +317,8 @@ void MissionViewer::startPlay() {
         pendingOrder_ = 0;
     }
     research_ = std::make_unique<Research>(level.shortName, playerSlot_);
+    effects_ = std::make_unique<ScriptEffects>(playerSlot_, *world_, ai_.get(), economy_.get(),
+                                               findMissionScript(level.shortName, side));
     researchMenu_ = vehicleMenu_ = false;
     // The mission's script, from its start, if Reluva has one.
     run_.reset();
@@ -388,6 +390,7 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    effects_.reset();
     research_.reset();
     fieldWork_.reset();
     ai_.reset();
@@ -633,6 +636,30 @@ void MissionViewer::drawCombat() {
                 if (dx * dx + dy * dy <= r * r && (dx * dx + dy * dy) * 3 >= r * r * int(t * 3))
                     plot(screen_, cx + dx, cy + dy, 255, uint8_t(220 - 160 * t), uint8_t(80 - 70 * t));
     }
+    // The script's effects: meteors (a falling streak, then a blast),
+    // storm flashes, beams (a column of light).
+    if (effects_)
+        for (const ScriptEffects::Spark& sp : effects_->sparks()) {
+            int gx = 0, gy = 0, tx = 0, ty = 0;
+            if (!toScreen(sp.x, sp.y, 0, gx, gy))
+                continue;
+            const float t = float(sp.age);
+            if (sp.kind == 0 && toScreen(sp.x, sp.y, 6000 * std::max(0.0f, 0.3f - t) / 0.3f, tx, ty)) {
+                line(screen_, tx, ty - 20, tx, ty, 255, 200, 120);
+                if (t > 0.3f)
+                    for (int dy = -4; dy <= 4; ++dy)
+                        for (int dx = -4; dx <= 4; ++dx)
+                            if (dx * dx + dy * dy <= int(16 * (1 - t)))
+                                plot(screen_, gx + dx, gy + dy, 255, 160, 60);
+            } else if (sp.kind == 1 && t < 0.15f && toScreen(sp.x, sp.y, 8000, tx, ty)) {
+                line(screen_, tx, ty, gx + 6, (ty + gy) / 2, 200, 220, 255);
+                line(screen_, gx + 6, (ty + gy) / 2, gx, gy, 200, 220, 255);
+            } else if (sp.kind == 2 && toScreen(sp.x, sp.y, 4000, tx, ty)) {
+                for (int dx = -2; dx <= 2; ++dx)
+                    if ((int(nowMs_ / 40) + dx) % 2)
+                        line(screen_, gx + dx, gy, tx + dx, ty, 180, 220, 255);
+            }
+        }
     // Scans as a dotted pale blue line; held buildings marked.
     if (fieldWork_) {
         for (const auto& [from, to] : fieldWork_->scanning()) {
@@ -1118,6 +1145,10 @@ void MissionViewer::update(uint64_t nowMs) {
         combatStep(happened);
         if (economy_ && world_)
             rollOut();
+        if (effects_) {
+            auto done = effects_->advance(std::min(dt, 0.25));
+            happened.insert(happened.end(), done.begin(), done.end());
+        }
         if (research_) {
             auto found = research_->advance(std::min(dt, 0.25));
             happened.insert(happened.end(), found.begin(), found.end());
@@ -1764,6 +1795,8 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
             ai_->stance(o.sender, o.text);
         else if (o.kind == MissionRun::Output::Research && research_)
             research_->unlock(o.text);
+        else if ((o.kind == MissionRun::Output::Effect || o.kind == MissionRun::Output::Stock) && effects_)
+            effects_->apply(o.sender, o.text);
     }
     if (!out.empty())
         redraw();

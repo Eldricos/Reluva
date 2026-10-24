@@ -65,6 +65,21 @@ const char* materialName(int m) {
 
 int unitsPerMaterial(int m) { return m >= Nitrium ? 100 : 1000; }
 
+int materialNamed(std::string_view name) {
+    static const char* const kPrefixes[] = {"dilith", "polycomp", "thermoc", "trans", "nitri", "duran"};
+    for (int m = 0; m < kMaterials; ++m)
+        if (name.rfind(kPrefixes[m], 0) == 0)
+            return m;
+    return -1;
+}
+
+void Economy::give(int material, int amount) {
+    if (material < 0 || material >= kMaterials)
+        return;
+    int64_t& u = units_[size_t(material)];
+    u = std::max<int64_t>(0, u + int64_t(amount) * unitsPerMaterial(material));
+}
+
 const char* oreName(int kind) {
     static const char* const kNames[] = {"dilithium", "talgonite", "silicon", "kelbonite", "magnesite", "dolamide"};
     return kind >= 1 && kind <= kOres ? kNames[kind - 1] : "";

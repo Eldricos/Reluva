@@ -21,6 +21,7 @@
 #include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/field_work.h"
 #include "engines/newworlds/research.h"
+#include "engines/newworlds/script_effects.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -649,6 +650,7 @@ private:
     // (s, m, e: a scan; c: a capture; 0 none).
     std::unique_ptr<FieldWork> fieldWork_;
     std::unique_ptr<Research> research_; // the side's research, and its list shown (R)
+    std::unique_ptr<ScriptEffects> effects_; // the script's effects in play
     bool researchMenu_ = false;
     bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
     void rollOut();

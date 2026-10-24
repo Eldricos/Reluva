@@ -5,6 +5,7 @@
 
 #include "common/types.h"
 
+#include <array>
 #include <cstdint>
 #include <map>
 #include <set>
@@ -21,6 +22,7 @@ namespace reluva::newworlds {
 //
 //   mission F1 F                     a mission and the side it's played as
 //   site temple 332 152              a named place (a map position)
+//   zone east 292 287 300 299        a named rectangle (two corners)
 //   objective 16                     an objective: its string id in the
 //   objective 19 hidden              mission's table; hidden until revealed;
 //   objective 21 optional            optional ones don't hold up the end
@@ -45,6 +47,15 @@ namespace reluva::newworlds {
 //     ai <side> <order>              an AI side acts: an attack, a build
 //                                    order, a patrol (named as the game does)
 //     give|take <material> <amount>  stock in or out (panel units)
+//     top-up <material> <amount>...  keep the stock up to these (off: stop)
+//     damage <group> <percent>|all   the group's units lose that share of
+//                                    their hit points (all: destroyed)
+//     beam-up <group>                the group beamed off the map
+//     spawn <side> <type> <count> <a> <b> [<group>]  units beamed in
+//     move <group> <a> <b>... [loop] the group driven (flown) along points
+//     meteors <zone> <seconds>|off   meteors fall in the zone that often
+//     storm <zone>                   a storm's flashes over the zone
+//     infect | cure                  the disease spreads / is cured
 //
 // Events: start; built <building>; built-all <building>[*count][|...]...;
 // approach <who> <site>; scan-started, scanned, scan-lost <kind> <site>;
@@ -56,7 +67,10 @@ namespace reluva::newworlds {
 // count-th time it's raised); mine-exhausted, power-low, short-resources,
 // short-crew; and the game's monitors: count <what> <=|>=|== <n>, held
 // <what> <seconds>, seen <site>, colony-size <percent>, stock <material>
-// <amount>, key <code>. An argument "*" matches anything. In text,
+// <amount>, key <code>; inside, outside <who> <zone> (a side's units, a
+// unit kind of ours, a group, or "any"); beamed-up <group>; standing <what>
+// <seconds> (built and standing that long); infection <percent>, cured.
+// An argument "*" matches anything. In text,
 // {site:name} becomes the site's position, {a}, {b} the event's position,
 // {1} the event's first argument (dashes as spaces, capitalised).
 
@@ -86,6 +100,7 @@ struct MissionScript {
     std::string mission;
     char side = 'F';
     std::map<std::string, std::pair<int, int>> sites;
+    std::map<std::string, std::array<int, 4>> zones; // a0, b0, a1, b1 (smallest first)
     std::vector<Objective> objectives;
     std::vector<Handler> handlers;
 };
@@ -107,7 +122,10 @@ public:
         // Failing: the mission will be lost (objective = the fail string)
         // when its delay runs out.
         // Research: a topic made available (text = the topic).
-        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock, Research } kind;
+        // Effect: one of the game's script effects (sender = the action:
+        // top-up, damage, beam-up, spawn, move, meteors, storm, infect,
+        // cure; text = its arguments).
+        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock, Research, Effect } kind;
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
         std::string clip;          // a message's voice clip (a media stem), if any

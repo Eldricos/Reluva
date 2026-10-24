@@ -99,6 +99,7 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/ai_sides.cpp
     src/engines/newworlds/field_work.cpp
     src/engines/newworlds/research.cpp
+    src/engines/newworlds/script_effects.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp
     src/engines/newworlds/sound_viewer.cpp

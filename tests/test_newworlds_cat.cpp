@@ -12,6 +12,7 @@
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/field_work.h"
 #include "engines/newworlds/research.h"
+#include "engines/newworlds/script_effects.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -1334,6 +1335,88 @@ void testCrew() {
     CHECK(few.takeVehicles().empty());
 }
 
+void testScriptEffects() {
+    // A script using the effects, on F1's sides over an open plain.
+    std::vector<MissionScript> parsed;
+    const char* text = "mission F1 F\n"
+                       "zone pad 400 200 420 240\n"
+                       "on start\n"
+                       "  give dilithium 100\n"
+                       "  take duranium 50\n"
+                       "  spawn klingon disruptor-tank 3 410 220 raiders\n"
+                       "  damage raiders 50\n"
+                       "  meteors pad 2\n"
+                       "on timer x\n"
+                       "  beam-up raiders\n";
+    CHECK(!parseMissionScripts(text, parsed) && parsed[0].zones.at("pad")[2] == 420);
+    std::vector<MissionScript> bad;
+    CHECK(parseMissionScripts("mission T F\non start\n  meteors nowhere 3\n", bad));
+    CHECK(parseMissionScripts("mission T F\non start\n  damage x lots\n", bad));
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    World w(t);
+    AiSides ai("F1", 0, w);
+    ai.start();
+    Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, ColonyMap{});
+    ScriptEffects fx(0, w, &ai, &e, &parsed[0]);
+    MissionRun run(parsed[0], nullptr);
+    for (const MissionRun::Output& o : run.fire({"start", {}}))
+        if (o.kind == MissionRun::Output::Effect || o.kind == MissionRun::Output::Stock)
+            fx.apply(o.sender, o.text);
+    CHECK(e.stock()[Dilithium] == 600 && e.stock()[Duranium] == 4950);
+    int raiders = 0;
+    for (const Unit& u : w.units())
+        if (u.label == "raiders") {
+            ++raiders;
+            CHECK(u.slot == 1 && u.name == "disruptor-tank" && u.hp == 30);
+        }
+    CHECK(raiders == 3);
+    // The zone sees them; the meteors fall on it.
+    std::vector<std::string> heard;
+    auto step = [&](double seconds) {
+        for (int i = 0; i < int(seconds * 10); ++i)
+            for (const ScriptEvent& ev : fx.advance(0.1)) {
+                std::string line = ev.kind;
+                for (const auto& a : ev.args)
+                    line += " " + a;
+                heard.push_back(line);
+            }
+    };
+    step(2.2);
+    auto has = [&](const std::string& line) { return std::find(heard.begin(), heard.end(), line) != heard.end(); };
+    CHECK(has("inside klingon pad") && has("inside raiders pad") && has("inside any pad") && has("outside taubat pad"));
+    CHECK(!fx.sparks().empty());
+    // Beamed up: gone, and the group reported.
+    fx.apply("beam-up", "raiders");
+    step(0.2);
+    CHECK(has("beamed-up raiders"));
+    for (const Unit& u : w.units())
+        CHECK(u.label != "raiders");
+    step(1.1);
+    CHECK(has("outside klingon pad"));
+    // A route; what stands, second by second.
+    const int scout = spawnObject(w, 0, 'F', *combatType(97), 100000, 100000, "geology-scout", {}, true);
+    fx.apply("move", "geology-scout 100 100 120 100");
+    CHECK(w.unit(scout)->moving());
+    e.addBuilt("colony-hub", 0, 0);
+    heard.clear();
+    step(3.05);
+    CHECK(has("standing colony-hub 3"));
+    std::vector<MissionScript> holdScript;
+    CHECK(!parseMissionScripts("mission T F\non standing colony-hub 2\n  win\non infection 3\n  win\n", holdScript));
+    MissionRun hold(holdScript[0], nullptr);
+    CHECK(!hold.fire({"standing", {"colony-hub", "1"}}).size() && hold.fire({"standing", {"colony-hub", "2"}}).size());
+    // The disease: spreading a percent at a time, cured to nothing.
+    fx.apply("infect", "");
+    heard.clear();
+    step(5.05);
+    CHECK(fx.infection() >= 4 && has("infection 3"));
+    fx.apply("cure", "");
+    step(5);
+    CHECK(fx.infection() == 0 && has("cured"));
+}
+
 void testResearch() {
     auto names = [](const std::vector<ScriptEvent>& ev) {
         std::vector<std::string> out;
@@ -1516,6 +1599,7 @@ int main() {
     testResearch();
     testVehicleProduction();
     testCrew();
+    testScriptEffects();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);
