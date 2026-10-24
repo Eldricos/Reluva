@@ -810,6 +810,40 @@ that corner (4 x 4). There is one for the side, not one per yard, and
 nothing found moves it. A unit within 4096 of its place stands and
 fires; one that can't get there tries again after 320-816 ticks.
 
+### Group counts
+
+Each object type has a class mask: 0x2 small buildings (generators,
+shields, storage, pads, science blocks, the Taubat house), 0x4 large ones
+(hubs, yards, accommodation, sickbay, farms, security, the Taubat hangar
+and temple), 0x8 mines, 0x10 turrets, 0x100 armed vehicles, 0x40000
+armed APCs, 0x400000 science vehicles, 0x4000000 scouts, 0x20000 large
+craft. Each side keeps a row per type and up to 16 rows per class mask:
+completed, being built, and held by each side. The count monitors (kinds
+2, 3, 48 and 49) read the class rows, so their "group ids" 2, 4 and 256
+are the small buildings, the large buildings and the armed vehicles.
+Kinds 2, 48 and 49 count completed objects not held by another side
+(so "no small buildings left" also comes true once the rest are
+captured); kind 3 adds the held ones. Sites and vehicles in production
+count in neither.
+
+**Colony size** (kinds 8 and 9): small + 3 x large, completed, not held
+(kind 9 adds those held by others), against its value on the first tick;
+it works for any side, natives included. **Colony capture** (kind 10):
+the holder's held small + 3 x large x 100 over the owner's size on the
+first tick (J1: the Taubat 22, so 30 % is 7: three hangars, or two and a
+house).
+
+### Rival watches
+
+The computer's sides never capture buildings or scan things: those
+orders come only from the player's playbook (the AI's own orders attack
+a side). So the other sides' raid watches (kind 37) succeed only when
+the group is destroyed (condition 1, by anyone) or their own buildings
+and vehicles mark its block scanned (condition 3). A watch's success
+sends its rivals Go_Futile: one under way reports "beaten to it"
+(target 1); one idle or still in its start delay turns futile and later
+reports "futile" (target 6) instead of success.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast

@@ -83,8 +83,11 @@ public:
 
     // What combat did, as the scripts' events: destroyed <name> for each
     // name of each object destroyed, hub-destroyed <race> for another
-    // colony's hub, and count <name> <n> when the number left of a kind
-    // changes (other than the player's buildings, which the colony counts).
+    // colony's hub, count <name> <n> when the number left of a kind
+    // changes (other than the player's buildings, which the colony counts)
+    // or of a side's group ([<race>-]small-buildings, large-buildings,
+    // fighting-units), and colony-size [<race>] <percent> as a side's
+    // colony grows or shrinks against its start.
     std::vector<ScriptEvent> observe(const std::vector<WorldEvent>& events);
 
     // Running orders, for tests and the title: by name ("" for unnamed).
@@ -134,6 +137,7 @@ private:
     std::map<int, Colony> colonies_;
     std::map<int, double> nativeSites_; // a building going up without an economy: seconds put in
     std::map<int, int> rallied_;         // per slot: vehicles sent to its rally point so far
+    std::map<int, int> colonyBase_, colonyShare_; // per slot: colony size at the start, its share last told
     ColonyMap ground_;
     std::map<std::string, int> counts_;
     double clock_ = 0;

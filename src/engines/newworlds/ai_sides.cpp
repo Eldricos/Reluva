@@ -504,6 +504,39 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
         if (!(u.slot == player_ && u.building) && u.built >= 1) // (sites aren't counted)
             for (const std::string& n : scriptNames(u, player_))
                 ++counts[n];
+    // Each side's groups, by class (exe.md#group-counts): its small and
+    // large buildings and its armed vehicles, standing and not held by
+    // another side; and its colony's size, small + 3 x large, as a share
+    // of what it was at the start.
+    std::map<int, int> size;
+    for (const Unit& u : world_.units()) {
+        const CombatType* t = combatType(u.type);
+        if (!t || u.built < 1 || u.heldBy >= 0)
+            continue;
+        const char race = raceOf(u.slot) == '?' ? u.side : raceOf(u.slot);
+        const std::string side = u.slot == player_ ? std::string() : std::string(raceName(race)) + "-";
+        if (t->mask & 0x2)
+            ++counts[side + "small-buildings"], size[u.slot] += 1;
+        else if (t->mask & 0x4)
+            ++counts[side + "large-buildings"], size[u.slot] += 3;
+        else if (t->mask & 0x100)
+            ++counts[side + "fighting-units"];
+    }
+    if (colonyBase_.empty())
+        colonyBase_ = size, colonyBase_[-1] = 0; // (taken once)
+    for (const auto& [slot, base] : colonyBase_) {
+        if (slot < 0 || base <= 0)
+            continue;
+        const int share = int(size[slot] * 100 / base);
+        if (auto it = colonyShare_.find(slot); it != colonyShare_.end() && it->second == share)
+            continue;
+        colonyShare_[slot] = share;
+        const char race = raceOf(slot);
+        if (slot == player_)
+            out.push_back({"colony-size", {std::to_string(share)}});
+        else if (race != '?')
+            out.push_back({"colony-size", {raceName(race), std::to_string(share)}});
+    }
     for (const auto& [n, c] : counts)
         if (auto it = counts_.find(n); it == counts_.end() || it->second != c)
             out.push_back({"count", {n, std::to_string(c)}});

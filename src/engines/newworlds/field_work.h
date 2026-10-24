@@ -39,6 +39,16 @@ namespace reluva::newworlds {
 // medical, engineering, strong-science, ...); scanned-nothing <kind> for
 // a scan no handler wants; entered, captured, capture-lost and vacated
 // <name>, and held <name> <seconds> each second it's held.
+//
+// The other sides' watches run too (exe.md#rival-watches). The computer's
+// sides never capture or scan actively, so theirs succeed only when the
+// group is destroyed (by anyone) or their own buildings and vehicles mark
+// its block scanned: captured-by <race> <name> (a capture or destroy
+// watch) or scanned-by <race> <name>. One side's success tells the others'
+// watches on the group: the player's, if under way, is beaten <name>;
+// otherwise its later success is futile <name> instead. And captured
+// <name> <percent>: the share of a colony the player's teams hold (small
+// buildings 1, large 3, of the colony's size at the start).
 class FieldWork {
 public:
     enum Kind { Science, Medical, Engineering };
@@ -124,13 +134,18 @@ private:
         int start = 0, hold = 0; // its own times (script ticks), without a raid
         int ticks = 0;
         bool started = false, done = false;
+        int side = 0;           // whose watch: the player's, or a rival's
+        bool futile = false;    // another side got there first: a success now counts for nothing
+        bool seen = false;      // its group has been on the map (for "all destroyed")
         std::vector<std::string> names;
     };
     void tick(std::vector<ScriptEvent>& out, const std::function<bool(const ScriptEvent&)>& handled);
     void release(int building);
     std::vector<std::string> namesOf(const Unit& u) const;
     float reach(const Unit& scanner, const Unit& target) const;
-    bool conditionMet(int condition, const std::string& label, int target) const;
+    bool conditionMet(const Watch& w) const;
+    void succeeded(const Watch& w, std::vector<ScriptEvent>& out);
+    void shares(std::vector<ScriptEvent>& out);
 
     std::string mission_;
     int player_;
@@ -146,6 +161,9 @@ private:
     std::vector<Watch> watches_;
     std::vector<ScriptEvent> pending_;
     std::map<int, std::vector<std::string>> heldNames_;
+    std::map<int, char> races_;           // each slot's race
+    std::map<int, int> colonyBase_;       // per slot: its colony's size at the start (small + 3 x large)
+    std::map<std::string, int> shared_;   // per label: the share of its side's colony the player holds, last sent
     double clock_ = 0;
     int tick_ = 0;
     const Fog* fog_ = nullptr;

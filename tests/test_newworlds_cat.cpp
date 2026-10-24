@@ -1307,9 +1307,76 @@ void testFieldWork() {
     run(15);
     CHECK(fw.heldBy(temple) == 0 && w.unit(temple)->hp == w.unit(temple)->maxHp);
     CHECK(heardIt("entered taubat-temple") && heardIt("held temple 10") && heardIt("captured taubat-temple"));
+    // The temple is all of its side's colony: held, the share is whole.
+    CHECK(w.unit(temple)->heldBy == 0 && heardIt("captured taubat-temple 100"));
     fw.cancel(apc);
     run(0.2);
-    CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple"));
+    CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple") && w.unit(temple)->heldBy == -1);
+}
+
+void testRivalsAndGroups() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    auto said = [](const std::vector<ScriptEvent>& ev, const std::string& want) {
+        return std::any_of(ev.begin(), ev.end(), [&](const ScriptEvent& e) {
+            std::string s = e.kind;
+            for (const auto& a : e.args)
+                s += " " + a;
+            return s == want;
+        });
+    };
+    // A side's groups by class and its colony's size against its start:
+    // F1's Taubat, a hangar (large) lost.
+    {
+        World w(t);
+        AiSides ai("F1", 0, w);
+        ai.start();
+        int houses = 0, hangar = 0;
+        for (const Unit& u : w.units())
+            if (u.slot == 3 && u.building) {
+                houses += u.name == "taubat-house";
+                if (u.name == "taubat-hangar")
+                    hangar = u.id;
+            }
+        const auto first = ai.observe({});
+        CHECK(houses > 0 && hangar && said(first, "count taubat-small-buildings " + std::to_string(houses)));
+        CHECK(said(first, "colony-size taubat 100") && said(first, "count klingon-fighting-units 12"));
+        WorldEvent gone;
+        gone.kind = WorldEvent::Destroyed;
+        gone.what = *w.unit(hangar);
+        w.remove(hangar);
+        const auto after = ai.observe({gone});
+        CHECK(std::any_of(after.begin(), after.end(), [](const ScriptEvent& e) {
+            return e.kind == "colony-size" && e.args.size() == 2 && e.args[0] == "taubat" && std::atoi(e.args[1].c_str()) < 100;
+        }));
+    }
+    // A rival's watch: J3's Klingon raid on a workshop is won when it's
+    // destroyed, by anyone (5 s, then 30 s).
+    {
+        World w(t);
+        AiSides ai("J3", 0, w);
+        ai.start();
+        FieldWork fw("J3", 0, w, {});
+        int target = 0;
+        for (const Unit& u : w.units())
+            if (u.label == "raid-building-one")
+                target = u.id;
+        CHECK(target != 0);
+        std::vector<ScriptEvent> heard;
+        auto run = [&](double seconds) {
+            for (int i = 0; i < int(seconds * 10); ++i) {
+                auto ev = fw.advance(0.1, [](const ScriptEvent&) { return true; });
+                heard.insert(heard.end(), ev.begin(), ev.end());
+            }
+        };
+        run(1);
+        w.remove(target);
+        run(34);
+        CHECK(!said(heard, "captured-by klingon raid-building-one"));
+        run(2);
+        CHECK(said(heard, "captured-by klingon raid-building-one"));
+    }
 }
 
 void testVehicleProduction() {
@@ -1924,6 +1991,7 @@ int main() {
     testFog();
     testRepairsShieldsCloaking();
     testOrders();
+    testRivalsAndGroups();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

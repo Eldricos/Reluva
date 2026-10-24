@@ -54,12 +54,15 @@ FieldWork::FieldWork(std::string_view mission, int playerSlot, World& world,
                      std::map<std::string, std::pair<int, int>> sites)
     : mission_(mission), player_(playerSlot), world_(world), sites_(std::move(sites)) {
     for (const Raid* r : raids(mission))
-        if (r->side == playerSlot) {
+        if (r->side >= 0 && r->side <= 5) {
             Watch w;
             w.raid = r;
             w.condition = r->condition;
+            w.side = r->side;
             watches_.push_back(std::move(w));
         }
+    for (const SideInfo* s : slotsOf(mission))
+        races_[s->slot] = s->race;
     for (const Officer* o : reluva::newworlds::officers(mission, playerSlot))
         officers_.push_back({o, 0});
 }
@@ -190,6 +193,8 @@ void FieldWork::release(int building) {
         if (c.target == building && c.state == 3)
             if (Unit* b = world_.unit(building))
                 b->hp = std::min(c.savedHp, b->maxHp);
+    if (Unit* b = world_.unit(building))
+        b->heldBy = -1;
     holds_.erase(it);
 }
 
@@ -229,22 +234,77 @@ std::vector<std::string> FieldWork::namesOf(const Unit& u) const {
     return out;
 }
 
-bool FieldWork::conditionMet(int condition, const std::string& label, int target) const {
+bool FieldWork::conditionMet(const Watch& w) const {
+    const std::string& label = w.raid ? w.raid->label : std::string();
+    bool any = false;
     for (const Unit& u : world_.units()) {
-        if (target ? u.id != target : u.label != label)
+        if (w.target ? u.id != w.target : u.label != label)
             continue;
-        if (condition == 2) {
-            if (heldBy(u.id) == player_)
+        any = true;
+        if (w.condition == 2) {
+            if (heldBy(u.id) == w.side)
                 return true;
-        } else if (condition == 3) {
-            // Its block marked scanned for us in the fog (any scanner).
-            if (fog_ && fog_->has(int(u.x / kBlock), int(u.y / kBlock), Fog::Scanned, player_))
+        } else if (w.condition == 3) {
+            // Its block marked scanned for the side in the fog (any scanner).
+            if (fog_ && fog_->has(int(u.x / kBlock), int(u.y / kBlock), Fog::Scanned, w.side))
                 return true;
-        } else if (auto it = scanned_.find(u.id); it != scanned_.end() && it->second[size_t(condition)] >= tick_ - 1) {
-            return true;
+        } else if (w.condition >= 4 && w.side == player_) {
+            // (Only the player's units scan: the computer's sides never do.)
+            if (auto it = scanned_.find(u.id); it != scanned_.end() && it->second[size_t(w.condition)] >= tick_ - 1)
+                return true;
         }
     }
-    return false;
+    // All destroyed: the group was on the map and none of it is left.
+    return w.condition == 1 && w.seen && !any;
+}
+
+// A watch's success tells the other sides' watches on the group: one
+// under way is beaten (the player hears it), the rest will find their
+// success futile.
+void FieldWork::succeeded(const Watch& done, std::vector<ScriptEvent>& out) {
+    if (!done.raid)
+        return;
+    for (Watch& w : watches_) {
+        if (&w == &done || !w.raid || w.side == done.side || std::string_view(w.raid->label) != done.raid->label)
+            continue;
+        if (w.started && !w.done) {
+            w.done = true;
+            if (w.side == player_)
+                out.push_back({"beaten", {w.raid->label}});
+        } else if (!w.done) {
+            w.futile = true;
+        }
+    }
+}
+
+// The share of each side's colony the player's teams hold, by the labels
+// of the buildings held: small buildings count 1, large 3, out of the
+// colony's size at the start.
+void FieldWork::shares(std::vector<ScriptEvent>& out) {
+    auto weight = [](const Unit& u) {
+        const CombatType* t = combatType(u.type);
+        return !t || !u.building || u.built < 1 ? 0 : (t->mask & 0x4) ? 3 : (t->mask & 0x2) ? 1 : 0;
+    };
+    if (colonyBase_.empty())
+        for (const Unit& u : world_.units())
+            if (u.heldBy < 0)
+                colonyBase_[u.slot] += weight(u);
+    std::map<int, int> held;            // per owner: the weight the player holds
+    std::map<std::string, int> owners;  // label: its owner
+    for (const auto& [id, h] : holds_)
+        if (const Unit* u = world_.unit(id); u && h.slot == player_) {
+            held[u->slot] += weight(*u);
+            if (!u->label.empty())
+                owners[u->label] = u->slot;
+        }
+    for (const auto& [label, owner] : owners) {
+        const int base = colonyBase_[owner];
+        const int share = base > 0 ? held[owner] * 100 / base : 0;
+        if (auto it = shared_.find(label); it == shared_.end() || it->second != share) {
+            shared_[label] = share;
+            out.push_back({"captured", {label, std::to_string(share)}});
+        }
+    }
 }
 
 std::vector<ScriptEvent> FieldWork::advance(double seconds, const std::function<bool(const ScriptEvent&)>& handled) {
@@ -353,6 +413,7 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
             c.savedHp = t->hp;
             t->hp = t->maxHp;
             holds_[t->id] = {u->slot, u->id, 0};
+            t->heldBy = u->slot;
             heldNames_[t->id] = namesOf(*t);
             c.state = 3;
             // A building no raid watches: taken at once.
@@ -383,12 +444,32 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
     }
 
     // The watches: the condition for start ticks, then for hold ticks.
+    shares(out);
     for (Watch& w : watches_) {
-        const bool met = conditionMet(w.condition, w.raid ? w.raid->label : "", w.target);
+        if (w.condition == 1 && w.raid && !w.seen)
+            w.seen = std::any_of(world_.units().begin(), world_.units().end(),
+                                 [&](const Unit& u) { return u.label == w.raid->label; });
+        const bool met = conditionMet(w);
         const double startS = (w.raid ? w.raid->start : w.start) / kScriptTicks;
         const double holdS = (w.raid ? w.raid->hold : w.hold) / kScriptTicks;
         const bool capture = w.condition == 2;
         auto send = [&](const std::string& kind) {
+            // A rival's watch: only its success is heard, by its race.
+            if (w.side != player_) {
+                if (kind == "captured" || kind == "scanned")
+                    for (const std::string& n : w.names)
+                        out.push_back({kind + "-by", {raceName(races_[w.side]), n}});
+                return;
+            }
+            // Ours after a rival's success: futile.
+            if (w.futile && (kind == "captured" || kind == "scanned")) {
+                for (const std::string& n : w.names)
+                    out.push_back({"futile", {n}});
+                return;
+            }
+            // (The player's "all destroyed" watch is heard as destroyed.)
+            if (w.condition == 1)
+                return;
             for (const std::string& n : w.names)
                 out.push_back(capture ? ScriptEvent{kind, {n}} : ScriptEvent{kind, {scanName(w.condition), n}});
         };
@@ -414,7 +495,8 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
             }
             if (w.started && !w.done && held >= startS + holdS) {
                 w.done = true;
-                send(capture ? "captured" : "scanned");
+                send(capture || w.condition == 1 ? "captured" : "scanned");
+                succeeded(w, out);
             }
         } else if (w.ticks > 0) {
             if (w.started && !w.done)

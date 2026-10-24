@@ -187,6 +187,16 @@ placed); the game's playbook and officer cards are keys here.
   the side's **rally point**, a 4 x 4 grid of parking places in the
   hub's block, and so do those sent back with Y; the AI's vehicles no
   order asked for park at theirs.
+- **Group counts, colony sizes and rivals** ([exe.md](exe.md#group-counts)):
+  the scripts can count a side's small buildings, large buildings and
+  armed vehicles (`count klingon-small-buildings <= 0`), hear any side's
+  colony grow or shrink against its start (`colony-size taubat 50`), and
+  the share of a colony the player's teams hold (`captured taubat-colony
+  30`). The other sides' raid watches run as the game's do: theirs
+  succeed only when the group is destroyed or their own units mark its
+  block scanned (`captured-by`, `scanned-by <race> <what>`), since the
+  computer never captures or scans; and their success turns the player's
+  watch on the group `beaten` (under way) or `futile` (later).
 - **Repairs, shields and cloaking** as the executable has them
   ([exe.md](exe.md#repairs)): vehicles mend a point at a time (faster
   with an engineer aboard); the colonies' buildings draw on a repair pool

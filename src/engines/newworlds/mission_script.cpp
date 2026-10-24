@@ -294,7 +294,15 @@ bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) const 
     // The game's monitors compare: stock <material> <at least>; count <what>
     // <op> <n> against count <what> <now>; colony-size [<side>] <percent>,
     // reached growing (over 100) or shrinking (to 100 or under).
-    if (want.kind == got.kind && (want.kind == "infection" || want.kind == "standing")) {
+    // captured <what> <percent>: the share of a colony held, reached. (A
+    // plain captured <what> [<member>] is the raid's, not this.)
+    auto share = [](const ScriptEvent& e) {
+        return e.kind == "captured" && e.args.size() == 2 && !e.args[1].empty() &&
+               std::isdigit(static_cast<unsigned char>(e.args[1][0]));
+    };
+    if (want.kind == "captured" && got.kind == "captured" && share(want) != share(got))
+        return false;
+    if (want.kind == got.kind && (want.kind == "infection" || want.kind == "standing" || share(want))) {
         // infection <percent>, standing <what> <seconds>: reached.
         if (want.args.empty() || want.args.size() != got.args.size())
             return false;

@@ -54,6 +54,10 @@ struct CombatType {
     int repair;
     bool shielded;     // a shield field and security officers lessen its damage
     bool cloaks;       // has a cloaking device
+    // Its class (exe.md#group-counts): 0x2 a small building, 0x4 a large
+    // one, 0x8 a mine, 0x10 a turret, 0x100 an armed vehicle, 0x40000 an
+    // armed APC, 0x400000 a science vehicle, 0x4000000 a scout, ...
+    int mask;
 };
 const CombatType* combatType(int id);
 
@@ -102,9 +106,9 @@ struct NpcOrder {
 std::vector<const NpcOrder*> npcOrders(std::string_view mission);
 
 // The game's watches on a named group (its placements' label): held by a
-// side, or scanned by it, for a while. Condition: 2 held (captured); 3 its
-// map cell scanned; 4-6 a weak science, medical or engineering scan; 7-9 a
-// strong one. The watch starts after start ticks of the condition (the
+// side, or scanned by it, for a while. Condition: 1 all destroyed (by
+// anyone); 2 held (captured); 3 its map cell scanned; 4-6 a weak science,
+// medical or engineering scan; 7-9 a strong one. The watch starts after start ticks of the condition (the
 // scripts' 16 a second), then succeeds after hold ticks more of it.
 struct Raid {
     const char* mission;

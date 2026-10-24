@@ -102,6 +102,7 @@ struct Unit {
     std::vector<int> protects;  // protecting an area: the buildings
     int chasing = 0;            // protecting: the attacker it's gone after
     int attackedTick = -100000; // when it was last hit
+    int heldBy = -1;            // a building another side's away team holds: that side's slot
 };
 
 // What combat did in a step: a shot (from, to, its ends) or something
