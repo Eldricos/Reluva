@@ -447,18 +447,26 @@ turn hostile to the Federation 300 s after the temple scan).
 
 **Orders.** An AI side's orders come in named and unnamed forms. Named
 ones wait for a script message (start, `Abort`, `Trigger`); unnamed ones
-run from the start (the natives' patrols, some guards and builds). Each
-gives a task, a unit type and count (or a building type and a delay) and
-up to four map positions:
+run from the start. Each gives a task, a type, a count, a time and up to
+four map positions. The nine constructors take their arguments in
+different orders (the record: task, a flag "also for a human side", a
+mode, type, count, time, positions, name). The time is mission time: the
+order may run once the game's tick counter reaches 16 x its value, not
+counted from its message.
 
 | Task | Orders | Reading |
 |---|---|---|
-| 1, 2 | 144 unnamed patrols, 68 named orders | patrol round the positions |
-| 4 | 112 named orders (`..._Protection_...`), 44 unnamed unit orders | guard the position |
-| 5 | 378 named orders | assault along the positions |
-| 6, 7, 8 | 655 named orders (most of the random raids) | assaults too, by their names |
-| 9 | 237 named builds | build the type at the position after the delay (F1's Klingons: construction yard at 60 s, vehicle yard 180, processor 300, accommodation 420, shield 540, science 660) |
-| 3 | 130 unnamed builds | the same, from the start |
+| 1, 2 | 293 unnamed, 76 named | patrol round the positions (F3's Klingon tanks, R8's "prepositioners") |
+| 4 | 102 named (`..._Protection_...`), 2 unnamed | guard the position |
+| 5 | 386 named | assault along the positions |
+| 6, 7, 8 | 655 named (most of the random raids) | assaults too, by their names |
+| 9 | 221 named, 6 unnamed | build the type at the position (F1's Klingons: construction yard at 60 s, vehicle yard 180, processor 300, accommodation 420, shield 540, science 660), and again whenever it's gone |
+| 3 | 17 unnamed | build the type at the position, once |
+
+Every build order names a building. 20 orders have the "also for a human
+side" flag; in the campaigns the player's own are R8's four
+prepositioners (they move the player's starting units into place), F8's
+tractor, F1's briefing patrol and one that never runs.
 
 73 **attack group** script objects create an order's units: the count of
 the type round one position ("with a transporter effect"), then start the
@@ -670,17 +678,48 @@ Officer training runs in a second queue the same way ("train staff":
 150000 points). The science station's labs are add-ons bought with
 materials, not research.
 
+### AI colonies
+
+How a side the computer plays builds and makes units:
+
+- **Turns.** Each side's AI commander checks one of its orders a tick, in
+  turn, and only for a side that isn't human unless the order's flag says
+  otherwise. An order that isn't ready waits for its next turn; there is
+  no other retry.
+- **Builds** (tasks 3 and 9) use only the type, the time and the first
+  position, snapped to the grid; the count is ignored. Ready when the
+  time has come and the spot passes the player's own placement test (a
+  mining station's needs its deposit); nothing searches round it. It then
+  goes through the player's construction routine: a site, its foreman
+  asking for four of the side's construction bees. **A side that isn't
+  human pays nothing**, and what a building needs isn't checked. Task 3
+  fires once (any message cancels it before then); task 9 stays armed, so
+  it puts the building up again once it's gone. `Abort` disarms it and
+  any other message arms it again; both start armed.
+- **Units** for patrols, guards and assaults: the group asks for its
+  count of the type, one at a time. The side's field marshal hands over
+  an idle unit; failing that, its production ministry passes the request
+  to a factory, one per vehicle yard, which makes it as the player's yard
+  does (build value x 300 at the yard's efficiency), **free to an AI
+  side**. Without a yard the request just waits; only the attack-group
+  script objects beam units in. The group sets off once it has them all.
+  A human side's pool passes on only requests for worker bees.
+- **Nothing else.** No building list, unit production or repairs of the
+  AI's own were found; it builds only what its orders say, and rebuilds
+  only through task 9. Every side has the same commander, ministries and
+  buildings, so power, crew and officers set an AI yard's pace as they do
+  the player's. Upgrades are always charged, but no order asks for one.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast
   construction bees build.
 - How the 50 ms step and the scripts' sixteenths relate.
 - How fast bees carry ore from the mines.
-- Placement flags, a third placement phase, and the AI order task codes 1,
-  2 and 6-8 (read from the orders' names).
+- Placement flags, a third placement phase, the AI order task codes 1,
+  2 and 6-8 (read from the orders' names), and the order modes.
 - Which of the posture bits the scan and capture menus test is hostile
   and which neutral; how the player moves officers (the gesture).
-- How the AI picks targets, and whether it builds units for its orders
-  (Reluva takes an order's units from the side, and makes up any it
-  lacks at the side's first building).
+- How the AI picks targets; how far apart the placement test keeps
+  buildings.
 - Several unnamed type ids (natives' units and buildings, effects).

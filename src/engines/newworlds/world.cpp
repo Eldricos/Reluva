@@ -369,7 +369,7 @@ void World::combatTick() {
         return distance(u, t) <= u.weapon.range + (t.building ? kBuildingReach : 0);
     };
     for (Unit& u : units_) {
-        if (u.weapon.kind == WeaponKind::None || u.hp <= 0 || u.holdFire)
+        if (u.weapon.kind == WeaponKind::None || u.hp <= 0 || u.holdFire || u.built < 1)
             continue;
         if (u.cooldown > 0)
             --u.cooldown;

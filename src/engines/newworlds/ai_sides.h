@@ -4,10 +4,12 @@
 #pragma once
 
 #include "engines/newworlds/ai_data.h"
+#include "engines/newworlds/economy.h"
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/world.h"
 
 #include <map>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -28,15 +30,22 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
 std::vector<std::string> scriptNames(const Unit& u, int playerSlot);
 
 // The sides a mission's AI plays (every slot but the player's): what they
-// place, their stances, the orders the game gives them from the start and
-// those the script sends (exe.md#sides-and-combat).
+// place, their stances, the orders the game gives them and those the script
+// sends (exe.md#sides-and-combat, exe.md#ai-colonies).
 //
-// An order's units are beamed in where the game's attack group puts them,
-// or are the side's own (idle ones of the type, nearest first); any it
-// lacks come out of the side's first building, standing in for the game's
-// own production, which isn't modelled. Guards hold their spot and fight
-// what comes near; patrols go round their waypoints; assaults follow
-// theirs, fighting what they meet, then go for the nearest enemy.
+// An order waits for its time (mission seconds from the start). Its units
+// are beamed in where the game's attack group puts them, or are the side's
+// own idle ones of the type, nearest first; those it lacks are asked of the
+// side's vehicle yards, and the group sets off once it has them all. Guards
+// hold their spot and fight what comes near; patrols go round their
+// waypoints; assaults follow theirs, fighting what they meet, then go for
+// the nearest enemy.
+//
+// The other colonies (slots 0-2) each run an economy as the player's does,
+// except that what they build and make costs them nothing. A build order
+// puts a site up on its spot once the spot is clear; a named one (task 9)
+// builds again whenever its building is gone. Orders the game marks as
+// also for a human side run for the player too, with the player's units.
 class AiSides {
 public:
     AiSides(std::string_view mission, int playerSlot, World& world);
@@ -44,6 +53,10 @@ public:
     // Places every AI side's objects and starts the orders that run from
     // the start; the stances between all sides as the mission sets them.
     void start();
+    // The ground, for the AI colonies' mining stations (before start).
+    void setGround(ColonyMap ground) { ground_ = std::move(ground); }
+    // An AI colony's economy; nullptr for the player's slot and natives.
+    const Economy* colony(int slot) const;
     // A script's ai action: "<order>" or "abort <order>", for the side
     // named ("klingon", "metar"). False if the mission has no such order.
     bool order(const std::string& side, const std::string& text);
@@ -72,9 +85,19 @@ private:
         std::vector<int> units;
         int leg = 0;
         double clock = 0, legClock = 0; // since it started, since its leg began
-        bool hunting = false, done = false;
+        bool started = false, gathered = false, hunting = false, done = false;
+        int awaited = 0; // units asked of the yards and not yet out
+        int site = 0;    // a build order's building, once put up
     };
-    void begin(const NpcOrder& o);
+    struct Colony {
+        std::unique_ptr<Economy> economy;
+        std::map<int, int> structureOf; // unit id: its structure in the economy
+    };
+    void queue(const NpcOrder& o);
+    void fire(Running& r);
+    void gather(Running& r);
+    void build(Running& r);
+    void colonies(double seconds);
     void steer(Running& r);
     std::pair<float, float> wayPoint(const NpcOrder& o, int leg) const;
     std::pair<float, float> openSpot(float x, float y) const;
@@ -85,6 +108,9 @@ private:
     World& world_;
     std::map<int, char> races_;
     std::vector<Running> running_;
+    std::map<int, Colony> colonies_;
+    std::map<int, double> nativeSites_; // a building going up without an economy: seconds put in
+    ColonyMap ground_;
     std::map<std::string, int> counts_;
     double clock_ = 0;
 };

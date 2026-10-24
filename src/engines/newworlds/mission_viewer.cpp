@@ -247,14 +247,23 @@ void MissionViewer::showColony() {
             buildings.push_back({c.model, c.a, c.b, 0, razed ? 0.0f : 1.0f, razed ? std::string() : bee});
         }
     // The other sides' buildings.
+    // The other sides' buildings (an AI colony's sites going up with its
+    // construction bee).
     shownBuildings_ = 0;
+    otherBuildings_.clear();
     if (world_)
         for (const Unit& u : world_->units())
             if (u.building && u.slot != playerSlot_ && !u.kind.model.empty() && visible(u)) {
+                const std::string otherBee = u.built >= 1   ? std::string()
+                                             : u.side == 'K' ? "geo/kln/conbee.geo"
+                                             : u.side == 'R' ? "geo/rom/rcb.geo"
+                                                             : "geo/fed/fconbee.geo";
                 buildings.push_back({u.kind.model, int(u.y / MapViewer::kBlockUnits * 8),
-                                     int(u.x / MapViewer::kBlockUnits * 8), 0, 1, {}});
+                                     int(u.x / MapViewer::kBlockUnits * 8), 0, u.built, otherBee});
+                otherBuildings_.push_back({u.id, u.built});
                 ++shownBuildings_;
             }
+    buildingsShown_ = buildings.size();
     map_.setBuildings(buildings);
     showProgress();
     map_.setPaved(colony_ && colonyShown_ ? colony_->pad() : std::vector<std::pair<int, int>>{});
@@ -289,7 +298,7 @@ void MissionViewer::startPlay() {
     startStock(level.shortName, side, stock); // the mission's own, when the executable gives it
     ColonyMap ground{[this](int bx, int by) { return map_.depositAt(bx, by); },
                      [this](int bx, int by) { return map_.depositAmount(bx, by); }};
-    economy_ = std::make_unique<Economy>(side, stock, 50, std::move(ground));
+    economy_ = std::make_unique<Economy>(side, stock, 50, ground);
     economy_->setOfficers(int(officers(level.shortName, side == 'K' ? 1 : side == 'R' ? 2 : 0).size()));
     structureIds_.clear();
     if (colony_)
@@ -300,6 +309,7 @@ void MissionViewer::startPlay() {
     // buildings as things they can shoot at.
     playerSlot_ = side == 'K' ? 1 : side == 'R' ? 2 : 0;
     ai_ = std::make_unique<AiSides>(level.shortName, playerSlot_, *world_);
+    ai_->setGround(ground);
     ai_->start();
     colonyObjects_.clear();
     flashes_.clear();
@@ -804,6 +814,19 @@ void MissionViewer::placeBuilding() {
 }
 
 void MissionViewer::showProgress() {
+    // The other sides' sites; one finished loses its bee.
+    const size_t own = buildingsShown_ - otherBuildings_.size();
+    bool finished = false;
+    for (size_t i = 0; world_ && i < otherBuildings_.size(); ++i)
+        if (const Unit* u = world_->unit(otherBuildings_[i].first); u && u->built != otherBuildings_[i].second) {
+            finished = finished || u->built >= 1;
+            otherBuildings_[i].second = u->built;
+            map_.setBuildingProgress(own + i, u->built);
+        }
+    if (finished) {
+        showColony();
+        return;
+    }
     if (!economy_)
         return;
     const auto& all = economy_->structures();
@@ -1213,7 +1236,8 @@ void MissionViewer::update(uint64_t nowMs) {
             economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
                                                     [&](const Unit& u) { return u.side == side; })) +
                                   housed_);
-            happened = economy_->advance(std::min(dt, 0.25));
+            auto built = economy_->advance(std::min(dt, 0.25));
+            happened.insert(happened.end(), built.begin(), built.end());
             showProgress();
         }
         // The script hears what happened, and its timers run.

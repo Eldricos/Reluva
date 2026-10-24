@@ -1102,11 +1102,64 @@ void testAiSides() {
     CHECK(std::count(after.begin(), after.end(), "initial-assault-one") == 0);
     ai.stance("taubat", "hostile");
     CHECK(w.stance(3, 0) == 3 && w.stance(0, 3) == 2);
-    // A build order: the building stands after its delay (the con yard at 60 s).
-    CHECK(ai.order("klingon", "kli-npc-build-con-yard"));
-    for (int i = 0; i < 61; ++i)
+    // The Klingons' named builds start armed: the construction yard's site
+    // goes up at 60 s (not counted until it stands), free to them.
+    const Economy* kliEco = ai.colony(1);
+    CHECK(kliEco && !ai.colony(0) && !ai.colony(3));
+    const Stock before = kliEco->stock();
+    auto yardSite = [&]() -> const Unit* {
+        for (const Unit& u : w.units())
+            if (u.slot == 1 && u.name == "construction-yard")
+                return &u;
+        return nullptr;
+    };
+    for (int i = 0; i < 57; ++i) // (2 s gone already)
         ai.advance(1.0);
-    CHECK(has(ai.observe({}), "klingon-construction-yard", 1));
+    CHECK(!yardSite());
+    ai.advance(2.0);
+    CHECK(yardSite() && yardSite()->built < 1 && !has(ai.observe({}), "klingon-construction-yard", -1));
+    CHECK(kliEco->stock() == before);
+    for (int i = 0; i < 200 && yardSite()->built < 1; ++i)
+        ai.advance(1.0);
+    CHECK(yardSite()->built >= 1 && has(ai.observe({}), "klingon-construction-yard", 1));
+    // Destroyed, it's built again (a named build keeps its building).
+    const int firstYard = yardSite()->id;
+    Unit gone = *yardSite();
+    w.remove(firstYard);
+    WorldEvent killed;
+    killed.kind = WorldEvent::Destroyed;
+    killed.what = gone;
+    ai.observe({killed});
+    ai.advance(2.0);
+    CHECK(yardSite() && yardSite()->id != firstYard && yardSite()->built < 1);
+    // A group the side has no idle units for waits for its vehicle yard
+    // (built at 180 s) to make them, then sets off.
+    std::vector<int> tanks;
+    for (const Unit& u : w.units())
+        if (u.slot == 1 && u.type == 10)
+            tanks.push_back(u.id);
+    for (int id : tanks)
+        w.remove(id);
+    CHECK(ai.order("klingon", "assault-random1"));
+    ai.advance(1.0);
+    auto kliTanks = [&] {
+        int n = 0;
+        for (const Unit& u : w.units())
+            n += u.slot == 1 && u.type == 10;
+        return n;
+    };
+    const int tanksBefore = kliTanks();
+    bool made = false;
+    for (int i = 0; i < 1500 && !made; ++i) {
+        ai.advance(1.0);
+        made = kliTanks() > tanksBefore;
+    }
+    CHECK(made && kliEco->stock() == before);
+    ai.advance(2.0);
+    bool off = false;
+    for (const Unit& u : w.units())
+        off = off || (u.slot == 1 && u.type == 10 && u.moving());
+    CHECK(off);
 
     // The first assault reaches the Federation colony and fights it: shots
     // both ways, the losses reported as the scripts name them.

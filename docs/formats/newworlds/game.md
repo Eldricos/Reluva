@@ -153,13 +153,22 @@ placed); the game's playbook and officer cards are keys here.
   (orange phasers, green disruptors) or a flying shell; damaged or
   selected units show a hit point bar.
 - **The AI** carries out the scripts' `ai` actions with the mission's own
-  orders: an assault takes its count of the type from the side's idle
-  units (or beams them in where the game's attack group does) and drives
-  along its waypoints, fighting what it meets, then goes for the nearest
-  enemy; a guard holds its spot and goes for enemies near it; a patrol
-  goes round; a build puts the building up after its delay; `abort` stops
-  an order. The orders the game runs from the start (the natives'
-  patrols) start with play. A colony's AI (slots 0-2) goes only for other
+  orders ([exe.md](exe.md#ai-colonies)), each once its mission time has
+  come: an assault takes its count of the type from the side's idle units
+  (or beams them in where the game's attack group does), asks the side's
+  vehicle yards for any it lacks, and once it has them all drives along
+  its waypoints, fighting what it meets, then goes for the nearest enemy;
+  a guard holds its spot and goes for enemies near it; a patrol goes
+  round; `abort` stops an order. The orders the game runs from the start
+  (the natives' patrols, the named builds) start with play, and those it
+  runs for a human side too move the player's units (R8's
+  prepositioners).
+- **AI colonies** run an economy each, as the player's colony does
+  (power, crew, officers, the yards' efficiency), but build and make
+  units for nothing. A build order puts a site up on its spot once it's
+  clear, drawn rising with the side's construction bee; a named build
+  puts its building back whenever it's destroyed. Sites don't fight and
+  aren't counted until they stand. A colony's AI (slots 0-2) goes only for other
   colonies, and fights natives only when they fire on it: F1's Klingons,
   hostile to every slot, pass the Taubat by as the recordings show. A
   script's stance action turns the side named towards the player.
@@ -250,7 +259,9 @@ placed); the game's playbook and officer cards are keys here.
 | A burst's shots | 3 ticks apart | Reluva's |
 | Reach on a building | 6000 units past its middle | Reluva's |
 | Target finding | the nearest enemy in range, every tick; AI colonies go only for colonies | Reluva's (F1's recordings for the last) |
-| An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
+| An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
+| A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
+| Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |

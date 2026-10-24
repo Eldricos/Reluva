@@ -139,6 +139,10 @@ public:
     // Raw ore waiting at the processor, in tonnes, by ore kind - 1.
     std::array<float, kOres> oreStock() const;
 
+    // An AI side's colony (exe.md#ai-colonies): what it builds and the
+    // vehicles its yards make cost it nothing, and its build orders don't
+    // wait for what a building needs or for room in the colony.
+    void setFree(bool free) { free_ = free; }
     // A building already standing (the starting colony).
     int addBuilt(const std::string& type, float x, float y);
     // Whether the menu offers a type now (what it needs stands; an upgrade
@@ -235,6 +239,7 @@ private:
     float lifeDraw_ = 0; // power the hub put into life support last tick
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
+    bool free_ = false;
 };
 
 } // namespace reluva::newworlds

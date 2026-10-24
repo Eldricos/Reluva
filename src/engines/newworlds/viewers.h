@@ -666,6 +666,8 @@ private:
     int playerSlot_ = 0;
     std::vector<int> colonyObjects_; // -1 once destroyed, 0 if not a target
     size_t shownBuildings_ = 0;
+    size_t buildingsShown_ = 0; // all the map's, the colony's first
+    std::vector<std::pair<int, float>> otherBuildings_; // the other sides' shown: unit id, progress shown
     std::array<int, 4> tricorder_{}; // the TRICORDER panel's map, as last drawn (x, y, w, h)      // the other sides' buildings last shown
     struct Flash {
         float x0, y0, x1, y1;

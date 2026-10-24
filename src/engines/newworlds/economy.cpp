@@ -410,9 +410,9 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
 
 int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     const BuildingType* t = buildingType(type);
-    if (!t || !available(*t))
+    if (!t || (free_ ? !t->upgradeOf.empty() || !t->sides[size_t(sideIndex())] : !available(*t)))
         return 0;
-    if (!affordable(*t)) {
+    if (!free_ && !affordable(*t)) {
         pendingShort_.push_back({"short-resources", {}});
         return 0;
     }
@@ -427,7 +427,7 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
             return 0;
     }
     const Stock& c = t->costFor(side_);
-    for (int m = 0; m < kMaterials; ++m)
+    for (int m = 0; m < kMaterials && !free_; ++m)
         units_[size_t(m)] -= int64_t(c[size_t(m)]) * unitsPerMaterial(m);
     structures_.push_back(s);
     return s.id;
@@ -446,12 +446,12 @@ bool Economy::vehicleAvailable(const VehicleType& v) const {
 }
 
 bool Economy::orderVehicle(const VehicleType& v) {
-    if (!vehicleAvailable(v))
+    if (free_ ? v.side != side_ : !vehicleAvailable(v))
         return false;
     // The yard's button is off while the colony is at its size limit.
-    if (colonySize() + int(jobs_.size()) >= capacity_)
+    if (!free_ && colonySize() + int(jobs_.size()) >= capacity_)
         return false;
-    for (int m = 0; m < kMaterials; ++m)
+    for (int m = 0; m < kMaterials && !free_; ++m)
         if (units_[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
             pendingShort_.push_back({"short-resources", {}});
             return false;
@@ -470,7 +470,7 @@ bool Economy::orderVehicle(const VehicleType& v) {
         }
     if (!yard)
         return false;
-    for (int m = 0; m < kMaterials; ++m)
+    for (int m = 0; m < kMaterials && !free_; ++m)
         units_[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
     for (const ColonyStructure& s : structures_)
         if (s.id == yard && s.crew < 1)

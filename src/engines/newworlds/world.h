@@ -61,6 +61,7 @@ struct Unit {
     std::string name;  // as the scripts name it ("taubat-hangar")
     std::string label; // the mission's name for it ("taubat-colony"), if any
     bool building = false;
+    float built = 1;   // a building's share put up: below 1 a site, which doesn't fight
     float x = 0, y = 0;
     float heading = 0; // radians anticlockwise from east
     std::vector<std::pair<float, float>> path; // waypoints still to reach

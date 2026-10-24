@@ -3,6 +3,8 @@
 
 #include "engines/newworlds/ai_sides.h"
 
+#include "engines/newworlds/start_data.h"
+
 #include <algorithm>
 #include <cmath>
 #include <set>
@@ -20,6 +22,11 @@ constexpr float kArrived = 0.6f * kBlock;
 // building there.
 constexpr float kSpacing = 2500;
 constexpr float kHubClear = 12000;
+// Placeholders: how far from another building a build order's spot must
+// be, centre to centre (the game uses its placement test), and how long
+// a building the economy doesn't know (defences, shield generators) takes to go up.
+constexpr float kBuildClear = 0.3f * kBlock;
+constexpr double kOtherBuildSeconds = 40;
 
 std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, float(a) / 8 * kBlock}; }
 
@@ -94,6 +101,17 @@ void AiSides::start() {
     for (const SideInfo* s : slotsOf(mission_))
         for (int to = 0; to < 7; ++to)
             world_.setStance(s->slot, to, s->posture[size_t(to)]);
+    // The other colonies' economies, with the mission's stock (else the
+    // game's default) and their officers.
+    for (const auto& [slot, race] : races_)
+        if (slot != player_ && slot <= 2 && (race == 'F' || race == 'K' || race == 'R')) {
+            Stock stock{200, 1000, 1000, 1000, 5000, 5000};
+            startStock(mission_, race, stock);
+            Colony& c = colonies_[slot];
+            c.economy = std::make_unique<Economy>(race, stock, 50, ground_);
+            c.economy->setFree(true);
+            c.economy->setOfficers(int(officers(mission_, slot).size()));
+        }
     for (const auto& [slot, race] : races_) {
         if (slot == player_)
             continue;
@@ -102,6 +120,7 @@ void AiSides::start() {
         for (const SidePlacement* p : sidePlacements(mission_, slot))
             if (const CombatType* t = combatType(p->type); t && t->building)
                 built.insert({p->a, p->b});
+        auto colony = colonies_.find(slot);
         for (const SidePlacement* p : sidePlacements(mission_, slot)) {
             const CombatType* t = combatType(p->type);
             // Without a model only what the scripts name is placed (unseen).
@@ -121,21 +140,33 @@ void AiSides::start() {
                 }
                 std::tie(x, y) = openSpot(x, y);
             }
-            spawnObject(world_, slot, race, *t, x, y, p->label, p->model);
+            const int id = spawnObject(world_, slot, race, *t, x, y, p->label, p->model);
+            if (colony != colonies_.end() && t->building && buildingType(t->name))
+                colony->second.structureOf[id] = colony->second.economy->addBuilt(t->name, x, y);
+        }
+        // Each building's best officer at its speciality.
+        if (colony != colonies_.end()) {
+            std::map<int, float> best;
+            for (const Officer* o : officers(mission_, slot))
+                for (const auto& [id, structure] : colony->second.structureOf) {
+                    const Unit* u = world_.unit(id);
+                    const BuildingType* b = u ? buildingType(u->name) : nullptr;
+                    if (u && b && u->type == o->building && b->speciality == o->speciality)
+                        best[structure] = std::max(best[structure], o->skill);
+                }
+            for (const auto& [structure, skill] : best)
+                colony->second.economy->setOfficer(structure, skill);
         }
     }
+    // Unnamed orders, and named builds (which start armed).
     for (const NpcOrder* o : npcOrders(mission_))
-        if (!*o->name && o->slot != player_)
-            begin(*o);
+        if ((!*o->name || o->task == 9) && (o->slot != player_ || o->human))
+            queue(*o);
 }
 
-bool AiSides::home(int slot, float& x, float& y) const {
-    for (const Unit& u : world_.units())
-        if (u.slot == slot && u.building) {
-            x = u.x, y = u.y;
-            return true;
-        }
-    return false;
+const Economy* AiSides::colony(int slot) const {
+    auto it = colonies_.find(slot);
+    return it == colonies_.end() ? nullptr : it->second.economy.get();
 }
 
 std::pair<float, float> AiSides::wayPoint(const NpcOrder& o, int leg) const {
@@ -145,48 +176,143 @@ std::pair<float, float> AiSides::wayPoint(const NpcOrder& o, int leg) const {
     return worldAt(o.way[i][0], o.way[i][1]);
 }
 
-void AiSides::begin(const NpcOrder& o) {
-    Running r{&o, {}};
-    const char race = raceOf(o.slot);
-    const CombatType* t = combatType(o.type);
-    if (o.task == 9 || o.task == 3) {
-        running_.push_back(std::move(r)); // built after its delay
+void AiSides::queue(const NpcOrder& o) {
+    running_.push_back(Running{&o, {}});
+    if (clock_ >= o.delay)
+        fire(running_.back());
+}
+
+// An order's time has come: a build tries its spot; a group gathers its
+// units (beamed in, the side's own, or asked of its yards).
+void AiSides::fire(Running& r) {
+    r.started = true;
+    if (r.order->task == 9 || r.order->task == 3) {
+        build(r);
         return;
     }
-    if (!t || t->building)
+    const NpcOrder& o = *r.order;
+    const CombatType* t = combatType(o.type);
+    if (!t || t->building) {
+        r.done = true;
+        return;
+    }
+    if (o.spawn[0] >= 0) {
+        const auto [x, y] = worldAt(o.spawn[0], o.spawn[1]);
+        const char race = raceOf(o.slot);
+        for (int n = 0; n < o.count; ++n) {
+            const float angle = float(n) * 1.1f;
+            const auto [sx, sy] = openSpot(x + std::cos(angle) * kSpacing, y + std::sin(angle) * kSpacing);
+            r.units.push_back(spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, sx, sy, {}));
+        }
+    }
+    gather(r);
+}
+
+// A group short of units: the side's idle ones of the type, nearest its
+// first waypoint first; the rest asked of its vehicle yards (an AI
+// colony's, free; never the player's). Once it has them all it sets off.
+void AiSides::gather(Running& r) {
+    const NpcOrder& o = *r.order;
+    r.units.erase(std::remove_if(r.units.begin(), r.units.end(), [&](int id) { return !world_.unit(id); }),
+                  r.units.end());
+    if (r.gathered)
         return;
     std::set<int> busy;
     for (const Running& other : running_)
         if (!other.done)
             busy.insert(other.units.begin(), other.units.end());
     const auto [wx, wy] = wayPoint(o, 0);
-    if (o.spawn[0] < 0) {
-        // The side's own, nearest the first waypoint first.
-        std::vector<std::pair<float, int>> idle;
-        for (const Unit& u : world_.units())
-            if (u.slot == o.slot && u.type == o.type && !busy.count(u.id))
-                idle.push_back({wx < 0 ? 0 : std::hypot(u.x - wx, u.y - wy), u.id});
-        std::sort(idle.begin(), idle.end());
-        for (size_t i = 0; i < idle.size() && int(r.units.size()) < o.count; ++i)
-            r.units.push_back(idle[i].second);
+    std::vector<std::pair<float, int>> idle;
+    for (const Unit& u : world_.units())
+        if (u.slot == o.slot && u.type == o.type && !u.building && !busy.count(u.id))
+            idle.push_back({wx < 0 ? 0 : std::hypot(u.x - wx, u.y - wy), u.id});
+    std::sort(idle.begin(), idle.end());
+    for (size_t i = 0; i < idle.size() && int(r.units.size()) + r.awaited < o.count; ++i)
+        r.units.push_back(idle[i].second);
+    auto colony = colonies_.find(o.slot);
+    const VehicleType* v = vehicleType(o.type);
+    while (colony != colonies_.end() && v && int(r.units.size()) + r.awaited < o.count &&
+           colony->second.economy->orderVehicle(*v))
+        ++r.awaited;
+    if (int(r.units.size()) >= o.count) {
+        r.gathered = true;
+        steer(r);
     }
-    if (int(r.units.size()) < o.count && (*t->model)) {
-        // The rest beamed in, or out of the side's first building.
-        float x = wx, y = wy;
-        if (o.spawn[0] >= 0)
-            std::tie(x, y) = worldAt(o.spawn[0], o.spawn[1]);
-        else
-            home(o.slot, x, y);
-        if (x < 0)
+}
+
+// A build order on its turn: once its spot is clear, the building goes up
+// there as a site (an AI colony's in its economy). A named one keeps
+// building it again whenever it's gone; the other builds once.
+void AiSides::build(Running& r) {
+    const NpcOrder& o = *r.order;
+    const CombatType* t = combatType(o.type);
+    if (!t || !t->building || o.ways == 0) {
+        r.done = true;
+        return;
+    }
+    if (r.site && world_.unit(r.site))
+        return;
+    const auto [x, y] = wayPoint(o, 0);
+    for (const Unit& u : world_.units())
+        if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear)
             return;
-        for (int n = int(r.units.size()); n < o.count; ++n) {
-            const float angle = float(n) * 1.1f;
-            const auto [sx, sy] = openSpot(x + std::cos(angle) * kSpacing, y + std::sin(angle) * kSpacing);
-            r.units.push_back(spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, sx, sy, {}));
+    int structure = 0;
+    auto colony = colonies_.find(o.slot);
+    const BuildingType* b = buildingType(t->name);
+    if (colony != colonies_.end() && b) {
+        structure = colony->second.economy->order(t->name, x, y, int(x / kTile), int(y / kTile));
+        if (!structure)
+            return; // (a mining station off its deposit) tried again on its next turn
+    }
+    const char race = raceOf(o.slot);
+    r.site = spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, x, y, {});
+    world_.unit(r.site)->built = 0;
+    if (structure)
+        colony->second.structureOf[r.site] = structure;
+    else
+        nativeSites_[r.site] = 0;
+    if (o.task == 3)
+        r.done = true;
+}
+
+// The AI colonies' economies moved on: sites going up, their buildings'
+// health, the vehicles their yards finish (each to the order that asked
+// for one of its type, oldest first).
+void AiSides::colonies(double seconds) {
+    for (auto& [id, put] : nativeSites_) {
+        put += seconds;
+        if (Unit* u = world_.unit(id))
+            u->built = float(std::min(1.0, put / kOtherBuildSeconds));
+    }
+    for (auto& [slot, c] : colonies_) {
+        for (const auto& [id, structure] : c.structureOf)
+            if (const Unit* u = world_.unit(id))
+                c.economy->setHealth(structure, u->hp / u->maxHp);
+        for (double left = seconds; left > 1e-9; left -= 0.25)
+            c.economy->advance(std::min(left, 0.25));
+        for (const ColonyStructure& s : c.economy->structures())
+            for (const auto& [id, structure] : c.structureOf)
+                if (structure == s.id)
+                    if (Unit* u = world_.unit(id))
+                        u->built = s.progress;
+        for (const auto& [type, yard] : c.economy->takeVehicles()) {
+            const CombatType* t = combatType(type);
+            if (!t)
+                continue;
+            float x = 0, y = 0;
+            for (const ColonyStructure& s : c.economy->structures())
+                if (s.id == yard)
+                    x = s.x, y = s.y - 1.2f * kTile;
+            const auto [px, py] = openSpot(x, y);
+            const int id = spawnObject(world_, slot, raceOf(slot), *t, px, py, {});
+            for (Running& r : running_)
+                if (!r.done && r.awaited > 0 && r.order->slot == slot && r.order->type == type) {
+                    --r.awaited;
+                    r.units.push_back(id);
+                    break;
+                }
         }
     }
-    running_.push_back(std::move(r));
-    steer(running_.back());
 }
 
 bool AiSides::order(const std::string& side, const std::string& text) {
@@ -207,7 +333,11 @@ bool AiSides::order(const std::string& side, const std::string& text) {
                 r.done = true;
         return true;
     }
-    begin(*found);
+    // A named build already armed stays as it is.
+    if (found->task == 9 && std::any_of(running_.begin(), running_.end(),
+                                        [&](const Running& r) { return r.order == found && !r.done; }))
+        return true;
+    queue(*found);
     return true;
 }
 
@@ -225,6 +355,9 @@ void AiSides::steer(Running& r) {
     const NpcOrder& o = *r.order;
     r.units.erase(std::remove_if(r.units.begin(), r.units.end(), [&](int id) { return !world_.unit(id); }),
                   r.units.end());
+    // A group wiped out is over.
+    if (r.units.empty())
+        r.done = true;
     if (r.units.empty() || o.ways == 0)
         return;
     const bool guard = o.task == 4, patrol = o.task == 1 || o.task == 2;
@@ -242,9 +375,12 @@ void AiSides::steer(Running& r) {
     // (A leg's first seconds don't count: its units are only setting off.)
     if (!guard && allThere && !r.hunting && r.legClock >= 2) {
         r.legClock = 0;
-        if (r.leg + 1 < o.ways)
+        if (r.leg + 1 < o.ways) {
             ++r.leg;
-        else if (patrol)
+        } else if (o.slot == player_) {
+            r.done = true; // the player's units, placed, are theirs again
+            return;
+        } else if (patrol)
             r.leg = 0;
         else
             r.hunting = true;
@@ -288,30 +424,29 @@ void AiSides::steer(Running& r) {
 
 void AiSides::advance(double seconds) {
     clock_ += seconds;
-    for (Running& r : running_) {
-        if (r.done)
-            continue;
-        r.clock += seconds;
-        r.legClock += seconds;
-        if (r.order->task == 9 || r.order->task == 3) {
-            // A build order: the building stands once its delay is up (how
-            // the AI's bees put it up isn't modelled).
-            if (r.clock >= r.order->delay && r.order->ways > 0) {
-                if (const CombatType* t = combatType(r.order->type); t && *t->model) {
-                    const auto [x, y] = wayPoint(*r.order, 0);
-                    spawnObject(world_, r.order->slot, raceOf(r.order->slot), *t, x, y, {});
-                }
-                r.done = true;
-            }
-            continue;
-        }
-    }
+    colonies(seconds);
+    for (Running& r : running_)
+        if (r.started && !r.done)
+            r.clock += seconds, r.legClock += seconds;
+    // Each second: orders whose time has come fire; builds try their spot
+    // again; groups still short gather; the rest are steered.
     if (std::floor(clock_) != std::floor(clock_ - seconds))
-        for (Running& r : running_)
-            if (!r.done && r.order->task != 9 && r.order->task != 3)
+        for (size_t i = 0; i < running_.size(); ++i) {
+            Running& r = running_[i];
+            if (r.done)
+                continue;
+            if (!r.started) {
+                if (clock_ >= r.order->delay)
+                    fire(r);
+            } else if (r.order->task == 9 || r.order->task == 3) {
+                build(r);
+            } else if (!r.gathered) {
+                gather(r);
+            } else {
                 steer(r);
-    running_.erase(std::remove_if(running_.begin(), running_.end(),
-                                  [](const Running& r) { return r.done && r.order->task != 9 && r.order->task != 3; }),
+            }
+        }
+    running_.erase(std::remove_if(running_.begin(), running_.end(), [](const Running& r) { return r.done; }),
                    running_.end());
 }
 
@@ -320,6 +455,12 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
     for (const WorldEvent& e : events) {
         if (e.kind != WorldEvent::Destroyed)
             continue;
+        nativeSites_.erase(e.what.id);
+        if (auto c = colonies_.find(e.what.slot); c != colonies_.end())
+            if (auto it = c->second.structureOf.find(e.what.id); it != c->second.structureOf.end()) {
+                c->second.economy->remove(it->second);
+                c->second.structureOf.erase(it);
+            }
         const int a = int(e.what.y / kBlock * 8), b = int(e.what.x / kBlock * 8);
         for (const std::string& n : scriptNames(e.what, player_))
             out.push_back({"destroyed", {n}, a, b});
@@ -328,7 +469,7 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
     }
     std::map<std::string, int> counts;
     for (const Unit& u : world_.units())
-        if (!(u.slot == player_ && u.building))
+        if (!(u.slot == player_ && u.building) && u.built >= 1) // (sites aren't counted)
             for (const std::string& n : scriptNames(u, player_))
                 ++counts[n];
     for (const auto& [n, c] : counts)

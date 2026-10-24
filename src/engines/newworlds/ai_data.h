@@ -71,11 +71,12 @@ struct SidePlacement {
 };
 std::vector<const SidePlacement*> sidePlacements(std::string_view mission, int slot);
 
-// An order a side's AI carries out. Task: 1 patrol (round the waypoints),
-// 4 guard (the first waypoint), 5-8 assault (along the waypoints, fighting
-// what it meets), 9 or 3 build (a building of the type after the delay).
-// Named orders wait for the script (ai <side> <name>); unnamed ones run
-// from the start.
+// An order a side's AI carries out (exe.md#ai-colonies). Task: 1, 2 patrol
+// (round the waypoints), 4 guard (the first waypoint), 5-8 assault (along
+// the waypoints, fighting what it meets), 3 build (a building of the type
+// at the first waypoint, once), 9 build and keep built. Named orders wait
+// for the script (ai <side> <name>), but named builds start armed; unnamed
+// ones run from the start. None runs before its mission time.
 struct NpcOrder {
     const char* mission;
     int slot;
@@ -83,7 +84,9 @@ struct NpcOrder {
     int task;
     int type;          // the units' type, or the building's
     int count;
-    int delay;         // seconds, for a build
+    int delay;         // mission seconds before it may run (from the start, not its message)
+    bool human;        // also run when the side is the player's
+    int mode;          // how a named group order starts (exe.md#ai-colonies)
     int ways;
     int way[4][2];     // map positions (eighths of a block, row first)
     // Where the game beams its units in (an attack group spawner); -1 if
