@@ -228,7 +228,14 @@ std::vector<std::string> FieldWork::namesOf(const Unit& u) const {
     std::vector<std::string> out = scriptNames(u, player_);
     for (const auto& [site, at] : sites_) {
         const float sx = float(at.second) / 8 * kBlock, sy = float(at.first) / 8 * kBlock;
-        if (std::hypot(u.x - sx, u.y - sy) <= kSiteNear && std::find(out.begin(), out.end(), site) == out.end())
+        const float d = std::hypot(u.x - sx, u.y - sy);
+        if (d > kSiteNear || std::find(out.begin(), out.end(), site) != out.end())
+            continue;
+        // Only the object nearest the site goes by its name (J3's workshops
+        // stand round its core building's site).
+        if (std::none_of(world_.units().begin(), world_.units().end(), [&](const Unit& v) {
+                return v.id != u.id && v.building == u.building && std::hypot(v.x - sx, v.y - sy) < d;
+            }))
             out.push_back(site);
     }
     return out;
@@ -277,9 +284,8 @@ void FieldWork::succeeded(const Watch& done, std::vector<ScriptEvent>& out) {
     }
 }
 
-// The share of each side's colony the player's teams hold, by the labels
-// of the buildings held: small buildings count 1, large 3, out of the
-// colony's size at the start.
+// The share of each side's colony the player's teams hold: small
+// buildings count 1, large 3, out of the colony's size at the start.
 void FieldWork::shares(std::vector<ScriptEvent>& out) {
     auto weight = [](const Unit& u) {
         const CombatType* t = combatType(u.type);
@@ -289,14 +295,16 @@ void FieldWork::shares(std::vector<ScriptEvent>& out) {
         for (const Unit& u : world_.units())
             if (u.heldBy < 0)
                 colonyBase_[u.slot] += weight(u);
+    // Told under every label the owner's buildings carry (a script names
+    // the colony by any of them: J1's "taubat-colony").
     std::map<int, int> held;            // per owner: the weight the player holds
     std::map<std::string, int> owners;  // label: its owner
     for (const auto& [id, h] : holds_)
-        if (const Unit* u = world_.unit(id); u && h.slot == player_) {
+        if (const Unit* u = world_.unit(id); u && h.slot == player_)
             held[u->slot] += weight(*u);
-            if (!u->label.empty())
-                owners[u->label] = u->slot;
-        }
+    for (const Unit& u : world_.units())
+        if (u.building && !u.label.empty() && held.count(u.slot))
+            owners[u.label] = u.slot;
     for (const auto& [label, owner] : owners) {
         const int base = colonyBase_[owner];
         const int share = base > 0 ? held[owner] * 100 / base : 0;

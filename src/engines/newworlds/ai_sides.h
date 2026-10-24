@@ -68,8 +68,8 @@ public:
     void setGround(ColonyMap ground) { ground_ = std::move(ground); }
     // An AI colony's economy; nullptr for the player's slot and natives.
     const Economy* colony(int slot) const;
-    // A script's ai action: "<order>" or "abort <order>", for the side
-    // named ("klingon", "metar"). False if the mission has no such order.
+    // A script's ai action: "<order>..." or "abort <order>...", for the
+    // side named ("klingon", "metar"). False if the mission lacks any of them.
     bool order(const std::string& side, const std::string& text);
     // A script's stance action (hostile, neutral, allied): the side named
     // takes that stance towards the player (as the game's posture switch).

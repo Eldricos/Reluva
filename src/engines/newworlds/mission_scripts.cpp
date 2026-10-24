@@ -749,15 +749,16 @@ on held temple 60
   disarm temple-unheld   # a held temple can no longer fail us by being destroyed
 
 # --- What the rivals do at the temple and the settlement -------------------
+# (The captures can't come from the computer's sides: they never capture.)
 every captured-by klingon temple
   say intelligence "The Klingons have got into the Taubat temple."
 every captured-by romulan temple
   say intelligence "The Romulans have got into the Taubat temple."
 every captured-by romulan taubat-colony 30
   say intelligence "A Romulan raid has seized part of the Taubat settlement."
-on count klingon-disruptor-tank == 14
 )",
-R"(  say intelligence "You should know, sir: the Klingons are massing a large force."
+R"(on count klingon-disruptor-tank == 14
+  say intelligence "You should know, sir: the Klingons are massing a large force."
 on destroyed temple
   say intelligence "The Taubat temple has been destroyed."
 
@@ -772,6 +773,7 @@ fail 24 colony-size taubat 50   # the settlement down to half (Klingon work, usu
 # this off.
 fail 24 destroyed temple as temple-unheld
   signal failing
+# A rival's hold on the temple (fail 26); only a human rival can capture.
 on held-by klingon temple 60
   fail 26 20
   say intelligence "The Klingons now control the Taubat power source."
@@ -797,12 +799,10 @@ on timer pass
   win
 
 # Not expressible yet:
-# - The rivals' temple captures and holds (capture monitors for the Klingons and
-#   Romulans) are written as captured-by / held-by <side> <what> [s]: Reluva has
-#   no event for another side's capture.
-# - colony-size taubat 50 (another side's colony halved, partly built buildings
-#   counted) and captured-by romulan taubat-colony 30 (30 % of the settlement
-#   held by the Romulans) are monitors on other sides.
+# - captured-by / held-by <side> temple and captured-by romulan taubat-colony
+#   30 never fire: the computer's sides never capture (kept for a human rival).
+# - colony-size taubat 50: the game's monitor still counts captured buildings
+#   in the settlement's size; Reluva's colony-size leaves them out.
 # - The temple scan is also wired to a stance switch (Tau_hostile_to_Federation)
 #   that the mission doesn't have, so nothing happens: the Taubat stay neutral.
 # - The rivals' own pass/fail lines ("the Klingons have completed their
@@ -860,8 +860,10 @@ on timer mining-advice
 # --- The other sides' attacks on the colony -------------------------------
 # Two Klingon assaults at 80 s; from 420 s a random Klingon and Romulan
 # assault every 180 s; from 420 s a Hubrin raider every 120 s until the
-# Hubrin fortress falls (each order beams its raider in near 82:325); and the Romulans turn on us once the Klingon colony
-# has been wiped out.
+# Hubrin fortress falls (each order beams its raider in near 82:325); and the
+# Romulans turn on us once the Klingon colony has been wiped out: four "none
+# left" watches, three on the Klingons' small buildings and one on their large
+# ones, all of which must report.
 on timer kli-assault-federation
   ai klingon kli-federation-assault-one
   ai klingon kli-federation-assault-two
@@ -924,7 +926,11 @@ every signal hubrin-assault-fed-random8
   ai hubrin hubrin-assault-fed-random8
 every destroyed hubrin-fortress
   stop hubrin-raids-on-fed
-every destroyed klingon-colony   # all its small, large, mine and armed buildings
+on count klingon-small-buildings <= 0
+  signal kli-colony-down
+on count klingon-large-buildings <= 0
+  signal kli-colony-down
+on signal kli-colony-down*2
   ai romulan rom-federation-assault-one
   ai romulan rom-federation-assault-two
 
@@ -944,15 +950,14 @@ on timer new-orders
 on timer pass
   win
 # A rival finishing its raid while ours is still running beats us (fail 12);
-# once a rival has finished, our own success counts for nothing.
+# once a rival has finished, our own success is futile (nothing happens).
+# (A rival's raid here is a capture, which only a human rival can make.)
 on beaten taubat-hangar
   fail 12 10
   say intelligence "A garbled message from our staff: it seems the Klingons or the Romulans have raided the building."
 every captured-by klingon taubat-hangar
-  disarm fed-raid
   timer kli-took-staff 7
 every captured-by romulan taubat-hangar
-  disarm fed-raid
   timer rom-took-staff 7
 on timer kli-took-staff
   say intelligence "The Klingons have taken the building and our staff with it."
@@ -968,11 +973,8 @@ on destroyed taubat-hangar
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
 
 # Not expressible yet:
-# - A rival's raid on the hangar succeeding while ours runs (beaten, fail 12)
-#   or before ours (ours then futile): written as beaten / captured-by <side>,
-#   events Reluva doesn't have.
-# - destroyed klingon-colony stands for four "at most 0" monitors on the
-#   Klingons' small and large building groups (group ids 2 and 4, no label).
+# - captured-by <side> taubat-hangar and beaten never fire against the
+#   computer's sides: they never capture.
 # - The objective sent at 120 s is shown only as the objective change; the
 #   game's "new primary objective" mail goes to a distributor, not the panel.
 # - The Federation's own AI orders (colony guard at 16 s, assault on the
@@ -1092,33 +1094,117 @@ every signal rom-scout-fed-random7
   ai romulan rom-scout-fed-random7
 every signal rom-scout-fed-random8
   ai romulan rom-scout-fed-random8
-every destroyed klingon-colony   # all its small, large, mine and armed buildings
+# (Four "none left" watches: three on the Klingons' small buildings, one on
+# their large ones; all four must report.)
+on count klingon-small-buildings <= 0
+  signal kli-colony-down
+on count klingon-large-buildings <= 0
+  signal kli-colony-down
+on signal kli-colony-down*2
   ai romulan rom-federation-assault-one
   ai romulan rom-federation-assault-two
 
 # --- Objective 13: scan three of the Taubat workshops ----------------------
-# Each scan must hold 5 s to start and 30 s more to count.
-every scan-started science raid-building
-  say science "Scanners running now, sir."
-every scan-lost science raid-building
-  say science "The scan has dropped out, sir. It needs another attempt."
-every scanned science raid-building
-  say science "Scan of the Taubat hangar complete, sir."
+# Each scan must hold 5 s to start and 30 s more to count. Each of the eight
+# workshops (raid-building-one .. -eight) has its own watch.
+every scan-started science raid-building-one
+  signal workshop-scan-on
+every scan-started science raid-building-two
+  signal workshop-scan-on
+every scan-started science raid-building-three
+  signal workshop-scan-on
+every scan-started science raid-building-four
+  signal workshop-scan-on
+every scan-started science raid-building-five
+  signal workshop-scan-on
+every scan-started science raid-building-six
+  signal workshop-scan-on
+every scan-started science raid-building-seven
+  signal workshop-scan-on
+every scan-started science raid-building-eight
+  signal workshop-scan-on
+every scan-lost science raid-building-one
+  signal workshop-scan-off
+every scan-lost science raid-building-two
+  signal workshop-scan-off
+every scan-lost science raid-building-three
+  signal workshop-scan-off
+every scan-lost science raid-building-four
+  signal workshop-scan-off
+every scan-lost science raid-building-five
+  signal workshop-scan-off
+every scan-lost science raid-building-six
+  signal workshop-scan-off
+every scan-lost science raid-building-seven
+  signal workshop-scan-off
+every scan-lost science raid-building-eight
+  signal workshop-scan-off
+every scanned science raid-building-one
   signal workshop-scanned
-on scanned science raid-building one     # any three of the eight
-on scanned science raid-building two
-on scanned science raid-building three
+every scanned science raid-building-two
+  signal workshop-scanned
+every scanned science raid-building-three
+  signal workshop-scanned
+every scanned science raid-building-four
+  signal workshop-scanned
+every scanned science raid-building-five
+  signal workshop-scanned
+every scanned science raid-building-six
+  signal workshop-scanned
+every scanned science raid-building-seven
+  signal workshop-scanned
+every scanned science raid-building-eight
+  signal workshop-scanned
+every signal workshop-scan-on
+  say science "Scanners running now, sir."
+every signal workshop-scan-off
+  say science "The scan has dropped out, sir. It needs another attempt."
+every signal workshop-scanned
+  say science "Scan of the Taubat hangar complete, sir."
+on scanned science raid-building-one     # any three of the eight
+on scanned science raid-building-two
+on scanned science raid-building-three
 on signal workshop-scanned*3
   say science "The Taubat hangar scans are complete."
   complete 13
   reveal 14
   signal survive-step
   signal pass-step
-# A workshop a rival got first (destroyed, captured or scanned before ours,
-# or during our scan) is lost to us; six of them is fail 18.
-every beaten raid-building
+# A workshop a rival got first is lost to us: beaten (a rival finished during
+# our scan) or futile (our scan finished after a rival's); six is fail 18.
+# The Klingons' destroy watch succeeds whenever a workshop falls, whoever
+# destroys it; the Romulans' capture watch only for a human player.
+every beaten raid-building-one
   signal workshop-lost
-every futile raid-building
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
   signal workshop-lost
 on signal workshop-lost*6
   fail 18 10
@@ -1139,11 +1225,11 @@ on scanned science metar-scan-building as fed-core-scan
   disarm core-watch   # once scanned, its destruction no longer fails us
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
 every scanned-by klingon metar-scan-building
-  disarm fed-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by romulan metar-scan-building
-  disarm fed-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -1231,15 +1317,8 @@ on destroyed metar-scan-building as core-watch
   say operations "The ruined city's main building is gone. Our mission can't succeed now."
 
 # Not expressible yet:
-# - The workshop and core scans are group conditions: scan-started (the scan
-#   flag held 5 s / 10 s), scanned (30 s / 60 s more), scan-lost, and the
-#   rivals' claims as beaten (during our scan) and futile (before it: our
-#   later scan then counts for nothing; for the core that is written as the
-#   rival's scan switching ours off). Reluva has no beaten, futile or
-#   scanned-by events, and events name a group and a member
-#   ("raid-building one").
-# - destroyed klingon-colony stands for four "at most 0" monitors on the
-#   Klingons' small and large building groups (group ids 2 and 4, no label).
+# - scanned-by <side> metar-scan-building never fires: the computer's sides
+#   never scan (and the Romulans never capture a workshop).
 # - The jnt03fed table's string 15 (scan the structures around the city) is
 #   not an objective in the game's graph, so it's left out.
 # - The Federation's own AI orders (colony guard, assault on the Romulans at
@@ -1368,7 +1447,8 @@ on captured science-block
 on timer objective-2-notice
   say command "Primary objective 2 achieved."
 # (Fail 16: likewise never sent in the game.)
-fail 16 beaten science-block
+)",
+R"(fail 16 beaten science-block
   say intelligence "The computer core is lost. The mission has failed."
   signal failing
 
@@ -1392,8 +1472,9 @@ on timer fail-notice
 
 # Not expressible yet:
 # - Both rescues' "beaten" outcomes carry fails 15 and 16, but no object sends
-#   the rivals' claim, so the game never fails them; written as beaten, an
-#   event Reluva doesn't have.
+#   the rivals' claim (the J4 raids don't hand off), so the game never fails
+#   them; written on the buildings' names, not the raid labels (kli-sci-blk,
+#   fed-sci-blk), so Reluva's hand-off can't fire them either.
 # - The Federation's own AI orders (colony guard, refugee APC, random raids on
 #   the Romulans from 360 s) only run when the side isn't played.
 
@@ -1433,8 +1514,7 @@ every signal hbr-raid-5
   ai hubrin hubrin-assault-fed-random5
 every signal hbr-raid-6
   ai hubrin hubrin-assault-fed-random6
-)",
-R"(every signal hbr-raid-7
+every signal hbr-raid-7
   ai hubrin hubrin-assault-fed-random7
 every signal hbr-raid-8
   ai hubrin hubrin-assault-fed-random8
@@ -1745,7 +1825,8 @@ every signal rom-raid-fed-8
 # Romulan raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
 every timer rom-raid-kli
   timer rom-raid-kli 60
-  random rom-raid-kli-1 rom-raid-kli-2 rom-raid-kli-3 rom-raid-kli-4 rom-raid-kli-5 rom-raid-kli-6 rom-raid-kli-7 rom-raid-kli-8
+)",
+R"(  random rom-raid-kli-1 rom-raid-kli-2 rom-raid-kli-3 rom-raid-kli-4 rom-raid-kli-5 rom-raid-kli-6 rom-raid-kli-7 rom-raid-kli-8
 every signal rom-raid-kli-1
   ai romulan rom-assault-kli-random1
 every signal rom-raid-kli-2
@@ -1808,8 +1889,7 @@ every signal met-raid-kli-8
 # Metar raids on the Romulans: one of eight attacks every 120 s, the first at 480 s
 every timer met-raid-rom
   timer met-raid-rom 120
-)",
-R"(  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
+  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
 every signal met-raid-rom-1
   ai metar metar-assault-rom-random1
 every signal met-raid-rom-2
@@ -1854,7 +1934,8 @@ on timer klingon-hub-falls
 # - Messages caused by the other sides: their mission passed/failed
 #   announcements (sent to every side), and the Klingon science officer's
 #   "scanning now" for an ordinary Metar scan, which the game misroutes to the
-#   Federation's mail. There's no event for a rival's scan or pass.
+#   Federation's mail. There's no event for a rival's pass; a rival's scan
+#   (scanned-by) can't happen: the computer's sides never scan.
 # - Whether the biodata research needs both the scan and the ward, or either:
 #   the game sends the topic from both; here either opens it.
 # - The AI sides stop their build orders when their hub falls (Abort to the
@@ -1921,10 +2002,17 @@ on all-completed
 on timer pass
   win
 
-# Growing the colony to four times its starting size draws two Metar attacks
+# A colony grown to four times its starting size draws two Metar attacks
+# on it: ours, and the other sides' too
 on colony-size 400
   ai metar met-assault-leading-player-fed-a
   ai metar met-assault-leading-player-fed-b
+on colony-size klingon 400
+  ai metar met-assault-leading-player-kli-a
+  ai metar met-assault-leading-player-kli-b
+on colony-size romulan 400
+  ai metar met-assault-leading-player-rom-a
+  ai metar met-assault-leading-player-rom-b
 
 # The other sides' AI: attacks on a clock (the Federation's own attack orders
 # are left out: the player gives those)
@@ -2141,14 +2229,13 @@ every signal met-raid-rom-8
 # Metar orders on a clock
 on timer met-assault-federation
   ai metar met-assault-federation
-on timer met-assault-klingon
+)",
+R"(on timer met-assault-klingon
   ai metar met-assault-klingon
 on timer met-assault-romulan
   ai metar met-assault-romulan
 
 # Not expressible yet:
-# - The other sides' colonies growing fourfold draw Metar attacks on them too
-#   (their own colony-size monitors); there's no event for a rival's colony.
 # - The Hubrin guides walk to each colony on their own orders (unit orders of
 #   the Hubrin side, not started by the script), and the AI sides build on
 #   their own timetable and stop when their hub falls.
@@ -2216,8 +2303,7 @@ on timer met-assault-1
 on timer met-assault-2
   ai metar met-assault-federation-2
 on timer met-assault-3
-)",
-R"(  ai metar met-assault-federation-3
+  ai metar met-assault-federation-3
 
 # --- Objective 13: the colony tripled, with power and farms ----------------------------------
 on colony-size 300
@@ -2535,7 +2621,8 @@ on timer metar-colony-protection-relay-three
 on timer metar-colony-protection-relay-four
   ai metar metar-colony-protection-thirteen
 on timer metar-federation-attack
-  ai metar metar-federation-assault-one
+)",
+R"(  ai metar metar-federation-assault-one
   ai metar metar-federation-assault-two
 on timer metar-klingon-attack
   ai metar metar-klingon-assault-one
@@ -2608,8 +2695,7 @@ every signal met-raid-7
 every signal met-raid-8
   ai metar met-assault-fed-random8
 on timer met-assault-1
-)",
-R"(  ai metar met-assault-federation-1
+  ai metar met-assault-federation-1
 on timer met-assault-2
   ai metar met-assault-federation-2
 on timer met-assault-3
@@ -2661,7 +2747,7 @@ objective 15
 # Fail criteria, the game's way: the cause at once, the end 10 s later (no
 # word to the other sides in J9). Our hub (14); all three Metar starships
 # destroyed (16; the game's message calls them colony cores). Fail 17 (a
-# rival got the technology while we were scanning) has no event: see the end.
+# rival got the technology while we were scanning) is with the scan below.
 on destroyed colony-hub
   fail 14 10
   say command "Colony hub lost. The mission has failed."
@@ -2680,14 +2766,25 @@ on start
 
 # Objective 13: scan the temple (10 s before the officer reports, then held
 # a minute); the technology is beamed home and its research opens; the
-# research done meets the objective
-every scan-started science metar-temple
+# research done meets the objective. The game's watch is "the device's block
+# scanned by us" (any of our scanning units nearby), on the group
+# Anomaly_Device: a cell scan.
+every scan-started cell anomaly-device
   say engineering "Searching the temple for the device's technology."
-every scan-lost science metar-temple
+every scan-lost cell anomaly-device
   say engineering "We lost the scan. Have another try."
-on scanned science metar-temple
+on scanned cell anomaly-device
   say engineering "The technology is beamed home to our hub for research."
   research anomaly-device
+# The race for the device: the first side to finish takes the technology. A
+# rival finishing while ours runs beats us (fail 17); once a rival has
+# finished, our later scan is futile (no technology, no research). The
+# computer's sides only win it if their own units happen to scan the block.
+on beaten anomaly-device
+  fail 17 10
+  say engineering "The technology is gone from here; the Klingons or the Romulans must have taken it."
+every futile anomaly-device
+  say engineering "That scan was useless."
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
@@ -2834,16 +2931,9 @@ every signal met-raid-rom-8
   ai metar metar-assault-rom-random8
 
 # Not expressible yet:
-# - The race for the temple: each side's scan, when it succeeds, tells the
-#   others' scans they're futile. A rival finishing while our scan is under
-#   way means fail 17 ("the technology isn't here - a rival must have taken
-#   it"); finishing earlier makes our later scan just "futile" (no
-#   technology, no research). There's no event for a rival's scan.
 # - The game's capture watch counts starships held, so one captured before
 #   the research and still held when the watch starts counts at once; here
 #   only a capture made after the research does (the event is the capture).
-# - Which scan the temple wants: the game checks "scanned by us" on the
-#   temple's cell (any kind); the objective says a science scan.
 # - The Klingons' random raids on the Romulans never happen in the game: their
 #   timer names orders (Kli_Assault_Kli_Random1-8) that don't exist. Left out.
 # - The AI sides' own research and captures (no events for rivals).
@@ -2932,7 +3022,8 @@ on timer orion-wave-9
   ai orion orion-attack1i
   ai orion orion-attack2i
 on timer orion-wave-10
-  ai orion orion-attack1j
+)",
+R"(  ai orion orion-attack1j
   ai orion orion-attack2j
 
 # --- The last wave beaten: that wakes the watch for the last Orion; when none is left,
@@ -3002,8 +3093,7 @@ on built-all colony-hub-upgrade construction-yard-upgrade arsenal disruptor-turr
   signal objective
 
 # Finding the fortress or any Taubat site; the first one found sets the Taubat on us.
-)",
-R"(on seen fortress
+on seen fortress
   say intelligence "We've found the antiproton source at 200:170: some kind of floating structure. A science scan would give us research data."
   signal taubat-alerted
 on seen temple
@@ -3060,7 +3150,7 @@ on timer hangar-gone
   arm taubat-tanks
   signal taubat-down
 # the vehicle count is only watched once the factory watch has seen it gone for 10 s
-on count taubat-vehicles <= 0 as taubat-tanks dormant
+on count taubat-fighting-units <= 0 as taubat-tanks dormant
   say intelligence "Every Taubat vehicle is destroyed."
   signal taubat-down
 on signal taubat-down*3
@@ -3137,8 +3227,6 @@ every scanned-nothing strong-engineering
   say engineering "Nothing here is worth our attention."
 
 # Not expressible yet:
-# - The Taubat vehicle watch counts their fighting-unit group (group id 256, not a
-#   label): written as taubat-vehicles, which nothing reports.
 # - "Scan again" lines for the fortress (weak: send Rok; strong: we already have the data)
 #   hang off the raids' futile output, which nothing in K1 triggers: they never play.
 # - The fail criterion goes to (the game's line), a name the game doesn't know, so
@@ -3260,7 +3348,7 @@ on timer rebel-hangar-two-gone
 # the gun-platform count is only watched once both factory watches have reported
 on signal rebel-hangars*2
   arm rebel-vehicles
-on count enemy-taubat-vehicles <= 0 as rebel-vehicles dormant
+on count enemy-taubat-fighting-units <= 0 as rebel-vehicles dormant
   say intelligence "The rebel Taubat gun platforms are destroyed."
   signal rebels-down
 on signal rebels-down*5
@@ -3289,7 +3377,7 @@ every timer ally-hangar-gone
   say "Incoming message" "They are wiping us out. We need help!"
   signal allies-hit
   arm ally-vehicles
-every count taubat-vehicles <= 1 as ally-vehicles dormant
+every count taubat-fighting-units <= 1 as ally-vehicles dormant
   disarm ally-vehicles
   say "Incoming message" "We are being overrun."
   signal allies-hit
@@ -3329,7 +3417,8 @@ every signal raid-2
 every signal raid-3
   ai taubat taubat-assault-kli-random3
 every signal raid-4
-  ai taubat taubat-assault-kli-random4
+)",
+R"(  ai taubat taubat-assault-kli-random4
 every signal raid-5
   ai taubat taubat-assault-kli-random5
 every signal raid-6
@@ -3356,9 +3445,6 @@ every scanned-nothing strong-engineering
 # Not expressible yet:
 # - The approach warnings filter by unit class (tanks; near the allies a wider mask);
 #   here any rebel unit counts.
-# - The Taubat vehicle watches (allies at most 1, rebels at most 0) are counts of each
-#   slot's fighting-unit group (group id 256, not a label): written as
-#   taubat-vehicles / enemy-taubat-vehicles, which nothing reports.
 # - Both factions' houses and hangars share Reluva's type names (taubat-house,
 #   taubat-hangar), so "count taubat-house == 0" (the allies' houses) also waits for
 #   the rebels', and a rebel hangar destroyed also reads as "destroyed taubat-hangar".
@@ -3390,8 +3476,7 @@ on start
 on timer rom-assault-klingons
   ai romulan rom-assault-klingons-1
   ai romulan rom-assault-klingons-2
-)",
-R"(every timer fed-raids-on-kli
+every timer fed-raids-on-kli
   random fed-assault-kli-random1 fed-assault-kli-random2 fed-assault-kli-random3 fed-assault-kli-random4 fed-assault-kli-random5 fed-assault-kli-random6 fed-assault-kli-random7 fed-assault-kli-random8
   timer fed-raids-on-kli 180
 every signal fed-assault-kli-random1
@@ -3486,6 +3571,7 @@ on signal temple-step*2
   complete 22
 
 # --- Rivals at the temple ---------------------------------------------------
+# (Captures can't come from the computer's sides: they never capture.)
 every captured-by federation temple
   say intelligence "The Federation has got into the Taubat temple."
 every captured-by romulan temple
@@ -3495,7 +3581,7 @@ every captured-by romulan temple
 fail 23 count colony-hub == 0
   say intelligence "The Klingon colony hub has been destroyed."
   signal failing
-# A rival's hold on the temple beats us (fail 24).
+# A rival's hold on the temple beats us (fail 24); only a human rival can capture.
 on held-by federation temple 60
   fail 24 20
   say intelligence "The Federation now controls the Taubat power source."
@@ -3525,12 +3611,11 @@ on timer pass
   win
 
 # Not expressible yet:
-# - captured-by romulan taubat-colony 30 (30 % of the settlement held by the
-#   Romulans) is a capture monitor on another side's colony; colony-size taubat
-#   50 counts partly built buildings too, which may not be how Reluva counts.
-# - The temple monitor is a capture monitor on the temple type: "captured",
-#   "vacated" (sent to every side each time it's let go) and "held <what> <s>";
-#   the rivals' versions are written as new events captured-by / held-by.
+# - captured-by / held-by <side> temple and captured-by romulan taubat-colony
+#   30 never fire: the computer's sides never capture (kept for a human rival).
+# - colony-size taubat 50: the game's monitor still counts captured buildings
+#   in the settlement's size; Reluva's colony-size leaves them out.
+# - The temple's "vacated" goes to every side each time it's let go.
 # - The rivals' own pass/fail lines and what the referee does with a rival's
 #   pass; the generic side-failed rule covers only the fail.
 # - The Klingons' own AI orders (strike on the Federation at 10 s, build
@@ -3645,7 +3730,13 @@ every destroyed hubrin-fortress
 # Any Romulan unit on the ridge sends their Bird of Prey on its flight (it lands at the end).
 on inside romulan romulan-ridge
   move rom-bop 145 246 100 299 172 299 50 222
-every destroyed romulan-colony   # all its small, large, mine and armed buildings
+# (Four "none left" watches: three on the Romulans' small buildings, one on
+# their large ones; all four must report.)
+on count romulan-small-buildings <= 0
+  signal rom-colony-down
+on count romulan-large-buildings <= 0
+  signal rom-colony-down
+on signal rom-colony-down*2
   ai federation fed-klingon-assault-one
   ai federation fed-klingon-assault-two
 
@@ -3664,16 +3755,16 @@ on timer new-orders
   say communications "New orders from command: we're being moved to a new outpost, and another team will look into the loss of our staff."
 on timer pass
   win
-# A rival finishing its raid while ours is still running beats us (fail 12);
-# once a rival has finished, our own success counts for nothing.
+)",
+R"(# A rival finishing its raid while ours is still running beats us (fail 12);
+# once a rival has finished, our own success is futile (nothing happens).
+# (A rival's raid here is a capture, which only a human rival can make.)
 on beaten taubat-hangar
   fail 12 10
   say intelligence "A garbled message from our staff: it seems the Federation or the Romulans have raided the building."
 every captured-by federation taubat-hangar
-  disarm kli-raid
   timer fed-took-staff 7
 every captured-by romulan taubat-hangar
-  disarm kli-raid
   timer rom-took-staff 7
 on timer fed-took-staff
   say intelligence "The Federation has taken the building and our staff with it."
@@ -3689,11 +3780,8 @@ on destroyed taubat-hangar
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
 
 # Not expressible yet:
-# - The hangar raid's rival outcomes: a rival's success during ours -> beaten,
-#   before ours -> ours futile (written as captured-by <side> switching ours
-#   off). Reluva has no beaten or captured-by events.
-# - destroyed romulan-colony stands for four "at most 0" monitors on the
-#   Romulans' building groups (small, large, mine, armed: group ids, not labels).
+# - captured-by <side> taubat-hangar and beaten never fire against the
+#   computer's sides: they never capture.
 # - The objective sent at 120 s is shown only as the objective change; the
 #   game's "new primary objective" mail goes to a distributor, not the panel.
 # - The Klingons' own AI orders (colony guard at 16 s, assault on the
@@ -3723,8 +3811,7 @@ on start
   timer fed-scouts 60
   timer rom-scouts 60
   timer tau-raids-on-kli 60
-)",
-R"(on timer greeting
+on timer greeting
   say operations "Contacts all over the scanners, east and south: this world is crawling with activity!"
 
 # --- The other sides' attacks on the colony -------------------------------
@@ -3824,7 +3911,13 @@ every signal klingon-assualt-one
   ai taubat klingon-assualt-one
 every signal klingon-assualt-two
   ai taubat klingon-assualt-two
-every destroyed romulan-colony   # all its small, large, mine and armed buildings
+# (Four "none left" watches: three on the Romulans' small buildings, one on
+# their large ones; all four must report.)
+on count romulan-small-buildings <= 0
+  signal rom-colony-down
+on count romulan-large-buildings <= 0
+  signal rom-colony-down
+on signal rom-colony-down*2
   ai federation fed-klingon-assault-one
   ai federation fed-klingon-assault-two
 
@@ -3862,9 +3955,41 @@ on signal workshop-destroyed*3
   signal core-go
   signal survive-step
   signal pass-step
-# A workshop a rival claims (captured or scanned) while ours is counting is
-# lost to us; six of them is fail 16.
-every beaten raid-building
+# A workshop a rival claims (captured or scanned) while ours is counting
+# (beaten), or one that falls after a rival's claim (futile), is lost to us;
+# six of them is fail 16. Only a human rival captures or scans, so against
+# the computer's sides this never happens.
+every beaten raid-building-one
+  signal workshop-lost
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
   signal workshop-lost
 on signal workshop-lost*6
   fail 16 10
@@ -3903,11 +4028,11 @@ on destroyed metar-scan-building as core-attack dormant
   signal pass-step
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
 every scanned-by federation metar-scan-building
-  disarm kli-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by romulan metar-scan-building
-  disarm kli-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -3976,17 +4101,17 @@ on destroyed metar-scan-building as core-watch
   say operations "The anti-Hubrin weapon's target has been destroyed. We can't complete the mission."
 
 # Not expressible yet:
-# - The workshop raids: a rival's claim during our 35 s count is "beaten";
-#   Reluva has no beaten or scanned-by events ("beaten raid-building" stands
-#   for the eight workshops' raids).
+# - scanned-by <side> metar-scan-building and the workshops' beaten / futile
+#   never fire: the computer's sides never capture or scan.
+# - A workshop destroyed after a rival's claim counts for the game only as
+#   lost; Reluva still reports it as destroyed (to objective 11) as well.
 # - Objective 13's core monitor wakes once 11 and 12 are both done, and a
-#   core destroyed before then counts at once; an armed handler here only
+)",
+R"(#   core destroyed before then counts at once; an armed handler here only
 #   hears events from then on.
 # - The valley detector looks for our units of certain classes (the game's
 #   mask), and polls: units already in the valley when it wakes set it off;
 #   "inside ours" only hears units coming in after it's armed.
-# - destroyed romulan-colony stands for four "at most 0" monitors on the
-#   Romulans' building groups (group ids, not labels).
 # - The jnt03klg table's string 14 (scan the small alien structures) is not an
 #   objective in the game's graph, so it's left out.
 # - A resource top-up object for the colony is active but has an empty bundle
@@ -4076,8 +4201,7 @@ on signal failing
 on timer fail-message
   say operations "We have not achieved our objectives."
 
-)",
-R"(# Raids: one of eight Taubat assaults every 60 s, one of eight Metar assaults every 120 s.
+# Raids: one of eight Taubat assaults every 60 s, one of eight Metar assaults every 120 s.
 every timer taubat-raids
   random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
   timer taubat-raids 60
@@ -4194,9 +4318,9 @@ on timer primaries-notice
   say intelligence "The primary objectives are complete."
 
 # --- Objective 19: no Metar or Taubat fighting units left -------------------
-on count metar-fighting-units == 0
+on count metar-fighting-units <= 0
   signal natives-gone
-on count taubat-fighting-units == 0
+on count taubat-fighting-units <= 0
   signal natives-gone
 on signal natives-gone*2
   timer secondary-notice 5
@@ -4239,10 +4363,8 @@ on timer fail-notice
 
 # Not expressible yet:
 # - The recaptures' fail lines hang on their "beaten" outcome, which no
-#   object sends; Reluva has no beaten event (written, never fires).
-# - count metar-fighting-units / taubat-fighting-units == 0: "at most 0"
-#   monitors on the natives' fighting-unit group (group id 256, a class of
-#   units rather than a label).
+#   object sends (the J4 raids don't hand off); written on the buildings'
+#   names, not the raid labels, so Reluva's hand-off can't fire them either.
 # - Fail 25 (all Klingon forces destroyed) and the table's string 15 (hold all
 #   four at once) have nothing in the game's graph; the pass only counts each
 #   recapture once, not simultaneous control.
@@ -4363,8 +4485,6 @@ every signal metar-raid-8
   ai metar metar-assault-kli-random8
 
 # Not expressible yet:
-# - Objective 14 counts the Metar's fighting-unit group (group id 256, not a label):
-#   written as metar-fighting-units, which nothing reports.
 # - The objectives' own lines ((the game's line), "75% of the Metar
 #   destroyed") sit behind relays that wait for a 10th message and only ever get one:
 #   the game never shows them, so they are left out here.
@@ -4386,7 +4506,8 @@ objective 17
 # Fail criteria, the game's way: the fail string at once, word to every
 # side at 10 s that the Klingons can't complete their mission, the end at
 # 20 s. Our hub (19); the Federation hub lost before our strong scan of it
-# is done (14: the scan disarms this watch, see objective 13).
+)",
+R"(# is done (14: the scan disarms this watch, see objective 13).
 on destroyed colony-hub
   fail 19 20
   say intelligence "Our colony hub has been destroyed."
@@ -4469,8 +4590,7 @@ on built sickbay-ward
 on researched metar-biodata
   say medical "The biodata analysis is finished, and it's worth a look."
 
-)",
-R"(# The Romulans' side of it: with our shields all down they beam their
+# The Romulans' side of it: with our shields all down they beam their
 # device into our hub; 15 s later it goes off and destroys it (the hub's
 # loss is fail 19)
 on count shield-generator == 0
@@ -4737,10 +4857,17 @@ on all-completed
 on timer pass
   win
 
-# Growing the colony to four times its starting size draws two Metar attacks
+# A colony grown to four times its starting size draws two Metar attacks
+# on it: ours, and the other sides' too
 on colony-size 400
   ai metar met-assault-leading-player-kli-a
   ai metar met-assault-leading-player-kli-b
+on colony-size federation 400
+  ai metar met-assault-leading-player-fed-a
+  ai metar met-assault-leading-player-fed-b
+on colony-size romulan 400
+  ai metar met-assault-leading-player-rom-a
+  ai metar met-assault-leading-player-rom-b
 
 # The other sides' AI: attacks on a clock (the Klingons' own attack orders
 # are left out: the player gives those)
@@ -4777,7 +4904,8 @@ every signal fed-raid-rom-3
   ai federation fed-assault-rom-random3
 every signal fed-raid-rom-4
   ai federation fed-assault-rom-random4
-every signal fed-raid-rom-5
+)",
+R"(every signal fed-raid-rom-5
   ai federation fed-assault-rom-random5
 every signal fed-raid-rom-6
   ai federation fed-assault-rom-random6
@@ -4873,8 +5001,7 @@ every signal tau-raid-kli-8
 # Taubat raids on the Romulans: one of eight attacks every 60 s, the first at 180 s
 every timer tau-raid-rom
   timer tau-raid-rom 60
-)",
-R"(  random tau-raid-rom-1 tau-raid-rom-2 tau-raid-rom-3 tau-raid-rom-4 tau-raid-rom-5 tau-raid-rom-6 tau-raid-rom-7 tau-raid-rom-8
+  random tau-raid-rom-1 tau-raid-rom-2 tau-raid-rom-3 tau-raid-rom-4 tau-raid-rom-5 tau-raid-rom-6 tau-raid-rom-7 tau-raid-rom-8
 every signal tau-raid-rom-1
   ai taubat taubat-assault-rom-random1
 every signal tau-raid-rom-2
@@ -4967,8 +5094,6 @@ on timer met-assault-romulan
 # - Fail 14: the Klingons' hub monitor names its fail criterion
 #   "Colony_hub_destroyed" but the table calls it "Colony_hub-destroyed", so
 #   the game ends the mission without ticking the fail string.
-# - The other sides' colonies growing fourfold draw Metar attacks on them too
-#   (their own colony-size monitors); there's no event for a rival's colony.
 # - The Hubrin guides walk to each colony on their own orders (unit orders of
 #   the Hubrin side, not started by the script), and the AI sides build on
 #   their own timetable and stop when their hub falls.
@@ -5176,7 +5301,8 @@ on start
   timer metar-klingon-attack 960
   timer metar-romulan-attack 960
 
-# Objective 13: the research done, the device built; a minute after the
+)",
+R"(# Objective 13: the research done, the device built; a minute after the
 # research our device is given its route to the site
 on researched anomaly-device
   say science "Our researchers have worked out how to build the device."
@@ -5266,8 +5392,7 @@ every signal rom-raid-fed-3
 every signal rom-raid-fed-4
   ai romulan rom-assault-fed-random4
 every signal rom-raid-fed-5
-)",
-R"(  ai romulan rom-assault-fed-random5
+  ai romulan rom-assault-fed-random5
 every signal rom-raid-fed-6
   ai romulan rom-assault-fed-random6
 every signal rom-raid-fed-7
@@ -5509,7 +5634,7 @@ objective 15
 # Fail criteria, the game's way: the cause at once, the end 10 s later (no
 # word to the other sides in J9). Our hub (14); all three Metar starships
 # destroyed (16; the game's message calls them colony cores). Fail 17 (a
-# rival got the technology while we were scanning) has no event: see the end.
+# rival got the technology while we were scanning) is with the scan below.
 on destroyed colony-hub
   fail 14 10
   say command "Colony hub lost. The mission has failed."
@@ -5529,14 +5654,25 @@ on start
 
 # Objective 13: scan the temple (10 s before the officer reports, then held
 # a minute); the technology is beamed home and its research opens; the
-# research done meets the objective
-every scan-started science metar-temple
+# research done meets the objective. The game's watch is "the device's block
+# scanned by us" (any of our scanning units nearby), on the group
+# Anomaly_Device: a cell scan.
+every scan-started cell anomaly-device
   say engineering "Searching the temple for the device's technology."
-every scan-lost science metar-temple
+every scan-lost cell anomaly-device
   say engineering "We lost the scan. Have another try."
-on scanned science metar-temple
+on scanned cell anomaly-device
   say engineering "The technology is beamed home to our hub for research."
   research anomaly-device
+# The race for the device: the first side to finish takes the technology. A
+# rival finishing while ours runs beats us (fail 17); once a rival has
+# finished, our later scan is futile (no technology, no research). The
+# computer's sides only win it if their own units happen to scan the block.
+on beaten anomaly-device
+  fail 17 10
+  say engineering "The technology is gone from here; the Federation or the Romulans must have taken it."
+every futile anomaly-device
+  say engineering "That scan was useless."
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
@@ -5563,7 +5699,8 @@ every timer fed-raid-kli
 every signal fed-raid-kli-1
   ai federation fed-assault-kli-random1
 every signal fed-raid-kli-2
-  ai federation fed-assault-kli-random2
+)",
+R"(  ai federation fed-assault-kli-random2
 every signal fed-raid-kli-3
   ai federation fed-assault-kli-random3
 every signal fed-raid-kli-4
@@ -5671,8 +5808,7 @@ every signal met-raid-kli-2
   ai metar metar-assault-kli-random2
 every signal met-raid-kli-3
   ai metar metar-assault-kli-random3
-)",
-R"(every signal met-raid-kli-4
+every signal met-raid-kli-4
   ai metar metar-assault-kli-random4
 every signal met-raid-kli-5
   ai metar metar-assault-kli-random5
@@ -5705,16 +5841,9 @@ every signal met-raid-rom-8
   ai metar metar-assault-rom-random8
 
 # Not expressible yet:
-# - The race for the temple: each side's scan, when it succeeds, tells the
-#   others' scans they're futile. A rival finishing while our scan is under
-#   way means fail 17 ("the technology isn't here - a rival must have taken
-#   it"); finishing earlier makes our later scan just "futile" (no
-#   technology, no research). There's no event for a rival's scan.
 # - The game's capture watch counts starships held, so one captured before
 #   the research and still held when the watch starts counts at once; here
 #   only a capture made after the research does (the event is the capture).
-# - Which scan the temple wants: the game checks "scanned by us" on the
-#   temple's cell (any kind); the objective says a science scan.
 # - The AI sides' own research and captures (no events for rivals).
 
 # --- C10 as K ----------------------------------------
@@ -5856,7 +5985,7 @@ on built-all vehicle-yard construction-yard power-generator resource-processor t
   complete 13
 
 # Objective 16: the rivals' fighting units down from twelve to nine.
-on count rival-tank <= 9
+on count rival-fighting-units <= 9
   say intelligence "Three of the rival Romulans' cloaked tanks are destroyed, sir."
   complete 16
 
@@ -5907,9 +6036,9 @@ on signal rival-base-step*2
 on researched rival-base
   say science "This site has all the marks of one of Admiral Narok's operations."
   complete 20
-on count rival-tank <= 3
+on count rival-fighting-units <= 3
   stop rival-raid
-on count rival-tank <= 0
+on count rival-fighting-units <= 0
   say intelligence "Every one of the rival Romulans' tanks is destroyed."
 
 # Scans that find nothing.
@@ -5969,7 +6098,8 @@ every signal rival-raid-6
 every signal rival-raid-7
   ai rival riv-rom-assault-rom-random7
 every signal rival-raid-8
-  ai rival riv-rom-assault-rom-random8
+)",
+R"(  ai rival riv-rom-assault-rom-random8
 
 # Mission fail: the colony hub. The cause now, "failed" at 10 s, the end at 20 s.
 on destroyed colony-hub
@@ -6062,8 +6192,7 @@ on captured taubat-temple
 # Optional objective 17: hold the first vehicle factory 10 s (a loss
 # before then reported each time).
 on entered taubat-hangar-one
-)",
-R"(  say security "The vehicle factory is ours. Looking for the Taubat prisoners."
+  say security "The vehicle factory is ours. Looking for the Taubat prisoners."
 every capture-lost taubat-hangar-one
   say security "The Taubat vehicle factory is lost to us. We should go back in with more troops."
 on captured taubat-hangar-one
@@ -6090,16 +6219,10 @@ on timer hangar-two-gone
   say communications "That was the Orions. An idle threat, I expect."
   signal orion-step
   arm orion-units
-on count taubat-house <= 0
+on count taubat-small-buildings <= 0   # the houses
   say intelligence "The houses the Orions hold are destroyed."
   signal orion-step
-on count taubat-tank <= 0 as orion-units dormant
-  signal orion-units-gone
-on count taubat-artillery <= 0 as orion-units dormant
-  signal orion-units-gone
-on count orion-tank <= 0 as orion-units dormant
-  signal orion-units-gone
-on signal orion-units-gone*3
+on count taubat-fighting-units <= 0 as orion-units dormant
   say intelligence "Every Orion and Taubat unit is destroyed."
   signal orion-step
 on signal orion-step*5
@@ -6180,8 +6303,6 @@ on timer mission-won
   win
 
 # Not expressible yet:
-# - The fighting-units watch is one count of the side's whole unit group;
-#   here three counts by type (taubat-tank, taubat-artillery, orion-tank).
 # - Each building's first-completion line is left to the generic rule.
 
 # --- J1 as R ----------------------------------------
@@ -6300,6 +6421,7 @@ on held temple 60
   disarm temple-unheld   # a held temple no longer fails us by being destroyed
 
 # --- Rivals at the temple ---------------------------------------------------
+# (Captures can't come from the computer's sides: they never capture.)
 every captured-by federation temple
   say intelligence "The Federation has got into the Taubat temple."
 every captured-by klingon temple
@@ -6311,7 +6433,7 @@ on destroyed temple
 fail 22 count colony-hub == 0
   say intelligence "The Romulan colony hub has been destroyed."
   signal failing
-# A rival's hold on the temple beats us (fail 24).
+# A rival's hold on the temple beats us (fail 24); only a human rival can capture.
 on held-by federation temple 60
   fail 24 20
   say intelligence "The Federation now controls the Taubat power source."
@@ -6341,13 +6463,17 @@ on timer pass
   win
 
 # Not expressible yet:
-# - captured taubat-colony 30: a colony-capture monitor (30 % of the Taubat
-#   settlement's buildings held by us); "captured" takes no share.
-# - The rivals' temple captures and holds are written as new events
-#   captured-by / held-by <side> <what> [s].
+# - captured taubat-colony 30 counts the whole settlement (houses 1, hangars
+#   3), but Reluva names the share by a held building's label: only one
+#   hangar carries taubat-colony, so it fires only once that one is held.
+# - captured-by / held-by <side> temple never fire: the computer's sides never
+#   capture (kept for a human rival).
+# - colony-size taubat 50: the game's monitor still counts captured buildings
+#   in the settlement's size; Reluva's colony-size leaves them out.
 # - The temple scan is also wired to a stance switch (Tau_hostile_to_Romulan)
 #   that the mission doesn't have, so nothing happens.
-# - The rivals' own pass/fail lines and what the referee does with a rival's
+)",
+R"(# - The rivals' own pass/fail lines and what the referee does with a rival's
 #   pass; the generic side-failed rule covers only the fail.
 # - The Romulans' own AI orders (build timetable, assaults on the Klingons at
 #   900 s and on the Federation when its colony doubles, random raids) only run
@@ -6421,8 +6547,7 @@ every signal fed-assault-rom-random7
 every signal fed-assault-rom-random8
   ai federation fed-assault-rom-random8
 every timer kli-raids-on-rom
-)",
-R"(  random kli-assault-rom-random1 kli-assault-rom-random2 kli-assault-rom-random3 kli-assault-rom-random4 kli-assault-rom-random5 kli-assault-rom-random6 kli-assault-rom-random7 kli-assault-rom-random8
+  random kli-assault-rom-random1 kli-assault-rom-random2 kli-assault-rom-random3 kli-assault-rom-random4 kli-assault-rom-random5 kli-assault-rom-random6 kli-assault-rom-random7 kli-assault-rom-random8
   timer kli-raids-on-rom 180
 every signal kli-assault-rom-random1
   ai klingon kli-assault-rom-random1
@@ -6461,7 +6586,13 @@ every signal hubrin-assault-rom-random8
   ai hubrin hubrin-assault-rom-random8
 every destroyed hubrin-fortress
   stop hubrin-raids-on-rom
-every destroyed federation-colony   # all its small, large, mine and armed buildings
+# (Four "none left" watches: three on the Federation's small buildings, one on
+# their large ones; all four must report.)
+on count federation-small-buildings <= 0
+  signal fed-colony-down
+on count federation-large-buildings <= 0
+  signal fed-colony-down
+on signal fed-colony-down*2
   ai klingon kli-romulan-assault-one
   ai klingon kli-romulan-assault-two
 
@@ -6487,15 +6618,14 @@ on timer new-orders
 on timer pass
   win
 # A rival finishing its raid while ours is still running beats us (fail 10);
-# once a rival has finished, our own success counts for nothing.
+# once a rival has finished, our own success is futile (nothing happens).
+# (A rival's raid here is a capture, which only a human rival can make.)
 on beaten taubat-hangar
   fail 10 10
   say intelligence "A garbled message from our staff: it seems the Klingons or the Federation have raided the building."
 every captured-by federation taubat-hangar
-  disarm rom-raid
   timer fed-took-staff 7
 every captured-by klingon taubat-hangar
-  disarm rom-raid
   timer kli-took-staff 7
 on timer fed-took-staff
   say intelligence "The Federation has taken the building and our staff with it."
@@ -6512,12 +6642,8 @@ on destroyed taubat-hangar
   say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
 
 # Not expressible yet:
-# - A rival's success during our raid on the hangar ("beaten") and before it
-#   (ours futile, written as the rival's success switching ours off): there
-#   are no beaten or captured-by <side> events.
-# - destroyed federation-colony stands for four "at most 0" monitors on the
-#   Federation's building groups (small, large, mine, armed): group ids in
-#   the side's group table, which counts can't name.
+# - captured-by <side> taubat-hangar and beaten never fire against the
+#   computer's sides: they never capture.
 # - The objective sent at 120 s is shown only as the objective change; the
 #   game's "new primary objective" mail goes to a distributor, not the panel.
 # - The Romulans' own AI orders (colony guard at 60 s, assault on the
@@ -6645,33 +6771,118 @@ every signal romulan-assualt-one
   ai taubat romulan-assualt-one
 every signal romulan-assualt-two
   ai taubat romulan-assualt-two
-every destroyed federation-colony   # all its small, large, mine and armed buildings
+# (Four "none left" watches: three on the Federation's small buildings, one on
+# their large ones; all four must report.)
+on count federation-small-buildings <= 0
+  signal fed-colony-down
+on count federation-large-buildings <= 0
+  signal fed-colony-down
+on signal fed-colony-down*2
   ai klingon kli-romulan-assault-one
   ai klingon kli-romulan-assault-two
 
 # --- Objective 11: capture three of the Taubat workshops ------------------
-# Hold one 5 s to start the infiltration, 30 s more to take it.
-every entered raid-building
-  say operations "Infiltration teams are going in. Stand by..."
-every capture-lost raid-building
-  say engineering "We lost the capture. Try again."
-every captured raid-building
-  say operations "Sir, our troops now hold a Taubat workshop."
+# Hold one 5 s to start the infiltration, 30 s more to take it. Each of the
+# eight workshops (raid-building-one .. -eight) has its own watch.
+every entered raid-building-one
+  signal workshop-entered
+every entered raid-building-two
+  signal workshop-entered
+every entered raid-building-three
+  signal workshop-entered
+every entered raid-building-four
+  signal workshop-entered
+every entered raid-building-five
+  signal workshop-entered
+every entered raid-building-six
+  signal workshop-entered
+every entered raid-building-seven
+  signal workshop-entered
+every entered raid-building-eight
+  signal workshop-entered
+every capture-lost raid-building-one
+)",
+R"(  signal workshop-capture-lost
+every capture-lost raid-building-two
+  signal workshop-capture-lost
+every capture-lost raid-building-three
+  signal workshop-capture-lost
+every capture-lost raid-building-four
+  signal workshop-capture-lost
+every capture-lost raid-building-five
+  signal workshop-capture-lost
+every capture-lost raid-building-six
+  signal workshop-capture-lost
+every capture-lost raid-building-seven
+  signal workshop-capture-lost
+every capture-lost raid-building-eight
+  signal workshop-capture-lost
+every captured raid-building-one
   signal workshop-captured
-on captured raid-building one     # any three of the eight
-on captured raid-building two
-on captured raid-building three
+every captured raid-building-two
+  signal workshop-captured
+every captured raid-building-three
+  signal workshop-captured
+every captured raid-building-four
+  signal workshop-captured
+every captured raid-building-five
+  signal workshop-captured
+every captured raid-building-six
+  signal workshop-captured
+every captured raid-building-seven
+  signal workshop-captured
+every captured raid-building-eight
+  signal workshop-captured
+every signal workshop-entered
+  say operations "Infiltration teams are going in. Stand by..."
+every signal workshop-capture-lost
+  say engineering "We lost the capture. Try again."
+every signal workshop-captured
+  say operations "Sir, our troops now hold a Taubat workshop."
+on captured raid-building-one     # any three of the eight
+on captured raid-building-two
+on captured raid-building-three
 on signal workshop-captured*3
   say engineering "Sir, the harmonic generators are cut off, but a cascade discharge has begun and nothing can halt it now."
   complete 11
   reveal 12
   signal survive-step
   signal pass-step
-# A workshop a rival got first (destroyed or scanned before ours, or during
-# our capture) is lost to us; six of them is fail 15.
-every beaten raid-building
+# A workshop a rival got first is lost to us: beaten (a rival finished during
+# our capture) or futile (ours finished after a rival's); six is fail 15.
+# The Klingons' destroy watch succeeds whenever a workshop falls, whoever
+# destroys it; the Federation's scan watch only for a human player.
+every beaten raid-building-one
   signal workshop-lost
-every futile raid-building
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
   signal workshop-lost
 on signal workshop-lost*6
   fail 15 10
@@ -6692,11 +6903,11 @@ on scanned science metar-scan-building as rom-core-scan
   disarm core-watch   # once scanned, its destruction no longer fails us
 
 # --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
 every scanned-by federation metar-scan-building
-  disarm rom-core-scan   # ours would now be futile
   signal metar-wake
 every scanned-by klingon metar-scan-building
-  disarm rom-core-scan   # ours would now be futile
   signal metar-wake
 every count metar-portal == 2   # one of the three portals destroyed
   timer portal-surge 5
@@ -6750,8 +6961,7 @@ on timer data-request
 
 # --- Mission pass: objectives 11 and 12 and the pick-up, then 10 s ----------
 on signal pass-step*3
-)",
-R"(  timer pass 10
+  timer pass 10
 on timer pass
   win
 
@@ -6766,13 +6976,8 @@ on destroyed metar-scan-building as core-watch
   say operations "The Taubat weapon's focal point has been destroyed. We can't complete the mission."
 
 # Not expressible yet:
-# - The rivals' claims on a workshop as beaten (during our raid) and futile
-#   (before it), and a rival's core scan making ours futile (written as their
-#   scan switching ours off): Reluva has no beaten, futile or scanned-by
-#   events, and events name a group and a member ("raid-building one").
-# - destroyed federation-colony stands for four "at most 0" monitors on the
-#   Federation's building groups (small, large, mine, armed): group ids in
-#   the side's group table, which counts can't name.
+# - scanned-by <side> metar-scan-building never fires: the computer's sides
+#   never scan (and the Federation never scans a workshop).
 # - The jnt03rom table's string 13 (scan the artifacts near the workshops) is
 #   not an objective in the game's graph, so it's left out.
 # - A resource top-up object for the colony is active but has an empty
@@ -6899,8 +7104,9 @@ on timer fail-notice
   say intelligence "The Romulans are unable to finish their mission."
 
 # Not expressible yet:
-# - The raid's "beaten" outcome carries fail 13, but no object sends it;
-#   Reluva has no beaten event (written as one).
+# - The raid's "beaten" outcome carries fail 13, but no object sends it (the
+#   J4 raids don't hand off); written on the building's name, not the raid
+#   label (kli-sec-cen), so Reluva's hand-off can't fire it either.
 # - The 60 s anti-matter timer also carries a line ("the building is armed,
 #   evacuate") that the game sends only to the pass counter, never to the
 #   panel, so it isn't said here.
@@ -6961,7 +7167,8 @@ on inside ours metar-approach
 on signal metar-guard
   ai metar met-colony-protection-1
   ai metar met-colony-protection-2
-  ai metar met-colony-protection-3
+)",
+R"(  ai metar met-colony-protection-3
   ai metar met-colony-protection-4
   ai metar met-colony-protection-5
 
@@ -7112,8 +7319,7 @@ on timer mission-won
 #   orders (scout-prepositioner, supply-vehicle-prepositioner,
 #   tank-prepositioner, artillery-prepositioner).
 # - Fail 15 is wired to the core search's "beaten to it" output, which
-)",
-R"(#   nothing sends; written as the core destroyed (inferred).
+#   nothing sends; written as the core destroyed (inferred).
 
 # --- R9 as R ----------------------------------------
 # R9 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
@@ -7357,7 +7563,8 @@ every scan-started engineering klingon-hub
 every scan-lost engineering klingon-hub
   say engineering "Lost the scan. Starting again."
 on scanned engineering klingon-hub
-  say engineering "Survey done, but their screens are scrambling our sensors. Could Grinke lend a hand?"
+)",
+R"(  say engineering "Survey done, but their screens are scrambling our sensors. Could Grinke lend a hand?"
 
 # Objective 15: every Klingon shield generator destroyed; the device is
 # beamed in and the objective met 15 s later, when the device also takes
@@ -7511,8 +7718,7 @@ every signal met-raid-fed-8
   ai metar metar-assault-fed-random8
 
 # Metar raids on the Klingons: one of eight attacks every 120 s, the first at 480 s
-)",
-R"(every timer met-raid-kli
+every timer met-raid-kli
   timer met-raid-kli 120
   random met-raid-kli-1 met-raid-kli-2 met-raid-kli-3 met-raid-kli-4 met-raid-kli-5 met-raid-kli-6 met-raid-kli-7 met-raid-kli-8
 every signal met-raid-kli-1
@@ -7755,7 +7961,8 @@ every signal tau-raid-fed-6
   ai taubat taubat-assault-fed-random6
 every signal tau-raid-fed-7
   ai taubat taubat-assault-fed-random7
-every signal tau-raid-fed-8
+)",
+R"(every signal tau-raid-fed-8
   ai taubat taubat-assault-fed-random8
 
 # Taubat raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
@@ -7913,8 +8120,7 @@ on destroyed hubrin-observer
 # Objective 12: the colony three times its starting size, plus four vehicle
 # yards and five power generators (or three advanced ones); then the
 # containment device's last research opens.
-)",
-R"(on built-all vehicle-yard*4 power-generator*5|advanced-generator*3
+on built-all vehicle-yard*4 power-generator*5|advanced-generator*3
   signal infrastructure
 on colony-size 300
   signal infrastructure
@@ -8146,7 +8352,8 @@ every signal fed-raid-rom-4
   ai federation fed-assault-rom-random4
 every signal fed-raid-rom-5
   ai federation fed-assault-rom-random5
-every signal fed-raid-rom-6
+)",
+R"(every signal fed-raid-rom-6
   ai federation fed-assault-rom-random6
 every signal fed-raid-rom-7
   ai federation fed-assault-rom-random7
@@ -8303,8 +8510,7 @@ on timer metar-romulan-attack
 
 # --- R14 as R ----------------------------------------
 # R14 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
-)",
-R"(mission R14 R
+mission R14 R
 site metar-core 82 269
 objective 12
 objective 14
@@ -8418,7 +8624,7 @@ objective 15
 # Fail criteria, the game's way: the cause at once, the end 10 s later (no
 # word to the other sides in J9). Our hub (14); all three Metar starships
 # destroyed (16; the game's message calls them colony cores). Fail 17 (a
-# rival got the technology while we were scanning) has no event: see the end.
+# rival got the technology while we were scanning) is with the scan below.
 on destroyed colony-hub
   fail 14 10
   say command "Colony hub lost. The mission has failed."
@@ -8437,14 +8643,25 @@ on start
 
 # Objective 13: scan the temple (10 s before the officer reports, then held
 # a minute); the technology is beamed home and its research opens; the
-# research done meets the objective
-every scan-started science metar-temple
+# research done meets the objective. The game's watch is "the device's block
+# scanned by us" (any of our scanning units nearby), on the group
+# Anomaly_Device: a cell scan.
+every scan-started cell anomaly-device
   say engineering "Searching the temple for the device's technology."
-every scan-lost science metar-temple
+every scan-lost cell anomaly-device
   say engineering "We lost the scan. Have another try."
-on scanned science metar-temple
+on scanned cell anomaly-device
   say engineering "The technology is beamed home to our hub for research."
   research anomaly-device
+# The race for the device: the first side to finish takes the technology. A
+# rival finishing while ours runs beats us (fail 17); once a rival has
+# finished, our later scan is futile (no technology, no research). The
+# computer's sides only win it if their own units happen to scan the block.
+on beaten anomaly-device
+  fail 17 10
+  say engineering "The technology is gone from here; the Federation or the Klingons must have taken it."
+every futile anomaly-device
+  say engineering "That scan was useless."
 on researched anomaly-device
   say science "Our researchers have worked out how to use the device."
   complete 13
@@ -8542,7 +8759,8 @@ every signal met-raid-fed-4
 every signal met-raid-fed-5
   ai metar metar-assault-fed-random5
 every signal met-raid-fed-6
-  ai metar metar-assault-fed-random6
+)",
+R"(  ai metar metar-assault-fed-random6
 every signal met-raid-fed-7
   ai metar metar-assault-fed-random7
 every signal met-raid-fed-8
@@ -8591,16 +8809,9 @@ every signal met-raid-rom-8
   ai metar metar-assault-rom-random8
 
 # Not expressible yet:
-# - The race for the temple: each side's scan, when it succeeds, tells the
-#   others' scans they're futile. A rival finishing while our scan is under
-#   way means fail 17 ("the technology isn't here - a rival must have taken
-#   it"); finishing earlier makes our later scan just "futile" (no
-#   technology, no research). There's no event for a rival's scan.
 # - The game's capture watch counts starships held, so one captured before
 #   the research and still held when the watch starts counts at once; here
 #   only a capture made after the research does (the event is the capture).
-# - Which scan the temple wants: the game checks "scanned by us" on the
-#   temple's cell (any kind); the objective says a science scan.
 # - The Klingons' random raids on the Romulans never happen in the game: their
 #   timer names orders (Kli_Assault_Kli_Random1-8) that don't exist. Left out.
 # - The AI sides' own research and captures (no events for rivals).
@@ -8693,8 +8904,7 @@ on timer ambassador-aboard
   say operations "The ambassador is in our hands!"
   complete 84
   signal objective-met
-)",
-R"(on timer narok-crush
+on timer narok-crush
   say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
   reveal 85
 
@@ -8888,7 +9098,8 @@ on timer camera-4
   say operations "F2 lifts the camera much higher, to the sky view; the other controls stay the same." Tutor22
   arm f2-sky
 on key 113 as f2-sky dormant
-  timer camera-5 26
+)",
+R"(  timer camera-5 26
 on timer camera-5
   say operations "There is also control zoom: hold Ctrl and left-click to zoom in on what the pointer is over." Tutor23
   timer camera-6 10
@@ -9025,8 +9236,7 @@ on timer fail-message
 # - The Romulan area detectors filter by class: at the colony gate only a ground scout
 #   (0x4000000), at the attack front only armed vehicles (0x100); "inside romulan" takes any
 #   Romulan unit (no "romulan-<kind>" who).
-)",
-R"(# - The Klingon and Taubat slots only hold dummy objects (they keep those sides alive).
+# - The Klingon and Taubat slots only hold dummy objects (they keep those sides alive).
 
 # --- C4 as F ----------------------------------------
 # C4 "Building" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
@@ -9247,7 +9457,8 @@ on timer pass
 # --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
 on destroyed colony-hub
   fail 56 20
-  say command "We have lost the colony hub."
+)",
+R"(  say command "We have lost the colony hub."
   timer fail-message 10
 on timer fail-message
   say command "You have not achieved your objectives."

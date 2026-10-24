@@ -348,10 +348,22 @@ void AiSides::colonies(double seconds) {
 }
 
 bool AiSides::order(const std::string& side, const std::string& text) {
-    std::string name = text;
-    const bool abort = name.rfind("abort ", 0) == 0;
+    // Several orders at once ("abort a b c", or "a b"): each in turn.
+    std::string rest = text;
+    const bool abort = rest.rfind("abort ", 0) == 0;
     if (abort)
-        name = name.substr(6);
+        rest = rest.substr(6);
+    if (rest.find(' ') != std::string::npos) {
+        bool all = true;
+        for (size_t at = 0; at < rest.size();) {
+            const size_t end = std::min(rest.find(' ', at), rest.size());
+            if (end > at)
+                all = order(side, (abort ? "abort " : "") + rest.substr(at, end - at)) && all;
+            at = end + 1;
+        }
+        return all;
+    }
+    std::string name = rest;
     const std::vector<int> slots = slotsNamed(side);
     const NpcOrder* found = nullptr;
     for (const NpcOrder* o : npcOrders(mission_))
