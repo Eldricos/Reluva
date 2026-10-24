@@ -50,6 +50,7 @@ struct BuildingType {
     std::string upgradeOf;  // an upgrade: the building it's fitted to (no placing)
     bool onDeposit = false; // a mining station: stands on a deposit
     bool orderable = true;  // offered by the build menu
+    std::array<bool, 3> sides{true, true, true}; // the sides that have it (a lab is one side's)
     // Power, in the game's units a tick: a generator's output at full
     // efficiency (per side), or a consumer's buffer (capacity, intake a
     // tick) and its standing use a tick.
@@ -62,6 +63,22 @@ struct BuildingType {
 };
 const std::vector<BuildingType>& buildingTypes();
 const BuildingType* buildingType(std::string_view id);
+
+// A vehicle the vehicle yard makes (exe.md#vehicle-production): the side's,
+// by the game's type id, its cost, what must stand first (buildings,
+// upgrades, the science station's labs) and its build value: the yard
+// works value x 300 units of power into it, at its efficiency.
+struct VehicleType {
+    int type;
+    char side;
+    const char* panel; // "PHASER TANK"
+    Stock cost;
+    std::vector<std::string> needs;
+    int value;
+    bool bee() const;  // goes into the hub, not out on the map
+};
+const std::vector<VehicleType>& vehicleTypes();
+const VehicleType* vehicleType(int type);
 
 // The ground the colony stands on, by block: its deposit kind (0 none) and
 // the amount its map cell holds (50-300; each unit a mining take of a
@@ -117,6 +134,30 @@ public:
     // A building destroyed: it no longer counts, works or draws power.
     void remove(int id);
 
+    // Vehicles: the side's that the menu offers now (their yard and what
+    // they need standing), and an order for one (the cost taken at once;
+    // false, and the colony told, if it can't be paid; false if the colony
+    // is at its size limit). The yard's work is shown as 0-1.
+    std::vector<const VehicleType*> vehicleMenu() const;
+    bool vehicleAvailable(const VehicleType& v) const;
+    bool orderVehicle(const VehicleType& v);
+    struct VehicleJob {
+        int type;
+        int yard;          // the vehicle yard's structure id
+        double work;       // power units still to put in
+        double total;
+        double rollout = 0; // seconds left rolling out, once done
+    };
+    const std::vector<VehicleJob>& vehicleJobs() const { return jobs_; }
+    // Vehicles finished since last asked: type id and the yard's id.
+    std::vector<std::pair<int, int>> takeVehicles();
+    // A building's best officer skill at its speciality (0 none): the
+    // officer term of its efficiency.
+    void setOfficer(int structure, float skill);
+    // A building's efficiency, as the game's: 0.4 x (health + power fill
+    // + officer) x crew (health and crew whole here).
+    float efficiency(const ColonyStructure& s) const;
+
     // Moves time on: construction, power, mining and refining. Returns what
     // happened, as the mission scripts' events (built <type>, power-low,
     // short-resources, mine-exhausted at its position).
@@ -125,6 +166,7 @@ public:
 private:
     static constexpr double kReserveCap = 640000;
     void tick(std::vector<ScriptEvent>& out);
+    void produce(std::vector<ScriptEvent>& out);
     int sideIndex() const;
     bool mineTake(ColonyStructure& mine); // one mining take; false when dry
 
@@ -141,6 +183,10 @@ private:
     double reserve_ = kReserveCap;
     float requested_ = 0, met_ = 1;
     std::vector<ScriptEvent> pendingShort_;
+    std::vector<VehicleJob> jobs_;
+    std::vector<std::pair<int, int>> finished_;
+    std::map<int, float> officers_;
+    std::map<int, bool> yardRunning_;
     int nextId_ = 1;
 };
 

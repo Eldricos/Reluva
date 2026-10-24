@@ -516,6 +516,37 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+### Vehicle production
+
+A vehicle yard makes one vehicle at a time. An order takes the cost at
+once and needs the colony below its size limit (the yard's button is off
+at the limit). The job is the type's **build value × 300** units of
+power; each tick a running yard takes up to 300 from its power buffer
+and puts that times its **efficiency** into the job. Efficiency is
+0.4 × (health + power fill + officer) × crew: health 1 above 75 % of
+the hit points, the buffer's fill (1 above 99 %), the best officer of
+the yards' speciality (1) posted there (their skill; 0 for none), the
+crew share. A yard (re)starts above 0.35 and stops below 0.2. So with a
+full buffer and no officer (0.8): build value 640 (tanks, artillery,
+science vehicles) takes 800 ticks, 40 s; 240 (armed transports) 15 s;
+128 (some scouts and cargo bees) 8 s; 0 (the Federation's scout, bees,
+transports) a tick. The training missions timed 40-50 s, about 25 s and
+about 8 s, so the yard adds some 8 s of its own (rolling the vehicle
+out; not found in the code).
+
+What each side's vehicles need besides the yard, by id: the extended
+(146, 183, 177) or specialist yard (147), the security centre, the
+science station, the advanced hub (169, 175), defensive weapons and
+artillery, and **labs** - add-ons to the science station bought with
+materials (10 polycomp, 15 thermoconc and 4-7 trans al each). Federation:
+phaser coil lab 294 (phaser tank), energy lab 295 (mobile shield),
+sensor lab 296 (science vehicle), away team lab 297 (transport), shield
+buffer lab 164. Klingon: special weapons 302, sensor lab 303, trooper
+centre 304, shield buffer 184, tracking systems 185, disruptor matrix
+186. Romulan: infiltration lab 311, energy lab 310, shield buffer 179,
+and 308 (tank) and 309 (cloaked tank), whose names the executable's
+tables don't give in order.
+
 ### Research
 
 Each side has the mission's **research topics** (`ai_data.cpp`): a name,

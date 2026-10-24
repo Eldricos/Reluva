@@ -22,6 +22,7 @@ As the first tutorial teaches them:
 | Left click on another side's unit or building (units selected) | sends them to attack it (scouts and science vehicles scan it instead: a science scan) |
 | S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
 | C, then a click on a building | the selected armed APCs capture it |
+| U, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
 | R, then 1-9 | the research topics open to the colony; a number starts one (several share the points) |
 | O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
@@ -179,6 +180,15 @@ placed); the game's playbook and officer cards are keys here.
   hear `entered`, then `captured` once a raid's hold time is up (at once
   where none watches it), `held <target> <seconds>` each second,
   `capture-lost` or `vacated` when the team comes out.
+- **Vehicles** as the executable makes them ([exe.md](exe.md#vehicle-production)):
+  U lists the side's vehicles whose yard, upgrades and labs stand (the
+  labs are in the build menu once the science station is up); an order
+  takes the cost and queues at the least busy yard; a yard puts up to
+  300 power a tick from its buffer, times its efficiency (0.8 without an
+  officer, 1 with one of skill 0.5), into the build value × 300, then the
+  vehicle rolls out beside it (8 s) - bees into the hub. Officers posted
+  in a building raise its efficiency. Not yet buildable: defensive
+  weapons and artillery, so the vehicles that need them aren't offered.
 - **Research** as the executable has it ([exe.md](exe.md#research)): a
   script's `research <topic>` opens the mission's topic once it has been
   sent as many times as the game wants; R lists the open ones in the NEW
@@ -218,6 +228,8 @@ placed); the game's playbook and officer cards are keys here.
 | An order's units | the side's own, any lacking made up at its first building | Reluva's: the AI's production isn't modelled |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Sightings | seen within 2.5 blocks, approach within 1.5 | Reluva's |
+| Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |
+| A lab's build time | 28 s | the training missions (21-35 s) |
 | Scans, captures, officers | ranges, flags, strength, 80 %, 16.8 s, 16 seats, 1414 units | the executable (exe.md#scans-and-captures) |
 | A target's size | buildings 6000, vehicles 1000 | Reluva's (the game uses the model's bounding radius) |
 | A scan no raid covers | 1 s to start, 10 s more | Reluva's (the scripts' own targets) |

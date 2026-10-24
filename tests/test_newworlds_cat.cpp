@@ -1231,6 +1231,55 @@ void testFieldWork() {
     CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple"));
 }
 
+void testVehicleProduction() {
+    auto run = [](Economy& e, double seconds) {
+        std::vector<std::pair<int, int>> out;
+        for (double t = 0; t < seconds - 1e-9; t += 0.25) {
+            e.advance(0.25);
+            for (const auto& v : e.takeVehicles())
+                out.push_back(v);
+        }
+        return out;
+    };
+    ColonyMap map;
+    Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
+    e.addBuilt("colony-hub", 0, 0);
+    e.addBuilt("construction-yard", 20000, 0);
+    const VehicleType* apc = vehicleType(56);
+    const VehicleType* tank = vehicleType(8);
+    CHECK(apc && tank && apc->value == 240 && tank->value == 640);
+    CHECK(!e.orderVehicle(*apc)); // no vehicle yard
+    const int yard = e.addBuilt("vehicle-yard", 0, 20000);
+    CHECK(e.vehicleAvailable(*apc) && !e.vehicleAvailable(*tank) && !e.vehicleAvailable(*vehicleType(10)));
+    // The armed transport: 240 x 300 units at 300 a tick and efficiency
+    // 0.8 (no officer): 300 ticks, 15 s, then 8 s rolling out.
+    CHECK(e.orderVehicle(*apc) && e.stock()[Duranium] == 4970);
+    CHECK(run(e, 22.5).empty());
+    auto out = run(e, 1);
+    CHECK(out.size() == 1 && out[0].first == 56 && out[0].second == yard);
+    // An officer of the yards' speciality at 0.5: efficiency 1.0, 12 s.
+    e.setOfficer(yard, 0.5f);
+    CHECK(e.orderVehicle(*apc));
+    CHECK(run(e, 19.5).empty() && run(e, 1).size() == 1);
+    // The phaser tank wants the extended yard and the phaser coil lab (a
+    // Federation lab, on the science station).
+    e.addBuilt("vehicle-yard-upgrade", 0, 20000);
+    e.addBuilt("science-station", 20000, 20000);
+    CHECK(!e.vehicleAvailable(*tank) && e.available(*buildingType("phaser-coil-lab")));
+    e.addBuilt("phaser-coil-lab", 20000, 20000);
+    CHECK(e.vehicleAvailable(*tank) && !e.available(*buildingType("phaser-coil-lab")));
+    Economy k('K', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
+    k.addBuilt("construction-yard", 0, 0);
+    k.addBuilt("science-station", 0, 0);
+    CHECK(!k.available(*buildingType("phaser-coil-lab")) && k.available(*buildingType("disruptor-matrix")));
+    // At the colony's size limit the yard takes no orders.
+    Economy full('F', {500, 1000, 2300, 500, 4000, 5000}, 3, map);
+    full.addBuilt("colony-hub", 0, 0);
+    full.addBuilt("construction-yard", 0, 0);
+    full.addBuilt("vehicle-yard", 0, 0);
+    CHECK(!full.orderVehicle(*apc));
+}
+
 void testResearch() {
     auto names = [](const std::vector<ScriptEvent>& ev) {
         std::vector<std::string> out;
@@ -1411,6 +1460,7 @@ int main() {
     testAiSides();
     testFieldWork();
     testResearch();
+    testVehicleProduction();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

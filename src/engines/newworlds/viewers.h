@@ -650,6 +650,8 @@ private:
     std::unique_ptr<FieldWork> fieldWork_;
     std::unique_ptr<Research> research_; // the side's research, and its list shown (R)
     bool researchMenu_ = false;
+    bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
+    void rollOut();
     char pendingOrder_ = 0;
     void orderOn(int target);
     const char* pendingOrderName() const;

@@ -316,7 +316,7 @@ void MissionViewer::startPlay() {
         pendingOrder_ = 0;
     }
     research_ = std::make_unique<Research>(level.shortName, playerSlot_);
-    researchMenu_ = false;
+    researchMenu_ = vehicleMenu_ = false;
     // The mission's script, from its start, if Reluva has one.
     run_.reset();
     walk_.clear();
@@ -414,6 +414,51 @@ const char* MissionViewer::pendingOrderName() const {
     case 'e': return "> ENGINEERING SCAN";
     case 'c': return "> CAPTURE BUILDING";
     default: return "";
+    }
+}
+
+// The colony's officers into its buildings' efficiency (each building's
+// best at its speciality), and the vehicles the yards have finished out
+// on the map beside them (bees into the hub).
+void MissionViewer::rollOut() {
+    if (fieldWork_ && colony_) {
+        for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i) {
+            const std::string& type = colony_->buildings()[i].name;
+            const int wanted = type == "construction-yard" || type == "vehicle-yard" ? 1
+                               : type == "security-center"                         ? 2
+                               : type == "sickbay"                                 ? 3
+                               : type == "science-station"                         ? 4
+                               : type == "mining-station" || type == "resource-processor" ? 6
+                               : type == "colony-hub"                              ? 7
+                               : type == "storage-facility"                        ? 8
+                               : type == "accommodation"                           ? 9
+                                                                                   : 0;
+            float best = 0;
+            for (const FieldWork::OfficerAt& o : fieldWork_->officers())
+                if (o.in == colonyObjects_[i] && o.in > 0 && o.officer->speciality == wanted)
+                    best = std::max(best, o.officer->skill);
+            economy_->setOfficer(structureIds_[i], best);
+        }
+    }
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    for (const auto& [type, yard] : economy_->takeVehicles()) {
+        const VehicleType* v = vehicleType(type);
+        if (v && v->bee()) {
+            ++housed_;
+            continue;
+        }
+        float x = map_.worldWidth() / 2, y = map_.worldHeight() / 2;
+        for (const ColonyStructure& c : economy_->structures())
+            if (c.id == yard)
+                x = c.x, y = c.y - 1.2f * kTile;
+        const ObjectType* t = objectType(type);
+        const CombatType* ct = combatType(type);
+        if (!t || !ct)
+            continue;
+        const auto [px, py] = world_->openSpot(x, y);
+        const int id = spawnObject(*world_, playerSlot_, side, *ct, px, py, {}, t->model, true);
+        world_->unit(id)->kind = UnitKind{t->name, t->model, groundScout(side).speed * t->pace / 0.125f};
+        showUnits();
     }
 }
 
@@ -741,8 +786,8 @@ bool MissionViewer::playEvent(const Event& ev) {
     }
     switch (ev.type) {
     case EventType::KeyDown:
-        if (ev.key == key::Escape && researchMenu_) {
-            researchMenu_ = false;
+        if (ev.key == key::Escape && (researchMenu_ || vehicleMenu_)) {
+            researchMenu_ = vehicleMenu_ = false;
             break;
         }
         if (ev.key == key::Escape && (buildMenu_ || !placing_.empty())) {
@@ -758,7 +803,20 @@ bool MissionViewer::playEvent(const Event& ev) {
         // R: the research topics open to the colony; a number starts one.
         if (ev.key == 'r' && research_) {
             researchMenu_ = !researchMenu_;
-            buildMenu_ = false;
+            buildMenu_ = vehicleMenu_ = false;
+            break;
+        }
+        // U: the vehicles the yards can make; a number orders one.
+        if (ev.key == 'u' && economy_) {
+            vehicleMenu_ = !vehicleMenu_;
+            buildMenu_ = researchMenu_ = false;
+            break;
+        }
+        if (vehicleMenu_ && economy_ && ev.key >= '0' && ev.key <= '9') {
+            const size_t n = ev.key == '0' ? 9 : size_t(ev.key - '1');
+            const auto menu = economy_->vehicleMenu();
+            if (n < menu.size())
+                economy_->orderVehicle(*menu[n]);
             break;
         }
         if (researchMenu_ && research_ && ev.key >= '1' && ev.key <= '9') {
@@ -768,7 +826,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             break;
         }
         if (ev.key == 'b') {
-            researchMenu_ = false;
+            researchMenu_ = vehicleMenu_ = false;
             buildMenu_ = !buildMenu_;
             placing_.clear();
             map_.setGhost({}, 0, 0, false);
@@ -1055,6 +1113,8 @@ void MissionViewer::update(uint64_t nowMs) {
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
         combatStep(happened);
+        if (economy_ && world_)
+            rollOut();
         if (research_) {
             auto found = research_->advance(std::min(dt, 0.25));
             happened.insert(happened.end(), found.begin(), found.end());
@@ -1420,7 +1480,12 @@ void MissionViewer::drawInterface() {
     {
         const auto menu = buildMenu_ ? buildMenu() : std::vector<const BuildingType*>{};
         const auto offered = researchMenu_ && research_ ? research_->offered() : std::vector<size_t>{};
-        const int lines = buildMenu_ ? int(menu.size()) + 1 : researchMenu_ ? std::max(2, int(offered.size()) + 1) : 7;
+        const auto vehicles = vehicleMenu_ && economy_ ? economy_->vehicleMenu() : std::vector<const VehicleType*>{};
+        const size_t jobs = vehicleMenu_ && economy_ ? economy_->vehicleJobs().size() : 0;
+        const int lines = buildMenu_      ? int(menu.size()) + 1
+                          : researchMenu_ ? std::max(2, int(offered.size()) + 1)
+                          : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
+                                          : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
@@ -1432,7 +1497,29 @@ void MissionViewer::drawInterface() {
         int ty = y + 16;
         const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
         const BuildingType* placing = placing_.empty() ? nullptr : buildingType(placing_);
-        if (researchMenu_ && research_) {
+        if (vehicleMenu_ && economy_) {
+            // Vehicles: what the yards can make now, each with its key
+            // (plain if the stock can't pay), then the yards' work.
+            ui_.drawSmall(screen_, x + 10, ty, "VEHICLES", bright);
+            if (vehicles.empty())
+                ui_.drawSmall(screen_, x + 10, ty + lh, "NO VEHICLE YARD", text);
+            const Stock st = economy_->stock();
+            for (size_t i = 0; i < vehicles.size(); ++i) {
+                bool pays = true;
+                for (int m = 0; m < kMaterials; ++m)
+                    pays = pays && st[size_t(m)] >= vehicles[i]->cost[size_t(m)];
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1),
+                              std::to_string((i + 1) % 10) + " " + vehicles[i]->panel, pays ? bright : text);
+            }
+            int line = std::max(2, int(vehicles.size()) + 1);
+            for (size_t i = 0; i < jobs && i < 4; ++i) {
+                const Economy::VehicleJob& j = economy_->vehicleJobs()[i];
+                const VehicleType* v = vehicleType(j.type);
+                const int pct = j.total > 0 ? int(100 - std::max(0.0, j.work) * 100 / j.total) : 100;
+                ui_.drawSmall(screen_, x + 10, ty + lh * line++,
+                              std::string("> ") + (v ? v->panel : "?") + " " + std::to_string(pct) + "%", text);
+            }
+        } else if (researchMenu_ && research_) {
             // Research: the topics open, each with its key, and how far
             // it has got (as the game's topic buttons: not started, in
             // progress, finished).

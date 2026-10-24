@@ -4,6 +4,7 @@
 #include "engines/newworlds/economy.h"
 
 #include <algorithm>
+#include <set>
 #include <cmath>
 
 namespace reluva::newworlds {
@@ -36,6 +37,14 @@ constexpr float kPowerLow = 0.75f;
 constexpr float kGeneratorEfficiency = 1.2f;
 // - the colony's capacity never passes 90.
 constexpr int kCapacityCap = 90;
+// Vehicle production (exe.md#vehicle-production): a job is its build value
+// x 300 power units; each tick a running yard takes up to 300 from its
+// buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
+// Then the vehicle rolls out: a placeholder from the recordings' scout,
+// whose value is 0 yet takes about 8 s.
+constexpr double kWorkPerValue = 300;
+constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
+constexpr double kRollout = 8;
 
 constexpr int sideOf(char side) { return side == 'K' ? 1 : side == 'R' ? 2 : 0; }
 
@@ -166,10 +175,87 @@ const std::vector<BuildingType>& buildingTypes() {
                 Stock{0, 1, 50, 3, 0, 0}, Stock{0, 1, 50, 3, 0, 0}, nullptr);
         upgrade("vehicle-yard-advanced", "SPECIALIST YARD", "vehicle-yard", Stock{0, 1, 50, 3, 0, 0},
                 Stock{0, 1, 50, 3, 0, 0}, Stock{0, 1, 50, 3, 0, 0}, "vehicle-yard-upgrade");
+        // The science station's labs: add-ons bought like upgrades, each
+        // one side's (exe.md#vehicle-production; the Romulans' 308 and 309
+        // aren't named in the executable's tables). The training missions
+        // timed a lab at 21-35 s.
+        auto lab = [&](const char* id, const char* panel, std::array<bool, 3> sides, Stock f, Stock k, Stock r) {
+            upgrade(id, panel, "science-station", f, k, r, nullptr);
+            t.back().sides = sides;
+            t.back().buildSeconds = 28;
+        };
+        const Stock fedLab{0, 10, 15, 7, 0, 0}, kliLab{0, 10, 15, 4, 0, 0}, romLab{0, 10, 15, 5, 0, 0};
+        lab("phaser-coil-lab", "PHASER COIL LAB", {true, false, false}, fedLab, kliLab, romLab);
+        lab("away-team-lab", "AWAY TEAM LAB", {true, false, false}, fedLab, kliLab, romLab);
+        lab("sensor-lab", "SENSOR LAB", {true, true, false}, fedLab, kliLab, romLab);
+        lab("energy-lab", "ENERGY LAB", {true, false, true}, fedLab, kliLab, romLab);
+        lab("shield-buffer-lab", "SHIELD BUFFER LAB", {true, true, true}, fedLab, kliLab, romLab);
+        lab("tracking-systems", "TRACKING SYSTEMS", {false, true, false}, fedLab, kliLab, romLab);
+        lab("disruptor-matrix", "DISRUPTOR MATRIX", {false, true, false}, fedLab, kliLab, romLab);
+        lab("special-weapons", "SPECIAL WEAPONS", {false, true, false}, fedLab, kliLab, romLab);
+        lab("trooper-center", "TROOPER CENTER", {false, true, false}, fedLab, kliLab, romLab);
+        lab("infiltration-lab", "INFILTRATION LAB", {false, false, true}, fedLab, kliLab, romLab);
+        lab("lab-308", "LAB (308)", {false, false, true}, fedLab, kliLab, romLab);
+        lab("lab-309", "LAB (309)", {false, false, true}, fedLab, kliLab, romLab);
         return t;
     }();
     return kTypes;
 }
+
+// Each side's vehicles as the executable registers them: costs (stock
+// units), what they need, build values (exe.md#vehicle-production).
+const std::vector<VehicleType>& vehicleTypes() {
+    static const std::vector<VehicleType> kVehicles = [] {
+        const std::string vy = "vehicle-yard", ext = "vehicle-yard-upgrade", spec = "vehicle-yard-advanced",
+                          sec = "security-center", sci = "science-station", hub3 = "colony-hub-advanced",
+                          dw = "defensive-weapon", da = "defensive-artillery";
+        return std::vector<VehicleType>{
+            {13, 'F', "CARGO BEE", Stock{1, 1, 0, 1, 0, 0}, {vy}, 128},
+            {14, 'F', "CONSTRUCTION BEE", Stock{1, 1, 0, 1, 0, 0}, {vy}, 0},
+            {12, 'F', "WORK BEE", Stock{0, 0, 0, 1, 0, 0}, {vy}, 0},
+            {97, 'F', "GROUND SCOUT", Stock{3, 1, 0, 1, 0, 0}, {vy}, 0},
+            {55, 'F', "TRANSPORT", Stock{5, 10, 0, 2, 0, 0}, {vy, "away-team-lab"}, 0},
+            {56, 'F', "ARMED TRANSPORT", Stock{4, 3, 0, 1, 0, 30}, {vy}, 240},
+            {62, 'F', "SCIENCE VEHICLE", Stock{8, 14, 0, 2, 0, 80}, {vy, "sensor-lab"}, 640},
+            {8, 'F', "PHASER TANK", Stock{15, 18, 0, 2, 0, 100}, {ext, "phaser-coil-lab"}, 640},
+            {47, 'F', "PHOTON ARTILLERY", Stock{10, 16, 0, 0, 100, 80}, {sec, ext}, 640},
+            {9, 'F', "ADV. ARTILLERY", Stock{12, 18, 0, 0, 150, 90}, {vy, spec, sec, sci}, 640},
+            {154, 'F', "MOBILE SHIELD", Stock{16, 20, 0, 2, 0, 160}, {spec, dw, da, "energy-lab"}, 640},
+            {61, 'K', "CARGO BEE", Stock{1, 2, 0, 1, 0, 0}, {vy}, 0},
+            {46, 'K', "CONSTRUCTION BEE", Stock{1, 2, 0, 1, 0, 0}, {vy}, 0},
+            {11, 'K', "WORK BEE", Stock{0, 0, 0, 1, 0, 0}, {vy}, 0},
+            {37, 'K', "GROUND SCOUT", Stock{3, 1, 0, 1, 0, 0}, {vy}, 128},
+            {88, 'K', "TRANSPORT", Stock{5, 10, 0, 2, 0, 0}, {vy, "trooper-center"}, 240},
+            {40, 'K', "ARMED TRANSPORT", Stock{4, 3, 0, 1, 0, 30}, {vy}, 240},
+            {95, 'K', "SCIENCE VEHICLE", Stock{8, 14, 0, 2, 0, 80}, {vy, "sensor-lab"}, 640},
+            {10, 'K', "DISRUPTOR TANK", Stock{15, 18, 0, 2, 0, 100}, {vy, "disruptor-matrix", ext}, 640},
+            {36, 'K', "PHOTON ARTILLERY", Stock{10, 16, 0, 0, 100, 80}, {vy, sec, ext}, 640},
+            {228, 'K', "DISRUPTOR BATTERY", Stock{18, 26, 0, 2, 0, 120}, {hub3, dw, da, "special-weapons"}, 640},
+            {229, 'K', "CLOAKED DISRUPTOR TANK", Stock{20, 20, 0, 4, 0, 80}, {hub3, dw, da, "disruptor-matrix"}, 640},
+            {90, 'R', "CARGO BEE", Stock{1, 2, 0, 1, 0, 0}, {vy}, 128},
+            {91, 'R', "CONSTRUCTION BEE", Stock{1, 2, 0, 1, 0, 0}, {vy}, 0},
+            {92, 'R', "WORK BEE", Stock{0, 0, 0, 1, 0, 0}, {vy}, 0},
+            {98, 'R', "GROUND SCOUT", Stock{3, 1, 0, 1, 0, 0}, {vy}, 0},
+            {89, 'R', "TRANSPORT", Stock{5, 10, 0, 2, 0, 0}, {vy, "infiltration-lab"}, 0},
+            {64, 'R', "ARMED TRANSPORT", Stock{5, 5, 0, 1, 0, 30}, {vy}, 240},
+            {63, 'R', "SCIENCE VEHICLE", Stock{8, 14, 0, 2, 0, 80}, {vy, sci, "energy-lab"}, 640},
+            {148, 'R', "TANK", Stock{15, 18, 0, 2, 0, 100}, {vy, sci, "lab-308"}, 640},
+            {87, 'R', "PHOTON ARTILLERY", Stock{10, 16, 0, 0, 100, 80}, {ext, sec}, 640},
+            {35, 'R', "CLOAKED TANK", Stock{18, 18, 0, 2, 0, 120}, {ext, "lab-309"}, 640},
+            {230, 'R', "CLOAKED APC", Stock{5, 7, 0, 1, 0, 40}, {hub3, dw, da, "energy-lab"}, 240},
+        };
+    }();
+    return kVehicles;
+}
+
+const VehicleType* vehicleType(int type) {
+    for (const VehicleType& v : vehicleTypes())
+        if (v.type == type)
+            return &v;
+    return nullptr;
+}
+
+bool VehicleType::bee() const { return std::string_view(panel).find("BEE") != std::string_view::npos; }
 
 const BuildingType* buildingType(std::string_view id) {
     for (const BuildingType& t : buildingTypes())
@@ -214,7 +300,7 @@ bool Economy::has(const std::string& type) const {
 }
 
 bool Economy::available(const BuildingType& t) const {
-    if (!t.orderable)
+    if (!t.orderable || !t.sides[size_t(sideIndex())])
         return false;
     for (const std::string& n : t.needsFor(side_))
         if (!has(n))
@@ -276,6 +362,100 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
         units_[size_t(m)] -= int64_t(c[size_t(m)]) * unitsPerMaterial(m);
     structures_.push_back(s);
     return s.id;
+}
+
+std::vector<const VehicleType*> Economy::vehicleMenu() const {
+    std::vector<const VehicleType*> out;
+    for (const VehicleType& v : vehicleTypes())
+        if (v.side == side_ && vehicleAvailable(v))
+            out.push_back(&v);
+    return out;
+}
+
+bool Economy::vehicleAvailable(const VehicleType& v) const {
+    return v.side == side_ && std::all_of(v.needs.begin(), v.needs.end(), [&](const std::string& n) { return has(n); });
+}
+
+bool Economy::orderVehicle(const VehicleType& v) {
+    if (!vehicleAvailable(v))
+        return false;
+    // The yard's button is off while the colony is at its size limit.
+    if (colonySize() + int(jobs_.size()) >= capacity_)
+        return false;
+    for (int m = 0; m < kMaterials; ++m)
+        if (units_[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
+            pendingShort_.push_back({"short-resources", {}});
+            return false;
+        }
+    // The yard with the least work queued.
+    int yard = 0;
+    double least = 1e30;
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "vehicle-yard" && s.progress >= 1) {
+            double queued = 0;
+            for (const VehicleJob& j : jobs_)
+                if (j.yard == s.id)
+                    queued += j.work + 1;
+            if (queued < least)
+                least = queued, yard = s.id;
+        }
+    if (!yard)
+        return false;
+    for (int m = 0; m < kMaterials; ++m)
+        units_[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
+    const double work = double(v.value) * kWorkPerValue;
+    jobs_.push_back({v.type, yard, work, work, -1});
+    return true;
+}
+
+std::vector<std::pair<int, int>> Economy::takeVehicles() {
+    std::vector<std::pair<int, int>> out;
+    out.swap(finished_);
+    return out;
+}
+
+void Economy::setOfficer(int structure, float skill) { officers_[structure] = skill; }
+
+float Economy::efficiency(const ColonyStructure& s) const {
+    const BuildingType* t = buildingType(s.type);
+    const float fill = t && t->bufferCap > 0 ? (s.stored >= t->bufferCap * 0.99f ? 1.0f : s.stored / t->bufferCap) : 1.0f;
+    auto it = officers_.find(s.id);
+    const float officer = it == officers_.end() ? 0 : it->second;
+    return 0.4f * (1 + fill + officer);
+}
+
+void Economy::produce(std::vector<ScriptEvent>& out) {
+    std::set<int> busy;
+    for (VehicleJob& j : jobs_) {
+        if (busy.count(j.yard))
+            continue; // one at a time per yard
+        busy.insert(j.yard);
+        auto s = std::find_if(structures_.begin(), structures_.end(), [&](const ColonyStructure& c) { return c.id == j.yard; });
+        if (s == structures_.end())
+            continue;
+        if (j.work > 0) {
+            // Running above 0.35, stopped below 0.2 (and between, as it was).
+            const float eff = efficiency(*s);
+            bool& running = yardRunning_[s->id];
+            running = eff > kYardStart || (running && eff >= kYardStop);
+            if (!running)
+                continue;
+            const float draw = std::min(kYardDraw, s->stored);
+            s->stored -= draw;
+            j.work -= double(draw * eff);
+            continue;
+        }
+        if (j.rollout < 0)
+            j.rollout = kRollout;
+        j.rollout -= 1 / kTicksPerSecond;
+        if (j.rollout <= 0) {
+            finished_.push_back({j.type, j.yard});
+            if (const VehicleType* v = vehicleType(j.type))
+                out.push_back({"vehicle-built", {v->panel}});
+            j.type = -1;
+        }
+    }
+    jobs_.erase(std::remove_if(jobs_.begin(), jobs_.end(), [](const VehicleJob& j) { return j.type < 0; }), jobs_.end());
 }
 
 bool Economy::mineTake(ColonyStructure& mine) {
@@ -345,6 +525,7 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         out.push_back({"power-low", {}});
         lastPowerWarning_ = clock_;
     }
+    produce(out);
     // Mining, for as long as there's a processor to take the ore: the bees
     // bring it at their pace.
     const bool processor = has("resource-processor");
