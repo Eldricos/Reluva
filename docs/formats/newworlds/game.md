@@ -16,7 +16,8 @@ As the first tutorial teaches them:
 
 | Input | What it does |
 |---|---|
-| Left click on a unit | selects it |
+| Left click on a unit | selects it; its panel (name, side, READY or EN ROUTE, shield cover, hit points) in NEW WORLDS |
+| Left click on a building (the colony's, or another side's in sight) | selects it; its panel in NEW WORLDS (double click: the camera locks on it) |
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
@@ -176,6 +177,19 @@ placed); the game's playbook and officer cards are keys here.
   colonies, and fights natives only when they fire on it: F1's Klingons,
   hostile to every slot, pass the Taubat by as the recordings show. A
   script's stance action turns the side named towards the player.
+- **The selection panel** as the executable draws it
+  ([exe.md](exe.md#the-selection-panel)): name, side (the holder's when
+  captured), state (OPERATIONAL, INCOMPLETE, CAPTURED, DESTROYED; a
+  vehicle READY or EN ROUTE), SHIELD COVER (HIGH inside a shield field of
+  its side, else BASIC) and a hit point bar. The colony's own buildings
+  add their EFFICIENCY; the hub and generators the colony's power
+  (GENERATOR LOW / MED. / HIGH by type, CONSUMPTION, DEMAND MET,
+  RESERVE), consumers their own (SUPPLY, RESERVE); OFFICERS, CREW and
+  POOL; the hub and construction yard the bees and transports; the
+  vehicle yard what it's making (or SUSPENDED); a shield generator its
+  COVERAGE; storage and the construction yard the stock; the resource
+  processor its raw ores. The game's buttons (BUILD, DEMOLISH, the hub's
+  overview and roster) are keys here or not yet made.
 - **Orders** as the executable gives them ([exe.md](exe.md#orders)): a
   move fires on the way without stopping; attack en route does the same,
   cloaking units included; an assault fires from where the units stand,

@@ -567,6 +567,9 @@ private:
     void placeBuilding();
     void showProgress();
     void drawMinerals(int x, int y, int w, int h);
+    // A selected object's panel lines, as the game's (exe.md#the-selection-panel),
+    // and its hit points' share for the bar under them.
+    std::vector<std::string> objectPanel(const Unit& u) const;
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
@@ -644,6 +647,8 @@ private:
     std::unique_ptr<Economy> economy_;
     std::vector<int> structureIds_; // per colony building, its economy structure
     int housed_ = 0;                // vehicles the mission starts inside the hub
+    std::map<std::string, int> beesHoused_; // of those, the bees by kind ("worker-bee")
+    int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
     std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the

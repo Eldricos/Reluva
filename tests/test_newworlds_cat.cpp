@@ -1405,6 +1405,10 @@ void testVehicleProduction() {
     CHECK(run(e, 22.5).empty());
     auto out = run(e, 1);
     CHECK(out.size() == 1 && out[0].first == 56 && out[0].second == yard);
+    // The panels' figures: the colony's consumption, each consumer's supply.
+    CHECK(e.consumption() > 0 && e.consumption() <= 1);
+    CHECK(std::all_of(e.structures().begin(), e.structures().end(),
+                      [](const ColonyStructure& c) { return c.supply > 0 && c.supply <= 1; }));
     // An officer of the yards' speciality at 0.5: efficiency 1.0, 12 s.
     e.setOfficer(yard, 0.5f);
     CHECK(e.orderVehicle(*apc));

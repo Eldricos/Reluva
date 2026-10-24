@@ -844,6 +844,41 @@ sends its rivals Go_Futile: one under way reports "beaten to it"
 (target 1); one idle or still in its start delay turns futile and later
 reports "futile" (target 6) instead of success.
 
+### The selection panel
+
+One object selected (a building's details need exactly one) shows in
+the NEW WORLDS panel, its class picked by type id:
+
+- **Every object:** its name; its side (table: Federation, Klingon,
+  Romulan, Taubat, Hubrin, Metar, Orion, Rival, Rebel), the holder's when
+  captured; a state word, later rules winning: OPERATIONAL once built,
+  else INCOMPLETE; CAPTURED when held; EVACUATING; DESTROYED below 1 hit
+  point. A vehicle shows EN ROUTE while moving, else READY. SHIELD COVER
+  is High when the object's block has its own side's shield-field mark,
+  else Basic (None if destroyed). A bar shows its hit points' share.
+  Another side's objects show only this.
+- **The colony's buildings** add EFFICIENCY (× 100, cut down: 1.2 shows
+  120 %). Consumers show CONSUMER, SUPPLY (the running average of the
+  share of power granted; 100 % when nothing was asked) and RESERVE
+  (their buffer's (4 × average + now) / (4 × capacity)). The hub and
+  generators show the colony's pool instead: GENERATOR Low (hub), Med.
+  (generator), High (advanced generator), by type; CONSUMPTION (power
+  drawn over made, last tick); DEMAND MET; RESERVE (stored / 6400 %).
+- **Extras by building:** OFFICERS / CREW / POOL from its people (hub,
+  security centre, science block, pad, accommodation); the hub and the
+  construction yard the side's WORKBEE, CARGOBEE, CNSTRCTNBEE and
+  TRANSPORT counts (the yard also colony size and the stock); the
+  vehicle yard its materials and MANUFACTURING with a bar, or SUSPENDED;
+  mines and the processor their raw ores; storage its materials; a
+  shield generator its COVERAGE High / Med. / Low (its field's size);
+  farms a producer block from life support; the sickbay its healthy,
+  sick and dead; upgrades on offer.
+- **Buttons:** BUILD (the build menu, or the vehicles on a yard; only
+  under the colony's limit), DEMOLISH (with a yes / no; not the hub,
+  storage, an unfinished or evacuating building); the hub a roster window
+  and a toggle to the colony overview (size, stock, JUMP TO); the sickbay
+  and science block a window and an assign button.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast

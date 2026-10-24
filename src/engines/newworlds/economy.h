@@ -110,6 +110,7 @@ struct ColonyStructure {
     bool exhausted = false;
     float stored = 0;    // its power buffer
     float fill = 1;      // the buffer's fill, averaged (for efficiency)
+    float supply = 1;    // the share of what it asked that it got, averaged (its panel's SUPPLY)
     float health = 1;    // its hit points' share, 0-1
     int crew = 0;        // at work in it
     int pool = 0;        // housed in it (hub, accommodation)
@@ -134,6 +135,7 @@ public:
     float powerSupply() const;
     float powerDemand() const { return requested_; }
     float demandMet() const { return met_; }
+    float consumption() const { return consumption_; } // the share of what's made that was drawn
     float reserve() const { return float(reserve_ / kReserveCap); }
     const std::vector<ColonyStructure>& structures() const { return structures_; }
     // Raw ore waiting at the processor, in tonnes, by ore kind - 1.
@@ -178,6 +180,12 @@ public:
     const std::vector<VehicleJob>& vehicleJobs() const { return jobs_; }
     // Vehicles finished since last asked: type id and the yard's id.
     std::vector<std::pair<int, int>> takeVehicles();
+    // Whether a vehicle yard is working (between its start and stop
+    // efficiencies, as it was); its panel shows SUSPENDED when not.
+    bool yardRunning(int structure) const {
+        auto it = yardRunning_.find(structure);
+        return it == yardRunning_.end() || it->second;
+    }
     // A building's best officer skill at its speciality (0 none): the
     // officer term of its efficiency.
     void setOfficer(int structure, float skill);
@@ -228,7 +236,7 @@ private:
     int oreCycle_ = 0, refineSlot_ = 0;
     double tickClock_ = 0, clock_ = 0, lastPowerWarning_ = -1e9;
     double reserve_ = kReserveCap;
-    float requested_ = 0, met_ = 1;
+    float requested_ = 0, met_ = 1, consumption_ = 0;
     std::vector<ScriptEvent> pendingShort_;
     std::vector<VehicleJob> jobs_;
     std::vector<std::pair<int, int>> finished_;

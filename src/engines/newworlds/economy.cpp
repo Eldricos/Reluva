@@ -756,6 +756,7 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         }
     life_ = std::clamp(life_, 0.0, kLifeCap);
     double supply = powerSupply();
+    const double produced = supply;
     if (hubEff > 0) {
         const double ask = (kLifeCap - life_) / kLifePerPower / hubEff;
         const double grant = std::min(ask, supply + reserve_);
@@ -777,11 +778,14 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
     }
     requested_ = asked;
     met_ = asked > 0 ? float(std::min(1.0, give / asked)) : 1;
+    // What the colony drew of what it made (the hub panel's consumption).
+    consumption_ = produced > 0 ? float(std::min(1.0, (lifeDraw_ + std::min(double(asked), supply)) / produced)) : 0;
     for (ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0) {
             const float want = std::min(t->intake, t->bufferCap - s.stored + t->demand);
             s.stored = std::clamp(s.stored + want * met_ - t->demand, 0.0f, t->bufferCap);
             s.fill = (s.stored / t->bufferCap + s.fill) * 0.5f; // the game's average, kept at each refill
+            s.supply = (met_ + s.supply) * 0.5f;                  // and of the share granted
         }
     if (met_ < kPowerLow && clock_ - lastPowerWarning_ >= kWarnEvery) {
         out.push_back({"power-low", {}});

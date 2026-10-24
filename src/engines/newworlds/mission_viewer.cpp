@@ -356,6 +356,8 @@ void MissionViewer::startPlay() {
     std::vector<Start> start;
     std::map<std::pair<int, int>, int> onSpot;
     housed_ = 0;
+    beesHoused_.clear();
+    selectedBuilding_ = 0;
     auto onHub = [&](const StartPlacement& p) {
         return colony_ && !colony_->buildings().empty() && p.a == colony_->buildings()[0].a &&
                p.b == colony_->buildings()[0].b;
@@ -365,8 +367,10 @@ void MissionViewer::startPlay() {
         return ct && isBee(*ct);
     };
     for (const StartPlacement& p : startPlacements(level.shortName, side))
-        if (const ObjectType* t = objectType(p.type); t && !t->building && onHub(p) && bee(p.type))
+        if (const ObjectType* t = objectType(p.type); t && !t->building && onHub(p) && bee(p.type)) {
             ++housed_;
+            ++beesHoused_[combatType(p.type)->name];
+        }
     // Bees placed on the hub itself stay inside it (its panel counts
     // them); other vehicles there park round it, as the game spreads them.
     for (const StartPlacement& p : startPlacements(level.shortName, side))
@@ -490,6 +494,8 @@ void MissionViewer::rollOut() {
         const VehicleType* v = vehicleType(type);
         if (v && v->bee()) {
             ++housed_;
+            if (const CombatType* ct = combatType(type))
+                ++beesHoused_[ct->name];
             continue;
         }
         float x = map_.worldWidth() / 2, y = map_.worldHeight() / 2;
@@ -1045,7 +1051,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             if (map_.locked())
                 map_.unlock();
             else
-                world_->clearSelection();
+                world_->clearSelection(), selectedBuilding_ = 0;
             showUnits();
         } else if (ev.button == MouseButton::Left) {
             boxing_ = true;
@@ -1110,7 +1116,28 @@ bool MissionViewer::playEvent(const Event& ev) {
                     if (d < ownD)
                         ownBuilding = u.id, ownD = d;
                 }
-            if (ownBuilding >= 0 && !world_->selection().empty()) {
+            // A building clicked with nothing to order: selected, its
+            // details in the panel (the colony's, or another side's seen).
+            int building = -1, buildingD = 30 * 30;
+            if (!pendingOrder_)
+                for (const Unit& u : world_->units()) {
+                    int sx = 0, sy = 0;
+                    if (!u.building || u.kind.model.empty() || (u.slot != playerSlot_ && !visible(u)) ||
+                        !map_.worldToScreen(u.x, u.y, map_.groundAtWorld(u.x, u.y) + 1500, sx, sy))
+                        continue;
+                    const int d = (sx - ev.mouseX) * (sx - ev.mouseX) + (sy - ev.mouseY) * (sy - ev.mouseY);
+                    if (d < buildingD)
+                        building = u.id, buildingD = d;
+                }
+            const bool ordering = !world_->selection().empty() && other >= 0 && building == other;
+            if (building >= 0 && best < 0 && !ordering && (world_->selection().empty() ||
+                                                           world_->unit(building)->slot == playerSlot_)) {
+                world_->clearSelection();
+                selectedBuilding_ = building;
+                // A double click locks the camera on it (the tutorial's).
+                if (ev.clicks >= 2)
+                    map_.lockOn(world_->unit(building)->x, world_->unit(building)->y);
+            } else if (ownBuilding >= 0 && !world_->selection().empty()) {
                 const Unit& b = *world_->unit(ownBuilding);
                 const std::vector<int> chosen = world_->selection();
                 std::vector<int> shields, others;
@@ -1126,7 +1153,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             } else if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
                 orderOn(other);
             else if (best >= 0)
-                world_->select({best});
+                world_->select({best}), selectedBuilding_ = 0;
             else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
                 if (!world_->selection().empty()) {
                     for (int id : world_->selection())
@@ -1605,6 +1632,123 @@ void MissionViewer::drawMinerals(int x, int y, int w, int h) {
         }
 }
 
+// A selected object's panel, as the game's: its name; its side (the
+// holder's, when captured); its state (OPERATIONAL or INCOMPLETE, CAPTURED,
+// DESTROYED; a vehicle READY or EN ROUTE); its shield cover (HIGH inside a
+// shield field of its side, else BASIC). For the colony's own buildings
+// also its efficiency, power, people and what the building keeps: the
+// hub and generators show the colony's power (their GENERATOR level by
+// type); consumers their own supply and reserve.
+std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
+    std::vector<std::string> out;
+    auto upper = [](std::string v) {
+        for (char& c : v)
+            c = c == '-' ? ' ' : char(std::toupper(static_cast<unsigned char>(c)));
+        return v;
+    };
+    auto pct = [](double v) { return std::to_string(int(std::clamp(v, 0.0, 9.99) * 100)) + "%"; };
+    const BuildingType* bt = u.building ? buildingType(u.name) : nullptr;
+    out.push_back(bt && u.slot == playerSlot_ ? bt->panel : upper(u.building ? u.name : u.kind.name));
+    const int owner = u.heldBy >= 0 ? u.heldBy : u.slot;
+    const char race = owner == playerSlot_ ? missionSides(missions_[size_t(current_)].shortName)[size_t(side_)]
+                      : ai_                ? ai_->raceOf(owner)
+                                           : u.side;
+    out.push_back(upper(raceName(race == '?' ? u.side : race)));
+    if (u.hp < 1)
+        out.push_back("DESTROYED");
+    else if (u.heldBy >= 0)
+        out.push_back("CAPTURED");
+    else if (u.building)
+        out.push_back(u.built >= 1 ? "OPERATIONAL" : "INCOMPLETE");
+    else
+        out.push_back(u.moving() ? "EN ROUTE" : "READY");
+    const bool high = fog_ && fog_->has(int(u.x / MapViewer::kBlockUnits), int(u.y / MapViewer::kBlockUnits), Fog::Shielded,
+                                       u.slot);
+    out.push_back(std::string("SHIELD COVER ") + (u.hp < 1 ? "NONE" : high ? "HIGH" : "BASIC"));
+    if (!u.building) {
+        if (fieldWork_) {
+            if (const std::string work = fieldWork_->status(u.id); !work.empty())
+                out.push_back(work);
+            for (const Officer* o : fieldWork_->aboard(u.id))
+                out.push_back(std::string("OFFICER ") + o->name);
+        }
+        return out;
+    }
+    // The colony's own: its structure in the economy.
+    const ColonyStructure* c = nullptr;
+    for (size_t i = 0; economy_ && i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+        if (colonyObjects_[i] == u.id)
+            for (const ColonyStructure& s : economy_->structures())
+                if (s.id == structureIds_[i])
+                    c = &s;
+    if (!c || !bt || u.slot != playerSlot_)
+        return out;
+    out.push_back("EFFICIENCY " + std::to_string(int(economy_->efficiency(*c) * 100)) + "%");
+    const bool generator = c->type == "colony-hub" || c->type == "power-generator" || c->type == "advanced-generator";
+    if (generator) {
+        out.push_back(std::string("GENERATOR ") + (c->type == "colony-hub"           ? "LOW"
+                                                  : c->type == "power-generator" ? "MED."
+                                                                                  : "HIGH"));
+        out.push_back("CONSUMPTION " + pct(economy_->consumption()));
+        out.push_back("DEMAND MET " + pct(economy_->demandMet()));
+        out.push_back("RESERVE " + pct(economy_->reserve()));
+    } else if (bt->bufferCap > 0) {
+        out.push_back("CONSUMER");
+        out.push_back("SUPPLY " + pct(c->supply > 0.99f ? 1.0 : c->supply));
+        const double reserve = (4 * c->fill + c->stored / bt->bufferCap) / 4;
+        out.push_back("RESERVE " + pct(reserve > 0.99 ? 1.0 : reserve));
+    }
+    if (bt->crewSlots > 0 || bt->poolSlots > 0 || c->type == "colony-hub") {
+        int officers = 0;
+        if (fieldWork_)
+            for (const FieldWork::OfficerAt& o : fieldWork_->officers())
+                officers += o.in == u.id;
+        out.push_back("OFFICERS " + std::to_string(officers));
+        out.push_back("CREW " + std::to_string(c->crew));
+        if (bt->poolSlots > 0)
+            out.push_back("POOL " + std::to_string(c->pool));
+    }
+    auto bees = [&](const char* kind) {
+        auto it = beesHoused_.find(kind);
+        return std::to_string(it == beesHoused_.end() ? 0 : it->second);
+    };
+    if (c->type == "colony-hub" || c->type == "construction-yard") {
+        int transports = 0;
+        for (const Unit& v : world_->units())
+            transports += v.slot == playerSlot_ && v.name == "unarmed-apc";
+        out.push_back("WORKBEE " + bees("worker-bee"));
+        out.push_back("CARGOBEE " + bees("cargo-bee"));
+        out.push_back("CNSTRCTNBEE " + bees("construction-bee"));
+        out.push_back("TRANSPORT " + std::to_string(transports));
+    }
+    if (c->type == "vehicle-yard") {
+        const Economy::VehicleJob* job = nullptr;
+        for (const Economy::VehicleJob& j : economy_->vehicleJobs())
+            if (j.yard == c->id && !job)
+                job = &j;
+        if (job && !economy_->yardRunning(c->id))
+            out.push_back("SUSPENDED");
+        else if (job)
+            if (const VehicleType* v = vehicleType(job->type))
+                out.push_back(std::string("MANUFACTURING ") + v->panel + " " +
+                              std::to_string(job->total > 0 ? int(100 - std::max(0.0, job->work) * 100 / job->total) : 100) +
+                              "%");
+    }
+    if (c->type == "shield-generator")
+        out.push_back(std::string("COVERAGE ") + (u.efficiency > 0.6f ? "HIGH" : u.efficiency > 0.2f ? "MED." : "LOW"));
+    if (c->type == "storage-facility" || c->type == "construction-yard") {
+        const Stock st = economy_->stock();
+        for (int m = 0; m < kMaterials; ++m)
+            out.push_back(std::string(materialName(m)) + " " + std::to_string(st[size_t(m)]));
+    }
+    if (c->type == "resource-processor") {
+        const auto ore = economy_->oreStock();
+        for (int k = 1; k <= kOres; ++k)
+            out.push_back("RAW " + upper(oreName(k)) + " " + std::to_string(int(ore[size_t(k - 1)])));
+    }
+    return out;
+}
+
 // What play adds over the map: the full-screen Tricorder (Tab), with the
 // units on it, and the box a left drag draws.
 void MissionViewer::drawPlay() {
@@ -1704,9 +1848,14 @@ void MissionViewer::drawInterface() {
         const auto offered = researchMenu_ && research_ ? research_->offered() : std::vector<size_t>{};
         const auto vehicles = vehicleMenu_ && economy_ ? economy_->vehicleMenu() : std::vector<const VehicleType*>{};
         const size_t jobs = vehicleMenu_ && economy_ ? economy_->vehicleJobs().size() : 0;
+        const Unit* picked = selectedBuilding_ && world_ ? world_->unit(selectedBuilding_) : nullptr;
+        if (!picked && world_ && world_->selection().size() == 1 && !buildMenu_ && !researchMenu_ && !vehicleMenu_)
+            picked = world_->unit(world_->selection()[0]);
+        const std::vector<std::string> info = picked ? objectPanel(*picked) : std::vector<std::string>{};
         const int lines = buildMenu_      ? int(menu.size()) + 1
                           : researchMenu_ ? std::max(2, int(offered.size()) + 1)
                           : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
+                          : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0)
                                           : economy_ ? 8 : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
@@ -1777,18 +1926,23 @@ void MissionViewer::drawInterface() {
                     ui_.drawSmall(screen_, x + 10, ty + lh * line++,
                                   std::string(materialName(m)) + " = " + std::to_string(placing->costFor(side)[size_t(m)]),
                                   economy_->stock()[size_t(m)] >= placing->costFor(side)[size_t(m)] ? text : Color{255, 80, 60});
-        } else if (sel.size() == 1) {
-            // One unit: its name and state, as the game's panel.
-            const Unit* u = world_->unit(sel[0]);
-            ui_.drawSmall(screen_, x + 10, ty, u->kind.name, bright);
-            const std::string work = fieldWork_ ? fieldWork_->status(u->id) : std::string();
-            ui_.drawSmall(screen_, x + 10, ty + lh, !work.empty() ? work : u->moving() ? "EN ROUTE" : "READY", text);
-            int line = 2;
-            if (fieldWork_)
-                for (const Officer* o : fieldWork_->aboard(u->id))
-                    ui_.drawSmall(screen_, x + 10, ty + lh * line++, std::string("OFFICER ") + o->name, text);
+        } else if (picked) {
+            // One object, a unit or a building: the game's panel, with its
+            // hit points as a bar under it.
+            for (size_t i = 0; i < info.size(); ++i)
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(i), info[i], i == 0 ? bright : text);
+            const int by = ty + lh * int(info.size()) + 2, bw = w - 20;
+            const float share = std::clamp(picked->hp / std::max(1.0f, picked->maxHp), 0.0f, 1.0f);
+            for (int yy = by; yy < by + 4 && yy < screen_.h; ++yy)
+                for (int xx = 0; xx < bw && x + 10 + xx < screen_.w; ++xx) {
+                    uint8_t* p = screen_.row(yy) + (x + 10 + xx) * 4;
+                    const bool full = xx < int(float(bw) * share);
+                    p[0] = full ? uint8_t(share < 0.3f ? 230 : 60) : 40;
+                    p[1] = full ? uint8_t(share < 0.3f ? 60 : 210) : 40;
+                    p[2] = full ? 70 : 50;
+                }
             if (pendingOrder_)
-                ui_.drawSmall(screen_, x + 10, ty + lh * line, pendingOrderName(), bright);
+                ui_.drawSmall(screen_, x + 10, by + 6, pendingOrderName(), bright);
         } else if (sel.size() > 1) {
             ui_.drawSmall(screen_, x + 10, ty, "MULTISELECTION", bright);
             for (size_t i = 0; i < sel.size() && i < 6; ++i)
