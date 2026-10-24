@@ -516,6 +516,27 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+### Research
+
+Each side has the mission's **research topics** (`ai_data.cpp`): a name,
+a field (1 medical, 3 science; 2 in F8 and 4 in CD1-CD2; the field only
+picks the topic's icon), the points it takes (10000-150000) and how many
+times its name must reach the side's research database before it opens
+(0: open from the start, as J8's; 1 most; 2 J6's biodata). The scripts
+send the name when the mission calls for the research. The player starts
+an open topic from the Operations panel's Research tab (its button is lit
+while any topic is open); nothing starts by itself. Every tick the side's
+**1000 research points** are shared out, in whole points, between the
+topics running: one alone takes 150000 points in 150 ticks (7.5 s), two
+at once go at 500 a tick each. **No building, officer, crew or power
+enters into it** (the sickbay and science station named by the messages
+don't take part). A finished topic sends its messages to its targets (the
+script's next step); the game announces nothing of its own. A topic's
+button reads one of three captions: not started, in progress, finished.
+Officer training runs in a second queue the same way ("train staff":
+150000 points). The science station's labs are add-ons bought with
+materials, not research.
+
 ## Still open
 
 - How long a path step is (so units' real speeds), and how fast

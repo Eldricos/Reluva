@@ -57,7 +57,8 @@ R9's trigger) and the stance changes
 colony's buildings, its stock and building counts, key presses (the
 training missions wait for keys), timers, what combat destroys, the
 counts of every side's units and buildings, sightings of the sites, and
-scans and captures through the mission's own watches on them (the
+research (the game's topics, opened by the scripts' `research` and started
+by the player), and scans and captures through the mission's own watches on them (the
 executable's raids: [game.md](game.md#the-other-sides-and-combat)). The
 capture events follow the raids: `entered` when the away team is in,
 `captured` when it has held the building long enough.

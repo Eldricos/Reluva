@@ -22,6 +22,7 @@ As the first tutorial teaches them:
 | Left click on another side's unit or building (units selected) | sends them to attack it (scouts and science vehicles scan it instead: a science scan) |
 | S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
 | C, then a click on a building | the selected armed APCs capture it |
+| R, then 1-9 | the research topics open to the colony; a number starts one (several share the points) |
 | O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
 | Double click on the ground (nothing selected) | locks the camera on the spot; numpad 4/6 orbit it |
@@ -178,6 +179,12 @@ placed); the game's playbook and officer cards are keys here.
   hear `entered`, then `captured` once a raid's hold time is up (at once
   where none watches it), `held <target> <seconds>` each second,
   `capture-lost` or `vacated` when the team comes out.
+- **Research** as the executable has it ([exe.md](exe.md#research)): a
+  script's `research <topic>` opens the mission's topic once it has been
+  sent as many times as the game wants; R lists the open ones in the NEW
+  WORLDS panel and a number starts one; the side's 1000 points a tick are
+  shared between those running (F1's plague: 7.5 s alone). Finished, the
+  scripts hear `researched <topic>`.
 - **Officers** start where the mission posts them; the panel lists those
   aboard a selected vehicle.
 - **Sightings:** the scripts hear `seen <site>` when one of the player's
@@ -218,6 +225,6 @@ placed); the game's playbook and officer cards are keys here.
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
 groups, combat), `ai_sides.h` (the other sides and their orders),
 `ai_data.h` (what the executable gives for every side), `field_work.h`
-(scans, captures, officers), `economy.h` (stock, construction, power, mining, crew),
+(scans, captures, officers), `research.h`, `economy.h` (stock, construction, power, mining, crew),
 `colony.h` (`ColonyLayout::spotAt`, where a building fits), the map view's game camera and picking (`viewers.h`,
 `MapViewer::gameKey`), and the missions page's play mode.

@@ -119,7 +119,8 @@ struct Officer {
 std::vector<const Officer*> officers(std::string_view mission, int slot);
 
 // A mission's research topic for a side: its field (1 medical, 3 science;
-// 2 and 4 also occur), the points it takes, and a flag of the game's.
+// 2 and 4 also occur; it picks the topic's icon), the points it takes, and
+// how many times the script must send its name to open it.
 // topic: as the scripts name it ("taubat-colony-research", "metar-biodata").
 struct ResearchTopic {
     const char* mission;
@@ -127,8 +128,9 @@ struct ResearchTopic {
     const char* topic;
     int field;
     int points;
-    int flag;
+    int locks;
 };
 const ResearchTopic* researchTopic(std::string_view mission, int slot, std::string_view topic);
+std::vector<const ResearchTopic*> researchTopics(std::string_view mission, int slot);
 
 } // namespace reluva::newworlds

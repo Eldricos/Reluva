@@ -315,6 +315,8 @@ void MissionViewer::startPlay() {
         fieldWork_->placeOfficers();
         pendingOrder_ = 0;
     }
+    research_ = std::make_unique<Research>(level.shortName, playerSlot_);
+    researchMenu_ = false;
     // The mission's script, from its start, if Reluva has one.
     run_.reset();
     walk_.clear();
@@ -385,6 +387,7 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    research_.reset();
     fieldWork_.reset();
     ai_.reset();
     world_.reset();
@@ -738,6 +741,10 @@ bool MissionViewer::playEvent(const Event& ev) {
     }
     switch (ev.type) {
     case EventType::KeyDown:
+        if (ev.key == key::Escape && researchMenu_) {
+            researchMenu_ = false;
+            break;
+        }
         if (ev.key == key::Escape && (buildMenu_ || !placing_.empty())) {
             buildMenu_ = false;
             placing_.clear();
@@ -748,7 +755,20 @@ bool MissionViewer::playEvent(const Event& ev) {
             stopPlay();
             return true;
         }
+        // R: the research topics open to the colony; a number starts one.
+        if (ev.key == 'r' && research_) {
+            researchMenu_ = !researchMenu_;
+            buildMenu_ = false;
+            break;
+        }
+        if (researchMenu_ && research_ && ev.key >= '1' && ev.key <= '9') {
+            const auto offered = research_->offered();
+            if (size_t(ev.key - '1') < offered.size())
+                research_->start(offered[size_t(ev.key - '1')]);
+            break;
+        }
         if (ev.key == 'b') {
+            researchMenu_ = false;
             buildMenu_ = !buildMenu_;
             placing_.clear();
             map_.setGhost({}, 0, 0, false);
@@ -1035,6 +1055,10 @@ void MissionViewer::update(uint64_t nowMs) {
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
         combatStep(happened);
+        if (research_) {
+            auto found = research_->advance(std::min(dt, 0.25));
+            happened.insert(happened.end(), found.begin(), found.end());
+        }
         if (fieldWork_) {
             auto worked = fieldWork_->advance(std::min(dt, 0.25), [this](const ScriptEvent& e) {
                 return run_ && run_->handles(e);
@@ -1395,7 +1419,8 @@ void MissionViewer::drawInterface() {
     // selection, or the build menu.
     {
         const auto menu = buildMenu_ ? buildMenu() : std::vector<const BuildingType*>{};
-        const int lines = buildMenu_ ? int(menu.size()) + 1 : 7;
+        const auto offered = researchMenu_ && research_ ? research_->offered() : std::vector<size_t>{};
+        const int lines = buildMenu_ ? int(menu.size()) + 1 : researchMenu_ ? std::max(2, int(offered.size()) + 1) : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
@@ -1407,7 +1432,24 @@ void MissionViewer::drawInterface() {
         int ty = y + 16;
         const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
         const BuildingType* placing = placing_.empty() ? nullptr : buildingType(placing_);
-        if (buildMenu_) {
+        if (researchMenu_ && research_) {
+            // Research: the topics open, each with its key, and how far
+            // it has got (as the game's topic buttons: not started, in
+            // progress, finished).
+            ui_.drawSmall(screen_, x + 10, ty, "RESEARCH", bright);
+            if (offered.empty())
+                ui_.drawSmall(screen_, x + 10, ty + lh, "NO TOPICS", text);
+            for (size_t i = 0; i < offered.size(); ++i) {
+                const Research::Topic& t = research_->topics()[offered[i]];
+                std::string name = t.name;
+                for (char& c : name)
+                    c = c == '-' ? ' ' : char(std::toupper(static_cast<unsigned char>(c)));
+                const std::string state =
+                    t.running ? std::to_string(t.done * 100 / std::max(1, t.points)) + "%" : "READY";
+                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), std::to_string(i + 1) + " " + name + " " + state,
+                              t.running ? bright : text);
+            }
+        } else if (buildMenu_) {
             // The menu: what can be built now, each with its key; plain
             // if the stock can't pay for it.
             ui_.drawSmall(screen_, x + 10, ty, "BUILD", bright);
@@ -1625,6 +1667,8 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
             ai_->order(o.sender, o.text);
         else if (o.kind == MissionRun::Output::Stance && ai_)
             ai_->stance(o.sender, o.text);
+        else if (o.kind == MissionRun::Output::Research && research_)
+            research_->unlock(o.text);
     }
     if (!out.empty())
         redraw();

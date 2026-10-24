@@ -6076,7 +6076,7 @@ constexpr Officer kOfficers[] = {
     {"R9", 2, "Kensal", 128, 4, 0.5f},
 };
 
-// Mission, slot, topic (its name without the side and "research"), field, points, a flag.
+// Mission, slot, topic (its name without the side and "research"), field, points, unlocks needed.
 constexpr ResearchTopic kTopics[] = {
     {"CD1", 0, "metar-biodata", 4, 150000, 0},
     {"CD2", 0, "metar-biodata", 4, 150000, 0},
@@ -6117,6 +6117,14 @@ const ResearchTopic* researchTopic(std::string_view mission, int slot, std::stri
         if (mission == t.mission && t.slot == slot && topic == t.topic)
             return &t;
     return nullptr;
+}
+
+std::vector<const ResearchTopic*> researchTopics(std::string_view mission, int slot) {
+    std::vector<const ResearchTopic*> out;
+    for (const ResearchTopic& t : kTopics)
+        if (mission == t.mission && t.slot == slot)
+            out.push_back(&t);
+    return out;
 }
 
 std::vector<const Raid*> raids(std::string_view mission) {

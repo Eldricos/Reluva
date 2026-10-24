@@ -20,6 +20,7 @@
 #include "engines/newworlds/world.h"
 #include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/field_work.h"
+#include "engines/newworlds/research.h"
 #include "engines/newworlds/geo.h"
 #include "engines/newworlds/gmf.h"
 #include "engines/newworlds/levels.h"
@@ -647,6 +648,8 @@ private:
     // Scans, captures and officers; a field order waiting for its target
     // (s, m, e: a scan; c: a capture; 0 none).
     std::unique_ptr<FieldWork> fieldWork_;
+    std::unique_ptr<Research> research_; // the side's research, and its list shown (R)
+    bool researchMenu_ = false;
     char pendingOrder_ = 0;
     void orderOn(int target);
     const char* pendingOrderName() const;

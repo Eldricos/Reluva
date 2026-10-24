@@ -11,6 +11,7 @@
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/field_work.h"
+#include "engines/newworlds/research.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
 #include "engines/newworlds/texture.h"
@@ -1230,6 +1231,57 @@ void testFieldWork() {
     CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple"));
 }
 
+void testResearch() {
+    auto names = [](const std::vector<ScriptEvent>& ev) {
+        std::vector<std::string> out;
+        for (const ScriptEvent& e : ev)
+            out.push_back(e.kind + " " + e.args[0]);
+        return out;
+    };
+    // F1: the plague topic opens with the script's one message; alone it
+    // takes 150000 points at 1000 a tick: 150 ticks, 7.5 s.
+    Research f1("F1", 0);
+    CHECK(f1.topics().size() == 1 && f1.topics()[0].name == "taubat-colony" && f1.topics()[0].field == 1);
+    CHECK(f1.offered().empty() && !f1.start(0));
+    f1.unlock("taubat-colony-research");
+    CHECK(f1.offered() == std::vector<size_t>{0});
+    CHECK(f1.advance(10).empty()); // not started: nothing
+    CHECK(f1.start(0) && !f1.start(0));
+    CHECK(f1.advance(7.4).empty() && f1.topics()[0].running);
+    const auto done = names(f1.advance(0.2));
+    CHECK(done == (std::vector<std::string>{"researched taubat-colony", "researched taubat-colony-research"}));
+    CHECK(f1.topics()[0].finished && f1.offered().empty());
+    // J6: the biodata wants its name twice.
+    Research j6("J6", 1);
+    j6.unlock("metar-biodata");
+    CHECK(j6.offered().empty());
+    j6.unlock("metar-biodata");
+    CHECK(j6.offered().size() == 1);
+    // F2: two topics share the points: the 50000 one at 500 a tick (5 s),
+    // then the 150000 one alone (100000 left: 5 s more).
+    Research f2("F2", 0);
+    f2.unlock("crash-site-research");
+    f2.unlock("disease-research");
+    for (size_t i : f2.offered())
+        CHECK(f2.start(i));
+    CHECK(f2.advance(4.9).empty());
+    CHECK(names(f2.advance(0.2)) == (std::vector<std::string>{"researched disease", "researched disease-research"}));
+    CHECK(f2.advance(4.8).empty());
+    CHECK(names(f2.advance(0.2)).size() == 2);
+    // A topic the mission doesn't have: open with its message, 100000 points.
+    Research own("C4", 0);
+    own.unlock("ruins");
+    CHECK(own.offered().size() == 1 && own.topics()[0].points == 100000);
+    // The script's action reaches the game.
+    std::vector<MissionScript> parsed;
+    CHECK(!parseMissionScripts("mission T F\non start\n  research taubat-colony-research\n", parsed));
+    MissionRun run(parsed[0], nullptr);
+    const auto out = run.fire({"start", {}});
+    CHECK(std::any_of(out.begin(), out.end(), [](const MissionRun::Output& o) {
+        return o.kind == MissionRun::Output::Research && o.text == "taubat-colony-research";
+    }));
+}
+
 void testModelTextures() {
     std::vector<TextureFile> tex;
     for (const char* name : {"k_bop_a", "k_bop_b", "k_bop_g", "kcs", "kcs_g", "kcs_l", "k_bop2_a", "kwb"})
@@ -1358,6 +1410,7 @@ int main() {
     testCombat();
     testAiSides();
     testFieldWork();
+    testResearch();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);
