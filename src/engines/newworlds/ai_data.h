@@ -47,6 +47,7 @@ struct CombatType {
     float pace;        // path steps a tick (0: it doesn't move)
     Weapon weapon;
     float scan;        // scan range (0: none)
+    int fog;           // fog class: the mask it reveals round itself (0: none)
 };
 const CombatType* combatType(int id);
 
