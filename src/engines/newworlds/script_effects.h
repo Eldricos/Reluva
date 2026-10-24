@@ -75,6 +75,7 @@ private:
     bool zonesSeen_ = false;
     std::map<std::string, double> standing_; // what: seconds standing
     double infection_ = 0;
+    int infected_ = 0, crewAtStart_ = 0;
     int infecting_ = 0; // 1 spreading, -1 being cured, 0 neither
     double clock_ = 0, second_ = 0, topUpClock_ = 0;
     uint32_t random_ = 2024;

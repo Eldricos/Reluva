@@ -1407,13 +1407,18 @@ void testScriptEffects() {
     CHECK(!parseMissionScripts("mission T F\non standing colony-hub 2\n  win\non infection 3\n  win\n", holdScript));
     MissionRun hold(holdScript[0], nullptr);
     CHECK(!hold.fire({"standing", {"colony-hub", "1"}}).size() && hold.fire({"standing", {"colony-hub", "2"}}).size());
-    // The disease: spreading a percent at a time, cured to nothing.
+    // The disease among the crew (four here: a yard's one, a vehicle
+    // yard's three): one of them rolls each tick, a tenth of the time
+    // catching it; once cured, three in five of the ill recover a roll.
+    e.addBuilt("construction-yard", 0, 0);
+    e.addBuilt("vehicle-yard", 0, 0);
+    CHECK(e.crew() == 4);
     fx.apply("infect", "");
     heard.clear();
-    step(5.05);
-    CHECK(fx.infection() >= 4 && has("infection 3"));
+    step(20);
+    CHECK(fx.infection() >= 25 && has("infection 25"));
     fx.apply("cure", "");
-    step(5);
+    step(20);
     CHECK(fx.infection() == 0 && has("cured"));
 }
 

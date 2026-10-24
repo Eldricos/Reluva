@@ -12,16 +12,19 @@ namespace reluva::newworlds {
 namespace {
 
 constexpr float kBlock = 16384;
-constexpr double kTick = 0.05;
-// The top-up's period (63 ticks, exe.md#script-effects).
-constexpr double kTopUpEvery = 63 * kTick;
-// Placeholders until the executable's figures are read: a meteor's damage
-// and reach, the storms' flash rate, and the disease's spread and cure in
-// percent a second.
-constexpr float kMeteorDamage = 40, kMeteorReach = 3000;
-constexpr double kFlashEvery = 0.4;
-constexpr double kSpread = 1.0, kCure = 2.0;
+// The script objects' tick: 16 a second (exe.md#script-effects), and
+// their figures: the top-up every 63 ticks; a meteor's 30 points of damage
+// to the one thing it hits; an area storm's 2 % chance a tick of a flash;
+// the disease's rolls (in a hundred): 10 to catch it, 60 to recover.
+constexpr double kTick = 1.0 / 16;
+constexpr int kTopUpTicks = 63;
+constexpr float kMeteorDamage = 30;
+constexpr float kFlashChance = 0.02f;
+constexpr float kCatch = 0.10f, kRecover = 0.60f;
 constexpr double kSparkLife = 1.0;
+// A thing's size, for a meteor hitting it (a placeholder for the model's
+// bounding sphere).
+constexpr float kBuildingSize = 6000, kVehicleSize = 1000;
 
 std::vector<std::string> words(const std::string& text) {
     std::istringstream in(text);
@@ -124,7 +127,7 @@ void ScriptEffects::apply(const std::string& verb, const std::string& args) {
         Storm s;
         s.zone = a[0];
         s.meteors = verb == "meteors";
-        s.every = s.meteors ? std::max(0.05, std::atof(a[1].c_str())) : kFlashEvery;
+        s.every = s.meteors ? std::max(kTick, std::atof(a[1].c_str())) : 0;
         storms_.push_back(s);
     } else if (verb == "infect") {
         infecting_ = 1;
@@ -156,7 +159,7 @@ void ScriptEffects::tick(std::vector<ScriptEvent>& out) {
         return float(random_ >> 8) / float(1u << 24);
     };
     // Top-up.
-    if (toppingUp_ && economy_ && (topUpClock_ += kTick) >= kTopUpEvery) {
+    if (toppingUp_ && economy_ && (topUpClock_ += 1) >= kTopUpTicks) {
         topUpClock_ = 0;
         const Stock st = economy_->stock();
         for (int m = 0; m < kMaterials; ++m)
@@ -166,17 +169,24 @@ void ScriptEffects::tick(std::vector<ScriptEvent>& out) {
     // Storms: a meteor (damage round where it falls) or a flash at a
     // random point of the zone.
     for (Storm& s : storms_) {
-        if ((s.clock += kTick) < s.every)
+        if (s.meteors ? (s.clock += kTick) < s.every - 1e-9 : random01() >= kFlashChance)
             continue;
         s.clock = 0;
         const auto r = zoneRect(s.zone);
         const float x = r[0] + (r[2] - r[0]) * random01(), y = r[1] + (r[3] - r[1]) * random01();
         sparks_.push_back({x, y, s.meteors ? 0 : 1});
-        if (s.meteors)
-            for (const Unit& u : world_.units())
-                if (std::hypot(u.x - x, u.y - y) < kMeteorReach + (u.building ? 4000 : 0))
-                    if (Unit* v = world_.unit(u.id))
-                        v->hp -= kMeteorDamage;
+        if (!s.meteors)
+            continue;
+        // The one thing it falls on.
+        const Unit* hit = nullptr;
+        float best = 1e30f;
+        for (const Unit& u : world_.units()) {
+            const float d = std::hypot(u.x - x, u.y - y);
+            if (d < (u.building ? kBuildingSize : kVehicleSize) && d < best)
+                best = d, hit = &u;
+        }
+        if (hit)
+            world_.unit(hit->id)->hp -= kMeteorDamage;
     }
     // Routes: on to the next point when one is reached.
     for (auto it = routes_.begin(); it != routes_.end();) {
@@ -201,13 +211,23 @@ void ScriptEffects::tick(std::vector<ScriptEvent>& out) {
         }
         ++it;
     }
-    // The disease, a percent at a time.
+    // The disease: each tick one of the crew, in turn, rolls: one who's
+    // well may catch it while it spreads; one who's ill may recover once
+    // the cure has begun. The percentage is of the crew when it began.
     if (infecting_ != 0) {
-        const int before = int(infection_);
-        infection_ = std::clamp(infection_ + (infecting_ > 0 ? kSpread : -kCure) * kTick, 0.0, 100.0);
+        if (crewAtStart_ == 0)
+            crewAtStart_ = std::max(1, economy_ ? economy_->crew() : 1);
+        const int before = infected_ * 100 / crewAtStart_;
+        const bool ill = random01() * float(crewAtStart_) < float(infected_);
+        const float roll = random01();
+        if (infecting_ > 0 && !ill && roll < kCatch)
+            infected_ = std::min(crewAtStart_, infected_ + 1);
+        else if (infecting_ < 0 && ill && roll < kRecover)
+            --infected_;
+        infection_ = double(infected_ * 100 / crewAtStart_);
         if (int(infection_) != before)
             out.push_back({"infection", {std::to_string(int(infection_))}});
-        if (infecting_ < 0 && infection_ <= 0) {
+        if (infecting_ < 0 && infected_ <= 0) {
             infecting_ = 0;
             out.push_back({"cured", {}});
         }

@@ -516,6 +516,40 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+### Script effects
+
+The script objects that act on the world, as the game runs them (16
+ticks a second, like all script objects):
+
+- **Group damage**: once, every unit of a named group loses a share of
+  its full strength: 20, 40, 60 or 80 %, or all of it.
+- **Group beam-up**: every unit of the group beamed off the map; the
+  object fires when the group is empty.
+- **Attack group**: the count of a type created for a side round a point,
+  with a transporter effect, and handed to an AI order.
+- **Unit path**: a unit (a Bird of Prey, a shuttle, the tractor) sent
+  along up to 16 points, stopping at the end or looping.
+- **Meteor storm**: whenever the game time divides by its interval (F2:
+  16, 24 and 32 ticks: 1, 1.5, 2 s), a meteor falls at a random point of
+  its rectangle and does **30** damage to the one object it hits (no
+  splash).
+- **Area storm**: lightning only: a 2 % chance a tick of a flash (half a
+  second, the camera shaken when near) somewhere in its rectangle.
+- **Commodity top-up**: every 63 ticks (3.9 s), any material below the
+  bundle is made up to it, into the side's stores, free.
+- **Thief / donor**: the bundle taken from / given to the side's stock.
+- **Disease** (F2): among the crew held by buildings and vehicles (not the
+  officers). Each tick one crewman in turn rolls (0-100): while it
+  spreads, a well one catches it under 10, an ill one loses health under
+  4 (dying at none: rare); once the cure starts, an ill one gets better
+  under 60, until all are well, when the object fires. The disease
+  monitor fires when the infected reach its share of the crew (F2: 1,
+  30, 80 %).
+- **Build and hold**: a type's count reaching its number starts a clock
+  (600 s for the CFD objectives); losing it stops the clock.
+- **Area detectors**: every 16 ticks, a side's units of a class inside
+  (or none inside) a rectangle; a group detector, the whole group.
+
 ### Crew and efficiency
 
 A building's **efficiency** is 0.4 × (health + power + officer) × crew:
