@@ -21,6 +21,8 @@ constexpr float kSpread = 2500;
 constexpr float kBuildingReach = 6000;
 // Ticks between a burst's shots; a placeholder.
 constexpr int kBurstGap = 3;
+// Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
+constexpr int kCloakAfter = 300, kCloakFade = 63;
 
 } // namespace
 
@@ -369,6 +371,16 @@ void World::combatTick() {
         return distance(u, t) <= u.weapon.range + (t.building ? kBuildingReach : 0);
     };
     for (Unit& u : units_) {
+        if (u.cloaks && u.hp > 0) {
+            if (u.fading > 0) {
+                if (--u.fading == 0) {
+                    u.cloaked = u.cloaking;
+                    u.cloakClock = 0;
+                }
+            } else if (!u.cloaked && ++u.cloakClock >= kCloakAfter) {
+                u.fading = kCloakFade, u.cloaking = true;
+            }
+        }
         if (u.weapon.kind == WeaponKind::None || u.hp <= 0 || u.holdFire || u.built < 1)
             continue;
         if (u.cooldown > 0)
@@ -376,20 +388,25 @@ void World::combatTick() {
         Unit* t = u.target ? unit(u.target) : nullptr;
         if (t && (t->hp <= 0 || (!u.ordered && !(u.ai ? prey(u.slot, t->slot) : hostile(u, *t)) && t->id != u.lastAttacker)))
             t = nullptr;
+        // A cloaked unit is no one's pick (only the player's own order keeps it).
+        if (t && t->cloaked && (u.ai || !u.ordered))
+            t = nullptr;
         if (t && !u.ordered && !inRange(u, *t))
             t = nullptr;
         // Finding one: the nearest enemy in range (a unit driving on its
         // player's orders doesn't stop to look; an AI's goes for its prey);
         // or whoever fired at it.
-        if (!t && (u.ai || u.building || !u.moving())) {
+        // (A cloaking unit doesn't look on the move: it stays cloaked.)
+        const bool looks = (u.ai || u.building || !u.moving()) && !(u.cloaks && u.moving());
+        if (!t && looks) {
             float best = 1e30f;
             for (Unit& v : units_)
-                if (v.hp > 0 && v.id != u.id && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
+                if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
                     distance(u, v) < best)
                     best = distance(u, v), t = &v;
         }
-        if (!t && u.lastAttacker && (u.ai || u.building || !u.moving()))
-            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && inRange(u, *a))
+        if (!t && u.lastAttacker && looks)
+            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a))
                 t = a;
         if (!t) {
             u.target = 0, u.ordered = false, u.firing = false, u.burstLeft = 0;
@@ -406,6 +423,12 @@ void World::combatTick() {
         u.firing = true;
         u.path.clear();
         u.turretYaw = std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading);
+        // Cloaked, it decloaks to fire; it can't while fading either way.
+        if (u.cloaks && (u.cloaked || u.fading > 0)) {
+            if (u.cloaked)
+                u.cloaked = false, u.fading = kCloakFade, u.cloaking = false;
+            continue;
+        }
         if (u.burstLeft > 0) {
             if (--u.burstGap <= 0) {
                 fire(u, *t);
@@ -437,7 +460,10 @@ void World::combatTick() {
 }
 
 void World::fire(Unit& u, Unit& t) {
-    t.hp -= float(u.weapon.damage * std::max(1, u.weapon.guns));
+    // (A building still going up takes no harm.)
+    const float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
+    if (t.built >= 1)
+        t.hp -= damage_ ? damage_(t, damage) : damage;
     t.lastAttacker = u.id;
     WorldEvent e;
     e.kind = WorldEvent::Shot;

@@ -48,6 +48,12 @@ struct CombatType {
     Weapon weapon;
     float scan;        // scan range (0: none)
     int fog;           // fog class: the mask it reveals round itself (0: none)
+    // How it's repaired (exe.md#repairs): 0 a point at a time, with no
+    // power; 1-3 from its side's repair pool, in that priority class; 4 a
+    // construction yard, which fills the pool instead.
+    int repair;
+    bool shielded;     // a shield field and security officers lessen its damage
+    bool cloaks;       // has a cloaking device
 };
 const CombatType* combatType(int id);
 

@@ -61,7 +61,7 @@ struct Unit {
     std::string name;  // as the scripts name it ("taubat-hangar")
     std::string label; // the mission's name for it ("taubat-colony"), if any
     bool building = false;
-    float built = 1;   // a building's share put up: below 1 a site, which doesn't fight
+    float built = 1;   // a building's share put up: below 1 a site, which neither fights nor is harmed
     float x = 0, y = 0;
     float heading = 0; // radians anticlockwise from east
     std::vector<std::pair<float, float>> path; // waypoints still to reach
@@ -80,6 +80,13 @@ struct Unit {
     bool firing = false; // stopped to shoot
     float turretYaw = 0; // from straight ahead, anticlockwise
     int lastAttacker = 0;
+    // A cloaking device (exe.md#cloaking): it cloaks after 300 ticks seen,
+    // fading 63 ticks either way. Cloaked, other sides don't see it and
+    // nothing picks it as a target; to fire it decloaks.
+    bool cloaks = false, cloaked = false;
+    int cloakClock = 0;  // ticks seen since it last decloaked
+    int fading = 0;      // ticks of a fade left
+    bool cloaking = false; // the fade's way: out of sight (else back)
 };
 
 // What combat did in a step: a shot (from, to, its ends) or something
@@ -148,6 +155,9 @@ public:
     bool advance(double seconds);
     // What combat did since last asked.
     std::vector<WorldEvent> takeEvents();
+    // What a hit does to its target: the weapon's damage in, the hit points
+    // it takes out (shields and security officers lessen it; none: all).
+    void setDamage(std::function<float(const Unit& target, float damage)> damage) { damage_ = std::move(damage); }
 
 private:
     int tileOf(float v) const { return int(v / kTile); }
@@ -169,6 +179,7 @@ private:
 
     std::array<std::array<int, 7>, 7> stances_{};
     std::vector<WorldEvent> events_;
+    std::function<float(const Unit&, float)> damage_;
     double tickClock_ = 0;
     int tick_ = 0;
 

@@ -12,6 +12,7 @@
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/field_work.h"
 #include "engines/newworlds/fog.h"
+#include "engines/newworlds/repairs.h"
 #include "engines/newworlds/research.h"
 #include "engines/newworlds/script_effects.h"
 #include "engines/newworlds/fif.h"
@@ -1476,6 +1477,97 @@ void testScriptEffects() {
     CHECK(fx.infection() == 0 && has("cured"));
 }
 
+void testRepairsShieldsCloaking() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    // A vehicle mends a point, then waits 6400 / its full hit points ticks.
+    {
+        World w(t);
+        const int tank = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {});
+        w.unit(tank)->hp = 10;
+        Repairs r(w);
+        r.tick();
+        CHECK(w.unit(tank)->hp == 11);
+        for (int i = 0; i < 213; ++i)
+            r.tick();
+        CHECK(w.unit(tank)->hp == 11);
+        r.tick();
+        CHECK(w.unit(tank)->hp == 12);
+        // A site isn't mended.
+        w.unit(tank)->built = 0.5f;
+        for (int i = 0; i < 500; ++i)
+            r.tick();
+        CHECK(w.unit(tank)->hp == 12);
+    }
+    // A building with a construction yard filling the pool: a step every
+    // 8 ticks, of 3 points with a skill-1 engineer in it; without a yard
+    // the slow rate (600 hp: a point every 10 / 3 + 1 ticks).
+    auto hubAfter = [&](bool yard) {
+        World w(t);
+        const int hub = spawnObject(w, 0, 'F', *combatType(23), 100000, 100000, {});
+        if (yard)
+            spawnObject(w, 0, 'F', *combatType(77), 140000, 100000, {});
+        w.unit(hub)->hp = 300;
+        Repairs r(w);
+        r.setEngineering([&](int id) { return id == hub ? 1.0f : 0.0f; });
+        for (int i = 0; i < 80; ++i)
+            r.tick();
+        return w.unit(hub)->hp;
+    };
+    CHECK(hubAfter(true) == 330 && hubAfter(false) == 320);
+
+    // Shields: half the damage inside its own side's field, for the kinds
+    // it covers; a security officer's skill divides what's left.
+    {
+        World w(t);
+        const float bx = 10.5f * 16384, by = 10.5f * 16384;
+        spawnObject(w, 1, 'K', *combatType(29), bx, by, {});
+        const int tank = spawnObject(w, 1, 'K', *combatType(10), bx, by + 16384, {});
+        const int bee = spawnObject(w, 1, 'K', *combatType(46), bx, by + 16384, {});
+        const int fed = spawnObject(w, 0, 'F', *combatType(8), bx + 16384, by, {});
+        const int far = spawnObject(w, 1, 'K', *combatType(10), bx + 5 * 16384, by, {});
+        Fog fog(64, 64);
+        fog.refresh(w);
+        CHECK(shieldedDamage(*w.unit(tank), 40, &fog, 0) == 20);
+        CHECK(shieldedDamage(*w.unit(tank), 40, &fog, 1) == 4);
+        CHECK(shieldedDamage(*w.unit(bee), 40, &fog, 0) == 40);
+        CHECK(shieldedDamage(*w.unit(fed), 40, &fog, 0) == 40);
+        CHECK(shieldedDamage(*w.unit(far), 40, &fog, 0) == 40);
+    }
+
+    // Cloaking: 300 ticks seen, a 63-tick fade, then out of everyone's
+    // sights; to fire it decloaks (63 ticks without a shot).
+    {
+        World w(t);
+        w.setStance(0, 2, 3);
+        w.setStance(2, 0, 3);
+        const int rom = spawnObject(w, 2, 'R', *combatType(35), 100000, 100000, {});
+        auto ticks = [&](int n) {
+            for (int i = 0; i < n; ++i)
+                w.advance(0.05);
+        };
+        ticks(301);
+        CHECK(w.unit(rom)->fading > 0 && !w.unit(rom)->cloaked);
+        ticks(63);
+        CHECK(w.unit(rom)->cloaked);
+        w.takeEvents();
+        const int fed = spawnObject(w, 0, 'F', *combatType(8), 110000, 100000, {});
+        ticks(2);
+        CHECK(!w.unit(rom)->cloaked && w.unit(rom)->fading > 0);
+        bool romFired = false, fedFired = false;
+        for (const WorldEvent& e : w.takeEvents())
+            romFired = romFired || (e.kind == WorldEvent::Shot && e.from == rom);
+        CHECK(!romFired);
+        ticks(70);
+        for (const WorldEvent& e : w.takeEvents()) {
+            romFired = romFired || (e.kind == WorldEvent::Shot && e.from == rom);
+            fedFired = fedFired || (e.kind == WorldEvent::Shot && e.from == fed);
+        }
+        CHECK(romFired && fedFired);
+    }
+}
+
 void testFog() {
     Terrain t;
     t.width = t.height = 64;
@@ -1697,6 +1789,7 @@ int main() {
     testCrew();
     testScriptEffects();
     testFog();
+    testRepairsShieldsCloaking();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

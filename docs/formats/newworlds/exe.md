@@ -227,7 +227,8 @@ the size of the area a unit reveals (classes 3 and 4: 5 blocks across; 5:
 Cloaking units (Romulan cloaked tank 35 and APC 230, Klingon cloaked
 disruptor tank 229) have no cloak figure: they are given a different
 behaviour when ordered, and the same combat figures as the uncloaked ones.
-Vehicles repair themselves, 1 hit point every 6400 / max hp ticks.
+Vehicles repair themselves, 1 hit point every 6400 / max hp ticks (see
+[Repairs](#repairs)).
 
 ## Buildings
 
@@ -709,6 +710,74 @@ How a side the computer plays builds and makes units:
   only through task 9. Every side has the same commander, ministries and
   buildings, so power, crew and officers set an AI yard's pace as they do
   the player's. Upgrades are always charged, but no order asks for one.
+
+### Repairs
+
+Every object's repair runs each tick, in battle as well; only a building
+still going up and a destroyed object are left out.
+
+- **Vehicles**, and the natives' buildings: a hit point, then a wait of
+  trunc(6400 / max hp) / (2 x skill + 1) ticks (at least 1), skill being
+  the best engineer aboard (a command officer counts at a quarter less,
+  at least a quarter). Whatever its hit points, a vehicle takes about
+  6400 ticks (320 s) to mend from nothing, a third of that with a
+  skill-1 engineer. No power.
+- **Colony buildings** draw on their side's **repair pool** (up to
+  2 097 152; not the power pool). Each tick a building holding less than
+  16384 asks for the rest, at most 2048, in its priority class (served
+  1, 2, 3); each 16384 it holds buys a step of 2 x skill + 1 hit points.
+  At the full draw that is a step every 8 ticks. A building that holds
+  nothing mends at the vehicles' rate. Efficiency plays no part.
+- **Construction yards** fill the pool, 8192 a tick each while standing,
+  and don't repair themselves; nothing else fills it. A yard feeds about
+  four buildings at the full draw; without one every building mends
+  slowly.
+
+| Class | Types |
+|---|---|
+| 1 | 21 22 23 24 30 31 43 54 69 70 71 75 80 81 82 83 84 118 123 158 171 172 178 207 208 |
+| 2 | 27 29 32 44 45 49 52 65 66 72 73 74 122 125 126 127 128 163 173 182 189 |
+| 3 | 16 25 26 50 51 67 68 76 121 124 |
+| yard | 53 77 78 |
+
+### Shields
+
+A hit on a building, an armed vehicle, an armed APC, a science vehicle
+or a scout is lessened: halved (rounded down) when its block is in a
+shield field of its own side (fog channel 5), then divided by
+4 x skill + 1 for its best security officer (a command officer at a
+quarter less), field or not. Nothing drains: the generator's power
+buffer isn't touched, and the halving has no limit. Bees, unarmed APCs,
+large craft and the tractor and anomaly devices always take the whole
+hit, as does another side's unit in the field.
+
+- **Shield generators** (21, 29, 69) pick their field each tick from
+  their efficiency: above 0.6 the 3 x 3 blocks round them, above 0.2 a
+  plus of five, else their own block. With no officer term (0.4 x
+  (health + power fill + 1)) that is 3 x 3 while powered, or while its
+  hit points are at least 30 %, and the plus below that.
+- **The mobile shield generator** (154) always covers the 3 x 3 blocks
+  round itself as it goes; it has no power of its own.
+- The fields follow the fog's refresh, a cell every 64 ticks.
+- The Shield buffer lab only allows the Federation's shield generator;
+  no shield figure was found on vehicles.
+
+### Cloaking
+
+Types 35 (and 272), 229, 230, 200 and 149 carry a cloaking device:
+
+- After 300 ticks (15 s) seen it fades out over 63 ticks; then it's
+  cloaked. No power or movement condition.
+- To fire it must be seen: cloaked, it starts decloaking (63 ticks,
+  seen from the first) and can't fire while fading either way. Once seen
+  the count starts again, firing or not, so in a long fight it cycles:
+  63 ticks decloaking, 300 firing, 63 cloaking.
+- Cloaked, other sides don't draw it or show it on the Tricorder, and
+  every automatic target search passes it by (as it does units dead or
+  still being built); a hit still counts if something aims at it. No scan
+  that finds it was found.
+- Its "attack en route" move only turns its turrets home, so it drives
+  without fighting and stays cloaked.
 
 ## Still open
 

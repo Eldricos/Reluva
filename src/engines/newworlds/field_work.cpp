@@ -130,18 +130,21 @@ int FieldWork::disembark(int vehicle) {
     return moved;
 }
 
-bool FieldWork::strong(int unit, Kind kind) const {
-    const int wanted = kind == Science ? 4 : kind == Medical ? 3 : 1;
+float FieldWork::skill(int unit, int speciality) const {
     float best = 0;
     for (const Officer* o : aboard(unit)) {
         float v = 0;
-        if (o->speciality == wanted)
+        if (o->speciality == speciality)
             v = o->skill;
-        else if (o->speciality == 7 && (wanted == 1 || wanted == 2))
+        else if (o->speciality == 7 && (speciality == 1 || speciality == 2))
             v = std::max(o->skill - 0.25f, 0.25f);
         best = std::max(best, v);
     }
-    return best >= kStrongSkill;
+    return best;
+}
+
+bool FieldWork::strong(int unit, Kind kind) const {
+    return skill(unit, kind == Science ? 4 : kind == Medical ? 3 : 1) >= kStrongSkill;
 }
 
 bool FieldWork::scan(int unit, int target, Kind kind) {

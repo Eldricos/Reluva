@@ -172,6 +172,15 @@ placed); the game's playbook and officer cards are keys here.
   colonies, and fights natives only when they fire on it: F1's Klingons,
   hostile to every slot, pass the Taubat by as the recordings show. A
   script's stance action turns the side named towards the player.
+- **Repairs, shields and cloaking** as the executable has them
+  ([exe.md](exe.md#repairs)): vehicles mend a point at a time (faster
+  with an engineer aboard); the colonies' buildings draw on a repair pool
+  the construction yards fill. A hit inside a shield field of the
+  target's own side is halved, and the target's security officer lessens
+  it further. Cloaked tanks and APCs vanish 15 s after being seen,
+  aren't shown or picked as targets while cloaked, drive on without
+  fighting, and decloak to fire. A building still going up takes no harm
+  and isn't fired at.
 - **Scans** as the executable has them ([exe.md](exe.md#scans-and-captures)):
   a scout or science vehicle drives into sensor range (60000, 18000, plus
   the target's size) and scans for as long as it stays; the mission's
@@ -216,7 +225,7 @@ placed); the game's playbook and officer cards are keys here.
   player's side first sees a site's block, and `cell-scanned <site>` when
   its block is first scanned (a science vehicle or a building beside it);
   K7's pod watches read the same mark. Not modelled: the camera kept to
-  seen blocks, shield fields, the mineral readout.
+  seen blocks, the mineral readout.
 - **Script effects** ([exe.md](exe.md#script-effects)): the scripts'
   spawns, group damage, beam-ups, routes, meteor storms (30 damage to
   what a meteor hits), lightning storms, the disease (among the crew),
@@ -262,6 +271,9 @@ placed); the game's playbook and officer cards are keys here.
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
 | A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
 | Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
+| A shield generator's field | always 3 x 3 blocks | the executable's rule shrinks it with efficiency, but the economy has no shield generators yet |
+| A repair pool at the start | empty | Reluva's |
+| Your own cloaked units | drawn as usual | the game draws them see-through |
 | Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |

@@ -396,6 +396,14 @@ void MissionViewer::startPlay() {
     if (fieldWork_)
         fieldWork_->setFog(fog_.get());
     fogClock_ = 0;
+    // Repairs, and hits lessened by shield fields and the colony's
+    // security officers.
+    repairs_ = std::make_unique<Repairs>(*world_);
+    repairs_->setEngineering([this](int id) { return fieldWork_ ? fieldWork_->skill(id, 1) : 0.0f; });
+    world_->setDamage([this](const Unit& target, float damage) {
+        const float security = fieldWork_ && target.slot == playerSlot_ ? fieldWork_->skill(target.id, 2) : 0;
+        return shieldedDamage(target, damage, fog_.get(), security);
+    });
     scannedSites_.clear();
     playing_ = true;
     interface_ = true;
@@ -414,6 +422,7 @@ void MissionViewer::stopPlay() {
         return;
     playing_ = false;
     fog_.reset();
+    repairs_.reset();
     effects_.reset();
     research_.reset();
     fieldWork_.reset();
@@ -731,7 +740,7 @@ void MissionViewer::drawCombat() {
 // Whether the player sees a thing: its own always, another side's on a
 // block its fog marks as seen (the game draws nothing else).
 bool MissionViewer::visible(const Unit& u) const {
-    return u.slot == playerSlot_ || !fog_ || fog_->seenAt(u.x, u.y, playerSlot_);
+    return u.slot == playerSlot_ || ((!fog_ || fog_->seenAt(u.x, u.y, playerSlot_)) && !u.cloaked);
 }
 
 void MissionViewer::showUnits() {
@@ -832,8 +841,11 @@ void MissionViewer::showProgress() {
     const auto& all = economy_->structures();
     for (size_t i = 0; i < structureIds_.size(); ++i)
         for (const ColonyStructure& c : all)
-            if (c.id == structureIds_[i])
+            if (c.id == structureIds_[i]) {
                 map_.setBuildingProgress(i, c.progress);
+                if (Unit* u = world_ && i < colonyObjects_.size() && colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
+                    u->built = c.progress;
+            }
 }
 
 bool MissionViewer::playEvent(const Event& ev) {
@@ -1188,6 +1200,8 @@ void MissionViewer::update(uint64_t nowMs) {
         std::vector<ScriptEvent> happened;
         if (ai_)
             ai_->advance(std::min(dt, 0.25));
+        if (repairs_)
+            repairs_->advance(std::min(dt, 0.25));
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
         if (fog_) {

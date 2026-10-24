@@ -50,6 +50,7 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     u.weapon = type.weapon;
     u.ai = !player;
     u.flies = std::string_view(type.name) == "bird-of-prey";
+    u.cloaks = type.cloaks;
     return id;
 }
 
@@ -123,8 +124,10 @@ void AiSides::start() {
         auto colony = colonies_.find(slot);
         for (const SidePlacement* p : sidePlacements(mission_, slot)) {
             const CombatType* t = combatType(p->type);
-            // Without a model only what the scripts name is placed (unseen).
-            if (!t || p->forWhom == 1 || isBee(*t) || (!*t->model && !*p->model && !*p->label))
+            // Without a model only what the scripts name, and shield
+            // generators (their fields count), are placed (unseen).
+            if (!t || p->forWhom == 1 || isBee(*t) ||
+                (!*t->model && !*p->model && !*p->label && std::string_view(t->name) != "shield-generator"))
                 continue;
             auto [x, y] = worldAt(p->a, p->b);
             if (!t->building) {
@@ -392,7 +395,7 @@ void AiSides::steer(Running& r) {
     if (r.hunting || guard) {
         float best = r.hunting ? 1e30f : kGuardReach;
         for (const Unit& v : world_.units())
-            if (world_.prey(o.slot, v.slot) && v.hp > 0) {
+            if (world_.prey(o.slot, v.slot) && v.hp > 0 && !v.cloaked && v.built >= 1) {
                 const float d = r.hunting ? std::hypot(v.x - cx, v.y - cy) : std::hypot(v.x - wx, v.y - wy);
                 if (d < best)
                     best = d, prey = &v;

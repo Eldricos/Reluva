@@ -75,6 +75,10 @@ public:
     int disembark(int vehicle);
     std::vector<const Officer*> aboard(int vehicle) const;
     bool strong(int unit, Kind kind) const;
+    // The best skill at a speciality among the officers in a building or
+    // vehicle (0 none); a command officer counts for engineering (1) and
+    // security (2) at a quarter less, at least a quarter.
+    float skill(int unit, int speciality) const;
 
     // The building's holder (a side slot), or -1.
     int heldBy(int building) const;
