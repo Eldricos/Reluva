@@ -605,7 +605,9 @@ A building's **efficiency** is 0.4 × (health + power + officer) × crew:
   housing, farms, shields and defences count it whole.
 
 So a healthy generator runs at 1.2 (500 × 1.2 = 600 a tick) and the hub
-without a command officer at 0.8 (400).
+without a command officer at 0.8 (400). Only the crew term is held to
+0-1; the result isn't capped, so 1.2 is the most any building reaches
+(checked in the efficiency routine: no clamp after the sum).
 
 **People.** Each race has a roster of **150** named people, the
 mission's officers among them. The hub takes everyone still in orbit
