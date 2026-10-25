@@ -1384,22 +1384,51 @@ void testBees() {
     one.setBees(1, 0);
     CHECK(one.order("construction-yard", 3000, 0, 0, 0)); // 45 s with four
     CHECK(built(one, 180) == 0 && built(one, 2) == 1);
-    // A mine's ore reaches the processor only while a cargo bee serves it.
+    // Pods (exe.md#bees): the mine fills its store at 2 t a second, packs
+    // 80 t into two pods of 40, its worker bee flies them out to its pad;
+    // with a cargo bee they reach the processor, without one they wait
+    // there.
     ColonyMap ore;
     ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
-    ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 30 : 0; };
+    ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 300 : 0; };
     for (int cargo : {0, 1}) {
         Economy m('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
         m.addBuilt("colony-hub", 0, 0);
         m.addBuilt("construction-yard", 20000, 0);
         m.addBuilt("resource-processor", 20000, 20000);
-        m.setBees(4, cargo);
+        m.addBuilt("storage-facility", -20000, 0);
+        m.setBees(4, cargo, 1); // the processor and storage get a worker bee free; one spare
+        CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.worker; }) == 3);
         CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
         CHECK(built(m, 100) == 1); // 22 s out, 60 s building
-        built(m, 10);
+        built(m, 45);
+        const bool parked = std::any_of(m.pods().begin(), m.pods().end(), [](const Economy::Pod& p) {
+            return p.state == Economy::Pod::Parked && !p.refined;
+        });
         const auto stock = m.oreStock();
-        CHECK((std::accumulate(stock.begin(), stock.end(), 0.0f) > 0) == bool(cargo));
-        CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.cargo && !b.home; }) == cargo);
+        const float arrived = std::accumulate(stock.begin(), stock.end(), 0.0f);
+        if (cargo) {
+            built(m, 60);
+            const auto later = m.oreStock();
+            CHECK(std::accumulate(later.begin(), later.end(), 0.0f) > 0);
+            // The processor's goods, packed once there's a pod's worth,
+            // reach the storage facility's own store by the same bees.
+            int storage = 0;
+            for (const ColonyStructure& c : m.structures())
+                if (c.type == "storage-facility")
+                    storage = c.id;
+            const Stock before = m.storeOf(storage);
+            built(m, 400);
+            CHECK(m.storeOf(storage)[Nitrium] > before[Nitrium]);
+        } else {
+            CHECK(parked && arrived == 0);
+            built(m, 60);
+            const auto later = m.oreStock();
+            CHECK(std::accumulate(later.begin(), later.end(), 0.0f) == 0);
+            CHECK(m.pods().size() <= 4); // the mine stops with four waiting
+        }
+        for (const Economy::Pod& p : m.pods())
+            CHECK(p.load[size_t(4)] > 0 || p.refined); // magnesite (kind 5) in every ore pod
     }
     // Without bees nothing goes up.
     Economy none('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);

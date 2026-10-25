@@ -137,7 +137,7 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
             start.push_back({UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f}, sx, sy, p.type});
         }
     }
-    economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
+    economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"], beesHoused_["worker-bee"]);
     if (start.empty())
         for (int i = 0; i < 4; ++i)
             start.push_back({groundScout(side_), hx + (float(i) - 1.5f) * 2500, hy - 1.4f * kTile, 0});
@@ -415,7 +415,7 @@ void MissionSim::rollOut() {
             ++housed_;
             if (const CombatType* ct = combatType(type))
                 ++beesHoused_[ct->name];
-            economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
+            economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"], beesHoused_["worker-bee"]);
             continue;
         }
         float x = float(blocksWide_) * kBlock / 2, y = float(blocksHigh_) * kBlock / 2;

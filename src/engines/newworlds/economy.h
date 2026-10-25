@@ -250,9 +250,11 @@ public:
     // bees shuttle between the working mines and the processor, docking
     // at each; a mine with none serving it sends nothing. Bees fly
     // straight, 150 units a tick, a flight at least 10 ticks.
-    void setBees(int construction, int cargo);
+    void setBees(int construction, int cargo, int worker = 0);
     struct Bee {
+        int id = 0;
         bool cargo = false;
+        bool worker = false;  // a worker bee: its building's pods out to its pad
         bool home = true;     // in the hub (not drawn)
         float x = 0, y = 0;   // where it is
         float heading = 0;
@@ -263,9 +265,35 @@ public:
         int dock = 0;         // ticks still docked
         float fromX = 0, fromY = 0, toX = 0, toY = 0;
         int flown = 0, flight = 0; // ticks: 0 flight when not flying
+        std::vector<int> pods;     // the pods aboard (a worker's one, a cargo bee's two)
     };
     const std::vector<Bee>& bees() const { return bees_; }
     int beesAt(int site) const; // construction bees at work on a site
+
+    // Cargo pods (exe.md#bees), with bees: a mine packs what it digs into
+    // pods (80 t the Federation's, 160 t the Klingons' and Romulans'; its
+    // stock split evenly over stock / size + 1 of them) once it holds a
+    // pod's worth, and stops while four wait; every mine, processor and
+    // storage facility has a worker bee of its own that flies its pods out
+    // to a pad round it; each pod goes to the first processor (ore) or
+    // storage facility (goods) that takes it, and a building with more
+    // than one coming asks for a cargo bee, which brings two a trip and
+    // puts their contents in its store. The processor packs its refined
+    // goods into pods every 32 ticks. Without bees (the computer's
+    // colonies) the ore and goods go straight on.
+    struct Pod {
+        int id = 0;
+        std::array<int64_t, kMaterials> load{}; // ore by kind - 1, or materials
+        bool refined = false;
+        int origin = 0, dest = 0; // structures (dest 0: no taker yet)
+        enum State { Queued, Parked, Aboard } state = Queued;
+        float x = 0, y = 0;       // parked: where
+        int slot = -1;            // its place on its pad
+    };
+    const std::vector<Pod>& pods() const { return pods_; }
+    // A mine's own store: the ore it has dug and not yet packed, tonnes by
+    // ore kind - 1.
+    std::array<float, kOres> mineStock(int structure) const;
 
     // Moves time on: construction, power, mining and refining. Returns what
     // happened, as the mission scripts' events (built <type>, power-low,
@@ -282,8 +310,14 @@ private:
     void produce(std::vector<ScriptEvent>& out);
     float crewShare(const ColonyStructure& s) const;
     int sideIndex() const;
-    bool mineTake(ColonyStructure& mine); // one mining take; false when dry
+    bool mineTake(ColonyStructure& mine, std::array<int64_t, kOres>& into); // one mining take; false when dry
     void beeTick();
+    void podTick();
+    void pack(int structure, std::array<int64_t, kMaterials>& stock, bool refined);
+    bool takes(const ColonyStructure& s, const Pod& p) const;
+    void unload(const Pod& p);
+    Bee* beeById(int id);
+    int64_t podSize() const { return side_ == 'F' ? 80000 : 160000; }
     void fly(Bee& b, float x, float y);
     const ColonyStructure* hub() const;
 
@@ -331,6 +365,18 @@ private:
     bool free_ = false;
     bool beesModelled_ = false;
     std::vector<Bee> bees_;
+    int nextBee_ = 1, nextPod_ = 1;
+    std::vector<Pod> pods_;
+    // Each mine, processor and storage facility's worker bee (its id; 0
+    // none), cargo bee, store of dug ore (a mine's) and whether a worker
+    // bee has been asked of the yard.
+    struct Depot {
+        int worker = 0, cargo = 0;
+        std::array<int64_t, kMaterials> dug{};
+        bool asked = false;
+    };
+    std::map<int, Depot> depots_;
+    int shipClock_ = 0;
 };
 
 } // namespace reluva::newworlds

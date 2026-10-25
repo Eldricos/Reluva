@@ -704,15 +704,22 @@ void MissionViewer::showUnits() {
         const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
         const char* conBee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
         const char* cargoBee = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rwbc.geo" : "geo/fed/fcarb.geo";
+        const char* workBee = side == 'K' ? "geo/kln/kwb.geo" : side == 'R' ? "geo/rom/rwb.geo" : "geo/fed/workbee.geo";
         for (const Economy::Bee& b : economy_->bees()) {
             if (b.home || b.working)
                 continue;
             const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
             const float lift = b.flight > 0 ? kBeeHeight * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
-            MapViewer::UnitDraw d{b.cargo ? cargoBee : conBee, b.x, b.y, b.heading};
+            MapViewer::UnitDraw d{b.worker ? workBee : b.cargo ? cargoBee : conBee, b.x, b.y, b.heading};
             d.lift = lift;
             draw.push_back(d);
         }
+        // The cargo pods parked on their pads (Reluva draws them as the
+        // Federation's small crate: which model the game's pods use isn't
+        // known).
+        for (const Economy::Pod& p : economy_->pods())
+            if (p.state == Economy::Pod::Parked)
+                draw.push_back({"geo/fed/crate_s.geo", p.x, p.y, 0});
     }
     map_.setUnits(std::move(draw));
 }
@@ -2057,6 +2064,11 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
         const Stock st = c->type == "storage-facility" ? economy_->storeOf(c->id) : economy_->stock();
         for (int m = 0; m < kMaterials; ++m)
             out.push_back(std::string(materialName(m)) + " " + std::to_string(st[size_t(m)]));
+    }
+    if (c->type == "mining-station") {
+        const auto ore = economy_->mineStock(c->id);
+        for (int k = 1; k <= kOres; ++k)
+            out.push_back("RAW " + upper(oreName(k)) + " " + std::to_string(int(ore[size_t(k - 1)])));
     }
     if (c->type == "resource-processor") {
         const auto ore = economy_->oreStock();

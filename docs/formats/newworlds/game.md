@@ -145,14 +145,25 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   is warned, once a minute. The title shows supply / asked.
 - **Mining:** a mining station works the nearest ore within three blocks
   of its own, a tonne a take; of every eight takes two are the cell's own
-  ore and one each kind. The cargo bees shuttle between the working mines
-  and the processor (each mine served in turn, a second at each dock);
-  a mine with no cargo bee sends nothing. Their carrying (about 2 t a
-  second a mine, measured) feeds the processor, which refines a quarter tonne a tick, in
+  ore and one each kind, into its own store at the measured 2 t a second
+  a mine. It goes on in cargo pods, as the game's ([exe.md](exe.md#bees)):
+  once the mine holds a pod's worth (80 t the Federation's, 160 t the
+  others') it packs its store evenly into store / size + 1 pods, and
+  stops while four wait; its worker bee flies them out, one at a time, to
+  places round it; each goes to the first processor that takes it
+  (built, crewed, with its own worker bee, fewer than 17 coming); a
+  building with more than one coming gets a cargo bee, which brings two
+  a trip and empties them into its store. Every mine, processor and
+  storage facility has a worker bee: those standing at the start get one
+  free, a later one takes a spare from the hub or has the vehicle yard
+  make one. The processor refines a quarter tonne a tick, in
   turn per ore, one for one: dilithium, talgonite, silicon, kelbonite,
   magnesite, dolamide into dilithium, polycomp, thermoconc, trans al,
-  nitrium, duranium. When nothing is left in reach the script hears
-  `mine-exhausted` at the mine's block.
+  nitrium, duranium; every 32 ticks it packs its goods into pods once
+  they make a pod's worth, and they go the same way to the first storage
+  facility, into its own store. (The computer's colonies, without bees,
+  send ore and goods straight on.) When nothing is left in reach the
+  script hears `mine-exhausted` at the mine's block.
 - **Colony size:** COLONY SIZE counts the colony's buildings and vehicles
   (those inside the hub too); the capacity starts at 50, accommodation
   adds 5 and a farm 10, up to 90.
@@ -422,7 +433,9 @@ kept apart from the game's behaviour:
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
-| Bees | fly 1500 units up; a cargo bee docks 1 s; worker bees stay in the hub (their pod shuttles aren't shown) | Reluva's |
+| Bees | fly 1500 units up; a cargo bee docks 1 s | Reluva's: the game's dock times weren't timed |
+| A pad's places | 16, in a ring 6000 out round the building | the game lays out 80 round it |
+| Cargo pods' model | the Federation's small crate (`crate_s`) | the game's model for them isn't named in its tables |
 | Evacuating a razed building | its crew back in the hub's pool at once, so it's razed the next tick | the game's people walk out first; how long that takes depends on the walk |
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
