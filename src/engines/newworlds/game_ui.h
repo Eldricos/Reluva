@@ -44,6 +44,9 @@ public:
     // for an incoming message, the side's emblem otherwise.
     const Texture* portraitFor(std::string_view sender, std::string_view natives) const;
     const Texture* icon(std::string_view name) const; // "logo32", "shldicon", "pbattack", "science", ...
+    // A building's or vehicle's small portrait by its picture's name
+    // ("fhub", "fcy", "fpv"; gui.md#pictures), or none.
+    const Texture* objectPortrait(std::string_view name) const;
 
     // Colours: the panel titles, ordinary text, highlighted text.
     Color titleColor() const { return title_; }
@@ -58,6 +61,7 @@ private:
     std::map<std::string, Texture> icons_;
     std::vector<Texture> crew_;
     std::map<std::string, Texture> faces_; // by section, where known
+    std::map<std::string, Texture, std::less<>> objects_; // the small building and craft portraits
     std::map<std::string, Texture> natives_;
     std::vector<GameFont> fonts_;
     const GameFont* small_ = nullptr;

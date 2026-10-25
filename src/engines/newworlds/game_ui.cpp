@@ -79,6 +79,19 @@ bool GameUi::load(const Archives& archives, char side) {
             if (loadPicture(archives, base + "ptrt/crew/lg/" + stem + ".lbp", t))
                 faces_[section] = std::move(t);
         }
+    // The small portraits of the side's buildings and craft.
+    for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/"}) {
+        const std::string under = base + folder;
+        for (const auto& a : archives)
+            for (const CatEntry& e : a->entries())
+                if (e.name.rfind(under, 0) == 0 && e.name.size() > under.size() + 4 &&
+                    e.name.compare(e.name.size() - 4, 4, ".lbp") == 0) {
+                    const std::string stem = e.name.substr(under.size(), e.name.size() - under.size() - 4);
+                    Texture t;
+                    if (!objects_.count(stem) && loadPicture(archives, e.name, t))
+                        objects_[stem] = std::move(t);
+                }
+    }
     for (const char* n : {"taubat", "metar", "hubrin", "orion"}) {
         Texture t;
         if (loadPicture(archives, base + "ptrt/crew/lg/" + n + ".lbp", t))
@@ -221,6 +234,11 @@ const Texture* GameUi::portraitFor(std::string_view sender, std::string_view nat
             return &it->second;
     }
     return icon("logo32");
+}
+
+const Texture* GameUi::objectPortrait(std::string_view name) const {
+    const auto it = objects_.find(name);
+    return it == objects_.end() ? nullptr : &it->second;
 }
 
 const Texture* GameUi::icon(std::string_view name) const {
