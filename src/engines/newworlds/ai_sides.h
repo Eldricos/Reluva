@@ -28,6 +28,11 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
 // it (the game parks a colony's vehicles round its hub).
 std::pair<float, float> parkingSpot(int n, float x, float y, bool building);
 bool isBee(const CombatType& type);
+// A main hub's type (the colonies' and the natives' bases).
+bool isMainHub(int type);
+// A starting vehicle the game lines up in its side's rally group (one
+// that fights, scouts or scans; not a bee or an unarmed APC).
+bool joinsRallyGroup(const CombatType& type);
 // A side's vehicle rally point (exe.md#orders): the n-th of its 16 parking
 // places, a 4 x 4 grid 4096 apart from 2560 inside the corner of the
 // block its hub stands on. New armed vehicles drive there, and so do

@@ -391,11 +391,32 @@ other side, and named officers.
 Each side's placements are its starting colony: a type and a map position
 (block column and row, and which quarter of the block). 21 of the 23
 starting mining stations sit on ore deposits read that way. Vehicles
-placed on the hub start inside it (its panel's bee and transport counts).
+placed on the hub start inside it (its panel's bee and transport counts;
+see below).
 F1's Federation hub is at 438:218, four blocks from the recorded Tricorder
 reading of 407:209; the sites guessed from recordings ([colony.md](colony.md))
 were 1-19 blocks off. Reluva places every mission's colony and vehicles
 from these (`start_data.cpp`).
+
+Only buildings keep their record's position. The set-up places each
+record in the file's order, then hands the vehicles on:
+
+- **Those that fight, scout or scan** (tanks, artillery, armed APCs,
+  scouts, science vehicles, mobile shield generators) join the side's
+  rally group: up to 16, on its 4 × 4 places in the side's hub's block
+  (2560 + 4096 n units in from the block's corner each way), the first
+  free one each, placed there at once. The record's position doesn't
+  count. A 17th starts at its record and drives in. With no hub (or the
+  hub listed after them) the group forms in the block at the map's middle.
+- **Bees and unarmed APCs** go inside the hub (if its crew is met);
+  without one they stay at their record's position.
+- A record's label only names the object.
+
+So spots several sides share in the data (C1's 322:338 for the Klingon
+and Romulan tanks, the Klingon bees at another map's hub, 424:71 in
+D1-E3, R9's 352:320) are never where those units start. Reluva keeps the
+player's unarmed APCs out, round the hub, as it has no way yet to bring
+them out of it.
 
 ### The script engine
 

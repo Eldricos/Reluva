@@ -35,6 +35,14 @@ std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, f
 
 bool isBee(const CombatType& t) { return std::string_view(t.name).find("bee") != std::string_view::npos; }
 
+bool isMainHub(int type) {
+    return type == 23 || type == 28 || type == 43 || type == 102 || type == 109 || type == 110;
+}
+
+bool joinsRallyGroup(const CombatType& t) {
+    return !t.building && !isBee(t) && std::string_view(t.name) != "unarmed-apc";
+}
+
 std::pair<float, float> rallySpot(float hubX, float hubY, int n) {
     const float cx = std::floor(hubX / kBlock) * kBlock, cy = std::floor(hubY / kBlock) * kBlock;
     n %= 16;
@@ -138,18 +146,31 @@ void AiSides::start() {
             if (const CombatType* t = combatType(p->type); t && t->building)
                 built.insert({p->a, p->b});
         auto colony = colonies_.find(slot);
+        // Where the side's fighting vehicles line up (exe.md#starting-
+        // colonies): its hub's block, once the hub is placed; before that
+        // (or with none) the map's middle.
+        const float midX = float(world_.terrain().width) * kTile / 2, midY = float(world_.terrain().height) * kTile / 2;
+        float hubX = midX, hubY = midY;
         for (const SidePlacement* p : sidePlacements(mission_, slot)) {
             const CombatType* t = combatType(p->type);
+            if (t && t->building && isMainHub(t->id) && hubX == midX && hubY == midY)
+                std::tie(hubX, hubY) = worldAt(p->a, p->b);
             // Without a model only what the scripts name, and shield
-            // generators (their fields count), are placed (unseen).
+            // generators (their fields count), are placed (unseen). Bees
+            // stay in the hub.
             if (!t || p->forWhom == 1 || isBee(*t) ||
                 (!*t->model && !*p->model && !*p->label && std::string_view(t->name) != "shield-generator"))
                 continue;
             auto [x, y] = worldAt(p->a, p->b);
-            if (!t->building) {
-                // Several on a spot stand round it, ring by ring (round
-                // the building, where one stands there: the game parks
-                // them by the hub).
+            if (!t->building && joinsRallyGroup(*t) && rallied_[slot] < 16) {
+                // The first 16 on the rally group's places in the hub's
+                // block, whatever spot the mission gives.
+                std::tie(x, y) = rallySpot(hubX, hubY, rallied_[slot]++);
+                std::tie(x, y) = openSpot(x, y);
+            } else if (!t->building) {
+                // The rest round their own spot (the game drives them in
+                // from there), ring by ring (round a building standing
+                // there).
                 std::tie(x, y) = parkingSpot(onSpot[{p->a, p->b}]++, x, y, built.count({p->a, p->b}) > 0);
                 std::tie(x, y) = openSpot(x, y);
             }

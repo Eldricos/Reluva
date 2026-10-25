@@ -538,6 +538,12 @@ checked each second; anything else the script still waits for from the
 player (buildings, scans, counts) is listed at the end as `script waits
 for:`. 15 minutes of every mission take about two minutes.
 
+The tutorials' first runs found C1 won in 21 seconds: its Klingon and
+Romulan tanks were placed where the data lists them, on one spot, and
+destroyed each other along with the artillery the tutorial waits for.
+The executable lines each side's vehicles up in its own hub's block
+instead ([exe.md](exe.md#starting-colonies)), and so does Reluva now.
+
 What the first runs found (fixed): vehicles the mission places on the
 hub's spot (R1's four tanks) were all kept inside it like bees, leaving
 the colony undefended (only bees go in now; the rest park round the

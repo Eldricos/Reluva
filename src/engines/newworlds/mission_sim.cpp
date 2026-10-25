@@ -141,10 +141,13 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     research_ = std::make_unique<Research>(mission_, player_);
     effects_ = std::make_unique<ScriptEffects>(player_, *world_, ai_.get(), economy_.get(), script_);
 
-    // The mission's own vehicles where it places them (several on one spot
-    // spread a little; bees on the hub's spot inside it, the construction
-    // and cargo bees flying out to work); else four ground scouts in a
-    // row south of the hub. Each on the nearest open tile.
+    // The mission's own vehicles (exe.md#starting-colonies): bees inside
+    // the hub (the construction and cargo bees flying out to work); the
+    // first 16 that fight, scout or scan on the rally group's places in
+    // the hub's block, whatever spot the mission gives; the rest (unarmed
+    // APCs, the game's in the hub too) round their spot, spread a little.
+    // Without any, four ground scouts in a row south of the hub. Each on
+    // the nearest open tile.
     float hx = float(blocksWide_) * kBlock / 2, hy = float(blocksHigh_) * kBlock / 2;
     if (!colony_.empty())
         std::tie(hx, hy) = worldAt(colony_[0].a, colony_[0].b);
@@ -164,12 +167,19 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         const ObjectType* t = objectType(p.type);
         if (!t || t->building)
             continue;
-        if (onHub(p) && bee(p.type)) {
+        const CombatType* ct = combatType(p.type);
+        if ((onHub(p) || !colony_.empty()) && bee(p.type)) {
             ++housed_;
-            ++beesHoused_[combatType(p.type)->name];
+            ++beesHoused_[ct->name];
         } else if (*t->model) {
-            const auto [x, y] = worldAt(p.a, p.b);
-            const auto [sx, sy] = parkingSpot(onSpot[{p.a, p.b}]++, x, y, onHub(p));
+            auto [x, y] = worldAt(p.a, p.b);
+            float sx = 0, sy = 0;
+            if (!colony_.empty() && ct && joinsRallyGroup(*ct) && rallied_ < 16)
+                std::tie(sx, sy) = rallySpot(hx, hy, rallied_++);
+            else if (!colony_.empty() && ct && !joinsRallyGroup(*ct))
+                std::tie(sx, sy) = parkingSpot(onSpot[{colony_[0].a, colony_[0].b}]++, hx, hy, true);
+            else
+                std::tie(sx, sy) = parkingSpot(onSpot[{p.a, p.b}]++, x, y, onHub(p));
             start.push_back({UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f}, sx, sy, p.type});
         }
     }
