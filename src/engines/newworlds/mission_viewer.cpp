@@ -1019,7 +1019,8 @@ void MissionViewer::showProgress() {
 bool MissionViewer::playEvent(const Event& ev) {
     if (ev.type == EventType::MouseMove || ev.type == EventType::MouseDown || ev.type == EventType::MouseUp)
         mouseX_ = ev.mouseX, mouseY_ = ev.mouseY;
-    const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0;
+    const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0,
+               alt = (ev.mods & keymod::Alt) != 0;
     // The tutorials wait for keys, by the game's (Windows) key codes.
     if (ev.type == EventType::KeyDown && run_ && !run_->finished()) {
         int code = 0;
@@ -1074,8 +1075,9 @@ bool MissionViewer::playEvent(const Event& ev) {
             buildMenu_ = vehicleMenu_ = false;
             break;
         }
-        // U: the vehicles the yards can make; a number orders one.
-        if (ev.key == 'u' && economy_) {
+        // V: the vehicles the yards can make (the game's vehicle menu); a
+        // number orders one.
+        if (ev.key == 'v' && !shift && !ctrl && !alt && economy_) {
             vehicleMenu_ = !vehicleMenu_;
             menuPage_ = 0;
             buildMenu_ = researchMenu_ = false;
@@ -1092,6 +1094,30 @@ bool MissionViewer::playEvent(const Event& ev) {
             const auto offered = research_->offered();
             if (size_t(ev.key - '1') < offered.size())
                 research_->start(offered[size_t(ev.key - '1')]);
+            break;
+        }
+        // Shift or Ctrl + B / V: the camera to the next of the colony's
+        // buildings / fighting vehicles (exe.md#keys).
+        if ((ev.key == 'b' || ev.key == 'v') && (shift || ctrl)) {
+            cycleCamera(ev.key == 'b');
+            break;
+        }
+        // C: the colony's details (the hub's INFO page).
+        if (ev.key == 'c' && !alt && !ctrl) {
+            for (size_t i = 0; economy_ && i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+                if (const ColonyStructure* c = structureOf(colonyObjects_[i]); c && c->type == "colony-hub") {
+                    world_->clearSelection();
+                    selectedBuilding_ = colonyObjects_[i];
+                    colonyDetails_ = true;
+                    buildMenu_ = vehicleMenu_ = researchMenu_ = false;
+                    break;
+                }
+            break;
+        }
+        // A, G, S, T, P: all the colony's APCs, ground scouts, science
+        // vehicles, tanks, photon artillery selected.
+        if (!alt && !ctrl && (ev.key == 'a' || ev.key == 'g' || ev.key == 's' || ev.key == 't' || ev.key == 'p')) {
+            selectAllOfKind(char(ev.key));
             break;
         }
         if (ev.key == 'b') {
@@ -1120,15 +1146,6 @@ bool MissionViewer::playEvent(const Event& ev) {
                 map_.centreOn(x, y);
             break;
         }
-        if (ev.key == 'v' && shift) {
-            // To the selected vehicles, or the first one.
-            float x = 0, y = 0;
-            if (world_->groupCentre(0, x, y))
-                map_.centreOn(x, y);
-            else if (!world_->units().empty())
-                map_.centreOn(world_->units()[0].x, world_->units()[0].y);
-            break;
-        }
         if (ev.key >= '1' && ev.key <= '9') {
             const int n = int(ev.key - '0');
             float x = 0, y = 0;
@@ -1145,15 +1162,15 @@ bool MissionViewer::playEvent(const Event& ev) {
             interface_ = !interface_;
             break;
         }
-        // Field work, for the selection: S, M, E a science, medical or
-        // engineering scan and C a capture (on the next unit or building
-        // clicked); O takes aboard the officers of the building beside it
-        // (Shift+O puts them down).
-        // The playbook's orders (exe.md#orders): A attack en route (on the
-        // ground) or assault (on a target), P protect a spot (or, mobile
-        // shield generators, the building clicked), Y back to the rally
-        // point.
-        if ((ev.key == 's' || ev.key == 'm' || ev.key == 'e' || ev.key == 'c' || ev.key == 'a' || ev.key == 'p') &&
+        // Field work, for the selection (Reluva's keys for the playbook's
+        // orders, under Alt, the game's own letters being taken): Alt+S,
+        // M, E a science, medical or engineering scan and Alt+C a capture
+        // (on the next unit or building clicked); O takes aboard the
+        // officers of the building beside it (Shift+O puts them down).
+        // Alt+A attack en route (on the ground) or assault (on a target),
+        // Alt+P protect a spot (or, mobile shield generators, the building
+        // clicked), Y back to the rally point.
+        if (alt && (ev.key == 's' || ev.key == 'm' || ev.key == 'e' || ev.key == 'c' || ev.key == 'a' || ev.key == 'p') &&
             !world_->selection().empty()) {
             pendingOrder_ = pendingOrder_ == char(ev.key) ? 0 : char(ev.key);
             break;
@@ -2917,6 +2934,54 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
 }
 
 const char* MissionViewer::buildMenuTitle() const { return vehicleMenu_ && !buildMenu_ ? "VEHICLES" : "BUILD"; }
+
+// A, G, S, T, P (exe.md#keys): the colony's vehicles of a kind selected.
+void MissionViewer::selectAllOfKind(char k) {
+    if (!world_)
+        return;
+    std::vector<int> ids;
+    for (const Unit& u : world_->units()) {
+        if (u.slot != playerSlot_ || u.building || u.hp <= 0)
+            continue;
+        const std::string& n = u.name;
+        const bool artillery = n.find("artillery") != std::string::npos && n.find("defensive") == std::string::npos;
+        const bool is = k == 'a'   ? n.find("apc") != std::string::npos
+                        : k == 'g' ? n == "ground-scout"
+                        : k == 's' ? n == "science-vehicle"
+                        : k == 'p' ? artillery
+                                   : (n.find("tank") != std::string::npos || n.find("battery") != std::string::npos);
+        if (is)
+            ids.push_back(u.id);
+    }
+    world_->select(ids);
+    selectedBuilding_ = 0;
+    showUnits();
+}
+
+// Shift or Ctrl + B / V: the camera on to the next of the colony's
+// buildings, or of its fighting, science and scouting vehicles.
+void MissionViewer::cycleCamera(bool buildings) {
+    if (!world_)
+        return;
+    std::vector<const Unit*> all;
+    for (const Unit& u : world_->units()) {
+        if (u.slot != playerSlot_ || u.hp <= 0 || u.building != buildings)
+            continue;
+        const CombatType* t = combatType(u.type);
+        if (!buildings && !(t && (t->mask & 0x4440100)))
+            continue;
+        all.push_back(&u);
+    }
+    if (all.empty())
+        return;
+    int& last = buildings ? cycledBuilding_ : cycledVehicle_;
+    size_t next = 0;
+    for (size_t i = 0; i < all.size(); ++i)
+        if (all[i]->id == last)
+            next = (i + 1) % all.size();
+    last = all[next]->id;
+    map_.centreOn(all[next]->x, all[next]->y);
+}
 
 void MissionViewer::stepScript() {
     const Level& level = missions_[size_t(current_)];

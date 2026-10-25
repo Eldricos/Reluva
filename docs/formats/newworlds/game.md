@@ -26,12 +26,15 @@ As the first tutorial teaches them:
 | A JUMP TO icon (nothing selected) | the camera to the next of the colony's objects of that class; a group's icon selects it and goes to it |
 | A click on an officer's card (STAFF), then on one of the colony's buildings or a vehicle that carries officers | moves the officer there |
 | TRAINING (on the STAFF panel), then a course | starts the officer's training |
-| A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
-| P, then a click on the ground / on one of the colony's buildings | protect from location: hold the spot, go after whoever attacks the colony, come back; with a building, mobile shield generators guard it ("protect area") and the rest hold beside it |
+| Alt + A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
+| Alt + P, then a click on the ground / on one of the colony's buildings | protect from location: hold the spot, go after whoever attacks the colony, come back; with a building, mobile shield generators guard it ("protect area") and the rest hold beside it |
 | Y | the selected armed vehicles drive back to the rally point |
-| S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
-| C, then a click on a building | the selected armed APCs capture it |
-| U, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
+| Alt + S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
+| Alt + C, then a click on a building | the selected armed APCs capture it |
+| V, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
+| A, G, S, T, P | all the colony's APCs, ground scouts, science vehicles, tanks, photon artillery selected |
+| Shift or Ctrl + B / V | the camera to the next of the colony's buildings / fighting vehicles |
+| C | the colony's details (the hub's INFO page) |
 | R, then 1-9 | the research topics open to the colony; a number starts one (several share the points) |
 | O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
@@ -46,7 +49,6 @@ As the first tutorial teaches them:
 | F2 | the sky view, much higher (F2 again: the bird's-eye view) |
 | F1 | the first-person view, low over the ground (F1 again: back) |
 | Home | back to the colony hub |
-| Shift + V | to the selected vehicles (or the first one) |
 | Ctrl + 1-9 | makes the selection a battle group |
 | 1-9 / Shift + 1-9 | selects the group / centres on it |
 | B | the build menu in the NEW WORLDS panel (B again closes it) |
@@ -62,7 +64,7 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. Not yet modelled: the
 multiselection's icon pages. The keys
-A, P, Y, S, M, E and C give the playbook's orders without it.
+Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
 
 ## What's modelled
 

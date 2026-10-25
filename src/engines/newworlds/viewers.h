@@ -590,6 +590,8 @@ private:
                   const std::vector<const BuildingType*>& buildings, size_t jobs);
     const char* buildMenuTitle() const;
     void jumpTo(int slot);
+    void selectAllOfKind(char k);
+    void cycleCamera(bool buildings);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
@@ -719,7 +721,8 @@ private:
     int menuPage_ = 0;                  // the build or vehicle menu's page
     std::pair<int, uint64_t> menuFlash_{-1, 0}; // the menu item last clicked, and when
     bool colonyDetails_ = false;        // the hub's INFO: the colony's details instead of the hub's
-    std::array<int, 5> jumpedTo_{};     // JUMP TO: each class's object the camera went to last
+    std::array<int, 5> jumpedTo_{};
+    int cycledBuilding_ = 0, cycledVehicle_ = 0; // Shift+B / Shift+V: where the camera went last     // JUMP TO: each class's object the camera went to last
     int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
