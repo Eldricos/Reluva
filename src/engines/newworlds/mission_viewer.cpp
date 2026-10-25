@@ -21,6 +21,31 @@ namespace reluva::newworlds {
 
 namespace {
 
+// A type's small portrait (gui.md#pictures), by the game's type id.
+const char* portraitOf(int type) {
+    static const std::pair<int, const char*> kPortraits[] = {
+        // Hubs, mining stations, defensive weapons and artillery (JUMP TO).
+        {23, "fhub_s"}, {28, "kchub_s"}, {43, "rchub_s"}, {45, "fms1_s"}, {52, "kms1_s"}, {65, "rms1_s"},
+        {80, "fpdt_s"}, {54, "kdws_s"}, {81, "rdsb_s"}, {83, "fpds_s"}, {82, "kdpt_s"}, {84, "rddt_s"},
+        // Vehicles.
+        {8, "fpv_s"}, {55, "fapcwt_s"}, {56, "fapc_s"}, {12, "fwb_s"}, {13, "fcrgb_s"}, {14, "fconb_s"},
+        {97, "fgs_s"}, {47, "fptl_s"}, {9, "fptla_s"}, {62, "fsv_s"}, {154, "fmsg_s"},
+        {88, "kapcwt_s"}, {10, "kdt_s"}, {229, "kcdt_s"}, {228, "kmdb_s"}, {11, "kwb_s"}, {36, "kpa_s"},
+        {37, "kfgs_s"}, {40, "kapc_s"}, {46, "kcb_s"}, {95, "ksv_s"},
+        {89, "rctp_s"}, {35, "rct_s"}, {98, "rfgs_s"}, {87, "rptl_s"}, {64, "rapc_s"}, {230, "rcapc_s"},
+        {90, "rcrgb_s"}, {91, "rconb_s"}, {92, "rwb_s"}, {63, "rsv_s"}, {148, "rt_s"}};
+    for (const auto& [id, name] : kPortraits)
+        if (id == type)
+            return name;
+    return "";
+}
+
+// JUMP TO's left column (exe.md#the-colony-overview): per race, the type
+// whose portrait each slot shows: the hub, the mining stations, the
+// defensive weapons, the defensive artillery, the fighting vehicles.
+constexpr int kJumpRows = 2; // an icon's height, in lines
+constexpr int kJumpIcons[3][5] = {{23, 45, 80, 83, 56}, {28, 52, 54, 82, 40}, {43, 65, 81, 84, 64}};
+
 constexpr Color kHeadingColor{255, 220, 90};
 constexpr Color kTextColor{230, 230, 230};
 constexpr Color kNoteColor{150, 160, 190};
@@ -360,6 +385,8 @@ void MissionViewer::startPlay() {
     selectedBuilding_ = 0;
     razeAsked_ = 0;
     razing_.clear();
+    colonyDetails_ = false;
+    jumpedTo_ = {};
     auto onHub = [&](const StartPlacement& p) {
         return colony_ && !colony_->buildings().empty() && p.a == colony_->buildings()[0].a &&
                p.b == colony_->buildings()[0].b;
@@ -1911,6 +1938,10 @@ bool MissionViewer::pressButton(int x, int y) {
             trainingView_ = true;
         } else if (b.action.rfind("course", 0) == 0 && fieldWork_) {
             fieldWork_->train(size_t(std::atoi(b.action.c_str() + 6)));
+        } else if (b.action == "info") {
+            colonyDetails_ = !colonyDetails_;
+        } else if (b.action.rfind("jump", 0) == 0) {
+            jumpTo(std::atoi(b.action.c_str() + 4));
         } else if (b.action == "raze" && u) {
             razeAsked_ = u->id;
         } else if (b.action == "raze-no") {
@@ -2061,6 +2092,12 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
                     c = &s;
     if (!c || !bt || u.slot != playerSlot_)
         return out;
+    // The hub's INFO: the colony's details in place of its own.
+    if (colonyDetails_ && c->type == "colony-hub") {
+        const std::vector<std::string> details = colonyDetails();
+        out.insert(out.end(), details.begin(), details.end());
+        return out;
+    }
     out.push_back("EFFICIENCY " + std::to_string(int(economy_->efficiency(*c) * 100)) + "%");
     const bool generator = c->type == "colony-hub" || c->type == "power-generator" || c->type == "advanced-generator";
     if (generator) {
@@ -2125,7 +2162,91 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
         for (int k = 1; k <= kOres; ++k)
             out.push_back("RAW " + upper(oreName(k)) + " " + std::to_string(int(ore[size_t(k - 1)])));
     }
+    // The sickbay: the colony's crew (not officers), the dead among them:
+    // healthy, sick (infected and alive), dead, and their average health
+    // (the dead counting none).
+    if (c->type == "sickbay") {
+        const int dead = economy_->dead(), assigned = economy_->crew() + economy_->pool() + dead;
+        const int infected = effects_ ? effects_->infected() : 0;
+        out.push_back("HEALTHY " + std::to_string(std::max(0, assigned - infected)));
+        out.push_back("SICK " + std::to_string(std::max(0, infected - dead)));
+        out.push_back("DEAD " + std::to_string(dead));
+        out.push_back("AVG. HEALTH " + std::string(assigned ? std::to_string((assigned - dead) * 100 / assigned) : "999") + "%");
+    }
+    // A farm: the colony's life support, as a producer.
+    if (c->type == "farm") {
+        out.push_back("PRODUCER");
+        out.push_back("CONSUMPTION " + std::to_string(int(std::lround(economy_->lifeConsumption() * 100))) + "%");
+        out.push_back("DEMAND MET " + std::to_string(int(std::lround(economy_->lifeDemandMet() * 100))) + "%");
+        out.push_back("RESERVE " + std::to_string(int(std::lround(economy_->lifeSupport() * 100))) + "%");
+    }
     return out;
+}
+
+// The hub's INFO page (the game's colony details): the colony's people,
+// then each building and upgrade going up.
+std::vector<std::string> MissionViewer::colonyDetails() const {
+    std::vector<std::string> out{"COLONY DETAILS"};
+    if (!economy_)
+        return out;
+    out.push_back("PEOPLE " + std::to_string(economy_->people()) + " IN ORBIT " + std::to_string(economy_->inOrbit()));
+    out.push_back("WORKING " + std::to_string(economy_->crew()) + " POOL " + std::to_string(economy_->pool()));
+    out.push_back("DEAD " + std::to_string(economy_->dead()));
+    std::vector<const ColonyStructure*> builds, upgrades;
+    for (const ColonyStructure& s : economy_->structures())
+        if (s.progress < 1) {
+            const BuildingType* t = buildingType(s.type);
+            (t && !t->upgradeOf.empty() ? upgrades : builds).push_back(&s);
+        }
+    auto list = [&](const std::vector<const ColonyStructure*>& v, const char* what) {
+        for (size_t i = 0; i < v.size(); ++i) {
+            const BuildingType* t = buildingType(v[i]->type);
+            out.push_back(std::string(what) + std::to_string(i + 1) + " OF " + std::to_string(v.size()) + " " +
+                          (t ? t->panel : v[i]->type) + " " + std::to_string(int(v[i]->progress * 100)) + "%");
+        }
+    };
+    list(builds, "BUILDING ");
+    list(upgrades, "ENGINEERING ");
+    return out;
+}
+
+// JUMP TO, a left slot: the camera to the next of the colony's objects of
+// its class (round again after the last), those being razed or destroyed
+// skipped; a right slot: battle group n selected, and the camera on it.
+void MissionViewer::jumpTo(int slot) {
+    if (!world_)
+        return;
+    if (slot >= 5) {
+        float x = 0, y = 0;
+        if (world_->selectGroup(slot - 4) && world_->groupCentre(slot - 4, x, y))
+            map_.centreOn(x, y);
+        showUnits();
+        return;
+    }
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0;
+    auto matches = [&](const Unit& u) {
+        if (u.slot != playerSlot_ || u.hp <= 0 || std::find(razing_.begin(), razing_.end(), u.id) != razing_.end())
+            return false;
+        const CombatType* t = combatType(u.type);
+        if (slot == 1)
+            return t && (t->mask & 0x8) != 0; // the mines
+        if (slot == 4)
+            return t && (t->mask & 0x4440100) != 0; // fighting, science and scouting vehicles
+        return u.type == kJumpIcons[race][slot];
+    };
+    std::vector<const Unit*> all;
+    for (const Unit& u : world_->units())
+        if (matches(u))
+            all.push_back(&u);
+    if (all.empty())
+        return;
+    size_t next = 0;
+    for (size_t i = 0; i < all.size(); ++i)
+        if (all[i]->id == jumpedTo_[size_t(slot)])
+            next = (i + 1) % all.size();
+    jumpedTo_[size_t(slot)] = all[next]->id;
+    map_.centreOn(all[next]->x, all[next]->y);
 }
 
 // What play adds over the map: the full-screen Tricorder (Tab), with the
@@ -2239,7 +2360,7 @@ void MissionViewer::drawInterface() {
         if (picked && picked->building && picked->slot == playerSlot_ && picked->built >= 1) {
             const BuildingType* bt = buildingType(picked->name);
             if (picked->name == "colony-hub")
-                actions.push_back({"STAFF", "staff"});
+                actions.push_back({"STAFF", "staff"}), actions.push_back({"INFO", "info"});
             if (picked->name == "colony-hub" || picked->name == "construction-yard" || picked->name == "vehicle-yard")
                 actions.push_back({"BUILD", "build"});
             if (picked->name == "science-station" || picked->name == "sickbay")
@@ -2262,7 +2383,7 @@ void MissionViewer::drawInterface() {
                           : trainingView_ && staffView_ ? std::max(2, int(training.size()) + 1)
                           : staffView_    ? int(cards.size()) + 2
                           : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0) + (actions.empty() ? 0 : 2)
-                                          : economy_ ? 8 : 7;
+                                          : economy_ ? 9 + 5 * kJumpRows : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
@@ -2432,6 +2553,42 @@ void MissionViewer::drawInterface() {
                 ui_.drawSmall(screen_, x + 10, ty + lh,
                               "CREW " + std::to_string(economy_->crew()) + " POOL " + std::to_string(economy_->pool()),
                               text);
+            // JUMP TO: on the left a slot for each class of the colony's
+            // objects (a click: the camera to the next of them), on the
+            // right battle groups 1-5 (their first member's portrait; a
+            // click selects the group and goes to it).
+            if (economy_ && world_) {
+                ty += lh * 2;
+                ui_.drawSmall(screen_, x + 10, ty, "JUMP TO", bright);
+                ty += lh;
+                const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0, icon = lh * kJumpRows - 2;
+                for (int i = 0; i < 10; ++i) {
+                    const int ix = x + 10 + (i / 5) * (icon + 8), iy = ty + (i % 5) * (icon + 2);
+                    int type = i < 5 ? kJumpIcons[race][i] : 0;
+                    if (i >= 5)
+                        if (const auto& g = world_->group(i - 4); !g.empty())
+                            if (const Unit* m = world_->unit(g[0]))
+                                type = m->type;
+                    const Texture* t = type ? ui_.objectPortrait(portraitOf(type)) : nullptr;
+                    if (t)
+                        ui_.drawPicture(screen_, *t, ix, iy, icon, icon);
+                    for (int xx = ix - 1; xx <= ix + icon; ++xx)
+                        for (int yy : {iy - 1, iy + icon})
+                            if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
+                                uint8_t* px = screen_.row(yy) + xx * 4;
+                                px[0] = text.r / 2, px[1] = text.g / 2, px[2] = text.b / 2;
+                            }
+                    for (int yy = iy - 1; yy <= iy + icon; ++yy)
+                        for (int xx : {ix - 1, ix + icon})
+                            if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
+                                uint8_t* px = screen_.row(yy) + xx * 4;
+                                px[0] = text.r / 2, px[1] = text.g / 2, px[2] = text.b / 2;
+                            }
+                    if (i >= 5 && !t)
+                        ui_.drawSmall(screen_, ix + icon / 2 - 3, iy + icon / 2 - lh / 2, std::to_string(i - 4), text);
+                    buttons_.push_back({ix, iy, icon, icon, "jump" + std::to_string(i)});
+                }
+            }
         }
     }
 

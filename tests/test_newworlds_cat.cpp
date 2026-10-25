@@ -1439,6 +1439,15 @@ void testStoresAndRazing() {
     // Gifts now go to the second.
     e.give(Dilithium, 10);
     CHECK(e.storeOf(second)[Dilithium] == 10);
+    // A building's crew die with it (the sickbay's DEAD); not a razed one's.
+    const int bay = e.addBuilt("sickbay", 0, -20000);
+    int crew = 0;
+    for (const ColonyStructure& c : e.structures())
+        if (c.id == bay)
+            crew = c.crew;
+    CHECK(crew > 0 && e.dead() == 0);
+    e.remove(bay);
+    CHECK(e.dead() == crew);
 }
 
 void testRivalsAndGroups() {

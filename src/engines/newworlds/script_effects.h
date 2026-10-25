@@ -43,6 +43,7 @@ public:
     };
     const std::vector<Spark>& sparks() const { return sparks_; }
     int infection() const { return int(infection_); } // percent
+    int infected() const { return infected_; }        // people
 
 private:
     struct Storm {

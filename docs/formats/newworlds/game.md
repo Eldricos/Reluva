@@ -22,7 +22,8 @@ As the first tutorial teaches them:
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
 | Double click (units selected) on the ground, another side's object, or one of the colony's buildings | the **playbook**: a column of the game's order icons left of the Tricorder (the pointer over one names it); a click gives that order: on the ground attack en route, protect from location, move without attacking, return to the rally point; on another side's object follow and attack, assault, capture (armed APCs on a building), or the three scans (scouts and science vehicles alone); protect area (mobile shield generators on the colony's building). Any other click or Escape puts it away |
-| A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it), DEMOLISH (then YES or NO) |
+| A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it), DEMOLISH (then YES or NO), INFO (the hub: the colony's details) |
+| A JUMP TO icon (nothing selected) | the camera to the next of the colony's objects of that class; a group's icon selects it and goes to it |
 | A click on an officer's card (STAFF), then on one of the colony's buildings or a vehicle that carries officers | moves the officer there |
 | TRAINING (on the STAFF panel), then a course | starts the officer's training |
 | A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
@@ -60,7 +61,7 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: the hub's colony overview. The keys
+modelled: the multiselection's icon pages. The keys
 A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
@@ -207,6 +208,21 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   COVERAGE; a storage facility what it holds itself, the construction
   yard the colony's stock; the resource processor its raw ores. The
   hub's overview isn't made yet.
+- **The colony overview** ([exe.md](exe.md#the-colony-overview)): with
+  nothing selected the NEW WORLDS panel shows the colony's size, its
+  stock, the crew and pool, and JUMP TO: on the left the race's
+  portraits of the hub, a mining station, the defensive weapon and
+  artillery and the armed APC, each a click to send the camera to the
+  next of that class (all fighting, science and scouting vehicles for
+  the last); on the right battle groups 1-5, shown by their first member,
+  a click to select the group and go to it. The hub's INFO switches its
+  panel to the colony's details: its people (on the planet, in orbit,
+  working, in the pools, dead) and each building and upgrade going up
+  (BUILDING 1 OF 2 ..., ENGINEERING ...).
+- **The sickbay and farms:** the sickbay's panel counts the crew HEALTHY,
+  SICK (the disease's infected, less the dead), DEAD (those who died with
+  their building) and their AVG. HEALTH; a farm's shows the colony's life
+  support as a producer (CONSUMPTION, DEMAND MET, RESERVE).
 - **Demolishing** ([exe.md](exe.md#demolishing)): DEMOLISH on a finished
   building (not the hub or a storage facility) asks yes or no; yes gives
   half its cost back at once, sends its crew to the hub's pool and its
@@ -399,6 +415,7 @@ built, to be put back at the end so play feels as the game's does:
 | The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
+| A person's health (the sickbay's AVG. HEALTH) | everyone whole but the dead | the game lowers it 10 at a time for the sick; Reluva counts how many are ill, not who |
 | Officers' portraits | the section's face (as the messages use) | which face is whose isn't known |
 | What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
 | Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |

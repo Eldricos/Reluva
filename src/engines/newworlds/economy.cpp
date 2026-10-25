@@ -854,21 +854,25 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
     // Life support first: everyone on the planet uses 16 a tick; farms add
     // to it; the hub buys back what's used with power, before any other
     // building (its request divided by its efficiency).
-    life_ -= kLifePerPerson * people();
+    lifeUsed_ = kLifePerPerson * people();
+    life_ -= lifeUsed_;
+    lifeProduced_ = 0;
     float hubEff = 0;
     for (const ColonyStructure& s : structures_)
         if (s.progress >= 1) {
             if (s.type == "farm")
-                life_ += kFarmLife * efficiency(s);
+                lifeProduced_ += kFarmLife * efficiency(s);
             else if (s.type == "colony-hub")
                 hubEff = std::max(hubEff, efficiency(s));
         }
-    life_ = std::clamp(life_, 0.0, kLifeCap);
+    life_ = std::clamp(life_ + lifeProduced_, 0.0, kLifeCap);
+    lifeMet_ = 1;
     double supply = powerSupply();
     const double produced = supply;
     if (hubEff > 0) {
         const double ask = (kLifeCap - life_) / kLifePerPower / hubEff;
         const double grant = std::min(ask, supply + reserve_);
+        lifeMet_ = ask > 0 ? float(grant / ask) : 1;
         life_ = std::min(kLifeCap, life_ + grant * kLifePerPower);
         supply -= grant;
         if (supply < 0) {
@@ -961,8 +965,12 @@ void Economy::remove(int id) {
         else
             (it->structure == id ? it->gone = true : false), ++it;
     for (const ColonyStructure& c : structures_)
-        if (c.id == id && c.type == "resource-processor")
-            ore_ = {}, refined_ = {};
+        if (c.id == id) {
+            if (c.type == "resource-processor")
+                ore_ = {}, refined_ = {};
+            // Its people die with it (not those razing let go).
+            dead_ += c.crew + c.pool;
+        }
     structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
                                      [&](const ColonyStructure& c) { return c.id == id; }),
                       structures_.end());

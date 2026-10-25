@@ -5,6 +5,7 @@
 
 #include "engines/newworlds/ai_data.h"
 
+#include <algorithm>
 #include <array>
 #include <functional>
 #include <string>
@@ -172,6 +173,7 @@ public:
     // Battle groups 1-9: Ctrl+N makes the selection group N, N selects it.
     void setGroup(int n);
     bool selectGroup(int n);
+    const std::vector<int>& group(int n) const { return groups_[size_t(std::clamp(n, 0, 9))]; }
     // The middle of group N (or of the selection, for n = 0); false if empty.
     bool groupCentre(int n, float& x, float& y) const;
 

@@ -745,6 +745,39 @@ How a side the computer plays builds and makes units:
   buildings, so power, crew and officers set an AI yard's pace as they do
   the player's. Upgrades are always charged, but no order asks for one.
 
+### The colony overview
+
+With nothing selected (or a patch of ground clicked) the NEW WORLDS panel
+shows the colony: COLONY SIZE n / limit, the six materials, then JUMP TO,
+ten 32 × 32 icons in two columns of five, and the Build button. The left
+column has a slot per class of the side's own objects, each with its
+race's portrait: the hub; the mining stations (all with class 0x8); the
+defensive weapons; the defensive artillery; the fighting, science and
+scouting vehicles (class 0x4440100: not bees or transports, shown by the
+armed APC's portrait). A click moves the camera (not the selection) to
+the next such object after the one it went to last, round again after
+the last, skipping those evacuating or destroyed. The right column is
+battle groups 1-5: blank until the group is made (Ctrl + digit), then the
+first member's portrait; a click selects the group and moves the camera
+to it. (The red icon seen in recordings is most likely the one under the
+pointer.)
+
+The hub's **Info** button switches its panel between the hub's own pages
+and the colony's details: the people (the roster's working, pool, dead,
+average health), then a page for each building ordered and not finished
+("building i of N") and each upgrade ("engineering i of N").
+
+**The sickbay's block** counts the side's plain crew (officers not
+included): assigned = the roster less officers and those in orbit (the
+dead stay in it), infected = those in the disease slots; healthy =
+assigned - infected, sick = infected - dead, dead = the roster's dead,
+and the average health of the assigned (health out of 256; the dead
+count nothing). The sickbay heals no one: disease takes no notice of it,
+and its wards only raise the colony's limit. **A farm's block** is the
+colony's life support as a producer: consumption (drawn over made last
+tick), demand met, and the reserve (stored over 655 360): every farm
+shows the same.
+
 ### Stores
 
 Only storage facilities put their store on the side's list, and the

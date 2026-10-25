@@ -583,6 +583,8 @@ private:
     std::vector<std::string> staffCards() const;
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
+    std::vector<std::string> colonyDetails() const;
+    void jumpTo(int slot);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
@@ -706,6 +708,8 @@ private:
     std::vector<PanelButton> buttons_;
     bool staffView_ = false;            // the STAFF panel: the officers' cards
     bool trainingView_ = false;         // its TRAINING list: the officers' courses
+    bool colonyDetails_ = false;        // the hub's INFO: the colony's details instead of the hub's
+    std::array<int, 5> jumpedTo_{};     // JUMP TO: each class's object the camera went to last
     int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard

@@ -219,6 +219,13 @@ public:
     // power, 16 units a person a tick; farms add to it.
     float lifeSupport() const { return float(life_ / kLifeCap); }
     float lifeSupportPower() const { return lifeDraw_; } // power a tick it took
+    // The life-support pool as a farm's panel shows it (its producer
+    // block): what was drawn over what the farms made last tick, the share
+    // of the hub's buying back granted.
+    float lifeConsumption() const { return lifeProduced_ > 0 ? float(std::min(1.0, lifeUsed_ / lifeProduced_)) : 0; }
+    float lifeDemandMet() const { return lifeMet_; }
+    // People who died with what they were in (the sickbay's DEAD).
+    int dead() const { return dead_; }
     // The crew the player wants in a building (the panel's assign
     // control, 0 to its slots): more are asked for, those over it go back
     // to the hub's pool.
@@ -313,6 +320,9 @@ private:
     int orbit_ = 150, officersDown_ = 0;
     double life_ = kLifeCap;
     float lifeDraw_ = 0; // power the hub put into life support last tick
+    double lifeProduced_ = 0, lifeUsed_ = 0;
+    float lifeMet_ = 1;
+    int dead_ = 0;
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
     bool free_ = false;
