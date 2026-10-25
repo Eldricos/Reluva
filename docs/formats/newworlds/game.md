@@ -185,7 +185,9 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   pulses and its reload, 1500): with its colony short of power it falls
   silent; vehicles and the natives' guns need none. A shot does its damage times the
   shooter's security skill + 1 (artillery's as it is). An armed unit or
-  turret looks round every 8-11 ticks for the nearest enemy in range,
+  turret looks round every 8-11 ticks for the nearest enemy in range and
+  in its arc (most turn all round; the Klingon armed APC's 90 degrees
+  each way, the Romulans' 60, some natives' less),
   its turret meanwhile following the nearest in its reach; it fires only
   once its turret has turned onto the target, at the game's rate: a side
   fires at those it's hostile to, the player's units also at those
@@ -435,7 +437,8 @@ kept apart from the game's behaviour:
 | What a shot can hit | buildings within 6000 of its path, vehicles within 1000; a falling shell what it's no higher than (4000, 1500) | the game's uses each model's radius |
 | Bees and unarmed APCs | hit like anything else | the game's hit test skips some flag bits that, read as classes, would be them; but bees are killed in the game, so it isn't applied |
 | A pulse's way | fixed when fired, from the turret as it moves | the game's turns with the turret |
-| Turret arcs | every turret turns all round | the executable's yaw and pitch limits (some APCs' 60° or 90° each way) |
+| A vehicle facing a target outside its turret's arc | turns on the spot, 4.5° a tick, when told to attack it | the game's turret waits at its stop; how the vehicle comes round isn't known |
+| Turrets' pitch limits | not applied | the executable's elevation limits (the map is flat to Reluva's shots) |
 | Reach on a building | 6000 units past its middle | Reluva's |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |

@@ -30,6 +30,9 @@ constexpr float kShellReach = 36850;
 // types pay it: the empires' defensive weapons and artillery (and their
 // copies for slots 3-5).
 constexpr float kShotPower = 300;
+// How fast a standing vehicle turns its hull to bring a target into its
+// turret's arc (Reluva's: how the game's units face one isn't known).
+constexpr float kHullTurn = 3.14159265f / 40;
 bool paysForShots(int type) {
     for (int t : {54, 80, 81, 82, 83, 84, 276, 277, 281, 282, 287, 288})
         if (t == type)
@@ -434,6 +437,14 @@ std::vector<WorldEvent> World::takeEvents() {
 void World::combatTick() {
     ++tick_;
     auto distance = [](const Unit& a, const Unit& b) { return std::hypot(b.x - a.x, b.y - a.y); };
+    // Within the turret's arc (exe.md#sides-and-combat: some turn only so
+    // far each way from straight ahead).
+    auto inArc = [&](const Unit& u, const Unit& t) {
+        if (u.weapon.arc >= 3.14f)
+            return true;
+        const float rel = std::remainder(std::atan2(t.y - u.y, t.x - u.x) - (u.building ? 0 : u.heading), 2 * 3.14159265f);
+        return std::abs(rel) <= u.weapon.arc + 0.01f;
+    };
     auto inRange = [&](const Unit& u, const Unit& t) {
         const float range = u.weapon.kind == WeaponKind::Artillery ? std::min(u.weapon.range, kShellReach) : u.weapon.range;
         return distance(u, t) <= range + (t.building ? kBuildingReach : 0);
@@ -480,11 +491,11 @@ void World::combatTick() {
             float best = 1e30f;
             for (Unit& v : units_)
                 if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
-                    distance(u, v) < best)
+                    inArc(u, v) && distance(u, v) < best)
                     best = distance(u, v), t = &v;
         }
         if (!t && u.lastAttacker && looks)
-            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a))
+            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a) && inArc(u, *a))
                 t = a;
         if (!t) {
             u.target = 0, u.ordered = false, u.firing = false, u.burstLeft = 0;
@@ -525,6 +536,16 @@ void World::combatTick() {
             if (u.cloaked)
                 u.cloaked = false, u.fading = kCloakFade, u.cloaking = false;
             turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading));
+            continue;
+        }
+        // Outside its turret's arc (one it was told to attack): the turret
+        // waits at its stop, and a standing vehicle turns to face it.
+        if (!inArc(u, *t)) {
+            turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading));
+            if (!u.building && !u.moving()) {
+                const float d = std::remainder(std::atan2(t->y - u.y, t->x - u.x) - u.heading, 2 * 3.14159265f);
+                u.heading += std::clamp(d, -kHullTurn, kHullTurn);
+            }
             continue;
         }
         // On target, or turning onto it.
@@ -608,6 +629,10 @@ void World::protectTick(Unit& u) {
 // Turns a turret towards an angle (from straight ahead), speeding up and
 // slowing down onto it; true once it's there.
 bool World::turnTurret(Unit& u, float want) {
+    // No further than its stops.
+    want = std::remainder(want, 2 * 3.14159265f);
+    if (u.weapon.arc < 3.14f)
+        want = std::clamp(want, -u.weapon.arc, u.weapon.arc);
     float d = std::remainder(want - u.turretYaw, 2 * 3.14159265f);
     if (std::abs(d) <= kTurretPush && std::abs(u.turretSpin) <= kTurretPush) {
         u.turretYaw = std::remainder(want, 2 * 3.14159265f), u.turretSpin = 0;

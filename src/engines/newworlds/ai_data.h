@@ -34,6 +34,7 @@ struct Weapon {
     int reload = 0;    // ticks (20 a second) between bursts or shots
     int magazine = 0;  // shots a burst
     int guns = 0;      // weapons the type carries
+    float arc = 3.14159f; // radians its turret turns each way from straight ahead (pi: all round)
 };
 
 struct CombatType {

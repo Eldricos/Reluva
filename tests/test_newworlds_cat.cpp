@@ -1505,6 +1505,30 @@ void testProjectiles() {
         }
         CHECK(!turretFired && tankFired && asked >= 300);
     }
+    // A turret that turns only 60 degrees each way (the Romulan armed APC)
+    // won't pick an enemy behind it; told to attack, it turns to face it.
+    {
+        World r(t);
+        r.setStance(2, 0, 3);
+        r.setStance(0, 2, 2);
+        const int apc = spawnObject(r, 2, 'R', *combatType(64), 100000, y, {}, {}, true);
+        CHECK(std::abs(combatType(64)->weapon.arc - 1.047f) < 0.01f);
+        r.unit(apc)->heading = 0; // facing east
+        const int behind = spawnObject(r, 0, 'F', *combatType(8), 88000, y, {});
+        auto fired = [&](int ticks) {
+            bool any = false;
+            for (int i = 0; i < ticks; ++i) {
+                r.advance(0.05);
+                for (const WorldEvent& e : r.takeEvents())
+                    any = any || (e.kind == WorldEvent::Shot && e.from == apc);
+            }
+            return any;
+        };
+        CHECK(!fired(100) && std::abs(r.unit(apc)->heading) < 0.01f);
+        r.select({apc});
+        r.attack({apc}, behind);
+        CHECK(fired(200));
+    }
     // A shell: up its arc and down onto a building 18000 away.
     World a(t);
     a.setStance(0, 1, 3);
