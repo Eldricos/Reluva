@@ -159,6 +159,10 @@ public:
     // The events the script's own handlers wait for, in the order written
     // (which is the order they happened in the recording): a walkthrough.
     std::vector<ScriptEvent> walkthrough() const;
+    // What the script's switched-on handlers wait for that hasn't happened
+    // (not timers, signals, its own follow-ons or what fails it), in the
+    // order written.
+    std::vector<ScriptEvent> awaited() const;
     // Whether the event waits on time: a handler for it is off (a timer
     // may arm it) and none that's on would take it now.
     bool waitsOnTimers(const ScriptEvent& event) const;

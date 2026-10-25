@@ -566,6 +566,19 @@ std::vector<MissionRun::Output> MissionRun::advance(double seconds) {
     return out;
 }
 
+std::vector<ScriptEvent> MissionRun::awaited() const {
+    std::vector<ScriptEvent> out;
+    for (const Rule& r : rules_) {
+        const ScriptEvent& e = r.handler->event;
+        const bool fails = std::any_of(r.handler->actions.begin(), r.handler->actions.end(),
+                                       [](const MissionScript::Action& a) { return a.verb == "lose" || a.verb == "fail"; });
+        if (r.armed && !r.fired && !r.handler->every && !fails && e.kind != "timer" && e.kind != "signal" &&
+            e.kind != "completed" && e.kind != "all-completed" && e.kind != "research-available")
+            out.push_back(e);
+    }
+    return out;
+}
+
 bool MissionRun::waitsOnTimers(const ScriptEvent& event) const {
     bool off = false;
     for (const Rule& r : rules_) {

@@ -529,9 +529,14 @@ the game would):
   crew once the hub is gone, too little power).
 
 `-v` adds the run's log: the script's AI orders, losses, won or lost.
-`all` plays every map in the archives from each side it's played from;
-the tutorials, played on other maps, aren't covered. 15 minutes of
-every mission take about a minute and a half.
+`all` plays every map in the archives from each side it's played from,
+and every mission with a script whose map is there under another name
+(the tutorials and bonus missions, C1-C11, and F14, K14 and R14 on the
+F12 map), as `levels.cpp`'s `missionMapNames` gives them. The keys a
+tutorial asks for are pressed when it asks (as a trainee following it),
+checked each second; anything else the script still waits for from the
+player (buildings, scans, counts) is listed at the end as `script waits
+for:`. 15 minutes of every mission take about two minutes.
 
 What the first runs found (fixed): vehicles the mission places on the
 hub's spot (R1's four tanks) were all kept inside it like bees, leaving

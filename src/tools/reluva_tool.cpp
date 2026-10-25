@@ -2417,6 +2417,22 @@ int cmdPlayCheck(int argc, char** argv) {
                 std::find(missions.begin(), missions.end(), stem) == missions.end())
                 missions.push_back(stem);
         }
+    // The missions that play on another's map (the tutorials, the bonus
+    // missions), by their scripts.
+    auto findMap = [&](const std::string& mission) -> std::string {
+        for (const std::string& name : nw::missionMapNames(mission))
+            for (const auto& a : archives)
+                if (a->find(name))
+                    return name;
+        return {};
+    };
+    for (const nw::MissionScript& script : nw::missionScripts()) {
+        std::string name = script.mission;
+        std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+        if (name != "GENERIC" && (which == "all" || name == which) && !findMap(name).empty() &&
+            std::find(missions.begin(), missions.end(), name) == missions.end())
+            missions.push_back(name);
+    }
     std::sort(missions.begin(), missions.end());
     if (missions.empty()) {
         std::fprintf(stderr, "no map for %s in those archives\n", which.c_str());
@@ -2427,7 +2443,8 @@ int cmdPlayCheck(int argc, char** argv) {
         nw::Ground ground;
         std::string lower = m;
         std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char c) { return char(std::tolower(c)); });
-        if (reluva::Error err = ground.load(archives, "map/" + lower + ".gmf")) {
+        const std::string map = findMap(m);
+        if (reluva::Error err = ground.load(archives, map.empty() ? "map/" + lower + ".gmf" : map)) {
             std::printf("%s: %s\n", m.c_str(), err.message.c_str());
             continue;
         }
@@ -2435,7 +2452,15 @@ int cmdPlayCheck(int argc, char** argv) {
             if (!onlySide.empty() && onlySide[0] != side)
                 continue;
             nw::MissionSim sim(m, side, ground);
-            sim.advance(seconds);
+            // The keys a tutorial asks for are pressed as it asks (a
+            // trainee following it), a second at a time.
+            for (double t = 0; t < seconds; t += 1) {
+                sim.advance(std::min(1.0, seconds - t));
+                if (nw::MissionRun* run = sim.run())
+                    for (const nw::ScriptEvent& e : run->awaited())
+                        if (e.kind == "key" && !run->finished())
+                            sim.fireScript(e);
+            }
             const auto problems = sim.problems();
             const auto stuck = size_t(std::count_if(problems.begin(), problems.end(),
                                                     [](const std::string& p) { return p.rfind("stuck", 0) == 0; }));
@@ -2447,6 +2472,19 @@ int cmdPlayCheck(int argc, char** argv) {
                     std::printf("   %s\n", l.c_str());
             for (const std::string& p : problems)
                 std::printf("   %s\n", p.c_str());
+            // What the script still waits for from the player.
+            if (nw::MissionRun* run = sim.run(); run && !run->finished()) {
+                std::string waits;
+                for (const nw::ScriptEvent& e : run->awaited()) {
+                    std::string what = e.kind;
+                    for (const std::string& a : e.args)
+                        what += " " + a;
+                    if (waits.find(what) == std::string::npos)
+                        waits += (waits.empty() ? "" : "; ") + what;
+                }
+                if (!waits.empty())
+                    std::printf("   script waits for: %s\n", waits.c_str());
+            }
         }
     }
     return troubled ? 3 : 0;
