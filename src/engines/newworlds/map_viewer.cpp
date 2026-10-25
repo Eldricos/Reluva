@@ -104,7 +104,7 @@ void MapViewer::show(int index) {
     paved_.clear();
     units_.clear();
     ghost_.reset();
-    locked_ = false;
+    locked_ = following_ = false;
     view_ = View::BirdsEye;
     pavedModels_.clear();
     makeUnderlay();
@@ -206,7 +206,7 @@ void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h, int tiles)
 
 void MapViewer::pan(float right, float forward) {
     const float fx = -std::sin(yaw_), fy = std::cos(yaw_);
-    locked_ = false;
+    locked_ = following_ = false;
     centreOn(targetX_ + fx * forward + fy * right, targetY_ + fy * forward - fx * right);
 }
 
@@ -625,6 +625,28 @@ void MapViewer::lockOn(float x, float y) {
     dirty_ = true;
 }
 
+void MapViewer::startFollowing() {
+    following_ = true;
+    locked_ = false;
+    followDistance_ = 1000, followOrbit_ = 0, followRise_ = 0;
+}
+
+// Behind the object along its heading, turned by the orbit, as the
+// game's: from the model's size, 5 radii out (times distance/800) and 0.8
+// up, looking a little down at it.
+void MapViewer::follow(float x, float y, float heading, const std::string& model) {
+    if (!following_)
+        return;
+    const TileModel& m = namedModel(model, false);
+    const float radius = m.error.empty() && m.geo.radius > 0 ? m.geo.radius * kUnitScale : 600.0f;
+    targetX_ = x, targetY_ = y;
+    targetZ_ = groundHeight(x, y) + 0.8f * radius;
+    yaw_ = heading - kPi / 2 + followOrbit_;
+    pitch_ = std::clamp(0.16f + followRise_, 0.02f, kMaxPitch);
+    distance_ = 5 * radius * followDistance_ / 800;
+    dirty_ = true;
+}
+
 void MapViewer::zoomAt(int sx, int sy, bool in) {
     float x = 0, y = 0;
     if (in && screenToGround(sx, sy, x, y))
@@ -640,6 +662,29 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
         locked_ = false;
         centreOn(targetX_ + ax * step, targetY_ + ay * step);
     };
+    // Following an object: the arrows bring the camera nearer or further,
+    // the numpad orbits, raises and lowers it; nothing else moves it.
+    if (following_) {
+        switch (k) {
+        case key::Up: followDistance_ = std::max(800.0f, followDistance_ - 80); return true;
+        case key::Down: followDistance_ = std::min(2000.0f, followDistance_ + 80); return true;
+        case key::Left:
+        case key::Right:
+        case key::Kp0 + 8:
+        case key::Kp0 + 2: return true;
+        case key::Kp0 + 4: followOrbit_ -= kKeyTurn; return true;
+        case key::Kp0 + 6: followOrbit_ += kKeyTurn; return true;
+        case key::Kp0 + 7:
+        case key::Kp0 + 9: followRise_ = std::min(followRise_ + kKeyTurn / 4, kMaxPitch); return true;
+        case key::Kp0 + 1:
+        case key::Kp0 + 3: followRise_ = std::max(followRise_ - kKeyTurn / 4, -0.14f); return true;
+        case key::F1:
+        case key::F1 + 1:
+        case key::F1 + 2:
+        case 'q': following_ = false; break;
+        default: break;
+        }
+    }
     switch (k) {
     case key::Up: move(fx, fy); break;
     case key::Down: move(-fx, -fy); break;

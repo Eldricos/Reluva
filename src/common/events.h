@@ -27,6 +27,7 @@ constexpr uint32_t Home = 0x105;
 constexpr uint32_t End = 0x106;
 constexpr uint32_t PageUp = 0x107;
 constexpr uint32_t PageDown = 0x108;
+constexpr uint32_t Pause = 0x109;
 constexpr uint32_t F1 = 0x110; // F1..F12 are consecutive
 constexpr uint32_t Kp0 = 0x120; // the numeric keypad's 0..9 are consecutive, whatever NumLock says
 constexpr uint32_t KpPeriod = 0x12a;
@@ -56,6 +57,8 @@ enum class EventType {
     MouseDown,
     MouseUp,
     MouseWheel,
+    FocusLost,         // the window lost the keyboard focus
+    FocusGained,
 };
 
 enum class MouseButton { None, Left, Right, Middle };

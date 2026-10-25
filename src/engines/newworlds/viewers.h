@@ -301,6 +301,14 @@ public:
     void lockOn(float x, float y);
     void unlock() { locked_ = false; }
     bool locked() const { return locked_; }
+    // F1's camera following an object (exe.md#cameras): behind it, turning
+    // with it, at 1000 (Up and Down: 800 to 2000); numpad 4/6 orbit it, 7/9
+    // raise and 1/3 lower the camera. F1, F2, F3 or Q (or panning) end it.
+    // follow() puts the camera on the object as it now is.
+    void startFollowing();
+    void stopFollowing() { following_ = false; }
+    bool following() const { return following_; }
+    void follow(float x, float y, float heading, const std::string& model);
     static constexpr float kBlockUnits = 16384; // a block's size in model units
     size_t buildingsShown() const { return buildings_.size(); }
 
@@ -389,6 +397,8 @@ private:
     float markX_ = 0, markY_ = 0; // Z's camera place
     bool marked_ = false;
     bool locked_ = false;
+    bool following_ = false;
+    float followDistance_ = 1000, followOrbit_ = 0, followRise_ = 0;
     std::vector<std::array<float, 4>> buildingAreas_; // middle x, y and half sizes, in model units
     void updateHidden();
     std::set<std::pair<int, int>> paved_;
@@ -595,7 +605,7 @@ private:
     void playbookOrder(char order);
     void drawPlaybook();
     void rallySelected();
-    bool pressButton(int x, int y);
+    bool pressButton(int x, int y, bool right = false, int clicks = 1);
     std::vector<std::string> staffCards() const;
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
@@ -609,6 +619,16 @@ private:
     void selectAllOfKind(char k);
     void speak(const std::string& what);
     void unitSpeaks(int unit, int group);
+    void doubleClicked(int unit);
+    void cameraTo(const Unit& u);
+    int followed_ = 0;                  // the object F1's camera follows
+    bool quitAsked_ = false;            // Escape's box up
+    int quitYes_[4] = {}, quitNo_[4] = {};
+    bool paused_ = false, unfocused_ = false;
+    static constexpr size_t kMultiPage = 15;            // MULTISELECTION entries a page
+    static constexpr int kMultiCellW = 46, kMultiCellH = 48;
+    int multiPage_ = 0;
+    std::set<int> multiTicked_;
     void orderSpoken(bool moving);
     std::map<int, int> unitVoices_;     // each vehicle's voice, once it's spoken
     std::vector<int> spokenSelection_;  // the selection its first vehicle last answered

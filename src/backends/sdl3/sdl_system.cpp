@@ -31,6 +31,7 @@ uint32_t translateKey(SDL_Keycode k) {
     case SDLK_END: return key::End;
     case SDLK_PAGEUP: return key::PageUp;
     case SDLK_PAGEDOWN: return key::PageDown;
+    case SDLK_PAUSE: return key::Pause;
     case SDLK_LSHIFT: return key::LShift;
     case SDLK_RSHIFT: return key::RShift;
     case SDLK_LCTRL: return key::LCtrl;
@@ -210,6 +211,10 @@ bool SdlSystem::pollEvent(Event& out) {
             out.mouseY = static_cast<int>(ev.button.y);
             out.clicks = ev.button.clicks;
             out.mods = translateMods(SDL_GetModState());
+            return true;
+        case SDL_EVENT_WINDOW_FOCUS_LOST:
+        case SDL_EVENT_WINDOW_FOCUS_GAINED:
+            out.type = ev.type == SDL_EVENT_WINDOW_FOCUS_LOST ? EventType::FocusLost : EventType::FocusGained;
             return true;
         case SDL_EVENT_MOUSE_WHEEL:
             out.type = EventType::MouseWheel;

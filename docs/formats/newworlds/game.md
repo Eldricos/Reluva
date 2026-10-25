@@ -17,7 +17,8 @@ As the first tutorial teaches them:
 | Input | What it does |
 |---|---|
 | Left click on a unit | selects it; its panel (name, side, READY or EN ROUTE, shield cover, hit points) in NEW WORLDS |
-| Left click on a building (the colony's, or another side's in sight) | selects it; its panel in NEW WORLDS (double click: the camera locks on it) |
+| Left click on a building (the colony's, or another side's in sight) | selects it; its panel in NEW WORLDS |
+| Double click on one of the colony's objects | in F1 the camera follows it (Up / Down nearer and further, numpad 4/6 orbit, 7/9 raise, 1/3 lower; F1, F2, F3 or Q let go); in F2 and F3 nothing more |
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
@@ -50,7 +51,7 @@ As the first tutorial teaches them:
 | F1 / F2 / F3, Q | the game's cameras: low over the ground (2000 up, looking level; numpad 9 / 3 tilt it a little) / isometric (28000 up, 45 degrees) / close-up isometric (15000 up); Q the next |
 | Z / X | keep the camera's place / go back to it |
 | The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up |
-| Space | the camera to the next of the colony's objects lately hit |
+| Space | the camera to the next of the colony's objects with an alert (lately hit, everyone beamed down, a mine exhausted); in F1 it follows it |
 | Home | back to the colony hub |
 | Ctrl + 1-9 | makes the selection a battle group |
 | 1-9 / Shift + 1-9 | selects the group / centres on it |
@@ -60,13 +61,14 @@ As the first tutorial teaches them:
 | Right click or Escape (placing) | puts the hologram away |
 | Tab | the full-screen Tricorder, units marked |
 | I | the interface on/off |
-| Escape | stops playing (first it closes the menu or hologram) |
+| Escape | asks whether to leave the mission (Y / Return or YES leaves, N / Escape or NO stays; the mission runs on meanwhile); first it closes the menu or hologram |
+| Pause | freezes the mission (as does the window losing the focus); again to go on |
+| MULTISELECTION's entries | right click ticks one; a click selects it alone, a double click as on the object; DELETE drops the ticked from the selection, INVERT flips the ticks, the arrows turn the pages |
 | G (missions page) | plays the mission through as the game runs it: a loading box over the three emblems, the briefing (Backspace skips it), a second loading box, play; once won or lost, the debriefing box, then the won or lost screen with the MISSION REPORT; CONTINUE (or Return) back to the page. Escape leaves at any point. F3 still starts play straight away |
 | Ctrl + X (playing) | the script's walkthrough a step on (a testing aid) |
 | COMMUNICATIONS' buttons | DELETE the message shown; the arrows to the first, previous, next and last; MISSION shows or hides the COMMAND panel (the mission and its objectives); X puts the panel away until the next message |
 
-The numpad keys work with NumLock on or off. Not yet modelled: the
-multiselection's icon pages. The keys
+The numpad keys work with NumLock on or off. The keys
 Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
 
 ## What's modelled
@@ -132,7 +134,11 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   building rising out of it, the bees at work at its corners playing
   their `manipulate` animation (`fconbee`, `conbee`, `rcb`), and the
   others flying. When it's done, the script hears `built <type>`
-  (Engineering's message, the game's spoken announcement). Upgrades
+  (Engineering's message, the game's spoken announcement; a hub the
+  officer's report instead). The officers' other reports (delays, a
+  vehicle finished, a yard suspended and back), the "under attack"
+  voice, and the vehicles' answers to being selected, ordered or unable
+  to go are heard as [exe.md](exe.md#sounds) gives them. Upgrades
   (improved and advanced hub and yards, vehicle yard stages) are in the
   menu once their building stands; they go on it at once, with no
   placing, and the bees build them where it stands. The other sides'
@@ -436,6 +442,8 @@ kept apart from the game's behaviour:
 | Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
 | Animation speed | 10 frames a second | Reluva's (arf.md) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
+| F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking 9 degrees down | the game's offsets; its look angle isn't known |
+| Escape's box | "LEAVE THIS MISSION?" | Reluva's wording |
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |

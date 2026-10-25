@@ -816,6 +816,16 @@ mode), X goes back to it. Space goes to the next of the side's objects
 with an alert (hit, or a report: everyone beamed down, a mine exhausted),
 in their list order; an alert lasts 41 Tricorder redraws.
 
+A double click on one of the side's own objects in F1 puts a camera on
+it: behind it at 5 times its model's radius (times distance / 800), 0.8
+radii up, turning as it turns. The distance starts at 1000; Up and Down
+bring it in and out between 800 and 2000. Numpad 4 / 6 orbit the object,
+7 / 9 raise and 1 / 3 lower the camera; the other arrows and edge
+scrolling do nothing. F1, F2, F3 or Q, or the object's loss, end it.
+JUMP TO and Space attach the same way in F1. In F2 and F3 a double click
+leaves the camera where it is and only plays the object's own sound
+(which clip isn't known yet). Every mission starts in F2.
+
 ### Keys
 
 The game's own: X (camera back; Ctrl+X quits), Escape (quit, with a
@@ -826,6 +836,52 @@ Ctrl the next building), V (the vehicle yard's; Shift or Ctrl the next
 fighting vehicle), C (the colony's details), Z, Q, Pause, Tab; in
 multiplayer Enter and Ctrl+K, R, F for messages. The arrows and numpad
 are read directly.
+
+Escape opens one box asking whether to quit, yes or no; the mission
+carries on while it's up, and yes goes back to the menus. Pause (and the
+window losing the focus) freezes the game: no simulation, no game time
+(the script's timers included), no input on the map; nothing on the
+screen says so.
+
+### Sounds
+
+Each of a side's vehicles carries three groups of its type's voice
+recordings: picked at its making, one of the type's two voices (the a /
+b-style letter) for life; each time a group plays, one of its two lines
+at random. Only the first object of the selection speaks, and only the
+player's own:
+
+| Group | Played when |
+|---|---|
+| 1 (`fapc003` / `004`) | a new selection is made |
+| 2 (`fapc007` / `012`) | an order is taken (a move's once the first unit has planned its way) |
+| 3 (`fneg1`) | no order fits what was clicked, or the move finds no way |
+
+The sets: Federation `fapc` (types 55, 56), `ffgs` (97), `fmsg` (154),
+`fpa` (9, 47), `fpv` (8), `fsv` (62); Klingon `kapc` (40, 88), `kdt` (10,
+229), `kmdb` (228), `kpa` (36), `kfgs` (37), `ksv` (95); Romulan `rapc`
+(64, 89, 230), `rct` (35, 148), `rfgs` (98), `rpa` (87), `rsv` (63).
+
+The officers report by number, in the player's race's one recording each
+(Media/Misc): 001 a vehicle delayed (the yard short of crew or
+materials), 002 a building delayed for want of materials, 003 an
+upgrade delayed, 004 a colony hub finished, 005 a vehicle finished, 006
+a yard's power below 0.2 (production suspended), 008 back above 0.35
+(007 never plays). Each report at most once in 600 ms; none plays over
+one already playing. A finished building of the player's hit plays the
+colony's danger music and its "under attack" voice, at most once in 30
+seconds. Other sides' reports are never heard.
+
+### The multiselection
+
+More than one object selected shows MULTISELECTION in the NEW WORLDS
+panel: pages of 15, three across, each a 46 × 48 cell with the object's
+32 × 32 portrait and a 32 × 3 health bar under it (green for the share of
+hit points left, red the rest). A right click ticks or unticks an entry
+(a frame round it, colour 0x0080ff); a click selects that object alone;
+a double click is a double click on the object. DELETE drops every
+ticked object from the selection; INVERT flips the ticks; the arrows
+turn the pages.
 
 ### Stores
 

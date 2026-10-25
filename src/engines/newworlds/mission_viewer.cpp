@@ -455,6 +455,8 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    quitAsked_ = paused_ = false;
+    map_.stopFollowing();
     world_ = nullptr, economy_ = nullptr, ai_ = nullptr, fieldWork_ = nullptr;
     research_ = nullptr, effects_ = nullptr, fog_ = nullptr, run_ = nullptr;
     sim_.reset();
@@ -839,6 +841,45 @@ bool MissionViewer::playEvent(const Event& ev) {
         mouseX_ = ev.mouseX, mouseY_ = ev.mouseY, mouseSeen_ = true;
     const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0,
                alt = (ev.mods & keymod::Alt) != 0;
+    // Pause (and the window losing the focus) freezes the mission: no
+    // time passes and nothing on the map can be touched; nothing says so
+    // (exe.md#keys).
+    if ((ev.type == EventType::KeyDown && ev.key == key::Pause) || ev.type == EventType::FocusLost ||
+        ev.type == EventType::FocusGained) {
+        if (ev.type == EventType::KeyDown)
+            paused_ = !paused_;
+        else
+            unfocused_ = ev.type == EventType::FocusLost;
+        boxing_ = false;
+        return true;
+    }
+    if (paused_ || unfocused_)
+        return true;
+    // Escape's box: quit the mission, yes or no; the mission goes on
+    // meanwhile.
+    if (quitAsked_) {
+        bool yes = false, no = false;
+        if (ev.type == EventType::KeyDown)
+            yes = ev.key == 'y' || ev.key == key::Return, no = ev.key == 'n' || ev.key == key::Escape;
+        else if (ev.type == EventType::MouseDown && ev.button == MouseButton::Left) {
+            auto in = [&](const int* r) {
+                return ev.mouseX >= r[0] && ev.mouseY >= r[1] && ev.mouseX < r[0] + r[2] && ev.mouseY < r[1] + r[3];
+            };
+            yes = in(quitYes_), no = in(quitNo_);
+        }
+        if (yes) {
+            quitAsked_ = false;
+            if (flow_ == Flow::Playing)
+                endFlow();
+            else
+                stopPlay();
+            return true;
+        }
+        if (no)
+            quitAsked_ = false, redraw();
+        if (yes || no || ev.type == EventType::KeyDown || ev.type == EventType::MouseDown)
+            return true;
+    }
     // The tutorials wait for keys, by the game's (Windows) key codes.
     if (ev.type == EventType::KeyDown && run_ && !run_->finished()) {
         int code = 0;
@@ -884,8 +925,8 @@ bool MissionViewer::playEvent(const Event& ev) {
             break;
         }
         if (ev.key == key::Escape) {
-            stopPlay();
-            return true;
+            quitAsked_ = true;
+            break;
         }
         // R: the research topics open to the colony; a number starts one.
         if (ev.key == 'r' && research_) {
@@ -971,7 +1012,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                     if (alerted[i]->id == alertedLast_)
                         next = (i + 1) % alerted.size();
                 alertedLast_ = alerted[next]->id;
-                map_.centreOn(alerted[next]->x, alerted[next]->y);
+                cameraTo(*alerted[next]);
             }
             break;
         }
@@ -1056,7 +1097,8 @@ bool MissionViewer::playEvent(const Event& ev) {
             redraw();
             break;
         }
-        if (ev.button == MouseButton::Left && interface_ && pressButton(ev.mouseX, ev.mouseY))
+        if ((ev.button == MouseButton::Left || (ev.button == MouseButton::Right && !ctrl)) && interface_ &&
+            pressButton(ev.mouseX, ev.mouseY, ev.button == MouseButton::Right, ev.clicks))
             break;
         if (ev.button == MouseButton::Left && interface_ && !ctrl && tricorder_[2] > 0 &&
             ev.mouseX >= tricorder_[0] && ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
@@ -1065,6 +1107,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             float wx = 0, wy = 0;
             map_.minimapToWorld(ev.mouseX, ev.mouseY, tricorder_[0], tricorder_[1], tricorder_[2], tricorder_[3],
                                 kTricorderTiles << tricorderZoom_, wx, wy);
+            map_.stopFollowing();
             map_.centreOn(wx, wy);
             break;
         }
@@ -1185,9 +1228,11 @@ bool MissionViewer::playEvent(const Event& ev) {
             if (building >= 0 && best < 0 && !ordering && world_->selection().empty()) {
                 world_->clearSelection();
                 selectedBuilding_ = building;
-                // A double click locks the camera on it (the tutorial's).
                 if (ev.clicks >= 2)
-                    map_.lockOn(world_->unit(building)->x, world_->unit(building)->y);
+                    doubleClicked(building);
+            } else if (best >= 0 && ev.clicks >= 2 && (other < 0 || otherD >= bestD)) {
+                world_->select({best}), selectedBuilding_ = 0;
+                doubleClicked(best);
             } else if (ownBuilding >= 0 && !world_->selection().empty()) {
                 const Unit& b = *world_->unit(ownBuilding);
                 const std::vector<int> chosen = world_->selection();
@@ -1246,7 +1291,7 @@ void MissionViewer::handleEvent(const Event& ev) {
     // Escape leaves it at any stage.
     if (flow_ != Flow::None) {
         const bool key = ev.type == EventType::KeyDown;
-        if (key && ev.key == key::Escape) {
+        if (key && ev.key == key::Escape && !(flow_ == Flow::Playing && playing_)) {
             endFlow();
             return;
         }
@@ -1389,7 +1434,7 @@ void MissionViewer::update(uint64_t nowMs) {
             dirty_ = true;
     }
     if (playing_ && sim_ && flow_ != Flow::Debriefing && flow_ != Flow::Report) {
-        const double dt = std::min(double(nowMs - lastTickMs_) / 1000.0, 0.25);
+        const double dt = paused_ || unfocused_ ? 0.0 : std::min(double(nowMs - lastTickMs_) / 1000.0, 0.25);
         lastTickMs_ = nowMs;
         // The mission moves on (mission_sim.h); the screen shows what it
         // did and what its script said.
@@ -1423,9 +1468,20 @@ void MissionViewer::update(uint64_t nowMs) {
             deliver(said.fired, said.out);
         for (const std::string& v : sim_->takeVoices())
             speak(v);
-        // A new selection: its first vehicle answers.
+        // F1 following an object: the camera on it, till it's gone.
+        if (map_.following()) {
+            const Unit* f = world_->unit(followed_);
+            if (!f || f->hp <= 0 || map_.view() != MapViewer::View::FirstPerson)
+                map_.stopFollowing();
+            else
+                map_.follow(f->x, f->y, f->heading, f->kind.model);
+        }
+        // A new selection: its first vehicle answers; MULTISELECTION starts
+        // at its first page, nothing ticked.
         if (world_->selection() != spokenSelection_) {
             spokenSelection_ = world_->selection();
+            multiTicked_.clear();
+            multiPage_ = 0;
             if (!spokenSelection_.empty())
                 unitSpeaks(spokenSelection_[0], 0);
         }
@@ -1815,12 +1871,43 @@ void MissionViewer::drawPlaybook() {
 }
 
 // A click on a panel's button: true if one was hit.
-bool MissionViewer::pressButton(int x, int y) {
+bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
     for (const PanelButton& b : buttons_) {
         if (x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h)
             continue;
+        const bool entry = b.action.rfind("msel", 0) == 0 && b.action.size() > 4 && std::isdigit(uint8_t(b.action[4]));
+        if (right && !entry)
+            return false;
         const Unit* u = selectedBuilding_ && world_ ? world_->unit(selectedBuilding_) : nullptr;
-        if (b.action == "staff") {
+        if (entry && world_) {
+            // A MULTISELECTION entry: right click ticks it; a click selects
+            // it alone; a double click is a double click on it.
+            const int id = std::atoi(b.action.c_str() + 4);
+            if (right) {
+                if (!multiTicked_.erase(id))
+                    multiTicked_.insert(id);
+            } else if (clicks >= 2) {
+                doubleClicked(id);
+            } else {
+                world_->select({id});
+                selectedBuilding_ = 0;
+            }
+        } else if (b.action == "msel-delete" && world_) {
+            std::vector<int> kept;
+            for (int id : world_->selection())
+                if (!multiTicked_.count(id))
+                    kept.push_back(id);
+            world_->select(kept);
+            multiTicked_.clear();
+        } else if (b.action == "msel-invert" && world_) {
+            std::set<int> flipped;
+            for (int id : world_->selection())
+                if (!multiTicked_.count(id))
+                    flipped.insert(id);
+            multiTicked_ = std::move(flipped);
+        } else if (b.action == "msel-prev" || b.action == "msel-next") {
+            multiPage_ += b.action == "msel-next" ? 1 : -1;
+        } else if (b.action == "staff") {
             staffView_ = !staffView_;
             trainingView_ = false;
             pickedOfficer_ = -1;
@@ -2183,7 +2270,7 @@ void MissionViewer::jumpTo(int slot) {
         if (all[i]->id == jumpedTo_[size_t(slot)])
             next = (i + 1) % all.size();
     jumpedTo_[size_t(slot)] = all[next]->id;
-    map_.centreOn(all[next]->x, all[next]->y);
+    cameraTo(*all[next]);
 }
 
 // What play adds over the map: the full-screen Tricorder (Tab), with the
@@ -2235,6 +2322,19 @@ void MissionViewer::drawPlay() {
             put(x, y0), put(x, y1);
         for (int y = y0; y <= y1; ++y)
             put(x0, y), put(x1, y);
+    }
+    // Escape's box (Reluva's wording).
+    if (quitAsked_) {
+        const int lh = ui_.smallHeight() + 2, w = std::max(180, ui_.smallWidth("LEAVE THIS MISSION?") + 40), h = 30 + lh * 3;
+        const int x = (screen_.w - w) / 2, y = (screen_.h - h) / 2;
+        ui_.drawPanel(screen_, x, y, w, h, "QUIT");
+        const std::string q = "LEAVE THIS MISSION?";
+        ui_.drawSmall(screen_, x + (w - ui_.smallWidth(q)) / 2, y + 18, q, ui_.brightColor());
+        const int by = y + 18 + lh * 2, yw = ui_.smallWidth("YES") + 12, nw = ui_.smallWidth("NO") + 12;
+        quitYes_[0] = x + w / 4 - yw / 2, quitYes_[1] = by - 2, quitYes_[2] = yw, quitYes_[3] = lh + 4;
+        quitNo_[0] = x + 3 * w / 4 - nw / 2, quitNo_[1] = by - 2, quitNo_[2] = nw, quitNo_[3] = lh + 4;
+        ui_.drawSmall(screen_, quitYes_[0] + 6, by, "YES", ui_.brightColor());
+        ui_.drawSmall(screen_, quitNo_[0] + 6, by, "NO", ui_.brightColor());
     }
 }
 
@@ -2323,7 +2423,10 @@ void MissionViewer::drawInterface() {
                           : trainingView_ && staffView_ ? std::max(2, int(training.size()) + 1)
                           : staffView_    ? int(cards.size()) + 2
                           : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0) + (actions.empty() ? 0 : 2)
-                                          : economy_ ? 9 + 5 * kJumpRows : 7;
+                          : world_ && world_->selection().size() > 1
+                              ? 3 + (pendingOrder_ ? 1 : 0) +
+                                    (kMultiCellH * int((std::min<size_t>(world_->selection().size(), kMultiPage) + 2) / 3) + lh - 1) / lh
+                          : economy_ ? 9 + 5 * kJumpRows : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, vehicleMenu_ && !buildMenu_ ? "ENGINEERING" : "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
@@ -2438,11 +2541,56 @@ void MissionViewer::drawInterface() {
                 bx += bw + 4;
             }
         } else if (sel.size() > 1) {
-            ui_.drawSmall(screen_, x + 10, ty, "MULTISELECTION", bright);
-            for (size_t i = 0; i < sel.size() && i < 6; ++i)
-                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), world_->unit(sel[i])->kind.name, text);
+            // MULTISELECTION (exe.md#the-multiselection): pages of 15, three
+            // across: each object's portrait with its health under it, a
+            // frame round those ticked; DELETE drops the ticked from the
+            // selection, INVERT flips the ticks.
+            const int pages = int((sel.size() + kMultiPage - 1) / kMultiPage);
+            multiPage_ = std::clamp(multiPage_, 0, pages - 1);
+            ui_.drawSmall(screen_, x + 10, ty,
+                          pages > 1 ? "MULTISELECTION " + std::to_string(multiPage_ + 1) + "/" + std::to_string(pages)
+                                    : std::string("MULTISELECTION"),
+                          bright);
+            auto rect = [&](int rx, int ry, int rw, int rh, uint8_t r, uint8_t g, uint8_t b) {
+                for (int yy = std::max(0, ry); yy < ry + rh && yy < screen_.h; ++yy)
+                    for (int xx = std::max(0, rx); xx < rx + rw && xx < screen_.w; ++xx) {
+                        uint8_t* p = screen_.row(yy) + xx * 4;
+                        p[0] = r, p[1] = g, p[2] = b;
+                    }
+            };
+            const int gx = x + std::max(4, (w - 3 * kMultiCellW) / 2), gy = ty + lh;
+            const size_t first = size_t(multiPage_) * kMultiPage;
+            for (size_t i = first; i < sel.size() && i < first + kMultiPage; ++i) {
+                const Unit* m = world_->unit(sel[i]);
+                if (!m)
+                    continue;
+                const int cx = gx + int((i - first) % 3) * kMultiCellW, cy = gy + int((i - first) / 3) * kMultiCellH;
+                if (multiTicked_.count(m->id)) {
+                    rect(cx + 5, cy + 1, 36, 2, 0, 128, 255), rect(cx + 5, cy + 41, 36, 2, 0, 128, 255);
+                    rect(cx + 5, cy + 1, 2, 42, 0, 128, 255), rect(cx + 39, cy + 1, 2, 42, 0, 128, 255);
+                }
+                if (const Texture* t = m->type ? ui_.objectPortrait(portraitOf(m->type)) : nullptr)
+                    ui_.drawPicture(screen_, *t, cx + 7, cy + 3, 32, 32);
+                else
+                    ui_.drawSmall(screen_, cx + 7, cy + 12, m->kind.name.substr(0, 4), text);
+                const int green = int(32 * std::clamp(m->hp / std::max(1.0f, m->maxHp), 0.0f, 1.0f));
+                rect(cx + 7, cy + 37, green, 3, 0, 255, 0);
+                rect(cx + 7 + green, cy + 37, 32 - green, 3, 255, 0, 0);
+                buttons_.push_back({cx, cy, kMultiCellW, kMultiCellH, "msel" + std::to_string(m->id)});
+            }
+            int by = gy + kMultiCellH * int((std::min(sel.size() - first, kMultiPage) + 2) / 3) + 2;
             if (pendingOrder_)
-                ui_.drawSmall(screen_, x + 10, ty + lh * int(std::min<size_t>(sel.size(), 6) + 1), pendingOrderName(), bright);
+                ui_.drawSmall(screen_, x + 10, by, pendingOrderName(), bright), by += lh;
+            int bx = x + 10;
+            for (const auto& [label, action] : std::vector<std::pair<std::string, std::string>>{
+                     {"<", "msel-prev"}, {"DELETE", "msel-delete"}, {"INVERT", "msel-invert"}, {">", "msel-next"}}) {
+                const bool off = (action == "msel-prev" && multiPage_ == 0) || (action == "msel-next" && multiPage_ + 1 >= pages);
+                const int bw = ui_.smallWidth(label) + 8;
+                ui_.drawSmall(screen_, bx + 4, by + 2, label, off ? text : bright);
+                if (!off)
+                    buttons_.push_back({bx, by, bw, lh + 4, action});
+                bx += bw + 4;
+            }
         } else {
             if (economy_) {
                 for (int i = 0; i < 6; ++i)
@@ -2865,7 +3013,7 @@ void MissionViewer::cycleCamera(bool buildings) {
         if (all[i]->id == last)
             next = (i + 1) % all.size();
     last = all[next]->id;
-    map_.centreOn(all[next]->x, all[next]->y);
+    cameraTo(*all[next]);
 }
 
 void MissionViewer::stepScript() {
@@ -3023,6 +3171,28 @@ void MissionViewer::unitSpeaks(int unit, int group) {
         return;
     if (auto sound = loadSound(clip))
         clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
+}
+
+// A double click on one of the player's objects (exe.md#cameras): in F1
+// the camera follows it; in F2 and F3 the camera stays put. (The game
+// also plays the object's own sound there; which clip that is isn't
+// known.)
+void MissionViewer::doubleClicked(int unit) {
+    const Unit* u = world_ ? world_->unit(unit) : nullptr;
+    if (!u || u->slot != playerSlot_ || map_.view() != MapViewer::View::FirstPerson)
+        return;
+    followed_ = unit;
+    map_.startFollowing();
+    map_.follow(u->x, u->y, u->heading, u->kind.model);
+}
+
+// The camera to one of the player's objects (JUMP TO, Space): in F1 it
+// follows it, as a double click; else it centres on it.
+void MissionViewer::cameraTo(const Unit& u) {
+    if (map_.view() == MapViewer::View::FirstPerson && u.slot == playerSlot_)
+        doubleClicked(u.id);
+    else
+        map_.centreOn(u.x, u.y);
 }
 
 // An order given to the selection: its first vehicle takes it, or, if it
