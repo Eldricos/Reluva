@@ -736,6 +736,10 @@ void testMissionScripts() {
     CHECK(unitLine(8, 0, 0, 0) == "fpv004b" && unitLine(8, 1, 1, 1) == "fpv008d" && unitLine(8, 2, 0, 0) == "fneg1");
     CHECK(unitLine(228, 0, 1, 1) == "kmdb002e" && unitLine(63, 1, 0, 0) == "rsv010c" && unitLine(97, 0, 0, 1) == "ffgs003c");
     CHECK(unitLine(54, 0, 0, 0).empty());
+    // The buildings' own sounds, from their race's build archive; none for vehicles.
+    CHECK(buildingSound(23) == std::make_pair(std::string("fedbuild.cat"), std::string("fcomstn")));
+    CHECK(buildingSound(69) == std::make_pair(std::string("rombuild.cat"), std::string("fshield")));
+    CHECK(buildingSound(75).second == "karsenal" && buildingSound(8).first.empty() && buildingSound(97).first.empty());
     CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}}, 'R') == "robjmet");
     CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}, {MissionRun::Output::Won, {}, {}, 0, {}}},
                           'F') == "fmiswin");

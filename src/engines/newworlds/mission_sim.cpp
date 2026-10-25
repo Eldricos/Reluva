@@ -73,6 +73,38 @@ std::string unitLine(int type, int group, int voice, int line) {
     return set.stem + std::string(number) + set.voices[voice & 1];
 }
 
+std::pair<std::string, std::string> buildingSound(int type) {
+    static const std::map<int, std::pair<const char*, const char*>> kSounds = {
+        // Federation
+        {16, {"fedbuild.cat", "fsec"}}, {21, {"fedbuild.cat", "fshield"}}, {22, {"fedbuild.cat", "fpower"}},
+        {158, {"fedbuild.cat", "fpower"}}, {23, {"fedbuild.cat", "fcomstn"}}, {24, {"fedbuild.cat", "fvyard"}},
+        {26, {"fedbuild.cat", "frespro"}}, {27, {"fedbuild.cat", "fshutpad"}}, {44, {"fedbuild.cat", "faccom"}},
+        {45, {"fedbuild.cat", "fmine"}}, {163, {"fedbuild.cat", "fmine"}}, {77, {"fedbuild.cat", "fcyard"}},
+        {80, {"fedbuild.cat", "fphasdef"}}, {83, {"fedbuild.cat", "fphotdef"}}, {122, {"fedbuild.cat", "fstore"}},
+        {123, {"fedbuild.cat", "fsickbay"}}, {126, {"fedbuild.cat", "fscience"}}, {171, {"fedbuild.cat", "fhfarm"}},
+        // Klingon
+        {28, {"klibuild.cat", "kchub"}}, {29, {"klibuild.cat", "kshield"}}, {30, {"klibuild.cat", "kpower"}},
+        {172, {"klibuild.cat", "kpower"}}, {31, {"klibuild.cat", "kvyard"}}, {32, {"klibuild.cat", "kstore"}},
+        {49, {"klibuild.cat", "kief"}}, {73, {"klibuild.cat", "kief"}}, {50, {"klibuild.cat", "klfarm"}},
+        {51, {"klibuild.cat", "krespro"}}, {52, {"klibuild.cat", "kmine"}}, {189, {"klibuild.cat", "kmine"}},
+        {53, {"klibuild.cat", "kcyard"}}, {54, {"klibuild.cat", "kdisdef"}}, {68, {"klibuild.cat", "kcolhous"}},
+        {75, {"klibuild.cat", "karsenal"}}, {82, {"klibuild.cat", "kphotdef"}}, {124, {"klibuild.cat", "ksickbay"}},
+        {127, {"klibuild.cat", "kscience"}},
+        // Romulan (its shield generator has the archive's own copy of fshield)
+        {43, {"rombuild.cat", "rchub"}}, {216, {"rombuild.cat", "rchub"}}, {65, {"rombuild.cat", "rmine"}},
+        {173, {"rombuild.cat", "rmine"}}, {66, {"rombuild.cat", "rstore"}}, {217, {"rombuild.cat", "rstore"}},
+        {67, {"rombuild.cat", "raccom"}}, {218, {"rombuild.cat", "raccom"}}, {69, {"rombuild.cat", "fshield"}},
+        {219, {"rombuild.cat", "fshield"}}, {70, {"rombuild.cat", "rpower"}}, {178, {"rombuild.cat", "rpower"}},
+        {220, {"rombuild.cat", "rpower"}}, {71, {"rombuild.cat", "rvyard"}}, {221, {"rombuild.cat", "rvyard"}},
+        {72, {"rombuild.cat", "rborder"}}, {74, {"rombuild.cat", "rinsecb"}}, {78, {"rombuild.cat", "rconyard"}},
+        {81, {"rombuild.cat", "rdisdef"}}, {84, {"rombuild.cat", "rphotdef"}}, {121, {"rombuild.cat", "rprocfac"}},
+        {125, {"rombuild.cat", "ruh"}}, {128, {"rombuild.cat", "rscien"}}, {182, {"rombuild.cat", "rcelbio"}},
+        {222, {"rombuild.cat", "rcelbio"}}};
+    const auto it = kSounds.find(type);
+    return it == kSounds.end() ? std::pair<std::string, std::string>{} : std::pair<std::string, std::string>{
+                                                                             it->second.first, it->second.second};
+}
+
 std::string mapPosition(float x, float y) {
     return std::to_string(int(y / kBlock * 8)) + ":" + std::to_string(int(x / kBlock * 8));
 }

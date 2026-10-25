@@ -844,8 +844,8 @@ bring it in and out between 800 and 2000. Numpad 4 / 6 orbit the object,
 7 / 9 raise and 1 / 3 lower the camera; the other arrows and edge
 scrolling do nothing. F1, F2, F3 or Q, or the object's loss, end it.
 JUMP TO and Space attach the same way in F1. In F2 and F3 a double click
-leaves the camera where it is and only plays the object's own sound
-(which clip isn't known yet). Every mission starts in F2.
+leaves the camera where it is and only plays the object's own sound.
+Every mission starts in F2.
 
 ### Keys
 
@@ -890,8 +890,31 @@ upgrade delayed, 004 a colony hub finished, 005 a vehicle finished, 006
 a yard's power below 0.2 (production suspended), 008 back above 0.35
 (007 never plays). Each report at most once in 600 ms; none plays over
 one already playing. A finished building of the player's hit plays the
-colony's danger music and its "under attack" voice, at most once in 30
+colony's danger music (Media/Music: `fedcoldanger`, `klinColonydan`,
+`RomColonyInDangr`) and its "under attack" voice, at most once in 30
 seconds. Other sides' reports are never heard.
+
+A double click on a finished building plays that building's own sound,
+from its race's build archive (`fedbuild.cat`, `klibuild.cat`,
+`rombuild.cat`): the hub `fcomstn` / `kchub` / `rchub`, the vehicle yard
+`fvyard` / `kvyard` / `rvyard`, and so on, one per building (upgrades and
+advanced versions share their base's; the Romulan shield generator has
+`rombuild.cat`'s own copy of `fshield`). Vehicles and the natives have
+none. Only the player's race's are loaded, so only the player's buildings
+sound. It plays from the building: volume (65536 − distance / 2) × 127 /
+65536 of the game's 127, so full at the listener and silent from 8 blocks
+off; panned by how far to the side it lies; one at a time (a new one
+stops the last). Reluva listens from the camera's spot on the ground.
+Vehicles' start-up clips are their drives', played as some moves start
+(which moves isn't known yet); Reluva doesn't play them.
+
+The executable's sound table pairs each resource id (archive number <<
+24 | the entry's index in it) with a side filter and the slot it fills.
+Read that way, the vehicles' voice slots may sit one entry off from the
+grouping the voice sets above were first read with; the sets as given
+follow the archives' own order (two lines in two voices, twice, then the
+refusal four times), which fits the groups' use.
+
 
 ### The multiselection
 

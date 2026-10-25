@@ -210,6 +210,7 @@ public:
     // Moves the camera along the ground, by world units right and forward.
     void pan(float right, float forward);
     void cameraTarget(float& x, float& y) const { x = targetX_, y = targetY_; }
+    float yaw() const { return yaw_; } // radians; the view's right along the ground is (cos, sin)
     void cameraPosition(int& a, int& b) const;
     float heading() const;
     void setColouring(int colouring) {
@@ -620,6 +621,8 @@ private:
     void speak(const std::string& what);
     void unitSpeaks(int unit, int group);
     void doubleClicked(int unit);
+    void followInF1(int unit);
+    audio::SoundHandle objectSoundHandle_ = audio::kNoSound; // the last double-clicked building's
     void cameraTo(const Unit& u);
     int followed_ = 0;                  // the object F1's camera follows
     bool quitAsked_ = false;            // Escape's box up

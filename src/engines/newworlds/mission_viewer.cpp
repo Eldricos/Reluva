@@ -3184,11 +3184,38 @@ void MissionViewer::unitSpeaks(int unit, int group) {
         clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
 }
 
-// A double click on one of the player's objects (exe.md#cameras): in F1
-// the camera follows it; in F2 and F3 the camera stays put. (The game
-// also plays the object's own sound there; which clip that is isn't
-// known.)
+// A double click on one of the player's objects (exe.md#cameras): a
+// finished building plays its own sound (exe.md#sounds), from where it
+// stands: full by the camera's spot, fading out 8 blocks off, panned to
+// its side; only one at a time. In F1 the camera then follows it; in F2
+// and F3 it stays put.
 void MissionViewer::doubleClicked(int unit) {
+    const Unit* u = world_ ? world_->unit(unit) : nullptr;
+    if (!u || u->slot != playerSlot_)
+        return;
+    if (const auto [archive, stem] = buildingSound(u->type); mixer_ && !archive.empty() && u->built >= 1) {
+        float cx = 0, cy = 0;
+        map_.cameraTarget(cx, cy);
+        const float dx = u->x - cx, dy = u->y - cy, d = std::hypot(dx, dy);
+        const int volume = std::clamp(int((65536 - d / 2) * 127 / 65536), 0, 127);
+        const float side = d > 0 ? (dx * std::cos(map_.yaw()) + dy * std::sin(map_.yaw())) / d : 0;
+        std::vector<uint8_t> data;
+        for (const auto& a : archives_)
+            if (fs::toLower(a->path().filename().string()) == archive)
+                if (const CatEntry* e = a->find("stnwsfx/" + stem + ".wav"); e && !a->read(*e, data))
+                    break;
+        auto sound = std::make_shared<audio::Sound>();
+        if (volume >= 1 && !data.empty() && !audio::decodeSound(data, *sound)) {
+            mixer_->stop(objectSoundHandle_);
+            objectSoundHandle_ = mixer_->play(std::move(sound), audio::SoundType::Effects, volume * 2,
+                                              int(std::lround(side * audio::kMaxPan)));
+        }
+    }
+    followInF1(unit);
+}
+
+// F1's camera on to one of the player's objects, following it.
+void MissionViewer::followInF1(int unit) {
     const Unit* u = world_ ? world_->unit(unit) : nullptr;
     if (!u || u->slot != playerSlot_ || map_.view() != MapViewer::View::FirstPerson)
         return;
@@ -3198,10 +3225,11 @@ void MissionViewer::doubleClicked(int unit) {
 }
 
 // The camera to one of the player's objects (JUMP TO, Space): in F1 it
-// follows it, as a double click; else it centres on it.
+// follows it, as after a double click (but without the sound); else it
+// centres on it.
 void MissionViewer::cameraTo(const Unit& u) {
     if (map_.view() == MapViewer::View::FirstPerson && u.slot == playerSlot_)
-        doubleClicked(u.id);
+        followInF1(u.id);
     else
         map_.centreOn(u.x, u.y);
 }

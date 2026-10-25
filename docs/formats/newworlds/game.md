@@ -18,7 +18,7 @@ As the first tutorial teaches them:
 |---|---|
 | Left click on a unit | selects it; its panel (name, side, READY or EN ROUTE, shield cover, hit points) in NEW WORLDS |
 | Left click on a building (the colony's, or another side's in sight) | selects it; its panel in NEW WORLDS |
-| Double click on one of the colony's objects | in F1 the camera follows it (Up / Down nearer and further, numpad 4/6 orbit, 7/9 raise, 1/3 lower; F1, F2, F3 or Q let go); in F2 and F3 nothing more |
+| Double click on one of the colony's objects | a finished building plays its own sound (from where it stands); in F1 the camera follows the object (Up / Down nearer and further, numpad 4/6 orbit, 7/9 raise, 1/3 lower; F1, F2, F3 or Q let go) |
 | Left drag | selects the side's units inside the box |
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
