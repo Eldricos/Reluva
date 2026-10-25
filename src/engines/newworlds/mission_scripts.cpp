@@ -241,14 +241,14 @@ on scanned strong-engineering temple
   signal temple-surveyed
 on timer temple-field-hint
   say engineering "The main containment field is misaligned and leaking badly. Easy to fix, but we must get in quickly."
-# the survey also wakes the capture watch (the game wakes it with the 20 s report: see the end)
 on signal temple-surveyed
   timer temple-report 20
-  arm temple-capture
-# 20 s after the survey: objective 18 met, 19 revealed, and the Taubat's patience runs out
+# 20 s after the survey: objective 18 met, 19 revealed, the capture watch woken, and the
+# Taubat's patience runs out
 on timer temple-report
   complete 18
   reveal 19
+  arm temple-capture
   signal objective
   timer temple-done 15
   timer temple-security 20
@@ -321,10 +321,6 @@ on timer fail-message
   say command "We have not met our objectives."
 
 # Not expressible yet:
-# - The capture watch is woken in the game by the 20 s report after the survey, not by the
-#   survey itself; armed at the survey here because script-check's walkthrough runs timers only
-#   after every event, and a late-armed capture/hold handler (unlike a count or stock one)
-#   doesn't look back at what already happened.
 # - Repeating a finished scan or capture gets its own line in the game ("consult a specialist",
 #   "radiation still rising", (the game's line), "health deteriorating, research at once",
 #   "containment field deteriorating", "field won't hold long", "temple retaken, field holding"):
@@ -2327,15 +2323,17 @@ on standing containment-device 1
   ai metar metar-attack-on-cfd
   spawn hubrin hubrin 1 154 241
   timer sabotage-1 15
-  arm fault-scan
 on timer sabotage-1
   say intelligence "Sir, a second Hubrin has turned up by the device. It says a building error has unbalanced the field."
   timer sabotage-2 15
 on timer sabotage-2
   say engineering "A remote scan bears that out. A science vehicle will have to get close to pin down the imbalance."
+  timer fault-scan-ready 15
+on timer fault-scan-ready
+  arm fault-scan
 
 # --- Objective 15: find the fault, and keep the device for 10 minutes ---------------------------
-# the fault scan sleeps until the device is in place (the game: 45 s after, see the end)
+# the fault scan sleeps until 15 s after the second sabotage line (45 s after the device stands)
 on scanned science cfd-fault as fault-scan dormant
   say science "Trying to isolate the field imbalance. Stand by..."
   timer recalibrate 20
@@ -2375,10 +2373,7 @@ on timer fail-message
   say command "We have not met our objectives."
 
 # Not expressible yet:
-# - The fault scan (a scan of the cell at 154:237) is woken by a timer, 15 s after the second
-#   saboteur message; armed here when the device is in place, because script-check's
-#   walkthrough runs timers only after every event and a late-armed scan handler (unlike a
-#   count or stock one) doesn't look back at what already happened.
+# - The fault scan is of the cell at 154:237.
 # - The sabotage timers hang on the saboteur's spawner, which by the spec fires when its
 #   units are dead; written (as the lines read) as following the spawn.
 # - The pass and fail messages and the Hubrin and hub lines go to all three empires' mail.
@@ -3918,31 +3913,46 @@ on signal rom-colony-down*2
   ai federation fed-klingon-assault-two
 
 # --- Objective 11: destroy three of the Taubat workshops ------------------
-# The game counts each one 35 s after it falls (5 s, then 30 s more); here at once,
-# since the walkthrough runs timers only after every event.
+# The game counts each one 35 s after it falls (5 s, then 30 s more).
 on destroyed raid-building-one
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-one-counted 35
+on timer workshop-one-counted
   signal workshop-destroyed
 on destroyed raid-building-two
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-two-counted 35
+on timer workshop-two-counted
   signal workshop-destroyed
 on destroyed raid-building-three
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-three-counted 35
+on timer workshop-three-counted
   signal workshop-destroyed
 on destroyed raid-building-four
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-four-counted 35
+on timer workshop-four-counted
   signal workshop-destroyed
 on destroyed raid-building-five
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-five-counted 35
+on timer workshop-five-counted
   signal workshop-destroyed
 on destroyed raid-building-six
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-six-counted 35
+on timer workshop-six-counted
   signal workshop-destroyed
 on destroyed raid-building-seven
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-seven-counted 35
+on timer workshop-seven-counted
   signal workshop-destroyed
 on destroyed raid-building-eight
   say security "One more Taubat workshop is in ruins!"
+  timer workshop-eight-counted 35
+on timer workshop-eight-counted
   signal workshop-destroyed
 on signal workshop-destroyed*3
   say engineering "Too late! A huge charge of energy is building up, aimed at the central tower!"
@@ -5154,16 +5164,18 @@ on standing containment-device 1
   ai metar metar-attack-on-cfd
   spawn hubrin hubrin 1 154 241
   timer sabotage-1 10
-  arm site-scan
+  timer sabotage-3 30
 on timer sabotage-1
   say intelligence "Sir, another Hubrin has appeared by the device. It says a mistake in the construction has thrown the field off balance."
   timer sabotage-2 10
 on timer sabotage-2
   say engineering "A remote scan confirms the fault. A science vehicle must get close to find the imbalance."
+on timer sabotage-3
+  arm site-scan
 
 # Objective 14: scan the device site and recalibrate (20 s), and keep the device for
-# 10 minutes; both are needed. The site scan sleeps until the device is in place
-# (the game: 30 s after, see the end).
+# 10 minutes; both are needed. The site scan sleeps until a third sabotage timer,
+# 30 s after the device is in place.
 on scanned * device-site as site-scan dormant
   say science "Trying to isolate the imbalance. Stand by..."
   timer recalibrate 20
@@ -5247,10 +5259,6 @@ every signal metar-raid-8
 # - The spawner kind is read as firing its message
 #   (and the Hubrin's, the sabotage timers) when its units die; the recording shows the
 #   lines in sequence without anyone dying, so they are written as following the spawn.
-# - The device-site scan is woken by a third sabotage timer, 30 s after the device is
-#   placed; armed here when the device is in place, because script-check's walkthrough
-#   runs timers only after every event and a late-armed scan handler (unlike a count or
-#   stock one) doesn't look back at what already happened.
 # - The success and failure lines also go to the other two sides' mail (all sides).
 
 # --- J8 as K ----------------------------------------
@@ -8136,16 +8144,17 @@ on standing containment-device 1
   ai metar metar-attack-on-cfd
   spawn hubrin hubrin 1 194 353 hubrin-saboteur
   timer saboteur-1 10
-  arm fault-scan
 on timer saboteur-1
   say intelligence "Sir, another Hubrin has shown up by the device. It says a construction error nobody foresaw has unbalanced the field."
   timer saboteur-2 10
 on timer saboteur-2
   say engineering "Our remote scan agrees. A science vehicle has to get close to isolate the imbalance."
+  timer fault-scan-ready 10
+on timer fault-scan-ready
+  arm fault-scan
 
-# Objective 14: the fault scanned (a watch asleep until the device stands;
-# the game wakes it 10 s after the line above, see the end) and fixed 20 s
-# later, and the device standing for 10 minutes.
+# Objective 14: the fault scanned (a watch asleep until 10 s after the line
+# above) and fixed 20 s later, and the device standing for 10 minutes.
 on scanned science field-fault as fault-scan dormant
   say science "Trying to isolate the imbalance. Stand by..."
   timer recalibrate 20
@@ -8228,12 +8237,8 @@ every signal metar-raid-8
 # Not expressible yet:
 # - The device spawner's own line ("construction complete") is sent when its
 #   group is gone; the recording heard it at once, as written here.
-# - The fault scan is woken by a timer 10 s after the engineering line (30 s
-#   after the device stands); armed here when the device stands, because
-#   script-check's walkthrough runs timers only after every event and a
-#   late-armed scan handler doesn't look back at what already happened. The
-#   scan is of the cell 186:357, of the kind the game's first scan bit
-#   records (taken to be science).
+# - The fault scan is of the cell 186:357, of the kind the game's first scan
+#   bit records (taken to be science).
 # - The game's hub fail sends "Fail Crieria 1", misspelt, so fail string 13
 #   is never ticked (the mission still fails); written as fail 13.
 # - Messages sent to every side's mail (the pass, the fail, the observer).

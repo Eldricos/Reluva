@@ -566,6 +566,38 @@ std::vector<MissionRun::Output> MissionRun::advance(double seconds) {
     return out;
 }
 
+bool MissionRun::waitsOnTimers(const ScriptEvent& event) const {
+    bool off = false;
+    for (const Rule& r : rules_) {
+        if (!matches(r.handler->event, event))
+            continue;
+        if (r.armed && (!r.fired || r.handler->every))
+            return false;
+        off = off || !r.armed;
+    }
+    return off;
+}
+
+std::vector<MissionRun::Output> MissionRun::walk(const ScriptEvent& event, double& waited) {
+    std::vector<Output> out;
+    waited = 0;
+    auto failed = [&] {
+        return std::any_of(out.begin(), out.end(),
+                           [](const Output& o) { return o.kind == Output::Failing || o.kind == Output::Lost; });
+    };
+    while (!finished() && waitsOnTimers(event) && nextTimer() >= 0 && waited < 3600 && !failed()) {
+        const double step = nextTimer();
+        waited += step;
+        auto more = advance(step);
+        out.insert(out.end(), more.begin(), more.end());
+    }
+    if (!finished()) {
+        auto more = fire(event);
+        out.insert(out.end(), more.begin(), more.end());
+    }
+    return out;
+}
+
 double MissionRun::nextTimer() const {
     double next = -1;
     for (const auto& [name, left] : timers_)

@@ -159,6 +159,13 @@ public:
     // The events the script's own handlers wait for, in the order written
     // (which is the order they happened in the recording): a walkthrough.
     std::vector<ScriptEvent> walkthrough() const;
+    // Whether the event waits on time: a handler for it is off (a timer
+    // may arm it) and none that's on would take it now.
+    bool waitsOnTimers(const ScriptEvent& event) const;
+    // A walkthrough step: while the event waits on time, the timers run
+    // on, one at a time (not past the mission failing, nor an hour); then
+    // it's fired. waited: the seconds that passed.
+    std::vector<Output> walk(const ScriptEvent& event, double& waited);
 
 private:
     struct Rule {

@@ -93,4 +93,9 @@ pass).
 The missions page plays a mission's script a step at a time with **X**,
 feeding it the walkthrough's events in order: the objectives (the game's
 strings, ticked as they're met) and the latest messages are shown over the
-map, and the title names the event. **Z** stops.
+map, and the title names the event. When the next event's handler is
+still off and a timer may switch it on (a watch the game wakes some
+seconds after a report), the steps let time pass first, one timer at a
+time, until it's on; not past the mission failing. **Z** stops.
+`reluva-tool script-check` walks each mission the same way, noting the
+seconds of timers run before an event.

@@ -645,6 +645,16 @@ void testMissionScripts() {
     CHECK(late.objectiveState(1) == MissionRun::State::Incomplete);
     late.fire({"start", {}});
     CHECK(late.objectiveState(1) == MissionRun::State::Complete && late.objectiveState(2) == MissionRun::State::Complete);
+    // A walkthrough step waits on the timers that arm its handler, and no
+    // longer: nothing waits for an event no off handler wants.
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\non start\n  timer wake 20\n  timer later 100\n"
+                               "on timer wake\n  arm scan\non scanned science site as scan dormant\n  complete 1\n", s));
+    MissionRun walker(s[0], nullptr);
+    double waited = -1;
+    walker.walk({"start", {}}, waited);
+    CHECK(waited == 0 && walker.waitsOnTimers({"scanned", {"science", "site"}}) && !walker.waitsOnTimers({"built", {"x"}}));
+    walker.walk({"scanned", {"science", "site"}}, waited);
+    CHECK(waited == 20 && walker.objectiveState(1) == MissionRun::State::Complete && walker.nextTimer() == 80);
     CHECK(bool(parseMissionScripts("mission T F\non start\n  arm nothing\n", s))); // no such label
     CHECK(bool(parseMissionScripts("mission T F\non start dormant\n  win\n", s)));  // dormant needs a label
     CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
@@ -668,8 +678,10 @@ void testMissionScripts() {
         if (&m == generic)
             continue;
         MissionRun r(m, generic);
-        for (const ScriptEvent& e : r.walkthrough())
-            r.fire(e);
+        for (const ScriptEvent& e : r.walkthrough()) {
+            double waited = 0;
+            r.walk(e, waited); // timers first while a timer has yet to arm its handler
+        }
         // Time passes (two hours at most: some timers repeat for ever).
         for (double t = 0; !r.finished() && r.nextTimer() >= 0 && t < 7200; t += r.nextTimer())
             r.advance(r.nextTimer());

@@ -3042,7 +3042,10 @@ void MissionViewer::stepScript() {
         return;
     std::vector<MissionRun::Output> out;
     ScriptEvent fired{"timer", {}};
-    if (walkPos_ < walk_.size()) {
+    // The next event first lets time pass while it waits on the script's
+    // timers (a handler for it a timer will arm).
+    const bool waits = walkPos_ < walk_.size() && run_->waitsOnTimers(walk_[walkPos_]) && run_->nextTimer() >= 0;
+    if (walkPos_ < walk_.size() && !waits) {
         const ScriptEvent& e = walk_[walkPos_++];
         walkNote_ = "event " + std::to_string(walkPos_) + "/" + std::to_string(walk_.size()) + ": " + e.kind;
         for (const std::string& a : e.args)

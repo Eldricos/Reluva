@@ -2494,8 +2494,12 @@ int cmdScriptCheck(int argc, char** argv) {
             std::string what = e.kind;
             for (const std::string& a : e.args)
                 what += " " + a;
+            double waited = 0;
+            const auto out = run.walk(e, waited);
+            if (waited > 0)
+                std::printf("  (%.0f s of timers first)\n", waited);
             std::printf("  %s\n", what.c_str());
-            show(run.fire(e));
+            show(out);
             if (run.finished())
                 break;
         }
