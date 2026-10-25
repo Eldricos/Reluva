@@ -79,8 +79,8 @@ bool GameUi::load(const Archives& archives, char side) {
             if (loadPicture(archives, base + "ptrt/crew/lg/" + stem + ".lbp", t))
                 faces_[section] = std::move(t);
         }
-    // The small portraits of the side's buildings and craft.
-    for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/"}) {
+    // The portraits of the side's buildings and craft, small ("fhub_s") and large ("fhub").
+    for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/", "ptrt/build/lg/", "ptrt/craft/lg/"}) {
         const std::string under = base + folder;
         for (const auto& a : archives)
             for (const CatEntry& e : a->entries())

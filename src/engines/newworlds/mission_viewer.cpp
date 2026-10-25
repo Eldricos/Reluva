@@ -40,10 +40,80 @@ const char* portraitOf(int type) {
     return "";
 }
 
+// A building's large portrait, per side (gui.md#pictures).
+std::string buildingPortrait(std::string_view id, char side) {
+    static const struct {
+        const char* id;
+        const char *fed, *kln, *rom;
+    } kPortraits[] = {
+        {"colony-hub", "fhub", "kchub", "rchub"},          {"construction-yard", "fcy", "kcy", "rcy"},
+        {"vehicle-yard", "fvpy", "kvy", "rvy"},            {"resource-processor", "frps", "krps", "rrpp"},
+        {"power-generator", "fpgs1", "kpg1", "rps1"},      {"advanced-generator", "fpgs2", "kpg2", "rps2"},
+        {"mining-station", "fms1", "kms1", "rms1"},        {"accommodation", "fca", "ka", "rab"},
+        {"sickbay", "fsb", "ksb", "ruh"},                  {"science-station", "fss", "kss", "rsb"},
+        {"security-center", "fsc", "kief", "risb"},        {"farm", "fhf", "klsf", "rf"},
+        {"storage-facility", "fsfr", "ksf", "rsf"},        {"transporter-pad", "flp", "", "rlp"},
+        {"landing-pad", "flp", "", ""},                    {"shield-generator", "fsg", "ksg", "rsg"},
+        {"defensive-weapon", "fpdt", "kdws", "rdsb"},      {"defensive-artillery", "fpds", "kdpt", "rddt"}};
+    for (const auto& p : kPortraits)
+        if (id == p.id)
+            return side == 'K' ? p.kln : side == 'R' ? p.rom : p.fed;
+    return {};
+}
+
+// The menus' one-line roles (Reluva's own words; the game's hover text
+// isn't copied).
+const char* roleOf(std::string_view id) {
+    static const std::pair<const char*, const char*> kRoles[] = {
+        {"storage-facility", "KEEPS THE COLONY'S MATERIALS"}, {"power-generator", "POWERS THE COLONY"},
+        {"advanced-generator", "POWERS THE COLONY, MORE"},   {"construction-yard", "SUPPLIES THE BUILDING SITES"},
+        {"vehicle-yard", "BUILDS VEHICLES"},                 {"resource-processor", "TURNS ORE INTO MATERIALS"},
+        {"mining-station", "DIGS ORE FROM A DEPOSIT"},       {"transporter-pad", "BEAMS PEOPLE DOWN"},
+        {"landing-pad", "BRINGS PEOPLE DOWN"},               {"science-station", "RESEARCH AND LABS"},
+        {"sickbay", "LOOKS AFTER THE SICK"},                 {"security-center", "THE COLONY'S SECURITY"},
+        {"accommodation", "HOUSES MORE PEOPLE"},             {"farm", "FEEDS LIFE SUPPORT"},
+        {"shield-generator", "SHIELDS WHAT'S ROUND IT"},     {"defensive-weapon", "A GUN THAT GUARDS THE COLONY"},
+        {"defensive-artillery", "SHELLS ATTACKERS FROM AFAR"}, {"cargo-bee", "CARRIES ORE AND GOODS"},
+        {"construction-bee", "PUTS UP BUILDINGS"},           {"worker-bee", "MOVES GOODS IN AND OUT"},
+        {"ground-scout", "FAST, UNARMED, SCANS"},            {"armed-apc", "CARRIES CREW, CAPTURES"},
+        {"unarmed-apc", "CARRIES CREW"},                     {"science-vehicle", "SCANS CLOSE UP"},
+        {"mobile-shield-generator", "SHIELDS UNITS ROUND IT"}};
+    for (const auto& [n, role] : kRoles)
+        if (id == n)
+            return role;
+    return "";
+}
+
+// A cost as the menus give it: dilithium in G, the next three in T,
+// nitrium and duranium in KG.
+std::vector<std::string> costLines(const Stock& c) {
+    static const char* const kUnits[] = {"G", "T", "T", "T", "KG", "KG"};
+    std::vector<std::string> out;
+    for (int m = 0; m < kMaterials; ++m)
+        if (c[size_t(m)] > 0)
+            out.push_back(std::string(materialName(m)) + " " + std::to_string(c[size_t(m)]) + kUnits[m]);
+    return out;
+}
+
+// The menus' order, as the training missions' pages show it; what they
+// didn't show after.
+int menuRank(std::string_view id) {
+    static const char* const kOrder[] = {"storage-facility", "power-generator", "construction-yard", "vehicle-yard",
+                                         "resource-processor", "mining-station", "transporter-pad", "landing-pad",
+                                         "science-station", "sickbay", "security-center",
+                                         "cargo-bee", "construction-bee", "worker-bee", "ground-scout", "armed-apc",
+                                         "photon-artillery", "advanced-photon-artillery"};
+    for (size_t i = 0; i < std::size(kOrder); ++i)
+        if (id == kOrder[i])
+            return int(i);
+    return int(std::size(kOrder));
+}
+
 // JUMP TO's left column (exe.md#the-colony-overview): per race, the type
 // whose portrait each slot shows: the hub, the mining stations, the
 // defensive weapons, the defensive artillery, the fighting vehicles.
 constexpr int kJumpRows = 2; // an icon's height, in lines
+constexpr int kMenuIcon = 48; // the menus' portraits (the game's are 64 x 60)
 constexpr int kJumpIcons[3][5] = {{23, 45, 80, 83, 56}, {28, 52, 54, 82, 40}, {43, 65, 81, 84, 64}};
 
 constexpr Color kHeadingColor{255, 220, 90};
@@ -387,6 +457,7 @@ void MissionViewer::startPlay() {
     razing_.clear();
     colonyDetails_ = false;
     jumpedTo_ = {};
+    commsShown_ = -1, commsClosed_ = false, commandShown_ = true;
     auto onHub = [&](const StartPlacement& p) {
         return colony_ && !colony_->buildings().empty() && p.a == colony_->buildings()[0].a &&
                p.b == colony_->buildings()[0].b;
@@ -844,6 +915,19 @@ std::vector<const BuildingType*> MissionViewer::buildMenu() const {
     for (const BuildingType& t : buildingTypes())
         if (economy_->available(t) && (!t.upgradeOf.empty() || !buildingModel(t.id, side).empty()))
             out.push_back(&t);
+    // (Upgrades, which the game offers on their building's own page, last.)
+    std::stable_sort(out.begin(), out.end(), [](const BuildingType* a, const BuildingType* b) {
+        return std::pair{!a->upgradeOf.empty(), menuRank(a->id)} < std::pair{!b->upgradeOf.empty(), menuRank(b->id)};
+    });
+    return out;
+}
+
+std::vector<const VehicleType*> MissionViewer::vehicleMenu() const {
+    std::vector<const VehicleType*> out = economy_ ? economy_->vehicleMenu() : std::vector<const VehicleType*>{};
+    std::stable_sort(out.begin(), out.end(), [](const VehicleType* a, const VehicleType* b) {
+        const CombatType *ta = combatType(a->type), *tb = combatType(b->type);
+        return menuRank(ta ? ta->name : "") < menuRank(tb ? tb->name : "");
+    });
     return out;
 }
 
@@ -993,12 +1077,13 @@ bool MissionViewer::playEvent(const Event& ev) {
         // U: the vehicles the yards can make; a number orders one.
         if (ev.key == 'u' && economy_) {
             vehicleMenu_ = !vehicleMenu_;
+            menuPage_ = 0;
             buildMenu_ = researchMenu_ = false;
             break;
         }
         if (vehicleMenu_ && economy_ && ev.key >= '0' && ev.key <= '9') {
             const size_t n = ev.key == '0' ? 9 : size_t(ev.key - '1');
-            const auto menu = economy_->vehicleMenu();
+            const auto menu = vehicleMenu();
             if (n < menu.size())
                 economy_->orderVehicle(*menu[n]);
             break;
@@ -1012,6 +1097,7 @@ bool MissionViewer::playEvent(const Event& ev) {
         if (ev.key == 'b') {
             researchMenu_ = vehicleMenu_ = false;
             buildMenu_ = !buildMenu_;
+            menuPage_ = 0;
             placing_.clear();
             map_.setGhost({}, 0, 0, false);
             break;
@@ -1938,6 +2024,41 @@ bool MissionViewer::pressButton(int x, int y) {
             trainingView_ = true;
         } else if (b.action.rfind("course", 0) == 0 && fieldWork_) {
             fieldWork_->train(size_t(std::atoi(b.action.c_str() + 6)));
+        } else if (b.action.rfind("menu-item", 0) == 0) {
+            const size_t n = size_t(std::atoi(b.action.c_str() + 9));
+            menuFlash_ = {int(n), nowMs_};
+            if (buildMenu_) {
+                const auto menu = buildMenu();
+                if (n < menu.size())
+                    choose(*menu[n]);
+            } else if (vehicleMenu_ && economy_) {
+                const auto menu = vehicleMenu();
+                if (n < menu.size())
+                    economy_->orderVehicle(*menu[n]);
+            }
+        } else if (b.action == "menu-prev" || b.action == "menu-next") {
+            menuPage_ += b.action == "menu-next" ? 1 : -1;
+        } else if (b.action == "menu-close") {
+            buildMenu_ = vehicleMenu_ = false;
+        } else if (b.action.rfind("comms-", 0) == 0) {
+            const int n = int(log_.size());
+            const int shown = commsShown_ < 0 || commsShown_ >= n ? n - 1 : commsShown_;
+            if (b.action == "comms-delete" && n > 0) {
+                log_.erase(log_.begin() + shown);
+                commsShown_ = std::min(shown, int(log_.size()) - 1);
+            } else if (b.action == "comms-first" && n > 0) {
+                commsShown_ = 0;
+            } else if (b.action == "comms-prev" && n > 0) {
+                commsShown_ = std::max(0, shown - 1);
+            } else if (b.action == "comms-next" && n > 0) {
+                commsShown_ = std::min(n - 1, shown + 1);
+            } else if (b.action == "comms-last") {
+                commsShown_ = -1;
+            } else if (b.action == "comms-mission") {
+                commandShown_ = !commandShown_;
+            } else if (b.action == "comms-close") {
+                commsClosed_ = true;
+            }
         } else if (b.action == "info") {
             colonyDetails_ = !colonyDetails_;
         } else if (b.action.rfind("jump", 0) == 0) {
@@ -1963,6 +2084,7 @@ bool MissionViewer::pressButton(int x, int y) {
         } else if (b.action == "build") {
             buildMenu_ = !(u && u->name == "vehicle-yard");
             vehicleMenu_ = u && u->name == "vehicle-yard";
+            menuPage_ = 0;
         } else if (b.action == "research") {
             researchMenu_ = true;
         } else if ((b.action == "crew-" || b.action == "crew+") && u && economy_) {
@@ -2348,7 +2470,7 @@ void MissionViewer::drawInterface() {
     {
         const auto menu = buildMenu_ ? buildMenu() : std::vector<const BuildingType*>{};
         const auto offered = researchMenu_ && research_ ? research_->offered() : std::vector<size_t>{};
-        const auto vehicles = vehicleMenu_ && economy_ ? economy_->vehicleMenu() : std::vector<const VehicleType*>{};
+        const auto vehicles = vehicleMenu_ && economy_ ? vehicleMenu() : std::vector<const VehicleType*>{};
         const size_t jobs = vehicleMenu_ && economy_ ? economy_->vehicleJobs().size() : 0;
         const Unit* picked = selectedBuilding_ && world_ ? world_->unit(selectedBuilding_) : nullptr;
         if (!picked && world_ && world_->selection().size() == 1 && !buildMenu_ && !researchMenu_ && !vehicleMenu_)
@@ -2377,15 +2499,15 @@ void MissionViewer::drawInterface() {
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
         const std::vector<std::string> training = staffView_ && trainingView_ ? trainingLines() : std::vector<std::string>{};
-        const int lines = buildMenu_      ? int(menu.size()) + 1
+        const int lines = buildMenu_      ? menuLines(lh)
                           : researchMenu_ ? std::max(2, int(offered.size()) + 1)
-                          : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
+                          : vehicleMenu_  ? menuLines(lh) + int(std::min<size_t>(jobs, 4))
                           : trainingView_ && staffView_ ? std::max(2, int(training.size()) + 1)
                           : staffView_    ? int(cards.size()) + 2
                           : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0) + (actions.empty() ? 0 : 2)
                                           : economy_ ? 9 + 5 * kJumpRows : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
-        ui_.drawPanel(screen_, x, y, w, h, "NEW WORLDS");
+        ui_.drawPanel(screen_, x, y, w, h, vehicleMenu_ && !buildMenu_ ? "ENGINEERING" : "NEW WORLDS");
         // The Romulans start with a little less (most of their recordings).
         static const char* const kNames[] = {"DILITHIUM", "POLYCOMP", "THERMOCONC", "TRANSALUMIN", "NITRIUM", "DURANIUM"};
         static constexpr int kStart[] = {500, 1000, 2300, 500, 4000, 5000}, kRomulan[] = {500, 988, 2211, 497, 3500, 5000};
@@ -2395,28 +2517,8 @@ void MissionViewer::drawInterface() {
         int ty = y + 16;
         const std::vector<int> sel = world_ ? world_->selection() : std::vector<int>{};
         const BuildingType* placing = placing_.empty() ? nullptr : buildingType(placing_);
-        if (vehicleMenu_ && economy_) {
-            // Vehicles: what the yards can make now, each with its key
-            // (plain if the stock can't pay), then the yards' work.
-            ui_.drawSmall(screen_, x + 10, ty, "VEHICLES", bright);
-            if (vehicles.empty())
-                ui_.drawSmall(screen_, x + 10, ty + lh, "NO VEHICLE YARD", text);
-            const Stock st = economy_->stock();
-            for (size_t i = 0; i < vehicles.size(); ++i) {
-                bool pays = true;
-                for (int m = 0; m < kMaterials; ++m)
-                    pays = pays && st[size_t(m)] >= vehicles[i]->cost[size_t(m)];
-                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1),
-                              std::to_string((i + 1) % 10) + " " + vehicles[i]->panel, pays ? bright : text);
-            }
-            int line = std::max(2, int(vehicles.size()) + 1);
-            for (size_t i = 0; i < jobs && i < 4; ++i) {
-                const Economy::VehicleJob& j = economy_->vehicleJobs()[i];
-                const VehicleType* v = vehicleType(j.type);
-                const int pct = j.total > 0 ? int(100 - std::max(0.0, j.work) * 100 / j.total) : 100;
-                ui_.drawSmall(screen_, x + 10, ty + lh * line++,
-                              std::string("> ") + (v ? v->panel : "?") + " " + std::to_string(pct) + "%", text);
-            }
+        if ((vehicleMenu_ && economy_) || buildMenu_) {
+            drawMenu(x, ty, w, buildMenu_ ? std::vector<const VehicleType*>{} : vehicles, menu, jobs);
         } else if (researchMenu_ && research_) {
             // Research: the topics open, each with its key, and how far
             // it has got (as the game's topic buttons: not started, in
@@ -2433,16 +2535,6 @@ void MissionViewer::drawInterface() {
                     t.running ? std::to_string(t.done * 100 / std::max(1, t.points)) + "%" : "READY";
                 ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), std::to_string(i + 1) + " " + name + " " + state,
                               t.running ? bright : text);
-            }
-        } else if (buildMenu_) {
-            // The menu: what can be built now, each with its key; plain
-            // if the stock can't pay for it.
-            ui_.drawSmall(screen_, x + 10, ty, "BUILD", bright);
-            const Color dim{uint8_t(text.r / 2), uint8_t(text.g / 2), uint8_t(text.b / 2)};
-            for (size_t i = 0; i < menu.size(); ++i) {
-                const BuildingType& t = *menu[i];
-                const Color c = !economy_->available(t) ? dim : economy_->affordable(t) ? bright : text;
-                ui_.drawSmall(screen_, x + 10, ty + lh * int(i + 1), std::to_string((i + 1) % 10) + " " + t.panel, c);
             }
         } else if (placing) {
             // Placing: the building and what it costs.
@@ -2634,14 +2726,19 @@ void MissionViewer::drawInterface() {
         }
     }
 
-    // COMMUNICATIONS: the script's latest message, with its sender's portrait.
-    {
-        const int w = 220, h = 70, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
+    // COMMUNICATIONS: a message (the latest, unless the arrows have gone
+    // back), with its sender's portrait and n/N; under it DELETE, the
+    // first / previous / next / last arrows, MISSION (the objectives) and
+    // X (the panel away until the next message).
+    if (!commsClosed_) {
+        const int w = 220, h = 70 + lh + 4, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "COMMUNICATIONS");
+        const int n = int(log_.size());
+        const int shown = commsShown_ < 0 || commsShown_ >= n ? n - 1 : commsShown_;
         if (log_.empty()) {
             ui_.drawSmall(screen_, x + 60, y + 16, "NO MESSAGES ON FILE.", text);
         } else {
-            const auto& [sender, message] = log_.back();
+            const auto& [sender, message] = log_[size_t(shown)];
             const std::string natives = level.shortName == "C9" ? "orion" : "taubat";
             if (const Texture* p = ui_.portraitFor(sender, natives))
                 ui_.drawPicture(screen_, *p, x + 10, y + 13, 44, 41);
@@ -2651,20 +2748,38 @@ void MissionViewer::drawInterface() {
             ui_.drawSmall(screen_, x + 58, ty, up, text);
             for (const std::string& l : ui_.wrapSmall(message, w - 70)) {
                 ty += lh;
-                if (ty > y + h - 12 - lh)
+                if (ty > y + h - 14 - 2 * lh)
                     break;
                 ui_.drawSmall(screen_, x + 58, ty, l, text);
             }
-            const std::string counter = std::to_string(log_.size()) + "/" + std::to_string(log_.size());
-            ui_.drawSmall(screen_, x + w - 12 - ui_.smallWidth(counter), y + h - 11 - lh, counter, text);
+            const std::string counter = std::to_string(shown + 1) + "/" + std::to_string(n);
+            ui_.drawSmall(screen_, x + w - 12 - ui_.smallWidth(counter), y + 14, counter, text);
+        }
+        int bx = x + 10;
+        const int by = y + h - 11 - lh;
+        for (const auto& [label, action] : {std::pair{"DELETE", "comms-delete"}, std::pair{"|<", "comms-first"},
+                                            std::pair{"<", "comms-prev"}, std::pair{">", "comms-next"},
+                                            std::pair{">|", "comms-last"}, std::pair{"MISSION", "comms-mission"},
+                                            std::pair{"X", "comms-close"}}) {
+            const int bw = ui_.smallWidth(label) + 6;
+            ui_.drawSmall(screen_, bx + 3, by, label, bright);
+            buttons_.push_back({bx, by - 2, bw, lh + 4, action});
+            bx += bw + 3;
         }
     }
 
-    // COMMAND: the objectives, as the recordings' panel lists them.
-    if (run_) {
+    // COMMAND: the mission, and its objectives as the recordings' panel
+    // lists them (MISSION on the communications panel shows or hides it).
+    if (run_ && commandShown_) {
         const MissionScript* script = findMissionScript(level.shortName, side);
         std::vector<std::pair<std::string, Color>> lines;
         const int w = 260;
+        {
+            std::string title = levelLabel() + (level.title.empty() ? "" : ": " + level.title);
+            std::transform(title.begin(), title.end(), title.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+            for (const std::string& l : ui_.wrapSmall(title, w - 24))
+                lines.push_back({l, bright});
+        }
         for (const MissionScript::Objective& o : script->objectives) {
             const MissionRun::State st = run_->objectiveState(o.id);
             if (st == MissionRun::State::Hidden)
@@ -2682,6 +2797,126 @@ void MissionViewer::drawInterface() {
     }
     drawPlaybook();
 }
+
+int MissionViewer::menuLines(int lh) const {
+    // The title, three icons, the hovered item's name, role and cost, the
+    // arrows.
+    return 1 + (3 * (kMenuIcon + 4) + lh - 1) / lh + 2 + kMaterials + 1;
+}
+
+// The build and vehicle menus as the game's: three portraits a page (the
+// key that picks each in its corner, its name beside it, plain if the
+// stock can't pay), the item under the pointer (else the page's first)
+// at the foot with its role and cost, then the arrows, the page and X; a
+// clicked icon flashes magenta. The vehicle menu adds the yards' work.
+void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const VehicleType*>& vehicles,
+                             const std::vector<const BuildingType*>& buildings, size_t jobs) {
+    const int lh = ui_.smallHeight();
+    const Color text = ui_.textColor(), bright = ui_.brightColor();
+    const Color dim{uint8_t(text.r / 2), uint8_t(text.g / 2), uint8_t(text.b / 2)};
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    struct Item {
+        std::string portrait, name, role;
+        Stock cost;
+        bool pays, open;
+    };
+    std::vector<Item> items;
+    const Stock st = economy_ ? economy_->stock() : Stock{};
+    auto pays = [&](const Stock& c) {
+        for (int m = 0; m < kMaterials; ++m)
+            if (st[size_t(m)] < c[size_t(m)])
+                return false;
+        return true;
+    };
+    for (const BuildingType* t : buildings) {
+        const bool upgrade = !t->upgradeOf.empty();
+        items.push_back({buildingPortrait(upgrade ? t->upgradeOf : t->id, side), t->panel,
+                         upgrade ? "AN UPGRADE" : roleOf(t->id), t->costFor(side), pays(t->costFor(side)),
+                         economy_->available(*t)});
+    }
+    for (const VehicleType* v : vehicles) {
+        const CombatType* ct = combatType(v->type);
+        std::string pic = portraitOf(v->type);
+        if (pic.size() > 2)
+            pic.resize(pic.size() - 2); // the large one
+        items.push_back({pic, v->panel, ct ? roleOf(ct->name) : "", v->cost, pays(v->cost), true});
+    }
+    const int pages = std::max(1, int((items.size() + 2) / 3));
+    menuPage_ = std::clamp(menuPage_, 0, pages - 1);
+    ui_.drawSmall(screen_, x + 10, ty, buildMenuTitle(), bright);
+    if (items.empty())
+        ui_.drawSmall(screen_, x + 10, ty + lh, vehicleMenu_ ? "NO VEHICLE YARD" : "NOTHING TO BUILD", text);
+    int iy = ty + lh + 2;
+    int shown = -1; // the item at the foot
+    for (int k = 0; k < 3; ++k) {
+        const int i = menuPage_ * 3 + k;
+        if (i >= int(items.size()))
+            break;
+        const Item& it = items[size_t(i)];
+        const int ix = x + 10;
+        if (const Texture* t = ui_.objectPortrait(it.portrait))
+            ui_.drawPicture(screen_, *t, ix, iy, kMenuIcon, kMenuIcon * 60 / 64);
+        const bool flash = menuFlash_.first == i && nowMs_ - menuFlash_.second < 300;
+        const bool over = mouseX_ >= ix && mouseX_ < x + w - 6 && mouseY_ >= iy && mouseY_ < iy + kMenuIcon;
+        if (over)
+            shown = i;
+        const Color frame = flash ? Color{255, 60, 255} : over ? bright : dim;
+        for (int xx = ix - 1; xx <= ix + kMenuIcon; ++xx)
+            for (int yy : {iy - 1, iy + kMenuIcon})
+                if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
+                    uint8_t* px = screen_.row(yy) + xx * 4;
+                    px[0] = frame.r, px[1] = frame.g, px[2] = frame.b;
+                }
+        for (int yy = iy - 1; yy <= iy + kMenuIcon; ++yy)
+            for (int xx : {ix - 1, ix + kMenuIcon})
+                if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
+                    uint8_t* px = screen_.row(yy) + xx * 4;
+                    px[0] = frame.r, px[1] = frame.g, px[2] = frame.b;
+                }
+        ui_.drawSmall(screen_, ix + 2, iy + 1, std::to_string((i + 1) % 10), bright);
+        int ny = iy;
+        for (const std::string& l : ui_.wrapSmall(it.name, w - kMenuIcon - 26)) {
+            ui_.drawSmall(screen_, ix + kMenuIcon + 6, ny, l, !it.open ? dim : it.pays ? bright : text);
+            ny += lh;
+        }
+        buttons_.push_back({ix, iy, w - 16, kMenuIcon, "menu-item" + std::to_string(i)});
+        iy += kMenuIcon + 4;
+    }
+    // The foot: what's under the pointer, else the page's first.
+    int fy = ty + lh + 2 + 3 * (kMenuIcon + 4);
+    if (shown < 0 && menuPage_ * 3 < int(items.size()))
+        shown = menuPage_ * 3;
+    if (shown >= 0) {
+        const Item& it = items[size_t(shown)];
+        ui_.drawSmall(screen_, x + 10, fy, it.name, bright);
+        ui_.drawSmall(screen_, x + 10, fy + lh, it.role, text);
+        int cy = fy + 2 * lh;
+        for (const std::string& c : costLines(it.cost)) {
+            ui_.drawSmall(screen_, x + 10, cy, c, text);
+            cy += lh;
+        }
+    }
+    fy += (2 + kMaterials) * lh;
+    // The arrows, the page, X.
+    int bx = x + 10;
+    for (const auto& [label, action] : {std::pair{"<", "menu-prev"}, std::pair{">", "menu-next"}, std::pair{"X", "menu-close"}}) {
+        const int bw = ui_.smallWidth(label) + 10;
+        ui_.drawSmall(screen_, bx + 5, fy, label, bright);
+        buttons_.push_back({bx, fy - 2, bw, lh + 4, action});
+        bx += bw + 6;
+    }
+    ui_.drawSmall(screen_, bx + 4, fy, std::to_string(menuPage_ + 1) + "/" + std::to_string(pages), text);
+    // The yards' work.
+    for (size_t i = 0; vehicleMenu_ && economy_ && i < jobs && i < 4; ++i) {
+        const Economy::VehicleJob& j = economy_->vehicleJobs()[i];
+        const VehicleType* v = vehicleType(j.type);
+        const int pct = j.total > 0 ? int(100 - std::max(0.0, j.work) * 100 / j.total) : 100;
+        ui_.drawSmall(screen_, x + 10, fy + lh * int(i + 1), std::string("> ") + (v ? v->panel : "?") + " " + std::to_string(pct) + "%",
+                      text);
+    }
+}
+
+const char* MissionViewer::buildMenuTitle() const { return vehicleMenu_ && !buildMenu_ ? "VEHICLES" : "BUILD"; }
 
 void MissionViewer::stepScript() {
     const Level& level = missions_[size_t(current_)];
@@ -2756,8 +2991,11 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
         walkNote_ += " [" + voice + "]";
     }
     for (const MissionRun::Output& o : out) {
-        if (o.kind == MissionRun::Output::Message)
+        if (o.kind == MissionRun::Output::Message) {
             log_.push_back({o.sender, o.text});
+            // A new message: the panel opens on it.
+            commsShown_ = -1, commsClosed_ = false;
+        }
         else if (o.kind == MissionRun::Output::Won || o.kind == MissionRun::Output::Lost) {
             walkNote_ += o.kind == MissionRun::Output::Won ? "; mission won" : "; mission lost";
             // In a mission's run, the debriefing follows.

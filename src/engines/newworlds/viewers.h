@@ -584,6 +584,11 @@ private:
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
     std::vector<std::string> colonyDetails() const;
+    std::vector<const VehicleType*> vehicleMenu() const; // the yards' offer, in the game's order
+    int menuLines(int lh) const;
+    void drawMenu(int x, int ty, int w, const std::vector<const VehicleType*>& vehicles,
+                  const std::vector<const BuildingType*>& buildings, size_t jobs);
+    const char* buildMenuTitle() const;
     void jumpTo(int slot);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
@@ -708,6 +713,11 @@ private:
     std::vector<PanelButton> buttons_;
     bool staffView_ = false;            // the STAFF panel: the officers' cards
     bool trainingView_ = false;         // its TRAINING list: the officers' courses
+    int commsShown_ = -1;               // the message COMMUNICATIONS shows (-1: the latest)
+    bool commsClosed_ = false;          // put away with X, until the next message
+    bool commandShown_ = true;          // the COMMAND panel (MISSION shows or hides it)
+    int menuPage_ = 0;                  // the build or vehicle menu's page
+    std::pair<int, uint64_t> menuFlash_{-1, 0}; // the menu item last clicked, and when
     bool colonyDetails_ = false;        // the hub's INFO: the colony's details instead of the hub's
     std::array<int, 5> jumpedTo_{};     // JUMP TO: each class's object the camera went to last
     int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them

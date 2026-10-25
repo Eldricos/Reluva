@@ -50,7 +50,7 @@ As the first tutorial teaches them:
 | Ctrl + 1-9 | makes the selection a battle group |
 | 1-9 / Shift + 1-9 | selects the group / centres on it |
 | B | the build menu in the NEW WORLDS panel (B again closes it) |
-| 1-9, 0 (menu open) | picks a building; its hologram follows the pointer |
+| 1-9, 0 (menu open), or a click on its portrait | picks a building (its hologram follows the pointer) or orders a vehicle; < and > turn the menu's pages, X closes it |
 | Left click (placing) | builds where the hologram is green |
 | Right click or Escape (placing) | puts the hologram away |
 | Tab | the full-screen Tricorder, units marked |
@@ -58,10 +58,10 @@ As the first tutorial teaches them:
 | F3 or Escape | stops playing (Escape first closes the menu or hologram) |
 | G (missions page) | plays the mission through as the game runs it: a loading box over the three emblems, the briefing (Backspace skips it), a second loading box, play; once won or lost, the debriefing box, then the won or lost screen with the MISSION REPORT; CONTINUE (or Return) back to the page. Escape leaves at any point. F3 still starts play straight away |
 | Ctrl + X (playing) | the script's walkthrough a step on (a testing aid) |
+| COMMUNICATIONS' buttons | DELETE the message shown; the arrows to the first, previous, next and last; MISSION shows or hides the COMMAND panel (the mission and its objectives); X puts the panel away until the next message |
 
-The numpad keys work with NumLock on or off. The game's build menu is a
-row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: the multiselection's icon pages. The keys
+The numpad keys work with NumLock on or off. Not yet modelled: the
+multiselection's icon pages. The keys
 A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
@@ -91,9 +91,17 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   (Romulans a little less; [play.md](play.md)), a crew of 20 and a
   capacity of 50.
 - **The build menu** offers the side's buildings that have a model
-  ([colony.md](colony.md)); one is dim until what it needs stands (a
-  construction yard first, a resource processor before mines), bright
-  when the stock can pay for it. While placing, the panel shows its cost,
+  ([colony.md](colony.md)) once what they need stands, as the game's
+  does (play-tutorials.md, play-vm-c7.md): three large portraits a page,
+  each with its key and name (bright when the stock can pay), in the
+  training missions' order (storage, power, construction yard, vehicle
+  yard, processor, mine, pad, science station, sickbay, security; the
+  rest after, upgrades last); the one under the pointer, else the
+  page's first, at the foot with a line of what it's for (Reluva's
+  words) and its cost as the game writes it (dilithium in G, nitrium and
+  duranium in KG, the rest in T); arrows, the page and X under it. A
+  clicked portrait flashes magenta. The vehicle yard's (ENGINEERING) is
+  the same, with the yards' work under it. While placing, the panel shows its cost,
   in red what the stock lacks.
 - **Where buildings go:** on the tile grid, over as many tiles as the model
   needs, on free, flat ground near the colony's level (the ground round
@@ -410,6 +418,8 @@ built, to be put back at the end so play feels as the game's does:
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
+| The menus' portraits | 48 pixels across | the game's are 64 × 60 |
+| The comms panel's X | away until the next message | what brings it back in the game isn't known |
 | Your own cloaked units | drawn at 35 % (fading over the 63-tick fades) | the game draws them see-through; how much isn't known |
 | The loading boxes | 3 s (2.5 s before play); Reluva's own wording | the recordings show them 3-10 s; their lines are the game's text, not copied |
 | The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
