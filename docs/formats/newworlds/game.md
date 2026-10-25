@@ -47,7 +47,7 @@ As the first tutorial teaches them:
 | Numpad 8 / 2 | zoom in towards the pointer / out ("targeted zoom") |
 | Numpad 7 / 1 | raise / lower the camera |
 | Numpad 9 / 3 | tilt |
-| F1 / F2 / F3, Q | the game's cameras: low over the ground / isometric (28000 up, 45 degrees) / close-up isometric (15000 up); Q the next |
+| F1 / F2 / F3, Q | the game's cameras: low over the ground (2000 up, looking level; numpad 9 / 3 tilt it a little) / isometric (28000 up, 45 degrees) / close-up isometric (15000 up); Q the next |
 | Z / X | keep the camera's place / go back to it |
 | The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up |
 | Space | the camera to the next of the colony's objects lately hit |
@@ -436,7 +436,6 @@ kept apart from the game's behaviour:
 | Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
 | Animation speed | 10 frames a second | Reluva's (arf.md) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
-| First-person view (F1) | 0.6 block away, 6° down | by eye: the game's is 2000 up, looking level |
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |

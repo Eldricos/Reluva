@@ -592,7 +592,10 @@ struct ViewShape {
 // times the square root of two).
 constexpr ViewShape kBirdsEye{28000.0f * 1.41421356f, 45.0f * kPi / 180.0f};
 constexpr ViewShape kClose{15000.0f * 1.41421356f, 45.0f * kPi / 180.0f};
-constexpr ViewShape kFirstPerson{0.6f * kBlockSize, 6.0f * kPi / 180.0f};
+// F1 (exe.md#cameras): 2000 units up, looking level; it tilts only a
+// little (the game's 512 of 65536 a turn each way).
+constexpr ViewShape kFirstPerson{2000.0f, 0.0f};
+constexpr float kEyeHeight = 2000, kEyeTilt = 512.0f / 65536 * 2 * kPi;
 } // namespace
 
 Terrain MapViewer::terrain() {
@@ -604,14 +607,14 @@ void MapViewer::setView(View v) {
     const ViewShape& s = v == View::Close ? kClose : v == View::FirstPerson ? kFirstPerson : kBirdsEye;
     distance_ = s.distance;
     pitch_ = s.pitch;
-    targetZ_ = groundHeight(targetX_, targetY_);
+    targetZ_ = groundHeight(targetX_, targetY_) + (v == View::FirstPerson ? kEyeHeight : 0);
     dirty_ = true;
 }
 
 void MapViewer::centreOn(float x, float y) {
     targetX_ = std::clamp(x, 0.0f, worldWidth());
     targetY_ = std::clamp(y, 0.0f, worldHeight());
-    targetZ_ = groundHeight(targetX_, targetY_);
+    targetZ_ = groundHeight(targetX_, targetY_) + (view_ == View::FirstPerson ? kEyeHeight : 0);
     dirty_ = true;
 }
 
@@ -664,8 +667,13 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
         distance_ = std::hypot(height, ground);
         break;
     }
-    case key::Kp0 + 9: pitch_ = std::clamp(pitch_ + kKeyTurn / 2, 0.02f, kMaxPitch); break;
-    case key::Kp0 + 3: pitch_ = std::clamp(pitch_ - kKeyTurn / 2, 0.02f, kMaxPitch); break;
+    case key::Kp0 + 9:
+    case key::Kp0 + 3: {
+        const float step = (k == key::Kp0 + 9 ? 1 : -1) * kKeyTurn / 2;
+        pitch_ = view_ == View::FirstPerson ? std::clamp(pitch_ + step / 8, -kEyeTilt, kEyeTilt)
+                                            : std::clamp(pitch_ + step, 0.02f, kMaxPitch);
+        break;
+    }
     // F1, F2, F3 the game's cameras; Q the next of them; Z keeps the
     // camera's place, X goes back to it.
     case key::F1: setView(View::FirstPerson); break;
