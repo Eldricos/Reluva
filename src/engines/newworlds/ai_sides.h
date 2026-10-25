@@ -137,7 +137,7 @@ private:
     std::map<int, Colony> colonies_;
     std::map<int, double> nativeSites_; // a building going up without an economy: seconds put in
     std::map<int, int> rallied_;         // per slot: vehicles sent to its rally point so far
-    std::map<int, int> colonyBase_, colonyShare_; // per slot: colony size at the start, its share last told
+    std::map<int, int> colonyBase_, colonyShare_, colonyTotal_; // per slot: colony size at the start, its shares last told
     ColonyMap ground_;
     std::map<std::string, int> counts_;
     double clock_ = 0;

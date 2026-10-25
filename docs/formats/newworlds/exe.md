@@ -910,7 +910,11 @@ orders come only from the player's playbook (the AI's own orders attack
 a side). So the other sides' raid watches (kind 37) succeed only when
 the group is destroyed (condition 1, by anyone) or their own buildings
 and vehicles mark its block scanned (condition 3). A watch's success
-sends its rivals Go_Futile: one under way reports "beaten to it"
+sends Go_Futile to the raids it names (targets 4 and 5) when its message
+is Go_Futile: in J2 the three hangar captures name each other (not the
+hangar's destruction monitor), in J3 each workshop's three raids; J4's
+and J6's raids on the same buildings send other messages and hand
+nothing off. A raid told so while under way reports "beaten to it"
 (target 1); one idle or still in its start delay turns futile and later
 reports "futile" (target 6) instead of success.
 

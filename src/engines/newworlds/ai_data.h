@@ -116,6 +116,8 @@ struct Raid {
     int condition;
     int side;          // whose capture or scan it watches
     int start, hold;   // ticks
+    const char* name;  // its own ("kli-hangar-capture-objective")
+    const char* futile[2]; // the rivals' raids its success sends Go_Futile to ("" none)
 };
 std::vector<const Raid*> raids(std::string_view mission);
 

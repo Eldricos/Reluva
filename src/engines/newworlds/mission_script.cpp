@@ -292,7 +292,8 @@ bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) const 
     if (want.kind == "built-all")
         return got.kind == "built" && requirementsMet(want);
     // The game's monitors compare: stock <material> <at least>; count <what>
-    // <op> <n> against count <what> <now>; colony-size [<side>] <percent>,
+    // <op> <n> against count <what> <now>; colony-size [<side>] <percent>
+    // (and colony-total, which counts the buildings other sides hold),
     // reached growing (over 100) or shrinking (to 100 or under).
     // captured <what> <percent>: the share of a colony held, reached. (A
     // plain captured <what> [<member>] is the raid's, not this.)
@@ -311,7 +312,8 @@ bool MissionRun::matches(const ScriptEvent& want, const ScriptEvent& got) const 
                 return false;
         return std::atof(got.args.back().c_str()) >= std::atof(want.args.back().c_str());
     }
-    if (want.kind == got.kind && (want.kind == "stock" || want.kind == "count" || want.kind == "colony-size")) {
+    if (want.kind == got.kind &&
+        (want.kind == "stock" || want.kind == "count" || want.kind == "colony-size" || want.kind == "colony-total")) {
         auto num = [](const std::string& v, double& out) {
             char* end = nullptr;
             out = std::strtod(v.c_str(), &end);
@@ -524,7 +526,8 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
         ++built_[event.args[0]];
     if (event.kind == "signal" && !event.args.empty())
         ++signals_[event.args[0]];
-    if ((event.kind == "stock" || event.kind == "count" || event.kind == "colony-size") && !event.args.empty())
+    if ((event.kind == "stock" || event.kind == "count" || event.kind == "colony-size" || event.kind == "colony-total") &&
+        !event.args.empty())
         state_[event.kind + " " + (event.args.size() > 1 ? event.args[0] : std::string())] = event;
     for (Rule& r : rules_) {
         if (!r.armed || (r.fired && !r.handler->every) || !matches(r.handler->event, event))

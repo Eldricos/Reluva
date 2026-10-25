@@ -6,6 +6,7 @@
 #include "engines/newworlds/start_data.h"
 
 #include <algorithm>
+#include <tuple>
 #include <cmath>
 #include <set>
 
@@ -520,9 +521,11 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
     // large buildings and its armed vehicles, standing and not held by
     // another side; and its colony's size, small + 3 x large, as a share
     // of what it was at the start.
-    std::map<int, int> size;
+    std::map<int, int> size, total; // total: with the buildings other sides hold
     for (const Unit& u : world_.units()) {
         const CombatType* t = combatType(u.type);
+        if (t && u.built >= 1 && u.heldBy >= 0)
+            total[u.slot] += t->mask & 0x2 ? 1 : t->mask & 0x4 ? 3 : 0;
         if (!t || u.built < 1 || u.heldBy >= 0)
             continue;
         const char race = raceOf(u.slot) == '?' ? u.side : raceOf(u.slot);
@@ -533,21 +536,28 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
             ++counts[side + "large-buildings"], size[u.slot] += 3;
         else if (t->mask & 0x100)
             ++counts[side + "fighting-units"];
+        total[u.slot] += t->mask & 0x2 ? 1 : t->mask & 0x4 ? 3 : 0;
     }
     if (colonyBase_.empty())
         colonyBase_ = size, colonyBase_[-1] = 0; // (taken once)
     for (const auto& [slot, base] : colonyBase_) {
         if (slot < 0 || base <= 0)
             continue;
-        const int share = int(size[slot] * 100 / base);
-        if (auto it = colonyShare_.find(slot); it != colonyShare_.end() && it->second == share)
-            continue;
-        colonyShare_[slot] = share;
+        // colony-size: as the game's size monitors (kind 8), what the
+        // side itself holds; colony-total (kind 9) counts its buildings
+        // other sides have captured too.
         const char race = raceOf(slot);
-        if (slot == player_)
-            out.push_back({"colony-size", {std::to_string(share)}});
-        else if (race != '?')
-            out.push_back({"colony-size", {raceName(race), std::to_string(share)}});
+        for (const auto& [kind, now, told] : {std::tuple{"colony-size", size[slot], &colonyShare_},
+                                              std::tuple{"colony-total", total[slot], &colonyTotal_}}) {
+            const int share = int(now * 100 / base);
+            if (auto it = told->find(slot); it != told->end() && it->second == share)
+                continue;
+            (*told)[slot] = share;
+            if (slot == player_)
+                out.push_back({kind, {std::to_string(share)}});
+            else if (race != '?')
+                out.push_back({kind, {raceName(race), std::to_string(share)}});
+        }
     }
     for (const auto& [n, c] : counts)
         if (auto it = counts_.find(n); it == counts_.end() || it->second != c)

@@ -68,7 +68,8 @@ namespace reluva::newworlds {
 // <objective>; all-completed; timer <name>; signal <name>[*count] (the
 // count-th time it's raised); mine-exhausted, power-low, short-resources,
 // short-crew; and the game's monitors: count <what> <=|>=|== <n>, held
-// <what> <seconds>, seen <site>, colony-size [<side>] <percent>, stock <material>
+// <what> <seconds>, seen <site>, colony-size [<side>] <percent> (colony-total
+// counting its buildings other sides hold), stock <material>
 // <amount>, key <code>; cell-scanned <site> (its block scanned in the fog);
 // inside, outside <who> <zone> (a side's units, a
 // unit kind of ours, a group, or "any"); beamed-up <group>; standing <what>

@@ -286,14 +286,17 @@ bool FieldWork::conditionMet(const Watch& w) const {
     return w.condition == 1 && w.seen && !any;
 }
 
-// A watch's success tells the other sides' watches on the group: one
+// A watch's success sends Go_Futile to the rivals' raids it names (as
+// the mission wires it; most race-for-it raids name the other two): one
 // under way is beaten (the player hears it), the rest will find their
 // success futile.
 void FieldWork::succeeded(const Watch& done, std::vector<ScriptEvent>& out) {
     if (!done.raid)
         return;
     for (Watch& w : watches_) {
-        if (&w == &done || !w.raid || w.side == done.side || std::string_view(w.raid->label) != done.raid->label)
+        if (&w == &done || !w.raid ||
+            std::none_of(std::begin(done.raid->futile), std::end(done.raid->futile),
+                         [&](const char* n) { return *n && std::string_view(n) == w.raid->name; }))
             continue;
         if (w.started && !w.done) {
             w.done = true;

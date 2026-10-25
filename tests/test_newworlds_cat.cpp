@@ -1442,9 +1442,39 @@ void testRivalsAndGroups() {
         gone.what = *w.unit(hangar);
         w.remove(hangar);
         const auto after = ai.observe({gone});
-        CHECK(std::any_of(after.begin(), after.end(), [](const ScriptEvent& e) {
-            return e.kind == "colony-size" && e.args.size() == 2 && e.args[0] == "taubat" && std::atoi(e.args[1].c_str()) < 100;
-        }));
+        auto share = [](const std::vector<ScriptEvent>& ev, const char* kind) {
+            for (const ScriptEvent& e : ev)
+                if (e.kind == kind && e.args.size() == 2 && e.args[0] == "taubat")
+                    return std::atoi(e.args[1].c_str());
+            return -1;
+        };
+        const int lost = share(after, "colony-size");
+        CHECK(lost > 0 && lost < 100 && share(after, "colony-total") == lost);
+        // A house captured: out of its size (kind 8), still in its total (kind 9).
+        for (const Unit& u : w.units())
+            if (u.slot == 3 && u.name == "taubat-house") {
+                w.unit(u.id)->heldBy = 0;
+                break;
+            }
+        const auto held = ai.observe({});
+        CHECK(share(held, "colony-size") < lost && share(held, "colony-total") == -1);
+    }
+    // Go_Futile goes where each raid sends it: J2's three hangar captures
+    // to each other (not the destruction monitor), none of J4's.
+    {
+        auto hands = [](const char* mission, const char* name) {
+            std::set<std::string> out;
+            for (const Raid* r : raids(mission))
+                if (std::string(r->name) == name)
+                    for (const char* f : r->futile)
+                        if (*f)
+                            out.insert(f);
+            return out;
+        };
+        CHECK(hands("J2", "kli-hangar-capture-objective") ==
+              (std::set<std::string>{"fed-hangar-capture-objective", "rom-hangar-capture-objective"}));
+        CHECK(hands("J2", "taubat-hangar-destruction-monitor").empty());
+        CHECK(hands("J4", "kli-sci-blk-raid").empty() && hands("J4", "hostage-sci-blk-raid").empty());
     }
     // A rival's watch: J3's Klingon raid on a workshop is won when it's
     // destroyed, by anyone (5 s, then 30 s).

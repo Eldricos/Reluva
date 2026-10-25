@@ -242,13 +242,17 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
 - **Group counts, colony sizes and rivals** ([exe.md](exe.md#group-counts)):
   the scripts can count a side's small buildings, large buildings and
   armed vehicles (`count klingon-small-buildings <= 0`), hear any side's
-  colony grow or shrink against its start (`colony-size taubat 50`), and
+  colony grow or shrink against its start (`colony-size taubat 50`;
+  `colony-total` keeps counting its buildings others have captured, as
+  J1's and R9's "down to half" monitors do), and
   the share of a colony the player's teams hold (`captured taubat-colony
   30`). The other sides' raid watches run as the game's do: theirs
   succeed only when the group is destroyed or their own units mark its
   block scanned (`captured-by`, `scanned-by <race> <what>`), since the
-  computer never captures or scans; and their success turns the player's
-  watch on the group `beaten` (under way) or `futile` (later).
+  computer never captures or scans; and a success sends Go_Futile to
+  the raids it is wired to (J2's three hangar captures to each other, J3's
+  per workshop; J4's and J6's to none), turning the player's watch
+  `beaten` (under way) or `futile` (later).
 - **Repairs, shields and cloaking** as the executable has them
   ([exe.md](exe.md#repairs)): vehicles mend a point at a time (faster
   with an engineer aboard); the colonies' buildings draw on a repair pool
