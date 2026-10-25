@@ -23,6 +23,7 @@
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/mission_sim.h"
 #include "engines/newworlds/model_pose.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
@@ -719,6 +720,10 @@ void testMissionScripts() {
     CHECK(announcementFor({"built", {"sickbay"}}, {}, 'R').empty());
     CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
     CHECK(announcementFor({"short-crew", {}}, {}, 'F').empty()); // the officers say it (MissionSim::takeVoices)
+    // The vehicles' voices: selected, ordered, refusing.
+    CHECK(unitLine(8, 0, 0, 0) == "fpv004b" && unitLine(8, 1, 1, 1) == "fpv008d" && unitLine(8, 2, 0, 0) == "fneg1");
+    CHECK(unitLine(228, 0, 1, 1) == "kmdb002e" && unitLine(63, 1, 0, 0) == "rsv010c" && unitLine(97, 0, 0, 1) == "ffgs003c");
+    CHECK(unitLine(54, 0, 0, 0).empty());
     CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}}, 'R') == "robjmet");
     CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}, {MissionRun::Output::Won, {}, {}, 0, {}}},
                           'F') == "fmiswin");

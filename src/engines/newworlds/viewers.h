@@ -39,6 +39,7 @@
 #include <functional>
 #include <array>
 #include <map>
+#include <random>
 #include <set>
 #include <memory>
 #include <optional>
@@ -607,6 +608,11 @@ private:
     void jumpTo(int slot);
     void selectAllOfKind(char k);
     void speak(const std::string& what);
+    void unitSpeaks(int unit, int group);
+    void orderSpoken(bool moving);
+    std::map<int, int> unitVoices_;     // each vehicle's voice, once it's spoken
+    std::vector<int> spokenSelection_;  // the selection its first vehicle last answered
+    std::minstd_rand rng_{std::random_device{}()};
     std::map<std::string, uint64_t> spokenAt_; // each clip, when it last played
     void cycleCamera(bool buildings);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);

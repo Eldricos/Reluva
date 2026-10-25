@@ -41,6 +41,38 @@ std::string orderName(const NpcOrder& o) {
 
 } // namespace
 
+std::string unitLine(int type, int group, int voice, int line) {
+    struct Set {
+        const char* stem;
+        int lines[4]; // selected, selected, ordered, ordered
+        char voices[2];
+    };
+    static const std::map<int, Set> kSets = [] {
+        const Set fapc{"fapc", {3, 4, 7, 12}, {'a', 'b'}}, ffgs{"ffgs", {2, 3, 9, 10}, {'c', 'd'}},
+            fmsg{"fmsg", {3, 4, 8, 12}, {'b', 'e'}}, fpa{"fpa", {1, 3, 7, 9}, {'a', 'c'}},
+            fpv{"fpv", {4, 5, 7, 8}, {'b', 'd'}}, fsv{"fsv", {1, 5, 10, 11}, {'c', 'e'}};
+        const Set kapc{"kapc", {1, 2, 4, 5}, {'a', 'b'}}, kdt{"kdt", {1, 2, 4, 5}, {'b', 'd'}},
+            kfgs{"kfgs", {1, 2, 4, 5}, {'c', 'd'}}, kmdb{"kmdb", {1, 2, 4, 5}, {'b', 'e'}},
+            kpa{"kpa", {1, 2, 4, 5}, {'a', 'c'}}, ksv{"ksv", {1, 2, 4, 5}, {'c', 'e'}};
+        const Set rapc{"rapc", {3, 4, 7, 12}, {'a', 'b'}}, rct{"rct", {4, 5, 7, 8}, {'b', 'd'}},
+            rfgs{"rfgs", {2, 3, 9, 10}, {'c', 'd'}}, rpa{"rpa", {1, 3, 7, 9}, {'a', 'c'}},
+            rsv{"rsv", {1, 5, 10, 11}, {'c', 'e'}};
+        return std::map<int, Set>{{56, fapc}, {55, fapc}, {97, ffgs}, {154, fmsg}, {47, fpa}, {9, fpa},
+                                  {8, fpv},   {62, fsv},  {88, kapc}, {40, kapc}, {10, kdt},  {229, kdt},
+                                  {228, kmdb}, {36, kpa}, {37, kfgs}, {95, ksv},  {89, rapc}, {64, rapc},
+                                  {230, rapc}, {35, rct}, {148, rct}, {98, rfgs}, {87, rpa},  {63, rsv}};
+    }();
+    const auto it = kSets.find(type);
+    if (it == kSets.end() || group < 0 || group > 2)
+        return {};
+    const Set& set = it->second;
+    if (group == 2)
+        return std::string(1, set.stem[0]) + "neg1";
+    char number[4];
+    std::snprintf(number, sizeof number, "%03d", set.lines[group * 2 + (line & 1)]);
+    return set.stem + std::string(number) + set.voices[voice & 1];
+}
+
 std::string mapPosition(float x, float y) {
     return std::to_string(int(y / kBlock * 8)) + ":" + std::to_string(int(x / kBlock * 8));
 }

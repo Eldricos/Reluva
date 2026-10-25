@@ -184,6 +184,12 @@ private:
     bool lost_ = false;
 };
 
+// A vehicle's voice (exe.md#sounds): the recording for its type, one of
+// its two voices (0, 1) and one of a group's two lines (0, 1); group 0
+// on being selected, 1 on taking an order, 2 refusing one. Empty if the
+// type has no voices.
+std::string unitLine(int type, int group, int voice, int line);
+
 // Where a world point is, as the scripts write it ("<row>:<col>" in
 // eighths of a block).
 std::string mapPosition(float x, float y);

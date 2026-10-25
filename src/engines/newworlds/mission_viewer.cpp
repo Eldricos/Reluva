@@ -1201,8 +1201,11 @@ bool MissionViewer::playEvent(const Event& ev) {
                 world_->protect(others);
                 world_->select(chosen);
                 pendingOrder_ = 0;
-            } else if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD))
+                orderSpoken(false);
+            } else if (other >= 0 && !world_->selection().empty() && (best < 0 || otherD < bestD)) {
                 orderOn(other);
+                orderSpoken(false);
+            }
             else if (best >= 0)
                 world_->select({best}), selectedBuilding_ = 0;
             else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
@@ -1219,6 +1222,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                     if (pendingOrder_ == 'p')
                         world_->protect(world_->selection());
                     pendingOrder_ = 0;
+                    orderSpoken(true);
                 }
                 else if (ev.clicks >= 2)
                     map_.lockOn(gx, gy);
@@ -1419,6 +1423,12 @@ void MissionViewer::update(uint64_t nowMs) {
             deliver(said.fired, said.out);
         for (const std::string& v : sim_->takeVoices())
             speak(v);
+        // A new selection: its first vehicle answers.
+        if (world_->selection() != spokenSelection_) {
+            spokenSelection_ = world_->selection();
+            if (!spokenSelection_.empty())
+                unitSpeaks(spokenSelection_[0], 0);
+        }
         updateGhost(); // the camera may have moved under the pointer
         if (economy_ && nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
             redraw(); // the panels' figures, once a second
@@ -1634,13 +1644,22 @@ void MissionViewer::updateTitle() {
 }
 
 std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& stem) {
-    const auto it = mediaFiles_.find(upperCase(stem));
-    if (it == mediaFiles_.end()) {
-        soundStatus_ = "no " + stem + " in the game folder";
-        return nullptr;
+    // The game folder's (Media/), else the archives' (the actors' voices:
+    // stnwsfx/fapc003a.wav).
+    std::vector<uint8_t> data;
+    if (const auto it = mediaFiles_.find(upperCase(stem)); it != mediaFiles_.end()) {
+        std::ifstream in(it->second, std::ios::binary);
+        data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
+    } else {
+        const CatEntry* entry = nullptr;
+        for (const auto& a : archives_)
+            if ((entry = a->find("stnwsfx/" + fs::toLower(stem) + ".wav")) && !a->read(*entry, data))
+                break;
+        if (data.empty()) {
+            soundStatus_ = "no " + stem + " in the game folder";
+            return nullptr;
+        }
     }
-    std::ifstream in(it->second, std::ios::binary);
-    const std::vector<uint8_t> data((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     auto sound = std::make_shared<audio::Sound>();
     if (Error err = audio::decodeSound(data, *sound)) {
         soundStatus_ = stem + ": " + err.message;
@@ -2987,6 +3006,33 @@ void MissionViewer::speak(const std::string& what) {
     spokenAt_[clip] = nowMs_;
     if (auto sound = loadSound(clip))
         clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
+}
+
+// One of the player's vehicles speaking (exe.md#sounds): group 0
+// selected, 1 ordered, 2 refusing; in its own voice (one of its type's
+// two, picked at random the first time), over no other clip.
+void MissionViewer::unitSpeaks(int unit, int group) {
+    const Unit* u = world_ ? world_->unit(unit) : nullptr;
+    if (!mixer_ || !u || u->slot != playerSlot_ || u->building || clipPlaying())
+        return;
+    const auto [it, fresh] = unitVoices_.try_emplace(unit, 0);
+    if (fresh)
+        it->second = int(rng_() & 1);
+    const std::string clip = unitLine(u->type, group, it->second, int(rng_() & 1));
+    if (clip.empty())
+        return;
+    if (auto sound = loadSound(clip))
+        clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
+}
+
+// An order given to the selection: its first vehicle takes it, or, if it
+// can't get there, refuses.
+void MissionViewer::orderSpoken(bool moving) {
+    const std::vector<int>& chosen = world_->selection();
+    if (chosen.empty())
+        return;
+    const Unit* u = world_->unit(chosen[0]);
+    unitSpeaks(chosen[0], moving && u && !u->moving() ? 2 : 1);
 }
 
 void MissionViewer::stopScript() {
