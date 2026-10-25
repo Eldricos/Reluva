@@ -60,8 +60,7 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: bees building (here a building goes up by itself once placed),
-DEMOLISH and the hub's colony overview. The keys
+modelled: DEMOLISH and the hub's colony overview. The keys
 A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
@@ -96,7 +95,8 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   when the stock can pay for it. While placing, the panel shows its cost,
   in red what the stock lacks.
 - **Where buildings go:** on the tile grid, over as many tiles as the model
-  needs, on free, flat ground near the hub's height, and not on a deposit
+  needs, on free, flat ground near the colony's level (the ground round
+  the hub), and not on a deposit
   block; a mining station's middle must be on one. The hologram is the
   model tinted green or red. Whether the game forbids building on
   deposits isn't known (Reluva's colony layout keeps them free for mines).
@@ -105,18 +105,24 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   placed on the hub start inside it. The mission's own starting stock.
 - **Construction:** the cost comes off the stock at the order; if the
   stock can't pay, nothing is spent and the colony is told ("short
-  resources"). Each type takes its own time, as timed in the training
-  missions ([play-vm-tutorials.md](play-vm-tutorials.md#build-times)): the
-  game's bees build at a pace the executable doesn't give as a number;
-  power doesn't enter into it. It is drawn as the recordings show it: an
-  apron (the model pressed flat) for the first 15 % of the time, then the
-  building rising out of it, with two of the side's construction bees
-  (`fconbee`, `conbee`, `rcb`) at its corners playing their `manipulate`
-  animation (the game's sites have room for four). When it's done, the
-  script hears `built <type>` (Engineering's message, the game's spoken
-  announcement). Upgrades (improved and advanced hub and yards, vehicle
-  yard stages) are in the menu once their building stands; they go on it
-  at once, with no placing.
+  resources"). The colony's construction bees build it
+  ([exe.md](exe.md#bees)): they leave the hub and fly to the site's four
+  corners (150 units a tick), up to four to a site, the sites ordered
+  first served first; each bee at work puts in a quarter of the type's
+  pace, as timed in the training missions with four bees
+  ([play-vm-tutorials.md](play-vm-tutorials.md#build-times)), so one bee
+  takes four times as long and a second site waits for bees. Power
+  doesn't enter into it. A site done, its bees go on to one still short
+  of them, or fly home. It is drawn as the recordings show it: an apron
+  (the model pressed flat) for the first 15 % of the work, then the
+  building rising out of it, the bees at work at its corners playing
+  their `manipulate` animation (`fconbee`, `conbee`, `rcb`), and the
+  others flying. When it's done, the script hears `built <type>`
+  (Engineering's message, the game's spoken announcement). Upgrades
+  (improved and advanced hub and yards, vehicle yard stages) are in the
+  menu once their building stands; they go on it at once, with no
+  placing, and the bees build them where it stands. The other sides'
+  colonies build at each type's pace, without bees.
 - **Power:** the game's rules (exe.md#the-economy): generators and the hub
   supply their output a tick at 1.2 efficiency; each building keeps a
   power buffer it refills at up to its intake a tick and draws its use
@@ -125,8 +131,10 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   is warned, once a minute. The title shows supply / asked.
 - **Mining:** a mining station works the nearest ore within three blocks
   of its own, a tonne a take; of every eight takes two are the cell's own
-  ore and one each kind. The bees' carrying (about 2 t a second a mine,
-  measured) feeds the processor, which refines a quarter tonne a tick, in
+  ore and one each kind. The cargo bees shuttle between the working mines
+  and the processor (each mine served in turn, a second at each dock);
+  a mine with no cargo bee sends nothing. Their carrying (about 2 t a
+  second a mine, measured) feeds the processor, which refines a quarter tonne a tick, in
   turn per ore, one for one: dilithium, talgonite, silicon, kelbonite,
   magnesite, dolamide into dilithium, polycomp, thermoconc, trans al,
   nitrium, duranium. When nothing is left in reach the script hears
@@ -346,7 +354,8 @@ built, to be put back at the end so play feels as the game's does:
 | Sky view | 14 blocks, 65° | by eye |
 | First-person view | 0.6 block, 6° | by eye |
 | Spacing of a group's spots | 2500 units | Reluva's |
-| Build time | per type: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md) |
+| Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
+| Bees | fly 1500 units up; a cargo bee docks 1 s; worker bees stay in the hub (their pod shuttles aren't shown) | Reluva's |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
 | Capacity | starts at 50, at most 90; accommodation +5, farms +10 | the executable |

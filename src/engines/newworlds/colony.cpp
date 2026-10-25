@@ -266,9 +266,19 @@ bool ColonyLayout::startWith(const std::vector<ColonyBuilding>& buildings) {
         taken_.push_back(r);
         buildings_.push_back(c);
     }
+    // The colony's level: the ground's most usual height round the hub
+    // (its own tile can be sunken: F1's hub stands in a pit of the ice).
     const Rect hub = taken_.front();
-    hubHeight_ = ground_.heightAt(hub.y * kTile + 2, hub.x * kTile + 2);
-    heightSet_ = !std::isnan(hubHeight_);
+    std::vector<float> heights;
+    for (int y = hub.y - kPad; y < hub.y + hub.h + kPad; ++y)
+        for (int x = hub.x - kPad; x < hub.x + hub.w + kPad; ++x)
+            if (const float h = ground_.heightAt(y * kTile + 2, x * kTile + 2); !std::isnan(h))
+                heights.push_back(h);
+    heightSet_ = !heights.empty();
+    if (heightSet_) {
+        std::nth_element(heights.begin(), heights.begin() + std::ptrdiff_t(heights.size() / 2), heights.end());
+        hubHeight_ = heights[heights.size() / 2];
+    }
     // Its concrete: the flat ground round the hub at the hub's own level
     // (not the sunken tiles beside it).
     for (int y = hub.y - kPad; y < hub.y + hub.h + kPad; ++y)

@@ -37,6 +37,14 @@ constexpr float kPowerLow = 0.75f;
 //   staffed (the panel's 120 %);
 // - the colony's capacity never passes 90.
 constexpr int kCapacityCap = 90;
+// Bees (exe.md#bees): their flying speed (units a tick), the shortest
+// flight, how far a site's spots are from its middle, and the most at a
+// site. A cargo bee's stay at a dock is Reluva's (not found).
+constexpr float kBeeSpeed = 150;
+constexpr int kShortestFlight = 10;
+constexpr float kBeeSpot = 2000;
+constexpr int kBeesASite = 4;
+constexpr int kDockTicks = 20;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
 // x 300 power units; each tick a running yard takes up to 300 from its
 // buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
@@ -743,13 +751,20 @@ bool Economy::mineTake(ColonyStructure& mine) {
 
 void Economy::tick(std::vector<ScriptEvent>& out) {
     clock_ += 1 / kTicksPerSecond;
-    // Construction, at each type's pace.
+    // Construction, at each type's pace (with bees, as many quarters of it
+    // as there are at work).
+    if (beesModelled_)
+        beeTick();
     for (ColonyStructure& s : structures_) {
         if (s.progress >= 1)
             continue;
         const BuildingType* t = buildingType(s.type);
-        s.progress = float(std::min(1.0, s.progress + 1 / (std::max(1.0, t->buildSeconds) * kTicksPerSecond)));
+        const double share = beesModelled_ ? double(beesAt(s.id)) / kBeesASite : 1;
+        s.progress = float(std::min(1.0, s.progress + share / (std::max(1.0, t->buildSeconds) * kTicksPerSecond)));
         if (s.progress >= 1) {
+            for (Bee& b : bees_)
+                if (!b.cargo && b.site == s.id)
+                    b.site = 0, b.working = false;
             s.stored = t->bufferCap;
             capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
             out.push_back({"built", {s.type}});
@@ -826,6 +841,8 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             mineCarry_.push_back({s.id, 0});
             it = mineCarry_.end() - 1;
         }
+        if (beesModelled_ && std::none_of(bees_.begin(), bees_.end(), [&](const Bee& b) { return b.cargo && b.site == s.id; }))
+            continue;
         it->second += kMineTonnesPerSecond / kTicksPerSecond;
         while (it->second >= 1) {
             it->second -= 1;
@@ -863,6 +880,152 @@ void Economy::remove(int id) {
     structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
                                      [&](const ColonyStructure& c) { return c.id == id; }),
                       structures_.end());
+}
+
+void Economy::setBees(int construction, int cargo) {
+    beesModelled_ = true;
+    for (int kind = 0; kind < 2; ++kind) {
+        const int want = kind ? cargo : construction;
+        int have = 0;
+        for (const Bee& b : bees_)
+            have += b.cargo == bool(kind);
+        for (; have < want; ++have) {
+            Bee b;
+            b.cargo = kind;
+            if (const ColonyStructure* h = hub())
+                b.x = h->x, b.y = h->y;
+            bees_.push_back(b);
+        }
+        // Fewer (lost): those at home go first.
+        for (bool atHome : {true, false})
+            for (auto it = bees_.begin(); have > want && it != bees_.end();)
+                if (it->cargo == bool(kind) && it->home == atHome)
+                    it = bees_.erase(it), --have;
+                else
+                    ++it;
+    }
+}
+
+int Economy::beesAt(int site) const {
+    return int(std::count_if(bees_.begin(), bees_.end(),
+                             [&](const Bee& b) { return !b.cargo && b.site == site && b.working; }));
+}
+
+const ColonyStructure* Economy::hub() const {
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "colony-hub" && s.progress >= 1)
+            return &s;
+    return nullptr;
+}
+
+void Economy::fly(Bee& b, float x, float y) {
+    if (const ColonyStructure* h = b.home ? hub() : nullptr)
+        b.x = h->x, b.y = h->y; // out of the hub
+    b.home = false, b.working = false;
+    b.fromX = b.x, b.fromY = b.y, b.toX = x, b.toY = y;
+    b.flown = 0;
+    b.flight = std::max(kShortestFlight, int(std::hypot(x - b.x, y - b.y) / kBeeSpeed));
+    if (x != b.x || y != b.y)
+        b.heading = std::atan2(y - b.y, x - b.x);
+}
+
+// A tick of the bees: flights on, then each idle one given work: a site
+// short of bees, a mine without a cargo bee, or home.
+void Economy::beeTick() {
+    const ColonyStructure* h = hub();
+    auto find = [&](int id) -> const ColonyStructure* {
+        for (const ColonyStructure& s : structures_)
+            if (s.id == id)
+                return &s;
+        return nullptr;
+    };
+    const ColonyStructure* processor = nullptr;
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "resource-processor" && s.progress >= 1)
+            processor = &s;
+    for (Bee& b : bees_) {
+        if (b.home)
+            continue;
+        if (b.dock > 0) {
+            --b.dock;
+            continue;
+        }
+        if (b.flight == 0)
+            continue;
+        // Speeding up and slowing down along the way (the game's curve).
+        const float f = float(++b.flown) / float(b.flight), e = f * f * (3 - 2 * f);
+        b.x = b.fromX + (b.toX - b.fromX) * e, b.y = b.fromY + (b.toY - b.fromY) * e;
+        if (b.flown < b.flight)
+            continue;
+        b.flight = 0;
+        if (b.cargo && b.site) {
+            b.dock = kDockTicks;
+            b.loaded = !b.loaded;
+        } else if (!b.cargo && b.site) {
+            b.working = true;
+        } else if (h && std::hypot(b.x - h->x, b.y - h->y) < 1) {
+            b.home = true;
+        }
+    }
+    // A site gone (or done) lets its bees go.
+    for (Bee& b : bees_)
+        if (!b.cargo && b.site)
+            if (const ColonyStructure* s = find(b.site); !s || s->progress >= 1)
+                b.site = 0, b.working = false;
+    // The construction bees: each site, first ordered first, takes up to
+    // four, at its free corners.
+    for (const ColonyStructure& s : structures_) {
+        if (s.progress >= 1)
+            continue;
+        int at = 0;
+        std::array<bool, kBeesASite> taken{};
+        for (const Bee& b : bees_)
+            if (!b.cargo && b.site == s.id)
+                ++at, taken[size_t(b.spot)] = true;
+        for (Bee& b : bees_) {
+            if (at >= kBeesASite)
+                break;
+            if (b.cargo || b.site)
+                continue;
+            b.site = s.id;
+            b.spot = int(std::find(taken.begin(), taken.end(), false) - taken.begin());
+            taken[size_t(b.spot)] = true;
+            ++at;
+            fly(b, s.x + (b.spot & 1 ? kBeeSpot : -kBeeSpot), s.y + (b.spot & 2 ? kBeeSpot : -kBeeSpot));
+        }
+    }
+    // The cargo bees: each working mine served by one in turn.
+    std::vector<int> mines;
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "mining-station" && s.progress >= 1 && !s.exhausted && processor)
+            mines.push_back(s.id);
+    for (Bee& b : bees_) {
+        if (!b.cargo)
+            continue;
+        if (b.site && std::find(mines.begin(), mines.end(), b.site) == mines.end())
+            b.site = 0, b.loaded = false;
+        if (!b.site && !mines.empty()) {
+            // The mine with fewest bees.
+            int best = 0, fewest = 1 << 30;
+            for (int m : mines) {
+                const int n = int(std::count_if(bees_.begin(), bees_.end(), [&](const Bee& o) { return o.cargo && o.site == m; }));
+                if (n < fewest)
+                    fewest = n, best = m;
+            }
+            b.site = best, b.loaded = false;
+            const ColonyStructure* m = find(best);
+            fly(b, m->x, m->y);
+            continue;
+        }
+        if (b.site && b.flight == 0 && b.dock == 0) {
+            const ColonyStructure* to = b.loaded ? processor : find(b.site);
+            fly(b, to->x, to->y);
+        }
+    }
+    // Idle ones home.
+    for (Bee& b : bees_)
+        if (!b.site && !b.home && b.flight == 0 && b.dock == 0 && h)
+            fly(b, h->x, h->y);
 }
 
 } // namespace reluva::newworlds

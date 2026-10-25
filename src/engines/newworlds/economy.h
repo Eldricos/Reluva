@@ -213,6 +213,33 @@ public:
     // power fill its buffer's (whole for generators and the hub).
     float efficiency(const ColonyStructure& s) const;
 
+    // Bees (exe.md#bees), once set (an AI's colony, and one never told,
+    // builds at each type's pace as before): the colony's construction
+    // bees live in the hub and fly out to a site's four spots, up to four
+    // to a site, the first sites ordered first; each at work puts a
+    // quarter of the type's pace in (so one builds it four times slower
+    // than four, as the training missions' times are with four). A site
+    // done, its bees go on to one still short of them, or home. The cargo
+    // bees shuttle between the working mines and the processor, docking
+    // at each; a mine with none serving it sends nothing. Bees fly
+    // straight, 150 units a tick, a flight at least 10 ticks.
+    void setBees(int construction, int cargo);
+    struct Bee {
+        bool cargo = false;
+        bool home = true;     // in the hub (not drawn)
+        float x = 0, y = 0;   // where it is
+        float heading = 0;
+        int site = 0;         // the site it builds, or the mine it serves (0 none)
+        int spot = 0;         // its corner of the site (0-3)
+        bool working = false; // at its spot, building
+        bool loaded = false;  // a cargo bee on its way to the processor
+        int dock = 0;         // ticks still docked
+        float fromX = 0, fromY = 0, toX = 0, toY = 0;
+        int flown = 0, flight = 0; // ticks: 0 flight when not flying
+    };
+    const std::vector<Bee>& bees() const { return bees_; }
+    int beesAt(int site) const; // construction bees at work on a site
+
     // Moves time on: construction, power, mining and refining. Returns what
     // happened, as the mission scripts' events (built <type>, power-low,
     // short-resources, mine-exhausted at its position).
@@ -229,6 +256,9 @@ private:
     float crewShare(const ColonyStructure& s) const;
     int sideIndex() const;
     bool mineTake(ColonyStructure& mine); // one mining take; false when dry
+    void beeTick();
+    void fly(Bee& b, float x, float y);
+    const ColonyStructure* hub() const;
 
     char side_;
     std::array<int64_t, kMaterials> units_{}; // the stock in the game's units
@@ -253,6 +283,8 @@ private:
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
     bool free_ = false;
+    bool beesModelled_ = false;
+    std::vector<Bee> bees_;
 };
 
 } // namespace reluva::newworlds

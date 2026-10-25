@@ -30,6 +30,7 @@
 #include "engines/newworlds/world.h"
 
 #include <algorithm>
+#include <numeric>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -1345,6 +1346,69 @@ void testTraining() {
     CHECK(!fw.train(0));
 }
 
+// Bees (exe.md#bees): construction bees fly from the hub at 150 units a
+// tick and build a site four to a site, each a quarter of the type's pace;
+// the next site waits for them; done, they fly home. A mine sends ore
+// only while a cargo bee serves it.
+void testBees() {
+    auto built = [](Economy& e, double seconds) {
+        int n = 0;
+        for (double t = 0; t < seconds; t += 0.05)
+            for (const ScriptEvent& x : e.advance(0.05))
+                n += x.kind == "built";
+        return n;
+    };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
+    e.addBuilt("colony-hub", 0, 0);
+    e.setBees(4, 0);
+    CHECK(e.bees().size() == 4 && e.bees()[0].home);
+    // A yard (45 s with four) 15000 off: the bees fly 4.4-5.7 s first.
+    const int yard = e.order("construction-yard", 15000, 0, 0, 0);
+    const int second = e.order("construction-yard", -15000, 0, 0, 0);
+    CHECK(yard && second);
+    CHECK(built(e, 3) == 0 && e.beesAt(yard) == 0);
+    CHECK(built(e, 3) == 0 && e.beesAt(yard) == 4 && e.beesAt(second) == 0);
+    CHECK(built(e, 43) == 0);
+    CHECK(built(e, 2) == 1);
+    // On to the second (30000 away: 9-11 s), all four, its 45 s.
+    CHECK(built(e, 52) == 0 && e.beesAt(second) == 4);
+    CHECK(built(e, 3) == 1);
+    built(e, 8);
+    CHECK(std::all_of(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.home; }));
+    // One bee: four times as long.
+    Economy one('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
+    one.addBuilt("colony-hub", 0, 0);
+    one.setBees(1, 0);
+    CHECK(one.order("construction-yard", 3000, 0, 0, 0)); // 45 s with four
+    CHECK(built(one, 180) == 0 && built(one, 2) == 1);
+    // A mine's ore reaches the processor only while a cargo bee serves it.
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+    ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 30 : 0; };
+    for (int cargo : {0, 1}) {
+        Economy m('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        m.addBuilt("colony-hub", 0, 0);
+        m.addBuilt("construction-yard", 20000, 0);
+        m.addBuilt("resource-processor", 20000, 20000);
+        m.setBees(4, cargo);
+        CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
+        CHECK(built(m, 100) == 1); // 22 s out, 60 s building
+        built(m, 10);
+        const auto stock = m.oreStock();
+        CHECK((std::accumulate(stock.begin(), stock.end(), 0.0f) > 0) == bool(cargo));
+        CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.cargo && !b.home; }) == cargo);
+    }
+    // Without bees nothing goes up.
+    Economy none('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
+    none.addBuilt("colony-hub", 0, 0);
+    none.setBees(0, 0);
+    none.order("power-generator", 3000, 0, 0, 0);
+    CHECK(built(none, 60) == 0);
+}
+
 void testRivalsAndGroups() {
     Terrain t;
     t.width = t.height = 128;
@@ -2043,6 +2107,7 @@ int main() {
     testOrders();
     testRivalsAndGroups();
     testTraining();
+    testBees();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

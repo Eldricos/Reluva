@@ -471,7 +471,7 @@ void MapViewer::setBuildings(const std::vector<Building>& buildings) {
         const float x = float(b.b) / 8 * kBlockSize - (cx * cs - cy * sn);
         const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
         const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
-        buildings_.push_back({{x, y, ground}, angle, &m, b.progress, b.builder});
+        buildings_.push_back({{x, y, ground}, angle, &m, b.progress, b.builder, b.builders});
         const bool across = b.turn % 2 != 0;
         buildingAreas_.push_back({float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize,
                                   (across ? h : w) / 2 + 512, (across ? w : h) / 2 + 512});
@@ -489,9 +489,13 @@ const MapViewer::Motion& MapViewer::motionOf(const std::string& model) {
     return it->second;
 }
 
-void MapViewer::setBuildingProgress(size_t i, float progress) {
+void MapViewer::setBuildingProgress(size_t i, float progress, int builders) {
     if (i < buildings_.size() && buildings_[i].progress != progress) {
         buildings_[i].progress = progress;
+        dirty_ = true;
+    }
+    if (i < buildings_.size() && builders >= 0 && buildings_[i].builders != builders) {
+        buildings_[i].builders = builders;
         dirty_ = true;
     }
 }
@@ -988,9 +992,9 @@ void MapViewer::render() {
         drawModel(*o.model, at, std::cos(o.angle), std::sin(o.angle), nullptr, nullptr, 1, rise);
     }
     // While it goes up, construction bees work on the pad (play-tutorials.md:
-    // "a dark rectangular pad ... with construction bees on it"): two, at
-    // opposite corners facing its middle, each playing its manipulate
-    // animation, half a cycle apart. How many the game sends isn't known.
+    // "a dark rectangular pad ... with construction bees on it"): those at
+    // work (the game's site has four spots), at its corners facing its
+    // middle, each playing its manipulate animation, out of step.
     for (size_t i = 0; i < buildings_.size() && i < buildingAreas_.size(); ++i) {
         const Placed& o = buildings_[i];
         if (o.progress >= 1 || o.builder.empty())
@@ -1000,16 +1004,16 @@ void MapViewer::render() {
         if (!bee.error.empty())
             continue;
         const auto& [bx, by, hw, hh] = buildingAreas_[i];
-        for (int k = 0; k < 2; ++k) {
-            const float sx = k == 0 ? -1.0f : 1.0f;
-            const float x = bx + sx * (hw - 512) * 0.8f, y = by - sx * (hh - 512) * 0.8f;
+        for (int k = 0; k < std::min(o.builders, 4); ++k) {
+            const float sx = k & 1 ? 1.0f : -1.0f, sy = (k == 0 || k == 3) ? 1.0f : -1.0f;
+            const float x = bx + sx * (hw - 512) * 0.8f, y = by + sy * (hh - 512) * 0.8f;
             const Vec at{x, y, groundHeight(x, y)};
             if (cam.toView(at).z < cam.nearZ)
                 continue;
             Pose pose;
             if (!motion.animations.empty()) {
                 const auto& frames = motion.animations[0].frames;
-                const size_t f = size_t(animClockMs_ / kFrameMs) + size_t(k) * frames.size() / 2;
+                const size_t f = size_t(animClockMs_ / kFrameMs) + size_t(k) * frames.size() / 4;
                 pose = framePose(bee.geo, motion.mdl, frames[f % frames.size()]);
             }
             // Facing the middle (the models face along −y; see the units).
@@ -1034,7 +1038,7 @@ void MapViewer::render() {
         const TileModel& m = namedModel(u.model, false);
         if (!m.error.empty())
             continue;
-        const Vec at{u.x, u.y, groundHeight(u.x, u.y)};
+        const Vec at{u.x, u.y, groundHeight(u.x, u.y) + u.lift};
         if (cam.toView(at).z < cam.nearZ)
             continue;
         ++drawnObjects_;

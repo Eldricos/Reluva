@@ -82,7 +82,13 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
                     break;
                 }
     }
-    // (Bees on the hub's spot stay inside; other vehicles there park round it.)
+    // (Bees on the hub's spot stay inside, and the construction and cargo
+    // bees fly out to work; other vehicles there park round it.)
+    std::map<std::string, int> bees;
+    for (const StartPlacement& p : placed)
+        if (const CombatType* ct = combatType(p.type); ct && isBee(*ct) && p.a == hubA && p.b == hubB)
+            ++bees[ct->name];
+    economy_->setBees(bees["construction-bee"], bees["cargo-bee"]);
     std::map<std::pair<int, int>, int> onSpot;
     for (const StartPlacement& p : placed)
         if (const ObjectType* t = objectType(p.type); t && !t->building && *t->model)

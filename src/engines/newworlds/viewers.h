@@ -216,12 +216,14 @@ public:
         int turn = 0;
         float progress = 1; // under construction: 0 just begun, 1 built
         std::string builder; // the construction bee working on it ("geo/fed/fconbee.geo"), or none
+        int builders = 2;    // how many of them are at work (0-4)
     };
     void setBuildings(const std::vector<Building>& buildings);
     // A building's construction moved on (by its index in setBuildings').
     // The recordings show an apron first, then the building rising out of
     // it (play-tutorials.md): here its model flat, then growing upwards.
-    void setBuildingProgress(size_t i, float progress);
+    // builders: how many bees are at work on it now (-1: as they were).
+    void setBuildingProgress(size_t i, float progress, int builders = -1);
     // The hologram of a building being placed (play): its model, tinted
     // green where it can go and red where it can't; model empty for none.
     void setGhost(const std::string& model, int a, int b, bool valid);
@@ -252,6 +254,7 @@ public:
         // raised, in radians, for a model with one.
         float turretYaw = 0, gunPitch = 0;
         float opacity = 1; // below 1 see-through (a cloaked unit)
+        float lift = 0;    // above the ground (a bee in flight)
     };
     void setUnits(std::vector<UnitDraw> units) {
         units_ = std::move(units);
@@ -312,6 +315,7 @@ private:
         const TileModel* model;
         float progress = 1;
         std::string builder;
+        int builders = 2;
     };
     // A model's moving parts: its metamodel, animations and turret.
     struct Motion {

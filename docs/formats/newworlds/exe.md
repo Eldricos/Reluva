@@ -744,6 +744,45 @@ How a side the computer plays builds and makes units:
   buildings, so power, crew and officers set an AI yard's pace as they do
   the player's. Upgrades are always charged, but no order asks for one.
 
+### Bees
+
+- **Where they are.** A side's bees belong to its hub (the vehicle pool's
+  only garages are hubs). A bee docked there is off the map: not drawn,
+  not hit. It's out only with a job, or on its way home. On a human side
+  the vehicle yard builds worker bees when asked for one; construction
+  and cargo bees are never made on demand, the jobs wait for one that's
+  free. All bees have 5 hit points.
+- **Flying.** Bees fly straight (no paths), a timed flight speeding up and
+  slowing down, of distance / speed ticks and at least 10: 150 units a
+  tick for construction and cargo bees, 200 for worker bees. (The paces
+  in the table are for driving units.)
+- **Building.** A site asks for four construction bees; each takes a free
+  spot at its corners (2000 units out each way). The building is put
+  together a piece at a time: its model's four corner sections, each cut
+  into tiles of about 800 by 1200 units, one arm movement (16-17 frames)
+  and a short flight (10 ticks or more) a tile. So there is no time per
+  type: the work is the model's tiles, shared by the bees there, and one
+  bee takes four times as long as four. A bee done with its section moves
+  to one no bee is on; with none left it goes home. Finished, the site
+  lets all four go, home or on to a site waiting for bees. A bee lost on
+  the way is replaced; the work done stays. No power or crew enters into
+  it.
+- **Carrying.** Goods go in cargo pods (types 19, 60 and 79), 80 t the
+  Federation's and 160 t the Klingons' and Romulans'. A mine that holds a
+  pod's worth packs its stock into pods, evenly; it stops while four
+  wait. Every mine, processor and storage facility has a worker bee of
+  its own, which only moves pods between its building and a parking pad
+  beside it. Ore goes to the first processor with room (the list's order,
+  not the nearest), refined goods to a storage facility; a processor
+  packs its refined stock for storage every 32 ticks. A building with
+  more than one pod coming asks for a cargo bee, which carries two pods
+  a trip. Lost bees are asked for again. While the starting colony is
+  set up, pods arrive at once.
+- Not found: the number of tiles each building's model gives (so the
+  build times; the training missions' timings stand in, with four bees),
+  and how long a bee stays docked, so a cargo trip's length (the
+  training missions' 2 t a second per mine stands in).
+
 ### Repairs
 
 Every object's repair runs each tick, in battle as well; only a building
@@ -912,10 +951,10 @@ the NEW WORLDS panel, its class picked by type id:
 
 ## Still open
 
-- How long a path step is (so units' real speeds), and how fast
-  construction bees build.
+- How long a path step is (so units' real speeds), and how many pieces
+  each building's model gives its bees to build.
 - How the 50 ms step and the scripts' sixteenths relate.
-- How fast bees carry ore from the mines.
+- How long bees stay docked (so how fast they carry ore).
 - Placement flags, a third placement phase, the AI order task codes 1,
   2 and 6-8 (read from the orders' names), and the order modes.
 - Which of the posture bits the scan and capture menus test is hostile

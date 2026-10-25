@@ -244,7 +244,7 @@ void MissionViewer::showColony() {
             const ColonyBuilding& c = colony_->buildings()[i];
             // A destroyed one is left as its flattened wreck.
             const bool razed = i < colonyObjects_.size() && colonyObjects_[i] < 0;
-            buildings.push_back({c.model, c.a, c.b, 0, razed ? 0.0f : 1.0f, razed ? std::string() : bee});
+            buildings.push_back({c.model, c.a, c.b, 0, razed ? 0.0f : 1.0f, razed ? std::string() : bee, 0});
         }
     // The other sides' buildings.
     // The other sides' buildings (an AI colony's sites going up with its
@@ -371,6 +371,9 @@ void MissionViewer::startPlay() {
             ++housed_;
             ++beesHoused_[combatType(p.type)->name];
         }
+    // The colony's construction and cargo bees: they fly out to work.
+    if (economy_)
+        economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
     // Bees placed on the hub itself stay inside it (its panel counts
     // them); other vehicles there park round it, as the game spreads them.
     for (const StartPlacement& p : startPlacements(level.shortName, side))
@@ -499,6 +502,7 @@ void MissionViewer::rollOut() {
             ++housed_;
             if (const CombatType* ct = combatType(type))
                 ++beesHoused_[ct->name];
+            economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
             continue;
         }
         float x = map_.worldWidth() / 2, y = map_.worldHeight() / 2;
@@ -780,6 +784,24 @@ void MissionViewer::showUnits() {
                                                      : 1.0f;
                 draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, opacity});
             }
+    // The colony's bees out of the hub: flying (rising off and settling
+    // back down), or docked at a mine or the processor; those at work on a
+    // site the map draws at its corners.
+    if (economy_) {
+        constexpr float kBeeHeight = 1500;
+        const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+        const char* conBee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
+        const char* cargoBee = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rwbc.geo" : "geo/fed/fcarb.geo";
+        for (const Economy::Bee& b : economy_->bees()) {
+            if (b.home || b.working)
+                continue;
+            const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
+            const float lift = b.flight > 0 ? kBeeHeight * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
+            MapViewer::UnitDraw d{b.cargo ? cargoBee : conBee, b.x, b.y, b.heading};
+            d.lift = lift;
+            draw.push_back(d);
+        }
+    }
     map_.setUnits(std::move(draw));
 }
 
@@ -873,7 +895,7 @@ void MissionViewer::showProgress() {
     for (size_t i = 0; i < structureIds_.size(); ++i)
         for (const ColonyStructure& c : all)
             if (c.id == structureIds_[i]) {
-                map_.setBuildingProgress(i, c.progress);
+                map_.setBuildingProgress(i, c.progress, economy_->beesAt(c.id));
                 if (Unit* u = world_ && i < colonyObjects_.size() && colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr) {
                     u->built = c.progress;
                     u->efficiency = economy_->efficiency(c);

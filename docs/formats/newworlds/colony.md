@@ -225,7 +225,10 @@ layout:
   each over as many tiles as its model needs with a small gap, centred on
   its model's middle (some models' origin is at a corner: `rch`, `rms`).
 - A tile is free if nothing stands on it, its ground is flat, near the
-  hub's height and on the map, and its block has no deposit.
+  colony's level and on the map, and its block has no deposit. The level
+  is the ground's middle height round the hub, not under it: F1's hub
+  stands in one of the ice's sunken squares, a level no other building
+  could reach.
 - The hub goes within six tiles of the site, where the most free tiles
   are around it, less a little for each tile it moves.
 - Each building the mission's script builds (its `built` events, as **X**
