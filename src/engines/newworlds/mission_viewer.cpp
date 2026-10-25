@@ -706,7 +706,8 @@ void MissionViewer::showUnits() {
         const char* cargoBee = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rwbc.geo" : "geo/fed/fcarb.geo";
         const char* workBee = side == 'K' ? "geo/kln/kwb.geo" : side == 'R' ? "geo/rom/rwb.geo" : "geo/fed/workbee.geo";
         for (const Economy::Bee& b : economy_->bees()) {
-            if (b.home || b.working)
+            // (A worker bee waiting at its building is docked inside it.)
+            if (b.home || b.working || (b.worker && b.flight == 0 && b.pods.empty()))
                 continue;
             const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
             const float lift = b.flight > 0 ? kBeeHeight * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
