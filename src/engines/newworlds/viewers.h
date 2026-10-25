@@ -251,6 +251,7 @@ public:
         // Its turret turned from straight ahead (anticlockwise) and its gun
         // raised, in radians, for a model with one.
         float turretYaw = 0, gunPitch = 0;
+        float opacity = 1; // below 1 see-through (a cloaked unit)
     };
     void setUnits(std::vector<UnitDraw> units) {
         units_ = std::move(units);
@@ -631,6 +632,25 @@ private:
     StringTable table_;
     std::vector<BriefingStep> script_;
     std::map<char, Texture> emblems_; // 640 x 480, by side
+    std::map<char, Texture> wins_, losses_; // the mission won and lost screens, by side
+    // A mission played through as the game runs it (G): a loading box, the
+    // briefing, a loading box, play; once won or lost, the debriefing box,
+    // then the won or lost screen with the MISSION REPORT and CONTINUE.
+    enum class Flow { None, Loading, Briefing, Starting, Playing, Debriefing, Report };
+    Flow flow_ = Flow::None;
+    static constexpr uint64_t kLoadingMs = 3000, kStartingMs = 2500; // Reluva's: the recordings' boxes show 3-10 s
+    static constexpr uint64_t kFlowUnstarted = ~uint64_t(0);
+    uint64_t flowStartMs_ = 0;
+    bool flowWon_ = false;
+    std::array<int, 4> continue_{}; // the CONTINUE button
+    bool flowScreen() const {
+        return flow_ == Flow::Loading || flow_ == Flow::Starting || flow_ == Flow::Debriefing || flow_ == Flow::Report;
+    }
+    void startFlow();
+    void endFlow();
+    void drawFlow();
+    std::string levelLabel() const;
+    bool loadScreen(const std::string& prefix, Texture& out) const;
     GeoModel galaxy_;
     std::vector<Texture> galaxyTextures_; // in the order its faces number them
     std::vector<std::string> systemNames_; // geo/solsys/'s systems

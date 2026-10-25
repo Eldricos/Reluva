@@ -825,7 +825,8 @@ void MapViewer::render() {
     // Draw a model turned by an angle with cosine c and sine s (anticlockwise)
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
-                         const uint8_t* tint = nullptr, float scale = 1, float rise = 1, const Pose* pose = nullptr) {
+                         const uint8_t* tint = nullptr, float scale = 1, float rise = 1, const Pose* pose = nullptr,
+                         float opacity = 1) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
@@ -912,12 +913,13 @@ void MapViewer::render() {
                         return a >= 0.5f;
                     }
                 }
+                // A see-through model (a cloaked unit) over what's behind it.
                 for (int i = 0; i < 3; ++i) {
                     const float base = tint ? (float(col[i]) + float(tint[i])) / 2 : float(col[i]);
-                    out[i] = uint8_t(std::min(255.0f, base * intensity));
+                    out[i] = uint8_t(std::min(255.0f, base * intensity * opacity + float(out[i]) * (1 - opacity)));
                 }
                 out[3] = 255;
-                return true;
+                return opacity >= 1;
             };
             for (size_t i = 1; i + 1 < projected.size(); ++i)
                 raster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);
@@ -1041,7 +1043,7 @@ void MapViewer::render() {
         if (u.turretYaw != 0 || u.gunPitch != 0)
             if (const Motion& motion = motionOf(u.model); motion.turret)
                 pose = turretPose(m.geo, motion.mdl, u.turretYaw, u.gunPitch);
-        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose);
+        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose, u.opacity);
     }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there

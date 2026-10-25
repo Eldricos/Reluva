@@ -767,8 +767,16 @@ void MissionViewer::showUnits() {
     std::vector<MapViewer::UnitDraw> draw;
     if (world_)
         for (const Unit& u : world_->units())
-            if (!u.building && !u.kind.model.empty() && visible(u))
-                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.firing ? u.turretYaw : 0, 0});
+            if (!u.building && !u.kind.model.empty() && visible(u)) {
+                // A cloaking unit fades over its 63 ticks; the side's own,
+                // cloaked, stays faintly seen, as the game draws them.
+                constexpr float kCloaked = 0.35f;
+                const float faded = 1 - (1 - kCloaked) * float(63 - u.fading) / 63;
+                const float opacity = u.cloaked ? kCloaked
+                                      : u.fading > 0 ? (u.cloaking ? faded : 1 - (1 - kCloaked) * float(u.fading) / 63)
+                                                     : 1.0f;
+                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.firing ? u.turretYaw : 0, 0, opacity});
+            }
     map_.setUnits(std::move(draw));
 }
 
@@ -1006,6 +1014,14 @@ bool MissionViewer::playEvent(const Event& ev) {
             pendingOrder_ = pendingOrder_ == char(ev.key) ? 0 : char(ev.key);
             break;
         }
+        // Ctrl+X: the script's walkthrough a step on (a testing aid, as X
+        // is on the missions page).
+        if (ev.key == 'x' && ctrl && run_) {
+            if (walk_.empty())
+                walk_ = run_->walkthrough(), walkPos_ = 0;
+            stepScript();
+            break;
+        }
         if (ev.key == 'y' && !world_->selection().empty()) {
             rallySelected();
             break;
@@ -1225,8 +1241,31 @@ bool MissionViewer::playEvent(const Event& ev) {
 void MissionViewer::handleEvent(const Event& ev) {
     if (missions_.empty())
         return;
+    // A mission's run: CONTINUE (or Return) after the report ends it;
+    // Escape leaves it at any stage.
+    if (flow_ != Flow::None) {
+        const bool key = ev.type == EventType::KeyDown;
+        if (key && ev.key == key::Escape) {
+            endFlow();
+            return;
+        }
+        if (flow_ == Flow::Report) {
+            const bool onContinue = ev.type == EventType::MouseDown && ev.button == MouseButton::Left &&
+                                    ev.mouseX >= continue_[0] && ev.mouseY >= continue_[1] &&
+                                    ev.mouseX < continue_[0] + continue_[2] && ev.mouseY < continue_[1] + continue_[3];
+            if (onContinue || (key && ev.key == key::Return))
+                endFlow();
+            return;
+        }
+        if (flowScreen())
+            return;
+    }
     if (playing_ && playEvent(ev))
         return;
+    if (ev.type == EventType::KeyDown && ev.key == 'g') {
+        startFlow();
+        return;
+    }
     if (ev.type == EventType::KeyDown && ev.key == key::F1 + 2) {
         startPlay();
         return;
@@ -1326,7 +1365,29 @@ void MissionViewer::update(uint64_t nowMs) {
         map_.turn(float(nowMs - lastTurnMs_) * kBriefingTurn);
         lastTurnMs_ = nowMs;
     }
-    if (playing_ && world_) {
+    // The mission's run (G): each stage after its time.
+    {
+        if (flowStartMs_ == kFlowUnstarted)
+            flowStartMs_ = nowMs;
+        const uint64_t since = nowMs - flowStartMs_;
+        if (flow_ == Flow::Loading && since >= kLoadingMs) {
+            if (!script_.empty()) {
+                flow_ = Flow::Briefing;
+                startBriefing();
+            } else {
+                flow_ = Flow::Starting;
+                flowStartMs_ = nowMs;
+            }
+        } else if (flow_ == Flow::Starting && since >= kStartingMs) {
+            flow_ = Flow::Playing;
+            startPlay();
+        } else if (flow_ == Flow::Debriefing && since >= kLoadingMs) {
+            flow_ = Flow::Report;
+        }
+        if (flowScreen())
+            dirty_ = true;
+    }
+    if (playing_ && world_ && flow_ != Flow::Debriefing && flow_ != Flow::Report) {
         const double dt = double(nowMs - lastTickMs_) / 1000.0;
         lastTickMs_ = nowMs;
         std::vector<ScriptEvent> happened;
@@ -1422,7 +1483,10 @@ void MissionViewer::update(uint64_t nowMs) {
     }
     if (mapInView())
         map_.update(nowMs);
-    else if (dirty_) {
+    else if (dirty_ && flowScreen()) {
+        drawFlow();
+        dirty_ = false;
+    } else if (dirty_) {
         if (running_)
             drawBackdrop(script_[size_t(step_)].view);
         else
@@ -2416,10 +2480,16 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
     for (const MissionRun::Output& o : out) {
         if (o.kind == MissionRun::Output::Message)
             log_.push_back({o.sender, o.text});
-        else if (o.kind == MissionRun::Output::Won)
-            walkNote_ += "; mission won";
-        else if (o.kind == MissionRun::Output::Lost)
-            walkNote_ += "; mission lost";
+        else if (o.kind == MissionRun::Output::Won || o.kind == MissionRun::Output::Lost) {
+            walkNote_ += o.kind == MissionRun::Output::Won ? "; mission won" : "; mission lost";
+            // In a mission's run, the debriefing follows.
+            if (flow_ == Flow::Playing) {
+                flow_ = Flow::Debriefing;
+                flowWon_ = o.kind == MissionRun::Output::Won;
+                flowStartMs_ = nowMs_;
+                dirty_ = true;
+            }
+        }
         else if (o.kind == MissionRun::Output::Failing)
             walkNote_ += "; mission failing";
         else if (o.kind == MissionRun::Output::Ai && ai_)
@@ -2459,6 +2529,11 @@ void MissionViewer::stopBriefing() {
     if (!running_)
         return;
     running_ = false;
+    // In a mission's run, play follows (after its loading box).
+    if (flow_ == Flow::Briefing) {
+        flow_ = Flow::Starting;
+        flowStartMs_ = nowMs_;
+    }
     stopClip();
     map_.setColouring(savedColouring_);
     map_.resetCamera();
@@ -2492,7 +2567,7 @@ void MissionViewer::startStep(int step) {
     updateTitle();
 }
 
-bool MissionViewer::mapInView() const { return hasMap_ && (!running_ || stepOnMap_); }
+bool MissionViewer::mapInView() const { return hasMap_ && !flowScreen() && (!running_ || stepOnMap_); }
 
 namespace {
 
@@ -2508,27 +2583,183 @@ bool loadTexture(const Archives& archives, const std::string& name, Texture& out
 
 } // namespace
 
+void MissionViewer::startFlow() {
+    stopBriefing();
+    stopPlay();
+    flow_ = Flow::Loading;
+    flowStartMs_ = kFlowUnstarted; // (timed from the next update: the clock may be stale)
+    dirty_ = true;
+}
+
+void MissionViewer::endFlow() {
+    const Flow was = flow_;
+    flow_ = Flow::None;
+    if (was == Flow::Briefing)
+        stopBriefing();
+    stopPlay();
+    dirty_ = true;
+    redraw();
+    updateTitle();
+}
+
+// The loading boxes' heading: the mission as the game labels it
+// ("FEDERATION LEVEL 01", "JOINT LEVEL 03", the tutorials, the bonus
+// missions).
+std::string MissionViewer::levelLabel() const {
+    const std::string& m = missions_[size_t(current_)].shortName;
+    const int n = std::atoi(m.c_str() + 1);
+    auto two = [](int v) { return (v < 10 ? "0" : "") + std::to_string(v); };
+    switch (m.empty() ? ' ' : m[0]) {
+    case 'F': return "FEDERATION LEVEL " + two(n);
+    case 'K': return "KLINGON LEVEL " + two(n);
+    case 'R': return "ROMULAN LEVEL " + two(n);
+    case 'J': return "JOINT LEVEL " + two(n);
+    case 'C':
+        if (n >= 9 && n <= 11)
+            return std::string("BONUS ") + (n == 9 ? "FEDERATION" : n == 10 ? "KLINGON" : "ROMULAN") + " MISSION";
+        return "TUTORIAL";
+    default: return missions_[size_t(current_)].title;
+    }
+}
+
+// The run's screens: the loading boxes over the three emblems (with the
+// mission's label, what's being readied and how far it has got), and the
+// end: the side's won or lost screen with the MISSION REPORT (each
+// objective complete or not) and CONTINUE.
+void MissionViewer::drawFlow() {
+    const Level& level = missions_[size_t(current_)];
+    const char side = missionSides(level.shortName)[size_t(side_)];
+    if (uiSide_ != side) {
+        uiSide_ = side;
+        ui_ = GameUi{};
+        ui_.load(archives_, side);
+    }
+    for (int y = 0; y < screen_.h; ++y) {
+        uint8_t* row = screen_.row(y);
+        for (int x = 0; x < screen_.w; ++x, row += 4)
+            row[0] = row[1] = row[2] = 0, row[3] = 255;
+    }
+    auto blit = [&](const Texture& t, int x0, int y0, int w, int h) {
+        for (int y = 0; y < h; ++y) {
+            if (y0 + y < 0 || y0 + y >= screen_.h)
+                continue;
+            uint8_t* row = screen_.row(y0 + y);
+            const int sy = y * t.height / h;
+            for (int x = 0; x < w; ++x) {
+                if (x0 + x < 0 || x0 + x >= screen_.w)
+                    continue;
+                const uint8_t* p = &t.rgba[(size_t(sy) * size_t(t.width) + size_t(x * t.width / w)) * 4];
+                uint8_t* o = row + (x0 + x) * 4;
+                o[0] = p[0], o[1] = p[1], o[2] = p[2];
+            }
+        }
+    };
+    if (!ui_.loaded()) {
+        drawText(kPanelMargin, kPanelMargin, "no GUI archive for this side", kNoteColor);
+        return;
+    }
+    const int lh = ui_.smallHeight();
+    if (flow_ == Flow::Report) {
+        const auto& screens = flowWon_ ? wins_ : losses_;
+        if (auto it = screens.find(side); it != screens.end())
+            blit(it->second, 0, 0, screen_.w, screen_.h);
+        else if (auto e = emblems_.find(side); e != emblems_.end())
+            blit(e->second, 0, 0, screen_.w, screen_.h);
+        // MISSION REPORT, right of centre: the outcome, then each objective.
+        std::vector<std::pair<std::string, Color>> lines;
+        lines.push_back({flowWon_ ? "MISSION ACCOMPLISHED" : "MISSION FAILED", ui_.brightColor()});
+        const int w = std::min(300, screen_.w / 2 - 20);
+        if (const MissionScript* script = findMissionScript(level.shortName, side); script && run_)
+            for (const MissionScript::Objective& o : script->objectives) {
+                const MissionRun::State st = run_->objectiveState(o.id);
+                if (st == MissionRun::State::Hidden)
+                    continue;
+                const std::string* t = table_.find(o.id);
+                const std::string line = "MISSION OBJECTIVE: " + (t ? *t : std::to_string(o.id)) +
+                                         (st == MissionRun::State::Complete ? " - COMPLETE" : " - INCOMPLETE");
+                for (const std::string& l : ui_.wrapSmall(line, w - 24))
+                    lines.push_back({l, st == MissionRun::State::Complete ? ui_.brightColor() : ui_.textColor()});
+            }
+        const int h = 30 + int(lines.size()) * lh + lh + 16;
+        const int x = std::min(screen_.w / 2 + 10, screen_.w - w - 8), y = (screen_.h - h) / 2;
+        ui_.drawPanel(screen_, x, y, w, h, "MISSION REPORT");
+        for (size_t i = 0; i < lines.size(); ++i)
+            ui_.drawSmall(screen_, x + 12, y + 15 + int(i) * lh, lines[i].first, lines[i].second);
+        // CONTINUE, bottom right.
+        const std::string label = "CONTINUE";
+        const int bw = ui_.smallWidth(label) + 16, bh = lh + 8;
+        const int bx = screen_.w - bw - 16, by = screen_.h - bh - 12;
+        for (int yy = by; yy < by + bh; ++yy) {
+            uint8_t* row = screen_.row(yy);
+            for (int xx = bx; xx < bx + bw; ++xx) {
+                uint8_t* o = row + xx * 4;
+                const bool edge = yy == by || yy == by + bh - 1 || xx == bx || xx == bx + bw - 1;
+                const Color c = edge ? ui_.textColor() : Color{10, 20, 40};
+                o[0] = c.r, o[1] = c.g, o[2] = c.b;
+            }
+        }
+        ui_.drawSmall(screen_, bx + 8, by + 4, label, ui_.brightColor());
+        continue_ = {bx, by, bw, bh};
+        return;
+    }
+    // The loading boxes: the three emblems, and a box with the lines.
+    const int ew = screen_.w / 4, eh = ew * 3 / 4, gap = screen_.w / 16;
+    const int ex = (screen_.w - 3 * ew - 2 * gap) / 2, ey = screen_.h / 6;
+    int k = 0;
+    for (char e : {'F', 'K', 'R'}) {
+        if (auto it = emblems_.find(e); it != emblems_.end())
+            blit(it->second, ex + k * (ew + gap), ey, ew, eh);
+        ++k;
+    }
+    const uint64_t length = flow_ == Flow::Starting ? kStartingMs : kLoadingMs;
+    const uint64_t since = flowStartMs_ == kFlowUnstarted || nowMs_ < flowStartMs_ ? 0 : nowMs_ - flowStartMs_;
+    const int done = int(std::min<uint64_t>(100, since * 100 / std::max<uint64_t>(1, length)));
+    std::vector<std::string> lines;
+    if (flow_ == Flow::Debriefing)
+        lines = {"PREPARING THE DEBRIEFING", levelLabel(), "COLLECTING THE OFFICERS' REPORTS"};
+    else
+        lines = {"STARTING COLONY SYSTEMS", levelLabel(), flow_ == Flow::Loading ? "READYING THE BRIEFING" : "READYING THE MAP",
+                 "LOADING COMMAND ROUTINES", "BRINGING THE OFFICERS ON STATION"};
+    lines.push_back("DONE " + std::to_string(done) + "%");
+    const int w = std::max(240, screen_.w / 3), h = 30 + int(lines.size()) * lh;
+    const int x = (screen_.w - w) / 2, y = ey + eh + screen_.h / 12;
+    ui_.drawPanel(screen_, x, y, w, h, flow_ == Flow::Debriefing ? "DEBRIEFING" : "LOADING");
+    for (size_t i = 0; i < lines.size(); ++i)
+        ui_.drawSmall(screen_, x + 12, y + 15 + int(i) * lh, lines[i], i == 1 ? ui_.brightColor() : ui_.textColor());
+}
+
+bool MissionViewer::loadScreen(const std::string& prefix, Texture& screen) const {
+    screen = Texture{};
+    screen.width = 640;
+    screen.height = 480;
+    screen.rgba.assign(size_t(640) * 480 * 4, 0);
+    for (int t = 0; t < 6; ++t) {
+        Texture tile;
+        if (!loadTexture(archives_, prefix + std::to_string(t + 1) + ".lbp", tile))
+            return false;
+        const int x0 = (t % 3) * 256, y0 = (t / 3) * 256;
+        for (int y = 0; y < tile.height && y0 + y < 480; ++y)
+            for (int x = 0; x < tile.width && x0 + x < 640; ++x)
+                std::copy_n(&tile.rgba[(size_t(y) * size_t(tile.width) + size_t(x)) * 4], 4,
+                            &screen.rgba[(size_t(y0 + y) * 640 + size_t(x0 + x)) * 4]);
+    }
+    return true;
+}
+
 void MissionViewer::loadBriefingArt() {
     // The emblem screens are six tiles, three across and two down:
     // 256 + 256 + 128 by 256 + 224, the 640 x 480 screen.
+    // The won and lost screens are cut the same way (f_win01-06, ...).
     const std::pair<char, const char*> sets[] = {{'F', "lbp/gui/ufp00"}, {'K', "lbp/gui/kliemp0"}, {'R', "lbp/gui/romemp0"}};
     for (const auto& [side, prefix] : sets) {
+        const char s = char(std::tolower(static_cast<unsigned char>(side)));
         Texture screen;
-        screen.width = 640;
-        screen.height = 480;
-        screen.rgba.assign(size_t(640) * 480 * 4, 0);
-        bool ok = true;
-        for (int t = 0; t < 6 && ok; ++t) {
-            Texture tile;
-            ok = loadTexture(archives_, prefix + std::to_string(t + 1) + ".lbp", tile);
-            const int x0 = (t % 3) * 256, y0 = (t / 3) * 256;
-            for (int y = 0; ok && y < tile.height && y0 + y < 480; ++y)
-                for (int x = 0; x < tile.width && x0 + x < 640; ++x)
-                    std::copy_n(&tile.rgba[(size_t(y) * size_t(tile.width) + size_t(x)) * 4], 4,
-                                &screen.rgba[(size_t(y0 + y) * 640 + size_t(x0 + x)) * 4]);
-        }
-        if (ok)
+        if (loadScreen(prefix, screen))
             emblems_[side] = std::move(screen);
+        if (loadScreen(std::string("lbp/gui/") + s + "_win0", screen))
+            wins_[side] = std::move(screen);
+        if (loadScreen(std::string("lbp/gui/") + s + "_lose0", screen))
+            losses_[side] = std::move(screen);
     }
     // The galaxy: a slab of star field round three flat layers (blue arm,
     // red ribbon, stars), numbering tabras01-04 in name order.

@@ -54,6 +54,8 @@ As the first tutorial teaches them:
 | Tab | the full-screen Tricorder, units marked |
 | I | the interface on/off |
 | F3 or Escape | stops playing (Escape first closes the menu or hologram) |
+| G (missions page) | plays the mission through as the game runs it: a loading box over the three emblems, the briefing (Backspace skips it), a second loading box, play; once won or lost, the debriefing box, then the won or lost screen with the MISSION REPORT; CONTINUE (or Return) back to the page. Escape leaves at any point. F3 still starts play straight away |
+| Ctrl + X (playing) | the script's walkthrough a step on (a testing aid) |
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
@@ -192,6 +194,15 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   COVERAGE; storage and the construction yard the stock; the resource
   processor its raw ores. The game's buttons (BUILD, DEMOLISH, the hub's
   overview and roster) are keys here or not yet made.
+- **A mission played through** (G): the loading box (the three emblems;
+  the mission's label as the game gives it, FEDERATION LEVEL 01, JOINT
+  LEVEL 03, TUTORIAL, BONUS ROMULAN MISSION; lines for the briefing,
+  command routines and officers; the share done), the briefing, a
+  loading box, play; won or lost, the debriefing box, then the side's won
+  or lost screen (`f_win`, `f_lose`, ...) with the MISSION REPORT: each
+  objective COMPLETE or INCOMPLETE, and CONTINUE.
+- **Cloaked units** of the player's own side are drawn see-through, and
+  every cloaking unit fades in and out over its fades.
 - **The officers** (the hub's STAFF): a card each, with a portrait (the
   section's), rank and name, section (Engineering, Security, Medical,
   Science, Operations) and skill (BASIC 0.25, SKILLED 0.5, HIGHLY
@@ -345,7 +356,9 @@ built, to be put back at the end so play feels as the game's does:
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
-| Your own cloaked units | drawn as usual | the game draws them see-through |
+| Your own cloaked units | drawn at 35 % (fading over the 63-tick fades) | the game draws them see-through; how much isn't known |
+| The loading boxes | 3 s (2.5 s before play); Reluva's own wording | the recordings show them 3-10 s; their lines are the game's text, not copied |
+| The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
 | Officers' ranks | Ens. below SKILLED, Lt. above | C8's three officers |
