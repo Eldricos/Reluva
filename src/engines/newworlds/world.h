@@ -110,8 +110,26 @@ struct Unit {
 
 // What combat did in a step: a shot (from, to, its ends) or something
 // destroyed (a copy of it as it was).
+// A shot on its way (exe.md#sides-and-combat): a phaser pulse running out
+// from its muzzle, a disruptor bolt, or a shell on its arc. It hits the
+// first object of another side its path crosses, or nothing.
+struct Projectile {
+    int from = 0, fromSlot = 0;
+    WeaponKind kind = WeaponKind::None;
+    float damage = 0;
+    float x = 0, y = 0, z = 0;    // where it is (z: a shell's height)
+    float px = 0, py = 0, pz = 0; // where it was a tick ago
+    float dx = 0, dy = 0;         // its way (beams and bolts)
+    float vx = 0, vy = 0, vz = 0; // a shell's speed, units a tick
+    float speed = 0, range = 0;   // beams and bolts: units a tick, how far it goes
+    float ox = 0, oy = 0;         // a pulse's muzzle, as the turret was last
+    int age = 0;                  // ticks
+};
+
 struct WorldEvent {
-    enum Kind { Shot, Destroyed } kind = Shot;
+    // Shot: fired (from, to: its target, the line to where it was aimed);
+    // Hit: a projectile struck (to: what it hit, at x1, y1); Destroyed.
+    enum Kind { Shot, Hit, Destroyed } kind = Shot;
     int from = 0, to = 0;
     int fromSlot = 0, toSlot = 0;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
@@ -126,6 +144,7 @@ public:
     const Terrain& terrain() const { return terrain_; }
     bool passable(int tx, int ty) const;
     int tick() const { return tick_; } // combat ticks so far
+    const std::vector<Projectile>& projectiles() const { return projectiles_; }
     // Whether a unit can step from one tile to a neighbour (8 ways; a
     // diagonal needs both tiles beside it open).
     bool canStep(int tx, int ty, int dx, int dy) const;
@@ -189,11 +208,17 @@ public:
     // A shooter's best security skill (its officers'; 0 none): its shots
     // do (skill + 1) times their damage, artillery's excepted.
     void setMarksmanship(std::function<float(const Unit& shooter)> skill) { marksmanship_ = std::move(skill); }
+    // A defensive turret's power for its shots (exe.md#sides-and-combat):
+    // 300 a fire, taken from its buffer; false if it hasn't that much
+    // (then it doesn't fire). Vehicles and the natives' guns need none.
+    void setShotPower(std::function<bool(const Unit& turret, float power)> pay) { shotPower_ = std::move(pay); }
 
 private:
     int tileOf(float v) const { return int(v / kTile); }
     void combatTick();
     void fire(Unit& u, Unit& t);
+    void flyProjectiles();
+    float groundAt(float x, float y) const;
     bool turnTurret(Unit& u, float want);
     void protectTick(Unit& u);
     // Whom a unit fires at unprovoked: those its side is hostile to (and,
@@ -214,6 +239,8 @@ private:
     std::vector<WorldEvent> events_;
     std::function<float(const Unit&, float)> damage_;
     std::function<float(const Unit&)> marksmanship_;
+    std::vector<Projectile> projectiles_;
+    std::function<bool(const Unit&, float)> shotPower_;
     double tickClock_ = 0;
     int tick_ = 0;
 

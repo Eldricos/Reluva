@@ -68,6 +68,9 @@ public:
     void setGround(ColonyMap ground) { ground_ = std::move(ground); }
     // An AI colony's economy; nullptr for the player's slot and natives.
     const Economy* colony(int slot) const;
+    // A defensive turret's shot paid for from its colony's power (true if
+    // it has no colony to pay).
+    bool payShot(const Unit& turret, float power);
     // A script's ai action: "<order>..." or "abort <order>...", for the
     // side named ("klingon", "metar"). False if the mission lacks any of them.
     bool order(const std::string& side, const std::string& text);

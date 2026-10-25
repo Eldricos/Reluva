@@ -174,7 +174,16 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   figures: hit points (the player's own times 1.2 for the Federation, 1.3
   for the Romulans), weapon damage, range and reload; a burst weapon fires
   its four pulses a tick apart and reloads after the last, artillery a
-  shell (reaching 36850 at most). A shot does its damage times the
+  shell (reaching 36850 at most). Every shot is a projectile
+  ([exe.md](exe.md#vehicles-and-turrets)): a phaser pulse running out
+  from its muzzle, a disruptor bolt at 2700 units a tick, a shell on its
+  low arc (350 a tick, falling 3 a tick each tick), aimed where a moving
+  target will be; it hurts the first object of another side its path
+  crosses (no friendly fire), or nothing if it reaches its range or the
+  ground, so shots can miss, and a nearer enemy in the way takes them. A
+  defensive turret pays 300 of its power buffer a shot (a burst's four
+  pulses and its reload, 1500): with its colony short of power it falls
+  silent; vehicles and the natives' guns need none. A shot does its damage times the
   shooter's security skill + 1 (artillery's as it is). An armed unit or
   turret looks round every 8-11 ticks for the nearest enemy in range,
   its turret meanwhile following the nearest in its reach; it fires only
@@ -422,7 +431,10 @@ kept apart from the game's behaviour:
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 | Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
-| Shots | hit at once; never miss; no power taken | the game's are projectiles that fly and can miss, and each takes 300 units of the shooter's power |
+| A phaser pulse's speed | 2500 units a tick | the game's is its beam model's length a tick (not measured) |
+| What a shot can hit | buildings within 6000 of its path, vehicles within 1000; a falling shell what it's no higher than (4000, 1500) | the game's uses each model's radius |
+| Bees and unarmed APCs | hit like anything else | the game's hit test skips some flag bits that, read as classes, would be them; but bees are killed in the game, so it isn't applied |
+| A pulse's way | fixed when fired, from the turret as it moves | the game's turns with the turret |
 | Turret arcs | every turret turns all round | the executable's yaw and pitch limits (some APCs' 60° or 90° each way) |
 | Reach on a building | 6000 units past its middle | Reluva's |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |

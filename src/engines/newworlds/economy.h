@@ -177,6 +177,9 @@ public:
     // (built, not the hub or a storage facility, not already evacuating);
     // the order: half its type's cost back at once (upgrades not), its
     // crew sent out. Once it's empty (evacuated()), it's destroyed.
+    // A defensive turret's shot: power taken from its buffer, if it holds
+    // that much (exe.md#sides-and-combat); false, and nothing taken, if not.
+    bool spend(int structure, float power);
     bool razable(int structure) const;
     bool raze(int structure);
     bool evacuated(int structure) const;

@@ -1122,6 +1122,17 @@ void Economy::beeTick() {
             fly(b, h->x, h->y);
 }
 
+bool Economy::spend(int structure, float power) {
+    for (ColonyStructure& s : structures_)
+        if (s.id == structure) {
+            if (s.progress < 1 || s.stored < power)
+                return false;
+            s.stored -= power;
+            return true;
+        }
+    return true; // (not the economy's)
+}
+
 bool Economy::razable(int structure) const {
     for (const ColonyStructure& s : structures_)
         if (s.id == structure)

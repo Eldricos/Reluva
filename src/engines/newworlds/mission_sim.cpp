@@ -121,6 +121,13 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
     world_->setDamage([this](const Unit& target, float damage) {
         return shieldedDamage(target, damage, fog_.get(), target.slot == player_ ? fieldWork_->skill(target.id, 2) : 0);
     });
+    world_->setShotPower([this](const Unit& turret, float power) {
+        if (turret.slot == player_) {
+            auto it = structureOf_.find(turret.id);
+            return it == structureOf_.end() || economy_->spend(it->second, power);
+        }
+        return ai_->payShot(turret, power);
+    });
     world_->setMarksmanship(
         [this](const Unit& shooter) { return shooter.slot == player_ ? fieldWork_->skill(shooter.id, 2) : 0.0f; });
 

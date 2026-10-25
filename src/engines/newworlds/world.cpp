@@ -26,6 +26,28 @@ constexpr float kBuildingReach = 6000;
 constexpr float kTurretPush = 128.0f / 65536 * 2 * 3.14159265f;
 constexpr int kRescan = 8;
 constexpr float kShellReach = 36850;
+// A defensive turret's power a fire (exe.md#sides-and-combat), and which
+// types pay it: the empires' defensive weapons and artillery (and their
+// copies for slots 3-5).
+constexpr float kShotPower = 300;
+bool paysForShots(int type) {
+    for (int t : {54, 80, 81, 82, 83, 84, 276, 277, 281, 282, 287, 288})
+        if (t == type)
+            return true;
+    return false;
+}
+// Projectiles: a disruptor bolt's speed and a shell's (units a tick), the
+// shells' gravity and longest flight; a phaser pulse runs a beam's length
+// a tick (its model's; Reluva's figure here, the model not measured).
+constexpr float kBoltSpeed = 2700, kShellSpeed = 350, kGravity = 3, kBeamLength = 2500;
+constexpr int kShellLife = 1000;
+// What a projectile can hit: an object's size (Reluva's; the game uses
+// its model's radius) and how high it stands, for a falling shell. (The
+// game's hit test also skips objects with some flag bits, 0x1dea0, which
+// read as class bits would be the bees and unarmed APCs; but bees are
+// killed and replaced in the game, so the field may be another: not
+// applied.)
+constexpr float kBuildingRadius = 6000, kVehicleRadius = 1000, kBuildingTall = 4000, kVehicleTall = 1500;
 // Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
 constexpr int kCloakAfter = 300, kCloakFade = 63;
 // Protecting (exe.md#orders): how often it looks for an attack on the
@@ -509,17 +531,25 @@ void World::combatTick() {
         if (!turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading)))
             continue;
         // A burst: a pulse a tick, its reload counted from the tick after
-        // the last.
+        // the last. A defensive turret pays its power for each (and once
+        // more for the call that starts the reload); short, it doesn't
+        // fire, and a burst breaks off.
+        auto paid = [&](float power) { return !shotPower_ || !paysForShots(u.type) || shotPower_(u, power); };
         if (u.burstLeft > 0) {
-            fire(u, *t);
-            --u.burstLeft;
-        } else if (u.cooldown == 0) {
+            if (paid(kShotPower * (u.burstLeft == 1 ? 2 : 1))) {
+                fire(u, *t);
+                --u.burstLeft;
+            } else {
+                u.burstLeft = 0;
+            }
+        } else if (u.cooldown == 0 && paid(kShotPower)) {
             fire(u, *t);
             const int pulses = u.weapon.kind == WeaponKind::Burst ? std::max(1, u.weapon.magazine) : 1;
             u.burstLeft = pulses - 1;
             u.cooldown = u.weapon.reload + (pulses > 1 ? pulses : 0);
         }
     }
+    flyProjectiles();
     // The destroyed go.
     std::vector<int> dead;
     for (const Unit& u : units_)
@@ -596,21 +626,118 @@ bool World::turnTurret(Unit& u, float want) {
 
 void World::fire(Unit& u, Unit& t) {
     // Each shot: its damage times the shooter's security skill + 1
-    // (artillery's as it is). (A building still going up takes no harm.)
+    // (artillery's as it is).
     float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
     if (u.weapon.kind != WeaponKind::Artillery && marksmanship_)
         damage = std::trunc(damage * (marksmanship_(u) + 1));
-    if (t.built >= 1)
-        t.hp -= damage_ ? damage_(t, damage) : damage;
+    // Aimed ahead of a moving target: where it will be when the shot
+    // gets there at the projectile's speed (a straight line's time).
+    const float speed = u.weapon.kind == WeaponKind::Artillery ? kShellSpeed
+                        : u.weapon.kind == WeaponKind::Single  ? kBoltSpeed
+                                                               : kBeamLength;
+    float ax = t.x, ay = t.y;
+    if (t.moving() && !t.building && !(t.firing && !firesOnTheMove(t))) {
+        const float ticks = std::hypot(t.x - u.x, t.y - u.y) / speed;
+        const float v = t.kind.speed / 20;
+        ax += std::cos(t.heading) * v * ticks, ay += std::sin(t.heading) * v * ticks;
+    }
+    Projectile p;
+    p.from = u.id, p.fromSlot = u.slot, p.kind = u.weapon.kind, p.damage = damage;
+    p.x = p.px = p.ox = u.x, p.y = p.py = p.oy = u.y;
+    const float d = std::max(1.0f, std::hypot(ax - u.x, ay - u.y));
+    p.dx = (ax - u.x) / d, p.dy = (ay - u.y) / d;
+    if (u.weapon.kind == WeaponKind::Artillery) {
+        // The low arc to where it's aimed (flat ground; the game lobs the
+        // high one when the line of sight is blocked).
+        const float sin2 = std::min(1.0f, kGravity * d / (kShellSpeed * kShellSpeed));
+        const float angle = 0.5f * std::asin(sin2);
+        p.z = p.pz = groundAt(u.x, u.y);
+        p.vx = p.dx * kShellSpeed * std::cos(angle), p.vy = p.dy * kShellSpeed * std::cos(angle);
+        p.vz = kShellSpeed * std::sin(angle);
+    } else {
+        p.speed = speed;
+        p.range = u.weapon.range + (t.building ? kBuildingReach : 0);
+    }
+    projectiles_.push_back(p);
+    // The target's turrets learn who fired at them.
     t.lastAttacker = u.id;
-    t.attackedTick = tick_;
     WorldEvent e;
     e.kind = WorldEvent::Shot;
     e.from = u.id, e.to = t.id;
     e.fromSlot = u.slot, e.toSlot = t.slot;
-    e.x0 = u.x, e.y0 = u.y, e.x1 = t.x, e.y1 = t.y;
+    e.x0 = u.x, e.y0 = u.y, e.x1 = ax, e.y1 = ay;
     e.weapon = u.weapon.kind;
     events_.push_back(std::move(e));
+}
+
+float World::groundAt(float x, float y) const { return terrain_.heightAt ? terrain_.heightAt(x, y) : 0; }
+
+// A tick of the projectiles in flight: each moves on (a pulse from its
+// shooter's muzzle as the turret now stands, a bolt straight on, a shell
+// along its arc) and strikes the first object its path crossed this tick
+// that isn't its shooter's side (nor a bee, unarmed APC or effect), or
+// the ground (nothing), or runs out.
+void World::flyProjectiles() {
+    std::vector<Projectile> flying;
+    for (Projectile p : projectiles_) {
+        ++p.age;
+        p.px = p.x, p.py = p.y, p.pz = p.z;
+        bool done = false;
+        if (p.kind == WeaponKind::Artillery) {
+            p.x += p.vx, p.y += p.vy, p.z += p.vz;
+            p.vz -= kGravity;
+            done = p.age >= kShellLife;
+        } else if (p.kind == WeaponKind::Single) {
+            p.x += p.dx * p.speed, p.y += p.dy * p.speed;
+            done = float(p.age) * p.speed >= p.range;
+        } else {
+            if (const Unit* s = unit(p.from))
+                p.ox = s->x, p.oy = s->y;
+            const float run = std::min(float(p.age) * p.speed, p.range);
+            p.px = p.ox + p.dx * (run - p.speed), p.py = p.oy + p.dy * (run - p.speed);
+            p.x = p.ox + p.dx * run, p.y = p.oy + p.dy * run;
+            done = run >= p.range;
+        }
+        // The first object along this tick's path.
+        const float sx = p.x - p.px, sy = p.y - p.py, len2 = sx * sx + sy * sy;
+        Unit* hit = nullptr;
+        float best = 2;
+        for (Unit& v : units_) {
+            if (v.hp <= 0 || v.id == p.from || v.slot == p.fromSlot)
+                continue;
+            const float r = v.building ? kBuildingRadius : kVehicleRadius;
+            // The nearest point of the path to it, as a share of the path.
+            const float f = len2 > 0 ? std::clamp(((v.x - p.px) * sx + (v.y - p.py) * sy) / len2, 0.0f, 1.0f) : 0;
+            if (std::hypot(p.px + sx * f - v.x, p.py + sy * f - v.y) > r || f >= best)
+                continue;
+            // A shell passes over what it's above.
+            if (p.kind == WeaponKind::Artillery &&
+                p.pz + (p.z - p.pz) * f - groundAt(v.x, v.y) > (v.building ? kBuildingTall : kVehicleTall))
+                continue;
+            hit = &v, best = f;
+        }
+        if (hit) {
+            // (A building still going up takes no harm.)
+            if (hit->built >= 1)
+                hit->hp -= damage_ ? damage_(*hit, p.damage) : p.damage;
+            hit->attackedTick = tick_;
+            if (hit->lastAttacker == 0 || !unit(hit->lastAttacker))
+                hit->lastAttacker = p.from;
+            WorldEvent e;
+            e.kind = WorldEvent::Hit;
+            e.from = p.from, e.to = hit->id;
+            e.fromSlot = p.fromSlot, e.toSlot = hit->slot;
+            e.x0 = e.x1 = p.px + sx * best, e.y0 = e.y1 = p.py + sy * best;
+            e.weapon = p.kind;
+            events_.push_back(std::move(e));
+            continue;
+        }
+        if (p.kind == WeaponKind::Artillery && p.z < groundAt(p.x, p.y))
+            continue; // into the ground: nothing
+        if (!done)
+            flying.push_back(p);
+    }
+    projectiles_ = std::move(flying);
 }
 
 } // namespace reluva::newworlds

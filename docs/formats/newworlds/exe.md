@@ -183,8 +183,14 @@ line of sight is blocked), with no multiplier and no splash; on flat
 ground it can't reach past about 36850 units. Every shot is a real
 projectile (bolts 2700 units a tick, beam pulses a beam's length a tick)
 that hits the first object of another side its path crosses, or misses
-into the ground; a shot also takes 300 units from the shooter's power
-buffer. Range in world units (a tile is 8192, a block 16384): 20000 is 1.2
+into the ground. A fire takes 300 units from the shooter's power buffer
+(each burst pulse, and the call that starts the reload, so 1500 a burst),
+but only buildings have a real buffer: every vehicle (and the natives'
+guns) has an empty stand-in that always says yes and takes nothing. So
+only the empires' defensive weapons and artillery can fall silent, when
+their side's power can't refill them (each side, the computer's too,
+runs the same power economy; a turret's buffer is 64000, refilled up to
+550 a tick, using 160). Range in world units (a tile is 8192, a block 16384): 20000 is 1.2
 blocks. Reload in simulation ticks. Traverse is the turret's yaw limits
 (180,180 turns all round), elevation up and down, in degrees. Pace is the
 game's path steps a tick (how long a step is wasn't found, so no world

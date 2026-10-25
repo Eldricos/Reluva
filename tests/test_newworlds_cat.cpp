@@ -1450,6 +1450,79 @@ void testStoresAndRazing() {
     CHECK(e.dead() == crew);
 }
 
+// Projectiles (exe.md#sides-and-combat): a disruptor bolt flies 2700
+// units a tick and hurts its target only on arrival; a side's shots pass
+// through its own (no friendly fire); a shell flies its arc.
+void testProjectiles() {
+    Terrain t;
+    t.width = t.height = 40;
+    t.moveClass.assign(1600, 1);
+    World w(t);
+    w.setStance(1, 0, 3);
+    const float y = 20 * 8192.0f;
+    const int back = spawnObject(w, 1, 'K', *combatType(10), 100000, y, {});
+    const int front = spawnObject(w, 1, 'K', *combatType(10), 106000, y, {});
+    const int fed = spawnObject(w, 0, 'F', *combatType(8), 116000, y, {});
+    w.unit(front)->holdFire = true;
+    const float hp = w.unit(fed)->hp;
+    bool fired = false;
+    int ticks = 0;
+    for (; ticks < 200 && !fired; ++ticks) {
+        w.advance(0.05);
+        for (const WorldEvent& e : w.takeEvents())
+            fired = fired || (e.kind == WorldEvent::Shot && e.from == back);
+    }
+    CHECK(fired && !w.projectiles().empty());
+    // 16000 away: six ticks out (2700 a tick), the front tank no shield.
+    CHECK(w.unit(fed)->hp == hp);
+    bool hit = false;
+    for (int i = 0; i < 8; ++i) {
+        w.advance(0.05);
+        for (const WorldEvent& e : w.takeEvents())
+            hit = hit || (e.kind == WorldEvent::Hit && e.to == fed);
+    }
+    CHECK(hit && (!w.unit(fed) || w.unit(fed)->hp < hp));
+    CHECK(w.unit(front)->hp == w.unit(front)->maxHp);
+    // A defensive turret's shots take 300 power each; without it, it's
+    // silent; a tank pays nothing.
+    {
+        World p(t);
+        p.setStance(0, 1, 3);
+        p.setStance(1, 0, 3);
+        int asked = 0;
+        p.setShotPower([&](const Unit&, float power) {
+            asked += int(power);
+            return false;
+        });
+        const int turret = spawnObject(p, 0, 'F', *combatType(80), 100000, y, {}, {}, true);
+        const int tank = spawnObject(p, 1, 'K', *combatType(10), 112000, y, {});
+        bool turretFired = false, tankFired = false;
+        for (int i = 0; i < 100; ++i) {
+            p.advance(0.05);
+            for (const WorldEvent& e : p.takeEvents())
+                if (e.kind == WorldEvent::Shot)
+                    turretFired = turretFired || e.from == turret, tankFired = tankFired || e.from == tank;
+        }
+        CHECK(!turretFired && tankFired && asked >= 300);
+    }
+    // A shell: up its arc and down onto a building 18000 away.
+    World a(t);
+    a.setStance(0, 1, 3);
+    const int gun = spawnObject(a, 0, 'F', *combatType(47), 100000, y, {});
+    const int hut = spawnObject(a, 1, 'T', *combatType(114), 118000, y, {}, {}, true);
+    float highest = 0;
+    bool landed = false;
+    for (int i = 0; i < 400 && !landed; ++i) {
+        a.advance(0.05);
+        for (const Projectile& p : a.projectiles())
+            highest = std::max(highest, p.z);
+        for (const WorldEvent& e : a.takeEvents())
+            landed = landed || (e.kind == WorldEvent::Hit && e.to == hut);
+    }
+    // (The low arc: about 13 degrees up at that range, topping out near 1000.)
+    CHECK(gun && landed && highest > 800 && highest < 1300);
+}
+
 void testRivalsAndGroups() {
     Terrain t;
     t.width = t.height = 128;
@@ -2180,6 +2253,7 @@ int main() {
     testTraining();
     testBees();
     testStoresAndRazing();
+    testProjectiles();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

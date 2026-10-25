@@ -177,6 +177,14 @@ void AiSides::start() {
             queue(*o);
 }
 
+bool AiSides::payShot(const Unit& turret, float power) {
+    auto c = colonies_.find(turret.slot);
+    if (c == colonies_.end())
+        return true;
+    auto it = c->second.structureOf.find(turret.id);
+    return it == c->second.structureOf.end() || c->second.economy->spend(it->second, power);
+}
+
 const Economy* AiSides::colony(int slot) const {
     auto it = colonies_.find(slot);
     return it == colonies_.end() ? nullptr : it->second.economy.get();

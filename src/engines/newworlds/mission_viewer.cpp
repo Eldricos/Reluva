@@ -518,6 +518,13 @@ void MissionViewer::startPlay() {
         const float security = fieldWork_ && target.slot == playerSlot_ ? fieldWork_->skill(target.id, 2) : 0;
         return shieldedDamage(target, damage, fog_.get(), security);
     });
+    world_->setShotPower([this](const Unit& turret, float power) {
+        if (turret.slot == playerSlot_) {
+            const ColonyStructure* c = structureOf(turret.id);
+            return !c || economy_->spend(c->id, power);
+        }
+        return !ai_ || ai_->payShot(turret, power);
+    });
     world_->setMarksmanship([this](const Unit& shooter) {
         return fieldWork_ && shooter.slot == playerSlot_ ? fieldWork_->skill(shooter.id, 2) : 0.0f;
     });
@@ -682,8 +689,12 @@ void MissionViewer::combatStep(std::vector<ScriptEvent>& happened) {
     const auto events = world_->takeEvents();
     bool rebuild = false;
     for (const WorldEvent& e : events) {
+        if (e.kind == WorldEvent::Hit) {
+            // A spark where it struck.
+            flashes_.push_back({e.x1, e.y1, e.x1, e.y1, e.weapon, nowMs_ + 200});
+            continue;
+        }
         if (e.kind == WorldEvent::Shot) {
-            flashes_.push_back({e.x0, e.y0, e.x1, e.y1, e.weapon, nowMs_ + (e.weapon == WeaponKind::Artillery ? 500 : 150)});
             // A race the player set neutral (ALLY) turns hostile at its
             // first shot at the player.
             if (e.toSlot == playerSlot_ && touchyNeutral_.erase(e.fromSlot) &&
@@ -717,7 +728,7 @@ void MissionViewer::combatStep(std::vector<ScriptEvent>& happened) {
                    flashes_.end());
     blasts_.erase(std::remove_if(blasts_.begin(), blasts_.end(), [&](const Blast& b) { return b.start + 800 <= nowMs_; }),
                   blasts_.end());
-    if (!flashes_.empty() || !blasts_.empty() || !events.empty())
+    if (!flashes_.empty() || !blasts_.empty() || !events.empty() || !world_->projectiles().empty())
         redraw();
 }
 
@@ -783,21 +794,36 @@ void MissionViewer::drawCombat() {
     auto toScreen = [&](float x, float y, float up, int& sx, int& sy) {
         return map_.worldToScreen(x, y, map_.groundAtWorld(x, y) + up, sx, sy);
     };
-    for (const Flash& f : flashes_) {
+    // The projectiles in flight: a phaser pulse an orange streak, a
+    // disruptor bolt a green one, a shell a bright dot up its arc.
+    for (const Projectile& p : world_->projectiles()) {
         int ax = 0, ay = 0, bx = 0, by = 0;
-        if (!toScreen(f.x0, f.y0, 700, ax, ay) || !toScreen(f.x1, f.y1, 500, bx, by))
-            continue;
-        if (f.weapon == WeaponKind::Artillery) {
-            const float t = 1 - float(f.until - std::min(f.until, nowMs_)) / 500.0f;
-            const int px = ax + int(float(bx - ax) * t), py = ay + int(float(by - ay) * t) - int(std::sin(t * 3.1416f) * 40);
+        if (p.kind == WeaponKind::Artillery) {
+            if (!map_.worldToScreen(p.x, p.y, p.z + 300, ax, ay))
+                continue;
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
-                    plot(screen_, px + dx, py + dy, 255, 240, 160);
-        } else if (f.weapon == WeaponKind::Single) {
+                    plot(screen_, ax + dx, ay + dy, 255, 240, 160);
+            continue;
+        }
+        if (!toScreen(p.px, p.py, 600, ax, ay) || !toScreen(p.x, p.y, 600, bx, by))
+            continue;
+        if (p.kind == WeaponKind::Single) {
             line(screen_, ax, ay, bx, by, 90, 255, 90);
             line(screen_, ax, ay + 1, bx, by + 1, 40, 200, 40);
         } else {
             line(screen_, ax, ay, bx, by, 255, 170, 60);
+        }
+    }
+    // Where they struck: a spark.
+    for (const Flash& f : flashes_) {
+        int cx = 0, cy = 0;
+        if (!toScreen(f.x1, f.y1, 500, cx, cy))
+            continue;
+        const bool green = f.weapon == WeaponKind::Single;
+        for (int d = -3; d <= 3; ++d) {
+            plot(screen_, cx + d, cy, 255, green ? 255 : 230, green ? 140 : 120);
+            plot(screen_, cx, cy + d, 255, green ? 255 : 230, green ? 140 : 120);
         }
     }
     for (const Blast& b : blasts_) {
