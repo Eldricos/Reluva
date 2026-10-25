@@ -260,10 +260,11 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   support as a producer (CONSUMPTION, DEMAND MET, RESERVE).
 - **Demolishing** ([exe.md](exe.md#demolishing)): DEMOLISH on a finished
   building (not the hub or a storage facility) asks yes or no; yes gives
-  half its cost back at once, sends its crew to the hub's pool and its
-  officers to the hub (the panel says EVACUATING meanwhile), and then it
-  is destroyed the usual way: the blast, the wreck, `destroyed <type>`
-  for the scripts.
+  half its cost back at once, its officers to the hub and its crew
+  walking back to the hub's pool (20 s), its worker and cargo bees off;
+  once nobody is inside and none of its bees is docked there (the panel
+  says EVACUATING meanwhile) it is destroyed the usual way: the blast,
+  the wreck, `destroyed <type>` for the scripts.
 - **Stores** ([exe.md](exe.md#stores)): the stock is what the storage
   facilities hold. The mission's stock is in the first, gifts and refunds
   go there, and the processor sends its refined goods there every 32
@@ -385,7 +386,13 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   "TERRAIN AT"). Only what the side sees is marked on the Tab Tricorder.
 - **Script effects** ([exe.md](exe.md#script-effects)): the scripts'
   spawns, group damage, beam-ups, routes, meteor storms (30 damage to
-  what a meteor hits), lightning storms, the disease (among the crew),
+  what a meteor hits), lightning storms, the disease (each of the
+  colony's plain crew, in its buildings and pools, visited in turn 16
+  times a second: under 10 in 101 catches it, then under 4 costs 10 of
+  their 256 health, and none left kills them; once the cure begins,
+  under 60 gives 10 back, then cures them; its percentage is of everyone
+  held when it began, and the cure is over once nobody counts as having
+  it - one who died of it still does, as in the game),
   stock given, taken and topped up are carried out on the map, and the
   scripts hear who comes into or leaves their zones, what has stood how
   long, beam-ups and the infection's spread. Meteors fall as streaks,
@@ -436,7 +443,7 @@ kept apart from the game's behaviour:
 | Bees | fly 1500 units up; a cargo bee docks 1 s | Reluva's: the game's dock times weren't timed |
 | A pad's places | 16, in a ring 6000 out round the building | the game lays out 80 round it |
 | Cargo pods' model | the Federation's small crate (`crate_s`) | the game's model for them isn't named in its tables |
-| Evacuating a razed building | its crew back in the hub's pool at once, so it's razed the next tick | the game's people walk out first; how long that takes depends on the walk |
+| Evacuating a razed building | 5 ticks at least, then as long as its bees take to leave; its people walk back to the hub's pool in 20 s | the game asks its parts each tick whether they can let go; the walk's time is Reluva's crew walk |
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
@@ -468,7 +475,6 @@ kept apart from the game's behaviour:
 | The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
-| A person's health (the sickbay's AVG. HEALTH) | everyone whole but the dead | the game lowers it 10 at a time for the sick; Reluva counts how many are ill, not who |
 | Officers' portraits | the section's face (as the messages use) | which face is whose isn't known |
 | What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
 | Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |

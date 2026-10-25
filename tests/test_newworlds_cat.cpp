@@ -1459,7 +1459,9 @@ void testStoresAndRazing() {
     CHECK(e.razable(gen));
     const Stock before = e.stock();
     const Stock cost = buildingType("power-generator")->costFor('F');
-    CHECK(e.raze(gen) && !e.razable(gen) && e.evacuated(gen));
+    CHECK(e.raze(gen) && !e.razable(gen) && !e.evacuated(gen));
+    e.advance(0.3); // a few ticks, nobody inside
+    CHECK(e.evacuated(gen));
     for (int m = 0; m < kMaterials; ++m)
         CHECK(e.stock()[size_t(m)] == before[size_t(m)] + cost[size_t(m)] / 2);
     // The first facility lost: its store goes out of the stock.
@@ -1468,6 +1470,12 @@ void testStoresAndRazing() {
     // Gifts now go to the second.
     e.give(Dilithium, 10);
     CHECK(e.storeOf(second)[Dilithium] == 10);
+    // A razed building's crew walk back to the hub's pool (20 s).
+    const int bay0 = e.addBuilt("sickbay", 0, -40000);
+    const int pool0 = e.pool();
+    CHECK(e.raze(bay0) && e.walking() > 0 && e.pool() == pool0);
+    e.advance(21);
+    CHECK(e.walking() == 0 && e.pool() > pool0);
     // A building's crew die with it (the sickbay's DEAD); not a razed one's.
     const int bay = e.addBuilt("sickbay", 0, -20000);
     int crew = 0;
@@ -1865,18 +1873,22 @@ void testScriptEffects() {
     CHECK(!parseMissionScripts("mission T F\non standing colony-hub 2\n  win\non infection 3\n  win\n", holdScript));
     MissionRun hold(holdScript[0], nullptr);
     CHECK(!hold.fire({"standing", {"colony-hub", "1"}}).size() && hold.fire({"standing", {"colony-hub", "2"}}).size());
-    // The disease among the crew (four here: a yard's one, a vehicle
-    // yard's three): one of them rolls each tick, a tenth of the time
-    // catching it; once cured, three in five of the ill recover a roll.
+    // The disease among the colony's plain crew (in its buildings and the
+    // hub's pool): one of them visited each tick, 16 a second, catching it
+    // on a roll under 10 of 101; once the cure begins, one who has it
+    // recovers on a roll under 60. Health stays whole but for the rare
+    // roll under 4.
     e.addBuilt("construction-yard", 0, 0);
     e.addBuilt("vehicle-yard", 0, 0);
     CHECK(e.crew() == 4);
     fx.apply("infect", "");
     heard.clear();
-    step(20);
+    step(60);
     CHECK(fx.infection() >= 25 && has("infection 25"));
+    const int held = e.crew() + e.pool();
+    CHECK(fx.healthSum() < int64_t(held) * 256 && fx.healthSum() > int64_t(held) * 256 * 9 / 10);
     fx.apply("cure", "");
-    step(20);
+    step(240);
     CHECK(fx.infection() == 0 && has("cured"));
 }
 

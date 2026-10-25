@@ -117,6 +117,7 @@ struct ColonyStructure {
     int wanted = 0;      // crew asked for and not yet sent
     int target = -1;     // the crew the player wants in it (-1: all its slots)
     bool evacuating = false; // being razed: its people leaving
+    int evacTicks = 0;       // ticks since
     // People on their way to it: how many, and seconds still to walk.
     std::vector<std::pair<int, double>> coming;
 };
@@ -229,6 +230,11 @@ public:
     float lifeDemandMet() const { return lifeMet_; }
     // People who died with what they were in (the sickbay's DEAD).
     int dead() const { return dead_; }
+    // One of the colony's plain crew killed (by disease): out of a pool
+    // first, else a building's crew.
+    void loseOne();
+    // People walking back to the hub's pool from a building razed.
+    int walking() const;
     // The crew the player wants in a building (the panel's assign
     // control, 0 to its slots): more are asked for, those over it go back
     // to the hub's pool.
@@ -360,6 +366,7 @@ private:
     double lifeProduced_ = 0, lifeUsed_ = 0;
     float lifeMet_ = 1;
     int dead_ = 0;
+    std::vector<std::pair<int, double>> walking_; // people on their way to the hub's pool, seconds left
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
     bool free_ = false;

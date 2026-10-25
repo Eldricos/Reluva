@@ -69,6 +69,9 @@ constexpr double kRollout = 8;
 constexpr int kRoster = 150, kBatch = 10;
 constexpr double kLifePerPerson = 16, kLifePerPower = 16.384, kFarmLife = 2048;
 constexpr double kCrewWalk = 20;
+// The least a razed building stands evacuating (Reluva's: the game's is
+// a few ticks, its parts let go in turn).
+constexpr int kEvacTicks = 5;
 
 constexpr int sideOf(char side) { return side == 'K' ? 1 : side == 'R' ? 2 : 0; }
 
@@ -629,7 +632,25 @@ int Economy::crew() const {
     return n;
 }
 
-int Economy::people() const { return pool() + crew() + officersDown_; }
+int Economy::people() const { return pool() + crew() + walking() + officersDown_; }
+
+int Economy::walking() const {
+    int n = 0;
+    for (const auto& w : walking_)
+        n += w.first;
+    return n;
+}
+
+void Economy::loseOne() {
+    for (bool pools : {true, false})
+        for (ColonyStructure& s : structures_)
+            if (int& n = pools ? s.pool : s.crew; n > 0) {
+                --n, ++dead_;
+                if (!pools)
+                    requestCrew(s);
+                return;
+            }
+}
 
 // A building's request for its crew (its slots less those it has or has
 // coming): all from the first hub or accommodation with enough in its pool,
@@ -848,8 +869,28 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             requestCrew(s);
         }
     }
-    for (ColonyStructure& s : structures_)
+    for (ColonyStructure& s : structures_) {
         staff(s, out);
+        s.evacTicks += s.evacuating;
+    }
+    // People walking back from a razed building reach the hub's pool (with
+    // no hub, the roster in orbit).
+    for (auto& w : walking_)
+        if ((w.second -= 1 / kTicksPerSecond) <= 0) {
+            ColonyStructure* h = nullptr;
+            for (ColonyStructure& c : structures_)
+                if (c.type == "colony-hub" && c.progress >= 1)
+                    h = h ? h : &c;
+            if (h)
+                h->pool += w.first;
+            else
+                orbit_ += w.first;
+        }
+    const bool arrived = std::any_of(walking_.begin(), walking_.end(), [](const auto& w) { return w.second <= 0; });
+    walking_.erase(std::remove_if(walking_.begin(), walking_.end(), [](const auto& w) { return w.second <= 0; }),
+                   walking_.end());
+    if (arrived)
+        retryCrew();
     // Power: each built consumer asks to fill its buffer, at most its
     // intake a tick; the supply (with the reserve behind it) is shared out
     // in proportion; then each uses its standing demand from its buffer.
@@ -1431,24 +1472,39 @@ bool Economy::raze(int structure) {
             for (int64_t& u : back)
                 u /= 2;
             deposit(back);
-            s.evacuating = true;
-            setCrewTarget(s.id, 0);
-            // Those still on their way turn back; with no hub to take them
-            // in, everyone left goes back to the roster.
+            s.evacuating = true, s.evacTicks = 0;
+            // Its people walk out to the hub's pool; those still on their
+            // way turn back.
+            int leaving = s.crew;
             for (const auto& c : s.coming)
-                s.crew += c.first;
+                leaving += std::abs(c.first);
             s.coming.clear();
-            if (s.crew > 0)
-                setCrewTarget(s.id, 0);
-            orbit_ += s.crew, s.crew = 0;
+            s.crew = 0, s.target = 0;
+            if (leaving > 0)
+                walking_.push_back({leaving, kCrewWalk});
+            // Its bees fly off.
+            if (auto d = depots_.find(s.id); d != depots_.end()) {
+                for (int id : {d->second.worker, d->second.cargo})
+                    if (Bee* b = beeById(id); b && b->site == s.id)
+                        b->site = 0;
+                d->second.worker = d->second.cargo = 0;
+            }
         }
     return true;
 }
 
+// Evacuated: its people out, no bee of its still docked there, and a few
+// ticks gone (the game asks each of its parts each tick whether it can
+// let go).
 bool Economy::evacuated(int structure) const {
     for (const ColonyStructure& s : structures_)
-        if (s.id == structure)
-            return s.evacuating && s.crew == 0 && s.coming.empty();
+        if (s.id == structure) {
+            if (!s.evacuating || s.crew > 0 || !s.coming.empty() || s.evacTicks < kEvacTicks)
+                return false;
+            return std::none_of(bees_.begin(), bees_.end(), [&](const Bee& b) {
+                return (b.worker || b.cargo) && b.flight == 0 && std::hypot(b.x - s.x, b.y - s.y) < 1;
+            });
+        }
     return false;
 }
 

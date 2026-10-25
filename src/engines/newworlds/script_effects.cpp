@@ -15,12 +15,13 @@ constexpr float kBlock = 16384;
 // The script objects' tick: 16 a second (exe.md#script-effects), and
 // their figures: the top-up every 63 ticks; a meteor's 30 points of damage
 // to the one thing it hits; an area storm's 2 % chance a tick of a flash;
-// the disease's rolls (in a hundred): 10 to catch it, 60 to recover.
+// the disease's rolls (out of 0-100): under 10 to catch it, under 4 to
+// lose 10 health, under 60 to get 10 back (or be cured).
 constexpr double kTick = 1.0 / 16;
 constexpr int kTopUpTicks = 63;
 constexpr float kMeteorDamage = 30;
 constexpr float kFlashChance = 0.02f;
-constexpr float kCatch = 0.10f, kRecover = 0.60f;
+constexpr int kCatch = 10, kWorse = 4, kRecover = 60, kHealthStep = 10, kWholeHealth = 256;
 constexpr double kSparkLife = 1.0;
 // A thing's size, for a meteor hitting it (a placeholder for the model's
 // bounding sphere).
@@ -214,27 +215,8 @@ void ScriptEffects::tick(std::vector<ScriptEvent>& out) {
         }
         ++it;
     }
-    // The disease: each tick one of the crew, in turn, rolls: one who's
-    // well may catch it while it spreads; one who's ill may recover once
-    // the cure has begun. The percentage is of the crew when it began.
-    if (infecting_ != 0) {
-        if (crewAtStart_ == 0)
-            crewAtStart_ = std::max(1, economy_ ? economy_->crew() : 1);
-        const int before = infected_ * 100 / crewAtStart_;
-        const bool ill = random01() * float(crewAtStart_) < float(infected_);
-        const float roll = random01();
-        if (infecting_ > 0 && !ill && roll < kCatch)
-            infected_ = std::min(crewAtStart_, infected_ + 1);
-        else if (infecting_ < 0 && ill && roll < kRecover)
-            --infected_;
-        infection_ = double(infected_ * 100 / crewAtStart_);
-        if (int(infection_) != before)
-            out.push_back({"infection", {std::to_string(int(infection_))}});
-        if (infecting_ < 0 && infected_ <= 0) {
-            infecting_ = 0;
-            out.push_back({"cured", {}});
-        }
-    }
+    if (infecting_ != 0)
+        disease(out, int(random01() * 101));
     // Once a second: zones, and what has stood how long.
     if ((second_ += kTick) >= 1) {
         second_ -= 1;
@@ -312,6 +294,63 @@ void ScriptEffects::zones(std::vector<ScriptEvent>& out) {
         before = std::move(now);
     }
     zonesSeen_ = true;
+}
+
+// The disease, a tick (exe.md#script-effects): the colony's plain crew
+// (in its buildings and pools) visited one at a time, in turn. While it
+// spreads, one who's well catches it on a roll under 10 (their health as
+// it was kept), one who has it loses 10 on a roll under 4, and dies at
+// none; once the cure has begun, one who has it gets 10 back on a roll
+// under 60, up to what they had, then is cured. The percentage is of the
+// crew when it began; the cure's end is when nobody has it.
+void ScriptEffects::disease(std::vector<ScriptEvent>& out, int roll) {
+    const int held = economy_ ? economy_->crew() + economy_->pool() : 0;
+    // The roster as the colony stands: newcomers well, the lost gone.
+    while (int(people_.size()) < held)
+        people_.push_back({});
+    while (int(people_.size()) > held && !people_.empty())
+        people_.pop_back();
+    if (people_.empty())
+        return;
+    if (crewAtStart_ == 0)
+        crewAtStart_ = std::max(1, held);
+    const int before = infected_ * 100 / crewAtStart_;
+    Person& p = people_[visit_++ % people_.size()];
+    if (infecting_ > 0) {
+        if (!p.ill && roll < kCatch) {
+            p.ill = true, p.saved = p.health;
+            ++infected_;
+        } else if (p.ill && roll < kWorse && (p.health -= kHealthStep) < 1) {
+            // Dead (and still counted among the infected, as the game's).
+            people_.erase(people_.begin() + std::ptrdiff_t((visit_ - 1) % people_.size()));
+            economy_->loseOne();
+        }
+    } else if (p.ill && roll < kRecover) {
+        if (p.health < p.saved)
+            p.health = std::min(p.saved, p.health + kHealthStep);
+        else
+            p.ill = false, --infected_;
+    }
+    infection_ = double(infected_ * 100 / crewAtStart_);
+    if (int(infection_) != before)
+        out.push_back({"infection", {std::to_string(int(infection_))}});
+    // (Someone who died of it stays counted, so then it never ends: the
+    // game's own quirk.)
+    if (infecting_ < 0 && infected_ <= 0) {
+        infecting_ = 0;
+        out.push_back({"cured", {}});
+    }
+}
+
+int64_t ScriptEffects::healthSum() const {
+    int64_t n = 0;
+    for (const Person& p : people_)
+        n += p.health;
+    // Those not yet visited count whole.
+    const int held = economy_ ? economy_->crew() + economy_->pool() : 0;
+    if (held > int(people_.size()))
+        n += int64_t(held - int(people_.size())) * kWholeHealth;
+    return n;
 }
 
 } // namespace reluva::newworlds

@@ -2085,7 +2085,9 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
         out.push_back("HEALTHY " + std::to_string(std::max(0, assigned - infected)));
         out.push_back("SICK " + std::to_string(std::max(0, infected - dead)));
         out.push_back("DEAD " + std::to_string(dead));
-        out.push_back("AVG. HEALTH " + std::string(assigned ? std::to_string((assigned - dead) * 100 / assigned) : "999") + "%");
+        // (Each out of 256; the dead count nothing.)
+        const int64_t health = effects_ ? effects_->healthSum() : int64_t(assigned - dead) * 256;
+        out.push_back("AVG. HEALTH " + std::string(assigned ? std::to_string(health * 100 / (int64_t(assigned) * 256)) : "999") + "%");
     }
     // A farm: the colony's life support, as a producer.
     if (c->type == "farm") {
