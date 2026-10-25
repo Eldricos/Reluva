@@ -116,6 +116,7 @@ struct ColonyStructure {
     int pool = 0;        // housed in it (hub, accommodation)
     int wanted = 0;      // crew asked for and not yet sent
     int target = -1;     // the crew the player wants in it (-1: all its slots)
+    bool evacuating = false; // being razed: its people leaving
     // People on their way to it: how many, and seconds still to walk.
     std::vector<std::pair<int, double>> coming;
 };
@@ -124,8 +125,17 @@ class Economy {
 public:
     Economy(char side, Stock start, int capacity, ColonyMap map);
 
-    // The stock as the panel shows it.
+    // The stock as the panel shows it: what the colony's storage
+    // facilities hold between them (exe.md#stores). Each keeps its own; the
+    // mission's stock goes into the first, as do refunds and what the
+    // script gives, and the processor sends its refined goods there every
+    // 32 ticks. Costs are taken from them in turn; a vehicle's only from
+    // the first storage facility the colony ever had (still, after it's
+    // gone: then outside the stock). A storage facility lost takes what it
+    // held with it, as a processor does its ore and goods. (Until the
+    // colony has one, the mission's stock waits for it, counted.)
     Stock stock() const;
+    Stock storeOf(int structure) const; // a storage facility's own
     // COLONY SIZE: the colony's buildings and vehicles, and the most it
     // may have (50 at the start, raised by housing, never past 90).
     int colonySize() const;
@@ -163,6 +173,13 @@ public:
     void give(int material, int amount);
     // A building destroyed: it no longer counts, works or draws power.
     void remove(int id);
+    // Demolishing (exe.md#demolishing): whether a building may be razed
+    // (built, not the hub or a storage facility, not already evacuating);
+    // the order: half its type's cost back at once (upgrades not), its
+    // crew sent out. Once it's empty (evacuated()), it's destroyed.
+    bool razable(int structure) const;
+    bool raze(int structure);
+    bool evacuated(int structure) const;
 
     // Vehicles: the side's that the menu offers now (their yard and what
     // they need standing), and an order for one (the cost taken at once;
@@ -260,8 +277,24 @@ private:
     void fly(Bee& b, float x, float y);
     const ColonyStructure* hub() const;
 
+    // The stores, in the game's units.
+    using Units = std::array<int64_t, kMaterials>;
+    struct Store {
+        int structure; // its storage facility (0: the mission's stock, before one stands)
+        bool gone = false; // its facility destroyed (kept only as the yards' store)
+        Units units{};
+    };
+    int64_t total(int m) const;
+    bool pays(const Units& cost) const;
+    void take(Units cost);     // in turn from the stores
+    void deposit(const Units& u); // into the first standing store (none: lost)
+    void addStore(int structure);
+    Store* yardStore();       // the first storage facility's, where vehicles are paid from
+    static Units unitsOf(const Stock& s);
+
     char side_;
-    std::array<int64_t, kMaterials> units_{}; // the stock in the game's units
+    std::vector<Store> stores_;
+    Units refined_{}; // at the processor, waiting to go to storage
     int capacity_, vehicles_ = 0;
     ColonyMap map_;
     std::vector<ColonyStructure> structures_;

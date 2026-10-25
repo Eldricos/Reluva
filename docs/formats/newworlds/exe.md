@@ -328,7 +328,8 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   doubles it. About 0.31 t a second of each at most - shown as 0.31 a
   second for the first four and 3.1 for nitrium and duranium (counted in
   hundreds), as C5 measured.
-- **Stock.** The sum of every store the side has. The default starting
+- **Stock.** What the side's storage facilities hold between them (see
+  [Stores](#stores)). The default starting
   stock is 500 / 1000 / 2300 / 500 / 4000 / 5000 (80 of the missions);
   exceptions: F12, K12, R12 800 / 1750 / 2300 / 1000 / 24000 / 25000; J7
   150 / 1000 / 2300 / 200 / 4000 / 10000; R2 dilithium 100; R8 polycomp and
@@ -743,6 +744,39 @@ How a side the computer plays builds and makes units:
   only through task 9. Every side has the same commander, ministries and
   buildings, so power, crew and officers set an AI yard's pace as they do
   the player's. Upgrades are always charged, but no order asks for one.
+
+### Stores
+
+Only storage facilities put their store on the side's list, and the
+colony's stock is that list's total: the hub has no store, and what a
+processor (its ore and refined goods) or a mine holds isn't counted, and
+goes with them. What comes in - the mission's starting stock (once the
+starting colony stands), refunds, the script's gifts, the processor's
+goods every 32 ticks - goes to the first facility with room (in practice
+the first: each holds 2000000000 units); with none, it's lost. A
+building's cost is checked against the total and taken from the
+facilities in the order they were built, each material until it's paid.
+A vehicle's cost (and the construction yard's own spending) comes only
+from the side's first storage facility ever, checked and taken when
+production starts and put back if the order is deleted; so a yard can be
+short while the colony's total isn't, and if that facility is destroyed
+the yards keep using its store, which no longer counts in the stock. A
+storage facility destroyed takes what it held. The computer's sides pay
+nothing (a per-side flag set only for human players).
+
+### Demolishing
+
+The panel's raze button asks yes or no, and works only on the side's own
+finished building that isn't a hub or storage facility and isn't already
+evacuating. Yes gives back half the type's cost at once (each material
+halved, rounded down; upgrades bought aren't refunded) and starts the
+evacuation: the building's crew target goes to 0 and its people walk to a
+hub or accommodation block with room; it waits for its docking bays and
+vehicles to empty and its jobs to finish. Then it takes its own hit
+points in damage and dies the usual way (the destruction effect; no
+under-attack alert), so it counts as destroyed. A site can't be razed or
+cancelled by the player; an aborted computer or script build order tears
+its site down with the full cost back.
 
 ### Bees
 

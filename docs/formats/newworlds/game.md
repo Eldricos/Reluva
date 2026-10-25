@@ -22,7 +22,7 @@ As the first tutorial teaches them:
 | Left click on the ground | sends the selected units there, firing on the way (cloaking units hold fire: the game's "move without attacking") |
 | Left click on another side's unit or building (units selected) | sends them to attack it, following it (scouts and science vehicles scan it instead: a science scan) |
 | Double click (units selected) on the ground, another side's object, or one of the colony's buildings | the **playbook**: a column of the game's order icons left of the Tricorder (the pointer over one names it); a click gives that order: on the ground attack en route, protect from location, move without attacking, return to the rally point; on another side's object follow and attack, assault, capture (armed APCs on a building), or the three scans (scouts and science vehicles alone); protect area (mobile shield generators on the colony's building). Any other click or Escape puts it away |
-| A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it) |
+| A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it), DEMOLISH (then YES or NO) |
 | A click on an officer's card (STAFF), then on one of the colony's buildings or a vehicle that carries officers | moves the officer there |
 | TRAINING (on the STAFF panel), then a course | starts the officer's training |
 | A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
@@ -60,7 +60,7 @@ As the first tutorial teaches them:
 
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
-modelled: DEMOLISH and the hub's colony overview. The keys
+modelled: the hub's colony overview. The keys
 A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
@@ -204,9 +204,22 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
   RESERVE), consumers their own (SUPPLY, RESERVE); OFFICERS, CREW and
   POOL; the hub and construction yard the bees and transports; the
   vehicle yard what it's making (or SUSPENDED); a shield generator its
-  COVERAGE; storage and the construction yard the stock; the resource
-  processor its raw ores. The game's buttons (BUILD, DEMOLISH, the hub's
-  overview and roster) are keys here or not yet made.
+  COVERAGE; a storage facility what it holds itself, the construction
+  yard the colony's stock; the resource processor its raw ores. The
+  hub's overview isn't made yet.
+- **Demolishing** ([exe.md](exe.md#demolishing)): DEMOLISH on a finished
+  building (not the hub or a storage facility) asks yes or no; yes gives
+  half its cost back at once, sends its crew to the hub's pool and its
+  officers to the hub (the panel says EVACUATING meanwhile), and then it
+  is destroyed the usual way: the blast, the wreck, `destroyed <type>`
+  for the scripts.
+- **Stores** ([exe.md](exe.md#stores)): the stock is what the storage
+  facilities hold. The mission's stock is in the first, gifts and refunds
+  go there, and the processor sends its refined goods there every 32
+  ticks; costs come from the facilities in turn, a vehicle's only from the
+  first one the colony had (even once it's gone, when it no longer counts
+  in the stock). A storage facility destroyed takes its store with it, a
+  processor its ore and goods.
 - **A mission played through** (G): the loading box (the three emblems;
   the mission's label as the game gives it, FEDERATION LEVEL 01, JOINT
   LEVEL 03, TUTORIAL, BONUS ROMULAN MISSION; lines for the briefing,
@@ -360,6 +373,8 @@ built, to be put back at the end so play feels as the game's does:
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
 | Bees | fly 1500 units up; a cargo bee docks 1 s; worker bees stay in the hub (their pod shuttles aren't shown) | Reluva's |
+| Evacuating a razed building | its crew back in the hub's pool at once, so it's razed the next tick | the game's people walk out first; how long that takes depends on the walk |
+| Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
 | Capacity | starts at 50, at most 90; accommodation +5, farms +10 | the executable |

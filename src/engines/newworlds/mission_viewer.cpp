@@ -358,6 +358,8 @@ void MissionViewer::startPlay() {
     housed_ = 0;
     beesHoused_.clear();
     selectedBuilding_ = 0;
+    razeAsked_ = 0;
+    razing_.clear();
     auto onHub = [&](const StartPlacement& p) {
         return colony_ && !colony_->buildings().empty() && p.a == colony_->buildings()[0].a &&
                p.b == colony_->buildings()[0].b;
@@ -1451,6 +1453,20 @@ void MissionViewer::update(uint64_t nowMs) {
         combatStep(happened);
         if (economy_ && world_)
             rollOut();
+        // Buildings being razed: once empty, gone (the game's own blow,
+        // through the usual destruction).
+        for (auto it = razing_.begin(); economy_ && world_ && it != razing_.end();) {
+            const ColonyStructure* c = structureOf(*it);
+            if (!c) {
+                it = razing_.erase(it);
+            } else if (economy_->evacuated(c->id)) {
+                if (Unit* u = world_->unit(*it))
+                    u->hp = 0;
+                it = razing_.erase(it);
+            } else {
+                ++it;
+            }
+        }
         if (effects_) {
             auto done = effects_->advance(std::min(dt, 0.25));
             happened.insert(happened.end(), done.begin(), done.end());
@@ -1895,6 +1911,24 @@ bool MissionViewer::pressButton(int x, int y) {
             trainingView_ = true;
         } else if (b.action.rfind("course", 0) == 0 && fieldWork_) {
             fieldWork_->train(size_t(std::atoi(b.action.c_str() + 6)));
+        } else if (b.action == "raze" && u) {
+            razeAsked_ = u->id;
+        } else if (b.action == "raze-no") {
+            razeAsked_ = 0;
+        } else if (b.action == "raze-yes" && u && economy_) {
+            razeAsked_ = 0;
+            if (const ColonyStructure* c = structureOf(u->id); c && economy_->raze(c->id)) {
+                // Its officers go to the hub; then it stands empty and is razed.
+                int hub = 0;
+                for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+                    for (const ColonyStructure& h : economy_->structures())
+                        if (h.id == structureIds_[i] && h.type == "colony-hub" && colonyObjects_[i] > 0)
+                            hub = colonyObjects_[i];
+                for (size_t i = 0; fieldWork_ && hub && i < fieldWork_->officers().size(); ++i)
+                    if (fieldWork_->officers()[i].in == u->id)
+                        fieldWork_->moveOfficer(i, hub);
+                razing_.push_back(u->id);
+            }
         } else if (b.action == "build") {
             buildMenu_ = !(u && u->name == "vehicle-yard");
             vehicleMenu_ = u && u->name == "vehicle-yard";
@@ -1943,6 +1977,15 @@ std::vector<std::string> MissionViewer::staffCards() const {
     return out;
 }
 
+const ColonyStructure* MissionViewer::structureOf(int unit) const {
+    for (size_t i = 0; economy_ && i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+        if (colonyObjects_[i] == unit)
+            for (const ColonyStructure& s : economy_->structures())
+                if (s.id == structureIds_[i])
+                    return &s;
+    return nullptr;
+}
+
 // The TRAINING list: a line for each officer's course, as the game's
 // buttons read: who, and train in / training in / trained in their
 // speciality (with how far it has got).
@@ -1986,8 +2029,11 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
                       : ai_                ? ai_->raceOf(owner)
                                            : u.side;
     out.push_back(upper(raceName(race == '?' ? u.side : race)));
+    const ColonyStructure* own = structureOf(u.id);
     if (u.hp < 1)
         out.push_back("DESTROYED");
+    else if (own && own->evacuating)
+        out.push_back("EVACUATING");
     else if (u.heldBy >= 0)
         out.push_back("CAPTURED");
     else if (u.building)
@@ -2068,8 +2114,9 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
     }
     if (c->type == "shield-generator")
         out.push_back(std::string("COVERAGE ") + (u.efficiency > 0.6f ? "HIGH" : u.efficiency > 0.2f ? "MED." : "LOW"));
+    // A storage facility its own store; the construction yard the colony's.
     if (c->type == "storage-facility" || c->type == "construction-yard") {
-        const Stock st = economy_->stock();
+        const Stock st = c->type == "storage-facility" ? economy_->storeOf(c->id) : economy_->stock();
         for (int m = 0; m < kMaterials; ++m)
             out.push_back(std::string(materialName(m)) + " " + std::to_string(st[size_t(m)]));
     }
@@ -2201,6 +2248,11 @@ void MissionViewer::drawInterface() {
                 actions.push_back({"- CREW", "crew-"});
                 actions.push_back({"+ CREW", "crew+"});
             }
+            if (const ColonyStructure* c = structureOf(picked->id); c && economy_->razable(c->id))
+                actions.push_back({"DEMOLISH", "raze"});
+            // DEMOLISH asks first.
+            if (razeAsked_ == picked->id)
+                actions = {{"DEMOLISH? YES", "raze-yes"}, {"NO", "raze-no"}};
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
         const std::vector<std::string> training = staffView_ && trainingView_ ? trainingLines() : std::vector<std::string>{};

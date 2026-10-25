@@ -45,6 +45,8 @@ constexpr int kShortestFlight = 10;
 constexpr float kBeeSpot = 2000;
 constexpr int kBeesASite = 4;
 constexpr int kDockTicks = 20;
+// How often the processor sends its goods to storage (ticks).
+constexpr int kShipEvery = 32;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
 // x 300 power units; each tick a running yard takes up to 300 from its
 // buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
@@ -84,8 +86,14 @@ int materialNamed(std::string_view name) {
 void Economy::give(int material, int amount) {
     if (material < 0 || material >= kMaterials)
         return;
-    int64_t& u = units_[size_t(material)];
-    u = std::max<int64_t>(0, u + int64_t(amount) * unitsPerMaterial(material));
+    Units u{};
+    u[size_t(material)] = int64_t(std::abs(amount)) * unitsPerMaterial(material);
+    if (amount >= 0) {
+        deposit(u);
+    } else {
+        u[size_t(material)] = std::min(u[size_t(material)], total(material));
+        take(u);
+    }
 }
 
 const char* oreName(int kind) {
@@ -348,8 +356,70 @@ const BuildingType* buildingType(std::string_view id) {
 
 Economy::Economy(char side, Stock start, int capacity, ColonyMap map)
     : side_(side), capacity_(std::min(capacity, kCapacityCap)), map_(std::move(map)) {
+    stores_.push_back({0, false, unitsOf(start)});
+}
+
+Economy::Units Economy::unitsOf(const Stock& s) {
+    Units u{};
     for (int m = 0; m < kMaterials; ++m)
-        units_[size_t(m)] = int64_t(start[size_t(m)]) * unitsPerMaterial(m);
+        u[size_t(m)] = int64_t(s[size_t(m)]) * unitsPerMaterial(m);
+    return u;
+}
+
+int64_t Economy::total(int m) const {
+    int64_t n = 0;
+    for (const Store& st : stores_)
+        if (!st.gone)
+            n += st.units[size_t(m)];
+    return n;
+}
+
+bool Economy::pays(const Units& cost) const {
+    for (int m = 0; m < kMaterials; ++m)
+        if (total(m) < cost[size_t(m)])
+            return false;
+    return true;
+}
+
+void Economy::take(Units cost) {
+    for (Store& st : stores_)
+        for (int m = 0; m < kMaterials && !st.gone; ++m) {
+            const int64_t t = std::min(cost[size_t(m)], st.units[size_t(m)]);
+            st.units[size_t(m)] -= t, cost[size_t(m)] -= t;
+        }
+}
+
+void Economy::deposit(const Units& u) {
+    for (Store& st : stores_)
+        if (!st.gone) {
+            for (int m = 0; m < kMaterials; ++m)
+                st.units[size_t(m)] += u[size_t(m)];
+            return;
+        }
+}
+
+// A storage facility standing: the first takes over the mission's stock
+// (and is the yards' store from then on); later ones start empty.
+void Economy::addStore(int structure) {
+    for (Store& st : stores_)
+        if (st.structure == 0) {
+            st.structure = structure;
+            return;
+        }
+    stores_.push_back({structure, false, {}});
+}
+
+Economy::Store* Economy::yardStore() {
+    return stores_.empty() ? nullptr : &stores_.front();
+}
+
+Stock Economy::storeOf(int structure) const {
+    Stock s{};
+    for (const Store& st : stores_)
+        if (st.structure == structure && !st.gone)
+            for (int m = 0; m < kMaterials; ++m)
+                s[size_t(m)] = int(st.units[size_t(m)] / unitsPerMaterial(m));
+    return s;
 }
 
 int Economy::sideIndex() const { return sideOf(side_); }
@@ -357,7 +427,7 @@ int Economy::sideIndex() const { return sideOf(side_); }
 Stock Economy::stock() const {
     Stock s{};
     for (int m = 0; m < kMaterials; ++m)
-        s[size_t(m)] = int(units_[size_t(m)] / unitsPerMaterial(m));
+        s[size_t(m)] = int(total(m) / unitsPerMaterial(m));
     return s;
 }
 
@@ -393,11 +463,7 @@ bool Economy::available(const BuildingType& t) const {
 }
 
 bool Economy::affordable(const BuildingType& t) const {
-    const Stock& c = t.costFor(side_);
-    for (int m = 0; m < kMaterials; ++m)
-        if (units_[size_t(m)] < int64_t(c[size_t(m)]) * unitsPerMaterial(m))
-            return false;
-    return true;
+    return pays(unitsOf(t.costFor(side_)));
 }
 
 float Economy::powerSupply() const {
@@ -413,6 +479,8 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
     s.id = nextId_++;
     s.type = type;
     s.x = x, s.y = y;
+    if (type == "storage-facility")
+        addStore(s.id);
     if (const BuildingType* t = buildingType(type)) {
         s.stored = t->bufferCap;
         capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
@@ -460,9 +528,8 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
         if (!free_ && (!map_.depositKind || map_.depositKind(s.blockX, s.blockY) == 0))
             return 0;
     }
-    const Stock& c = t->costFor(side_);
-    for (int m = 0; m < kMaterials && !free_; ++m)
-        units_[size_t(m)] -= int64_t(c[size_t(m)]) * unitsPerMaterial(m);
+    if (!free_)
+        take(unitsOf(t->costFor(side_)));
     structures_.push_back(s);
     return s.id;
 }
@@ -485,8 +552,10 @@ bool Economy::orderVehicle(const VehicleType& v) {
     // The yard's button is off while the colony is at its size limit.
     if (!free_ && colonySize() + int(jobs_.size()) >= capacity_)
         return false;
+    // Paid from the first storage facility's store alone.
+    Store* store = yardStore();
     for (int m = 0; m < kMaterials && !free_; ++m)
-        if (units_[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
+        if (!store || store->units[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
             pendingShort_.push_back({"short-resources", {}});
             return false;
         }
@@ -505,7 +574,7 @@ bool Economy::orderVehicle(const VehicleType& v) {
     if (!yard)
         return false;
     for (int m = 0; m < kMaterials && !free_; ++m)
-        units_[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
+        store->units[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
     for (const ColonyStructure& s : structures_)
         if (s.id == yard && s.crew < 1)
             pendingShort_.push_back({"short-crew", {}});
@@ -762,6 +831,8 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         const double share = beesModelled_ ? double(beesAt(s.id)) / kBeesASite : 1;
         s.progress = float(std::min(1.0, s.progress + share / (std::max(1.0, t->buildSeconds) * kTicksPerSecond)));
         if (s.progress >= 1) {
+            if (s.type == "storage-facility")
+                addStore(s.id);
             for (Bee& b : bees_)
                 if (!b.cargo && b.site == s.id)
                     b.site = 0, b.working = false;
@@ -860,7 +931,12 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         if (slot < kOres) {
             const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
             ore_[size_t(slot)] -= use;
-            units_[size_t(slot)] += use;
+            refined_[size_t(slot)] += use;
+        }
+        // Every 32 ticks its goods go to storage.
+        if (refineSlot_ % kShipEvery == 0) {
+            deposit(refined_);
+            refined_ = {};
         }
     }
 }
@@ -877,6 +953,16 @@ std::vector<ScriptEvent> Economy::advance(double seconds) {
 }
 
 void Economy::remove(int id) {
+    // What it held goes with it: a storage facility's store (the first
+    // stays the yards'), a processor's ore and goods.
+    for (auto it = stores_.begin(); it != stores_.end();)
+        if (it->structure == id && it != stores_.begin())
+            it = stores_.erase(it);
+        else
+            (it->structure == id ? it->gone = true : false), ++it;
+    for (const ColonyStructure& c : structures_)
+        if (c.id == id && c.type == "resource-processor")
+            ore_ = {}, refined_ = {};
     structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
                                      [&](const ColonyStructure& c) { return c.id == id; }),
                       structures_.end());
@@ -1026,6 +1112,46 @@ void Economy::beeTick() {
     for (Bee& b : bees_)
         if (!b.site && !b.home && b.flight == 0 && b.dock == 0 && h)
             fly(b, h->x, h->y);
+}
+
+bool Economy::razable(int structure) const {
+    for (const ColonyStructure& s : structures_)
+        if (s.id == structure)
+            return s.progress >= 1 && !s.evacuating && s.type != "colony-hub" && s.type != "storage-facility" &&
+                   buildingType(s.type) && buildingType(s.type)->upgradeOf.empty();
+    return false;
+}
+
+// The game's raze: half the type's cost back at once (in whole units,
+// rounded down; what was spent on upgrades isn't), then the crew leave.
+bool Economy::raze(int structure) {
+    if (!razable(structure))
+        return false;
+    for (ColonyStructure& s : structures_)
+        if (s.id == structure) {
+            Units back = unitsOf(buildingType(s.type)->costFor(side_));
+            for (int64_t& u : back)
+                u /= 2;
+            deposit(back);
+            s.evacuating = true;
+            setCrewTarget(s.id, 0);
+            // Those still on their way turn back; with no hub to take them
+            // in, everyone left goes back to the roster.
+            for (const auto& c : s.coming)
+                s.crew += c.first;
+            s.coming.clear();
+            if (s.crew > 0)
+                setCrewTarget(s.id, 0);
+            orbit_ += s.crew, s.crew = 0;
+        }
+    return true;
+}
+
+bool Economy::evacuated(int structure) const {
+    for (const ColonyStructure& s : structures_)
+        if (s.id == structure)
+            return s.evacuating && s.crew == 0 && s.coming.empty();
+    return false;
 }
 
 } // namespace reluva::newworlds

@@ -1409,6 +1409,38 @@ void testBees() {
     CHECK(built(none, 60) == 0);
 }
 
+// Stores and razing (exe.md#stores, #demolishing): the mission's stock
+// sits in the first storage facility, costs come from the facilities in
+// turn, a vehicle's from the first alone; a facility lost takes its
+// store; a razed building gives half its cost back and empties first.
+void testStoresAndRazing() {
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    Economy e('F', {500, 1000, 2300, 500, 4000, 5000}, 50, map);
+    e.addBuilt("colony-hub", 0, 0);
+    const int first = e.addBuilt("storage-facility", 20000, 0);
+    const int second = e.addBuilt("storage-facility", 40000, 0);
+    CHECK(e.storeOf(first)[Polycomp] == 1000 && e.storeOf(second)[Polycomp] == 0 && e.stock()[Polycomp] == 1000);
+    e.give(Polycomp, 50);
+    CHECK(e.storeOf(first)[Polycomp] == 1050);
+    // The hub and storage facilities can't be razed.
+    CHECK(!e.razable(first) && !e.razable(1));
+    const int gen = e.addBuilt("power-generator", 0, 20000);
+    CHECK(e.razable(gen));
+    const Stock before = e.stock();
+    const Stock cost = buildingType("power-generator")->costFor('F');
+    CHECK(e.raze(gen) && !e.razable(gen) && e.evacuated(gen));
+    for (int m = 0; m < kMaterials; ++m)
+        CHECK(e.stock()[size_t(m)] == before[size_t(m)] + cost[size_t(m)] / 2);
+    // The first facility lost: its store goes out of the stock.
+    e.remove(first);
+    CHECK(e.stock()[Polycomp] == 0 && e.storeOf(first)[Polycomp] == 0);
+    // Gifts now go to the second.
+    e.give(Dilithium, 10);
+    CHECK(e.storeOf(second)[Dilithium] == 10);
+}
+
 void testRivalsAndGroups() {
     Terrain t;
     t.width = t.height = 128;
@@ -2138,6 +2170,7 @@ int main() {
     testRivalsAndGroups();
     testTraining();
     testBees();
+    testStoresAndRazing();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

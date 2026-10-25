@@ -582,6 +582,7 @@ private:
     bool pressButton(int x, int y);
     std::vector<std::string> staffCards() const;
     std::vector<std::string> trainingLines() const;
+    const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map
     void stopScript();
@@ -680,6 +681,8 @@ private:
     int housed_ = 0;                // vehicles the mission starts inside the hub
     std::map<std::string, int> beesHoused_; // of those, the bees by kind ("worker-bee")
     int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
+    int razeAsked_ = 0;             // DEMOLISH pressed: the building asked about (yes / no)
+    std::vector<int> razing_;       // buildings being razed (unit ids), destroyed once empty
     // The playbook (exe.md#orders): the orders a double click offers for
     // the selection and what was clicked, as a column of icons beside the
     // Tricorder. Each entry: its icon, its name, and the order (f follow
