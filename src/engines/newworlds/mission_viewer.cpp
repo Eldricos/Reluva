@@ -113,7 +113,10 @@ int menuRank(std::string_view id) {
 // whose portrait each slot shows: the hub, the mining stations, the
 // defensive weapons, the defensive artillery, the fighting vehicles.
 constexpr int kJumpRows = 2; // an icon's height, in lines
-constexpr int kMenuIcon = 48; // the menus' portraits (the game's are 64 x 60)
+constexpr int kMenuIcon = 48;
+constexpr int kTricorderTiles = 16;
+constexpr float kEdgeRamp = 80, kEdgeTop = 6400; // edge scrolling, units a tick
+constexpr int kAlertTicks = 41; // how long a hit object stays among Space's alerts (Reluva's: the game's 41 Tricorder redraws) // tiles across the small Tricorder at its closest (X4) // the menus' portraits (the game's are 64 x 60)
 constexpr int kJumpIcons[3][5] = {{23, 45, 80, 83, 56}, {28, 52, 54, 82, 40}, {43, 65, 81, 84, 64}};
 
 constexpr Color kHeadingColor{255, 220, 90};
@@ -681,6 +684,13 @@ void MissionViewer::combatStep(std::vector<ScriptEvent>& happened) {
     for (const WorldEvent& e : events) {
         if (e.kind == WorldEvent::Shot) {
             flashes_.push_back({e.x0, e.y0, e.x1, e.y1, e.weapon, nowMs_ + (e.weapon == WeaponKind::Artillery ? 500 : 150)});
+            // A race the player set neutral (ALLY) turns hostile at its
+            // first shot at the player.
+            if (e.toSlot == playerSlot_ && touchyNeutral_.erase(e.fromSlot) &&
+                world_->stance(playerSlot_, e.fromSlot) == 2)
+                for (int slot : allyRaces())
+                    if (ai_->raceOf(slot) == ai_->raceOf(e.fromSlot))
+                        world_->setStance(playerSlot_, slot, 3);
             continue;
         }
         blasts_.push_back({e.x0, e.y0, e.what.building ? 5000.0f : 2500.0f, nowMs_});
@@ -1018,7 +1028,7 @@ void MissionViewer::showProgress() {
 
 bool MissionViewer::playEvent(const Event& ev) {
     if (ev.type == EventType::MouseMove || ev.type == EventType::MouseDown || ev.type == EventType::MouseUp)
-        mouseX_ = ev.mouseX, mouseY_ = ev.mouseY;
+        mouseX_ = ev.mouseX, mouseY_ = ev.mouseY, mouseSeen_ = true;
     const bool ctrl = (ev.mods & keymod::Ctrl) != 0, shift = (ev.mods & keymod::Shift) != 0,
                alt = (ev.mods & keymod::Alt) != 0;
     // The tutorials wait for keys, by the game's (Windows) key codes.
@@ -1065,7 +1075,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             map_.setGhost({}, 0, 0, false);
             break;
         }
-        if (ev.key == key::Escape || ev.key == key::F1 + 2) {
+        if (ev.key == key::Escape) {
             stopPlay();
             return true;
         }
@@ -1138,6 +1148,23 @@ bool MissionViewer::playEvent(const Event& ev) {
         }
         if (ev.key == key::Tab) {
             tricorderFull_ = !tricorderFull_;
+            break;
+        }
+        // Space: the camera to the next of the colony's objects lately hit
+        // (the game's alerts), in their order, round again.
+        if (ev.key == ' ' && world_) {
+            std::vector<const Unit*> alerted;
+            for (const Unit& u : world_->units())
+                if (u.slot == playerSlot_ && u.hp > 0 && world_->tick() - u.attackedTick < kAlertTicks)
+                    alerted.push_back(&u);
+            if (!alerted.empty()) {
+                size_t next = 0;
+                for (size_t i = 0; i < alerted.size(); ++i)
+                    if (alerted[i]->id == alertedLast_)
+                        next = (i + 1) % alerted.size();
+                alertedLast_ = alerted[next]->id;
+                map_.centreOn(alerted[next]->x, alerted[next]->y);
+            }
             break;
         }
         if (ev.key == key::Home) {
@@ -1227,9 +1254,10 @@ bool MissionViewer::playEvent(const Event& ev) {
             ev.mouseX >= tricorder_[0] && ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
             ev.mouseY < tricorder_[1] + tricorder_[3]) {
             // A click on the tricorder takes the camera there.
-            const float fx = float(ev.mouseX - tricorder_[0]) / float(tricorder_[2]);
-            const float fy = 1 - float(ev.mouseY - tricorder_[1] + 1) / float(tricorder_[3]);
-            map_.centreOn(fx * map_.worldWidth(), fy * map_.worldHeight());
+            float wx = 0, wy = 0;
+            map_.minimapToWorld(ev.mouseX, ev.mouseY, tricorder_[0], tricorder_[1], tricorder_[2], tricorder_[3],
+                                kTricorderTiles << tricorderZoom_, wx, wy);
+            map_.centreOn(wx, wy);
             break;
         }
         if (ev.button == MouseButton::Left && ctrl) {
@@ -1558,6 +1586,19 @@ void MissionViewer::update(uint64_t nowMs) {
             repairs_->advance(std::min(dt, 0.25));
         if (world_->advance(std::min(dt, 0.25)))
             showUnits();
+        // The pointer on the screen's outermost pixels scrolls the
+        // isometric cameras that way, speeding up 80 a tick to 6400.
+        edgeClock_ += std::min(dt, 0.25) * 20;
+        for (; edgeClock_ >= 1; edgeClock_ -= 1) {
+            const int ex = mouseX_ <= 0 ? -1 : mouseX_ >= screen_.w - 1 ? 1 : 0;
+            const int ey = mouseY_ <= 0 ? 1 : mouseY_ >= screen_.h - 1 ? -1 : 0;
+            if ((ex || ey) && map_.view() != MapViewer::View::FirstPerson && mouseSeen_) {
+                edgeSpeed_ = std::min(kEdgeTop, edgeSpeed_ + kEdgeRamp);
+                map_.pan(float(ex) * edgeSpeed_, float(ey) * edgeSpeed_);
+            } else {
+                edgeSpeed_ = 0;
+            }
+        }
         if (fog_) {
             // The fog at the game's 20 ticks a second; what the player sees
             // of the other sides follows it.
@@ -1885,7 +1926,7 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
 // The deposits the side has surveyed, coloured on a Tricorder map by ore
 // (the game's "mineral deposits appear as colored areas"; its colours
 // aren't known: these are Reluva's).
-void MissionViewer::drawMinerals(int x, int y, int w, int h) {
+void MissionViewer::drawMinerals(int x, int y, int w, int h, int tiles) {
     if (!fog_)
         return;
     static constexpr uint8_t kOre[6][3] = {{255, 70, 200}, {255, 200, 40}, {170, 170, 190},
@@ -1896,9 +1937,10 @@ void MissionViewer::drawMinerals(int x, int y, int w, int h) {
             if (kind < 1 || kind > 6 || map_.depositAmount(bx, by) <= 0 || !fog_->has(bx, by, Fog::Surveyed, playerSlot_))
                 continue;
             int px0 = 0, py0 = 0, px1 = 0, py1 = 0;
-            map_.minimapPoint(float(bx) * MapViewer::kBlockUnits, float(by) * MapViewer::kBlockUnits, x, y, w, h, px0, py0);
+            map_.minimapPoint(float(bx) * MapViewer::kBlockUnits, float(by) * MapViewer::kBlockUnits, x, y, w, h, px0, py0,
+                              tiles);
             map_.minimapPoint(float(bx + 1) * MapViewer::kBlockUnits, float(by + 1) * MapViewer::kBlockUnits, x, y, w, h, px1,
-                              py1);
+                              py1, tiles);
             for (int py = std::min(py0, py1); py <= std::max(py0, py1); ++py)
                 for (int px = std::min(px0, px1); px <= std::max(px0, px1); ++px)
                     if (px >= x && py >= y && px < x + w && py < y + h && px < screen_.w && py < screen_.h) {
@@ -2076,6 +2118,28 @@ bool MissionViewer::pressButton(int x, int y) {
             } else if (b.action == "comms-close") {
                 commsClosed_ = true;
             }
+        } else if (b.action == "tri-comms") {
+            commsClosed_ = false;
+        } else if (b.action == "tri-zoom") {
+            tricorderZoom_ = (tricorderZoom_ + 1) % 3;
+        } else if (b.action == "tri-ally") {
+            allyOpen_ = !allyOpen_, allyPick_ = -1;
+        } else if (b.action.rfind("ally-race", 0) == 0) {
+            const int slot = std::atoi(b.action.c_str() + 9);
+            allyPick_ = allyPick_ == slot ? -1 : slot;
+        } else if (b.action.rfind("ally-set", 0) == 0 && world_ && allyPick_ >= 0) {
+            // The player's posture towards that race (theirs unchanged);
+            // set neutral, it turns hostile at their first shot.
+            const int v = std::atoi(b.action.c_str() + 8);
+            for (int slot : allyRaces())
+                if (ai_ && ai_->raceOf(slot) == ai_->raceOf(allyPick_)) {
+                    world_->setStance(playerSlot_, slot, v);
+                    if (v == 2)
+                        touchyNeutral_.insert(slot);
+                    else
+                        touchyNeutral_.erase(slot);
+                }
+            allyPick_ = -1;
         } else if (b.action == "info") {
             colonyDetails_ = !colonyDetails_;
         } else if (b.action.rfind("jump", 0) == 0) {
@@ -2399,8 +2463,10 @@ void MissionViewer::drawPlay() {
             for (int x = 0; x < screen_.w; ++x, row += 4)
                 row[0] = uint8_t(row[0] / 4), row[1] = uint8_t(row[1] / 4), row[2] = uint8_t(row[2] / 4);
         }
-        map_.drawMinimap(screen_, x0, y0, size, size);
-        drawMinerals(x0, y0, size, size);
+        // (Twice as many tiles across as the small one.)
+        const int tiles = kTricorderTiles << (tricorderZoom_ + 1);
+        map_.drawMinimap(screen_, x0, y0, size, size, tiles);
+        drawMinerals(x0, y0, size, size, tiles);
         // What the side sees: its own green (selected orange), those
         // hostile to it red, the rest yellow.
         if (world_)
@@ -2408,7 +2474,8 @@ void MissionViewer::drawPlay() {
                 if (!visible(u))
                     continue;
                 int px = 0, py = 0;
-                map_.minimapPoint(u.x, u.y, x0, y0, size, size, px, py);
+                if (!map_.minimapPoint(u.x, u.y, x0, y0, size, size, px, py, tiles))
+                    continue;
                 const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
                 const uint8_t r = u.selected ? 255 : own ? 120 : 255;
                 const uint8_t g = u.selected ? 150 : own ? 255 : enemy ? 70 : 230;
@@ -2701,21 +2768,26 @@ void MissionViewer::drawInterface() {
         }
     }
 
-    // TRICORDER: the map small, and the camera's position.
+    // TRICORDER (exe.md#the-tricorder): the map round the camera at its
+    // zoom, the side's units on it; a line naming what's under the pointer
+    // (else the view and zoom); COMMS, ALLY, ZOOM under it.
     {
-        const int x = screen_.w - sideW, w = sideW, h = 102, y = screen_.h - h;
+        const int x = screen_.w - sideW, w = sideW, h = 102 + lh + 4, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
+        const int mx = x + 12, my = y + 14, mw = w - 24, mh = h - 34 - 2 * lh;
+        const int tiles = kTricorderTiles << tricorderZoom_;
         if (hasMap_) {
-            map_.drawMinimap(screen_, x + 12, y + 14, w - 24, h - 30 - lh);
-            drawMinerals(x + 12, y + 14, w - 24, h - 30 - lh);
-            tricorder_ = {x + 12, y + 14, w - 24, h - 30 - lh};
+            map_.drawMinimap(screen_, mx, my, mw, mh, tiles);
+            drawMinerals(mx, my, mw, mh, tiles);
+            tricorder_ = {mx, my, mw, mh};
             // The player's own green, those hostile to it red, the rest yellow.
             if (world_)
                 for (const Unit& u : world_->units()) {
                     if (!visible(u))
                         continue;
                     int px = 0, py = 0;
-                    map_.minimapPoint(u.x, u.y, x + 12, y + 14, w - 24, h - 30 - lh, px, py);
+                    if (!map_.minimapPoint(u.x, u.y, mx, my, mw, mh, px, py, tiles))
+                        continue;
                     const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
                     for (int dy = 0; dy < 2; ++dy)
                         for (int dx = 0; dx < 2; ++dx)
@@ -2724,22 +2796,46 @@ void MissionViewer::drawInterface() {
                                 p[0] = own ? 120 : 255, p[1] = own ? 255 : enemy ? 70 : 230, p[2] = own ? 120 : 60;
                             }
                 }
-            int a = 0, b = 0;
-            map_.cameraPosition(a, b);
-            auto pad = [](int v) {
-                std::string s = std::to_string(v);
-                return std::string(s.size() < 3 ? 3 - s.size() : 0, '0') + s;
-            };
-            // The ore under it once the side has surveyed the block (the
-            // game's readout names it), else just the terrain.
-            std::string what = "TERRAIN";
-            if (fog_ && fog_->has(b / 8, a / 8, Fog::Surveyed, playerSlot_) && map_.depositAmount(b / 8, a / 8) > 0)
-                if (const int kind = map_.depositAt(b / 8, a / 8)) {
-                    what = kind == 5 ? "MAGNESITE ORE" : oreName(kind);
-                    std::transform(what.begin(), what.end(), what.begin(),
-                                   [](unsigned char c) { return char(std::toupper(c)); });
+            ui_.drawSmall(screen_, x + 10, y + h - 14 - 2 * lh, tricorderReadout(mx, my, mw, mh, tiles), text);
+        }
+        int bx = x + 10;
+        for (const auto& [label, action] : {std::pair{"COMMS", "tri-comms"}, std::pair{"ALLY", "tri-ally"},
+                                            std::pair{"ZOOM", "tri-zoom"}}) {
+            const int bw = ui_.smallWidth(label) + 8;
+            ui_.drawSmall(screen_, bx + 4, y + h - 11 - lh, label, allyOpen_ && std::string_view(action) == "tri-ally" ? bright : text);
+            buttons_.push_back({bx, y + h - 13 - lh, bw, lh + 4, action});
+            bx += bw + 4;
+        }
+        // ALLY: a row for each other race in the mission, the player's
+        // posture towards it; a click on one offers FRIENDLY, NEUTRAL,
+        // HOSTILE.
+        if (allyOpen_ && world_) {
+            std::vector<std::string> rows;
+            const auto others = allyRaces();
+            const int ah = 30 + int(others.size() + (allyPick_ >= 0 ? 1 : 0)) * (lh + 2);
+            const int ay = y - ah;
+            ui_.drawPanel(screen_, x, ay, w, ah, "ALLY");
+            int ry = ay + 15;
+            for (int slot : others) {
+                const int st = world_->stance(playerSlot_, slot);
+                std::string name = raceName(ai_ ? ai_->raceOf(slot) : '?');
+                std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+                const std::string word = st == 1 ? "FRIENDLY" : st == 2 ? "NEUTRAL" : "HOSTILE";
+                ui_.drawSmall(screen_, x + 10, ry, name, slot == allyPick_ ? bright : text);
+                ui_.drawSmall(screen_, x + w - 12 - ui_.smallWidth(word), ry, word, st == 3 ? Color{255, 90, 70} : text);
+                buttons_.push_back({x + 6, ry - 1, w - 12, lh + 2, "ally-race" + std::to_string(slot)});
+                ry += lh + 2;
+                if (slot == allyPick_) {
+                    int ox = x + 14;
+                    for (const auto& [label, v] : {std::pair{"FRIENDLY", 1}, std::pair{"NEUTRAL", 2}, std::pair{"HOSTILE", 3}}) {
+                        const int bw = ui_.smallWidth(label) + 6;
+                        ui_.drawSmall(screen_, ox + 3, ry, label, bright);
+                        buttons_.push_back({ox, ry - 1, bw, lh + 2, "ally-set" + std::to_string(v)});
+                        ox += bw + 4;
+                    }
+                    ry += lh + 2;
                 }
-            ui_.drawSmall(screen_, x + 10, y + h - 12 - lh, what + " AT <" + pad(a) + ":" + pad(b) + ">", text);
+            }
         }
     }
 
@@ -2934,6 +3030,61 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
 }
 
 const char* MissionViewer::buildMenuTitle() const { return vehicleMenu_ && !buildMenu_ ? "VEHICLES" : "BUILD"; }
+
+// The Tricorder's line (exe.md#the-tricorder): with the pointer over
+// it, what's there: one of the side's objects in sight (FRIENDLY,
+// NEUTRAL or HOSTILE, by the player's posture to its side, then DEFENSES,
+// STRUCTURE or UNIT), ground no unit can cross (IMPASSABLE), a surveyed
+// deposit (its ore AT <a:b>) or the ground (TERRAIN AT <a:b>); else the
+// view and its zoom (RELIEF X2).
+std::string MissionViewer::tricorderReadout(int mx, int my, int mw, int mh, int tiles) const {
+    static const char* const kZoom[] = {"X4", "X2", "X1"};
+    if (mouseX_ < mx || mouseY_ < my || mouseX_ >= mx + mw || mouseY_ >= my + mh)
+        return std::string("RELIEF ") + kZoom[tricorderZoom_];
+    float wx = 0, wy = 0;
+    map_.minimapToWorld(mouseX_, mouseY_, mx, my, mw, mh, tiles, wx, wy);
+    // An object within two pixels' worth of the pointer.
+    float x1 = 0, y1 = 0;
+    map_.minimapToWorld(mouseX_ + 2, mouseY_, mx, my, mw, mh, tiles, x1, y1);
+    const float reach = std::max(std::fabs(x1 - wx), 1500.0f);
+    if (world_)
+        for (const Unit& u : world_->units())
+            if (visible(u) && std::hypot(u.x - wx, u.y - wy) < reach) {
+                const int st = u.slot == playerSlot_ ? 1 : world_->stance(playerSlot_, u.slot);
+                const CombatType* t = combatType(u.type);
+                const char* kind = t && (t->mask & 0x10) ? " DEFENSES" : u.building ? " STRUCTURE" : " UNIT";
+                return std::string(st == 1 ? "FRIENDLY" : st == 2 ? "NEUTRAL" : "HOSTILE") + kind;
+            }
+    const int a = int(wy / MapViewer::kBlockUnits * 8), b = int(wx / MapViewer::kBlockUnits * 8);
+    auto pad = [](int v) {
+        std::string s = std::to_string(v);
+        return std::string(s.size() < 3 ? 3 - s.size() : 0, '0') + s;
+    };
+    if (world_ && !world_->passable(int(wx / kTile), int(wy / kTile)))
+        return "IMPASSABLE";
+    std::string what = "TERRAIN";
+    if (fog_ && fog_->has(b / 8, a / 8, Fog::Surveyed, playerSlot_) && map_.depositAmount(b / 8, a / 8) > 0)
+        if (const int kind = map_.depositAt(b / 8, a / 8)) {
+            what = kind == 5 ? "MAGNESITE ORE" : oreName(kind);
+            std::transform(what.begin(), what.end(), what.begin(), [](unsigned char c) { return char(std::toupper(c)); });
+        }
+    return what + " AT <" + pad(a) + ":" + pad(b) + ">";
+}
+
+// The other races in the mission, one slot each (not the player's).
+std::vector<int> MissionViewer::allyRaces() const {
+    std::vector<int> out;
+    std::set<char> seen;
+    if (!world_ || !ai_)
+        return out;
+    for (const Unit& u : world_->units()) {
+        const char race = ai_->raceOf(u.slot);
+        if (u.slot != playerSlot_ && race != '?' && seen.insert(race).second)
+            out.push_back(u.slot);
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
 
 // A, G, S, T, P (exe.md#keys): the colony's vehicles of a kind selected.
 void MissionViewer::selectAllOfKind(char k) {

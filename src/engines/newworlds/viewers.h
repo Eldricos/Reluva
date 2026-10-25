@@ -198,9 +198,16 @@ public:
     // colours, with the camera's target marked; the target as a map
     // position (eighths of a block, row first); the camera's heading in
     // degrees (0 when unturned, clockwise).
-    void drawMinimap(Surface& s, int x, int y, int w, int h) const;
-    // A world point's pixel on a minimap drawn at x, y, w, h.
-    void minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py) const;
+    // tiles: how many tiles across it shows, round the camera's target
+    // (the Tricorder's zoom); 0 the whole map.
+    void drawMinimap(Surface& s, int x, int y, int w, int h, int tiles = 0) const;
+    // A world point's pixel on a minimap drawn at x, y, w, h (false if
+    // it's outside it), and the world point under a pixel.
+    bool minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py, int tiles = 0) const;
+    void minimapToWorld(int px, int py, int x, int y, int w, int h, int tiles, float& wx, float& wy) const;
+    // Moves the camera along the ground, by world units right and forward.
+    void pan(float right, float forward);
+    void cameraTarget(float& x, float& y) const { x = targetX_, y = targetY_; }
     void cameraPosition(int& a, int& b) const;
     float heading() const;
     void setColouring(int colouring) {
@@ -277,7 +284,9 @@ public:
     // view, F1's first-person view; arrows move, numpad 4/6 turn, 8/2 zoom
     // towards the pointer, 7/1 raise and lower, 9/3 tilt. A key it doesn't
     // use returns false. mouseX/Y: where the pointer is, for the zoom.
-    enum class View { BirdsEye, Sky, FirstPerson };
+    // The game's cameras (exe.md#cameras): F1 low over the ground, F2
+    // isometric, F3 close-up isometric.
+    enum class View { BirdsEye, Close, FirstPerson };
     bool gameKey(uint32_t key, int mouseX, int mouseY);
     void setView(View v);
     View view() const { return view_; }
@@ -374,6 +383,9 @@ private:
     std::optional<Placed> ghost_;
     bool ghostValid_ = false;
     View view_ = View::BirdsEye;
+    void minimapWindow(int w, int h, int tiles, float& ox, float& oy, float& tw, float& th) const;
+    float markX_ = 0, markY_ = 0; // Z's camera place
+    bool marked_ = false;
     bool locked_ = false;
     std::vector<std::array<float, 4>> buildingAreas_; // middle x, y and half sizes, in model units
     void updateHidden();
@@ -571,7 +583,9 @@ private:
     void updateGhost();
     void placeBuilding();
     void showProgress();
-    void drawMinerals(int x, int y, int w, int h);
+    void drawMinerals(int x, int y, int w, int h, int tiles = 0);
+    std::string tricorderReadout(int mx, int my, int mw, int mh, int tiles) const;
+    std::vector<int> allyRaces() const;
     // A selected object's panel lines, as the game's (exe.md#the-selection-panel),
     // and its hit points' share for the bar under them.
     std::vector<std::string> objectPanel(const Unit& u) const;
@@ -715,6 +729,14 @@ private:
     std::vector<PanelButton> buttons_;
     bool staffView_ = false;            // the STAFF panel: the officers' cards
     bool trainingView_ = false;         // its TRAINING list: the officers' courses
+    int alertedLast_ = 0;               // Space: the alerted object the camera went to last
+    double edgeClock_ = 0;
+    float edgeSpeed_ = 0;               // edge scrolling's speed, units a tick
+    bool mouseSeen_ = false;            // the pointer has moved (it starts at 0, 0)
+    int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
+    bool allyOpen_ = false;             // the ALLY page
+    int allyPick_ = -1;                 // its race clicked (a slot): the postures offered
+    std::set<int> touchyNeutral_;       // races set neutral on it: hostile at their first shot
     int commsShown_ = -1;               // the message COMMUNICATIONS shows (-1: the latest)
     bool commsClosed_ = false;          // put away with X, until the next message
     bool commandShown_ = true;          // the COMMAND panel (MISSION shows or hides it)

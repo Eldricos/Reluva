@@ -136,25 +136,51 @@ void MapViewer::lookAt(int a, int b, bool ground) {
     dirty_ = true;
 }
 
-void MapViewer::minimapPoint(float wx, float wy, int x0, int y0, int w, int h, int& px, int& py) const {
-    px = x0 + int(wx / (float(map_.width) * kBlockSize) * float(w));
-    py = y0 + h - 1 - int(wy / (float(map_.height) * kBlockSize) * float(h));
+// The part of the map a minimap shows, in tiles: all of it, or a window
+// so many tiles across round the camera's target (as high as the minimap
+// is), kept on the map.
+void MapViewer::minimapWindow(int w, int h, int tiles, float& ox, float& oy, float& tw, float& th) const {
+    const float allW = float(map_.width * 2), allH = float(map_.height * 2);
+    ox = oy = 0, tw = allW, th = allH;
+    if (tiles <= 0 || w <= 0 || h <= 0)
+        return;
+    tw = std::min(float(tiles), allW);
+    th = std::min(allH, tw * float(h) / float(w));
+    ox = std::clamp(targetX_ / kTileSize - tw / 2, 0.0f, allW - tw);
+    oy = std::clamp(targetY_ / kTileSize - th / 2, 0.0f, allH - th);
 }
 
-void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h) const {
+bool MapViewer::minimapPoint(float wx, float wy, int x0, int y0, int w, int h, int& px, int& py, int tiles) const {
+    float ox = 0, oy = 0, tw = 1, th = 1;
+    minimapWindow(w, h, tiles, ox, oy, tw, th);
+    const float fx = (wx / kTileSize - ox) / tw, fy = (wy / kTileSize - oy) / th;
+    px = x0 + int(fx * float(w));
+    py = y0 + h - 1 - int(fy * float(h));
+    return fx >= 0 && fx < 1 && fy >= 0 && fy < 1;
+}
+
+void MapViewer::minimapToWorld(int px, int py, int x0, int y0, int w, int h, int tiles, float& wx, float& wy) const {
+    float ox = 0, oy = 0, tw = 1, th = 1;
+    minimapWindow(w, h, tiles, ox, oy, tw, th);
+    wx = (ox + (float(px - x0) + 0.5f) / float(w) * tw) * kTileSize;
+    wy = (oy + (float(h - 1 - (py - y0)) + 0.5f) / float(h) * th) * kTileSize;
+}
+
+void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h, int tiles) const {
     if (map_.width <= 0 || map_.height <= 0)
         return;
-    const int tilesW = map_.width * 2, tilesH = map_.height * 2;
+    float ox = 0, oy = 0, tw = 1, th = 1;
+    minimapWindow(w, h, tiles, ox, oy, tw, th);
     for (int y = 0; y < h; ++y) {
         if (y0 + y < 0 || y0 + y >= s.h)
             continue;
         // Row 0 of the grid at the bottom, as the map is drawn.
-        const float fy = (float(h - 1 - y) + 0.5f) / float(h) * float(tilesH);
+        const float fy = oy + (float(h - 1 - y) + 0.5f) / float(h) * th;
         uint8_t* row = s.row(y0 + y);
         for (int x = 0; x < w; ++x) {
             if (x0 + x < 0 || x0 + x >= s.w)
                 continue;
-            const float fx = (float(x) + 0.5f) / float(w) * float(tilesW);
+            const float fx = ox + (float(x) + 0.5f) / float(w) * tw;
             const int t = tileAt(int(fx), int(fy));
             unsigned code = 0;
             if (t >= 0 && size_t(t) < map_.tiles.size())
@@ -168,14 +194,20 @@ void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h) const {
         }
     }
     // The camera's target, a small cross.
-    const int cx = x0 + int(targetX_ / (float(map_.width) * kBlockSize) * float(w));
-    const int cy = y0 + h - 1 - int(targetY_ / (float(map_.height) * kBlockSize) * float(h));
+    int cx = 0, cy = 0;
+    minimapPoint(targetX_, targetY_, x0, y0, w, h, cx, cy, tiles);
     for (int d = -3; d <= 3; ++d)
         for (const auto& [px, py] : {std::pair{cx + d, cy}, std::pair{cx, cy + d}})
             if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
                 uint8_t* p = s.row(py) + px * 4;
                 p[0] = 255, p[1] = 255, p[2] = 255;
             }
+}
+
+void MapViewer::pan(float right, float forward) {
+    const float fx = -std::sin(yaw_), fy = std::cos(yaw_);
+    locked_ = false;
+    centreOn(targetX_ + fx * forward + fy * right, targetY_ + fy * forward - fx * right);
 }
 
 void MapViewer::cameraPosition(int& a, int& b) const {
@@ -555,8 +587,11 @@ namespace {
 struct ViewShape {
     float distance, pitch;
 };
-constexpr ViewShape kBirdsEye{3.5f * kBlockSize, 40.0f * kPi / 180.0f};
-constexpr ViewShape kSky{14.0f * kBlockSize, 65.0f * kPi / 180.0f};
+// The game's isometric cameras (exe.md#cameras): F2 28000 units up and
+// F3 15000, both looking 45 degrees down (so that far from their target
+// times the square root of two).
+constexpr ViewShape kBirdsEye{28000.0f * 1.41421356f, 45.0f * kPi / 180.0f};
+constexpr ViewShape kClose{15000.0f * 1.41421356f, 45.0f * kPi / 180.0f};
 constexpr ViewShape kFirstPerson{0.6f * kBlockSize, 6.0f * kPi / 180.0f};
 } // namespace
 
@@ -566,7 +601,7 @@ Terrain MapViewer::terrain() {
 
 void MapViewer::setView(View v) {
     view_ = v;
-    const ViewShape& s = v == View::Sky ? kSky : v == View::FirstPerson ? kFirstPerson : kBirdsEye;
+    const ViewShape& s = v == View::Close ? kClose : v == View::FirstPerson ? kFirstPerson : kBirdsEye;
     distance_ = s.distance;
     pitch_ = s.pitch;
     targetZ_ = groundHeight(targetX_, targetY_);
@@ -631,8 +666,21 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
     }
     case key::Kp0 + 9: pitch_ = std::clamp(pitch_ + kKeyTurn / 2, 0.02f, kMaxPitch); break;
     case key::Kp0 + 3: pitch_ = std::clamp(pitch_ - kKeyTurn / 2, 0.02f, kMaxPitch); break;
-    case key::F1: setView(view_ == View::FirstPerson ? View::BirdsEye : View::FirstPerson); break;
-    case key::F1 + 1: setView(view_ == View::Sky ? View::BirdsEye : View::Sky); break;
+    // F1, F2, F3 the game's cameras; Q the next of them; Z keeps the
+    // camera's place, X goes back to it.
+    case key::F1: setView(View::FirstPerson); break;
+    case key::F1 + 1: setView(View::BirdsEye); break;
+    case key::F1 + 2: setView(View::Close); break;
+    case 'q':
+        setView(view_ == View::FirstPerson ? View::BirdsEye : view_ == View::BirdsEye ? View::Close : View::FirstPerson);
+        break;
+    case 'z': markX_ = targetX_, markY_ = targetY_, marked_ = true; break;
+    case 'x':
+        if (!marked_)
+            return false;
+        locked_ = false;
+        centreOn(markX_, markY_);
+        break;
     default: return false;
     }
     dirty_ = true;

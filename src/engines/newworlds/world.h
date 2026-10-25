@@ -125,6 +125,7 @@ public:
 
     const Terrain& terrain() const { return terrain_; }
     bool passable(int tx, int ty) const;
+    int tick() const { return tick_; } // combat ticks so far
     // Whether a unit can step from one tile to a neighbour (8 ways; a
     // diagonal needs both tiles beside it open).
     bool canStep(int tx, int ty, int dx, int dy) const;

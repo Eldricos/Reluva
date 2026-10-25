@@ -38,6 +38,7 @@ As the first tutorial teaches them:
 | R, then 1-9 | the research topics open to the colony; a number starts one (several share the points) |
 | O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
+| TRICORDER's buttons | COMMS opens the communications panel; ALLY lists the other races and your posture towards each (a click, then FRIENDLY, NEUTRAL or HOSTILE; set neutral, a race turns hostile at its first shot at you); ZOOM steps the map X2, X1, X4 |
 | Double click on the ground (nothing selected) | locks the camera on the spot; numpad 4/6 orbit it |
 | Right click | drops the selection (or the camera's lock) |
 | Ctrl + left / right click | zooms in on the pointed spot / out |
@@ -46,8 +47,10 @@ As the first tutorial teaches them:
 | Numpad 8 / 2 | zoom in towards the pointer / out ("targeted zoom") |
 | Numpad 7 / 1 | raise / lower the camera |
 | Numpad 9 / 3 | tilt |
-| F2 | the sky view, much higher (F2 again: the bird's-eye view) |
-| F1 | the first-person view, low over the ground (F1 again: back) |
+| F1 / F2 / F3, Q | the game's cameras: low over the ground / isometric (28000 up, 45 degrees) / close-up isometric (15000 up); Q the next |
+| Z / X | keep the camera's place / go back to it |
+| The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up |
+| Space | the camera to the next of the colony's objects lately hit |
 | Home | back to the colony hub |
 | Ctrl + 1-9 | makes the selection a battle group |
 | 1-9 / Shift + 1-9 | selects the group / centres on it |
@@ -57,7 +60,7 @@ As the first tutorial teaches them:
 | Right click or Escape (placing) | puts the hologram away |
 | Tab | the full-screen Tricorder, units marked |
 | I | the interface on/off |
-| F3 or Escape | stops playing (Escape first closes the menu or hologram) |
+| Escape | stops playing (first it closes the menu or hologram) |
 | G (missions page) | plays the mission through as the game runs it: a loading box over the three emblems, the briefing (Backspace skips it), a second loading box, play; once won or lost, the debriefing box, then the won or lost screen with the MISSION REPORT; CONTINUE (or Return) back to the page. Escape leaves at any point. F3 still starts play straight away |
 | Ctrl + X (playing) | the script's walkthrough a step on (a testing aid) |
 | COMMUNICATIONS' buttons | DELETE the message shown; the arrows to the first, previous, next and last; MISSION shows or hides the COMMAND panel (the mission and its objectives); X puts the panel away until the next message |
@@ -393,9 +396,8 @@ built, to be put back at the end so play feels as the game's does:
 | Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
 | Animation speed | 10 frames a second | Reluva's (arf.md) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
-| Bird's-eye view | 3.5 blocks away, 40° down | by eye |
-| Sky view | 14 blocks, 65° | by eye |
-| First-person view | 0.6 block, 6° | by eye |
+| First-person view (F1) | 0.6 block away, 6° down | by eye: the game's is 2000 up, looking level |
+| Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
 | Bees | fly 1500 units up; a cargo bee docks 1 s; worker bees stay in the hub (their pod shuttles aren't shown) | Reluva's |

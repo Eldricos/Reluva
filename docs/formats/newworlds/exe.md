@@ -778,6 +778,49 @@ colony's life support as a producer: consumption (drawn over made last
 tick), demand met, and the reserve (stored over 655 360): every farm
 shows the same.
 
+### The Tricorder
+
+The small Tricorder (bottom right) has three buttons. **ZOOM** steps its
+scale: X2 at the start, then X1, then X4, round again; the small map is
+32, 64 or 16 tiles across round the camera (the full-screen one, Tab,
+twice as many). **COMMS** opens the communications panel (a log of the
+messages: one at a time with the sender's portrait and i/n, Delete,
+Done, Mission; again it doesn't close it). **ALLY** lists the other races
+in the mission (from its Defence database), each a click to pick
+Friendly, Neutral or Hostile: it sets only the player's posture towards
+that race (through the order queue, as a script's posture switch does),
+theirs unchanged; set Neutral, it turns Hostile at the first shot that
+race fires at the player (a provocation limit of 1).
+
+Its line names what's under the pointer: an object, by the player's
+posture to its side (Friendly, Neutral, Hostile) and its class
+(defenses, structure, unit), "Debris" for one gone; Impassable ground;
+an ore (`<ore> at <a:b>`) or the terrain (`Terrain at <a:b>`); with the
+pointer elsewhere, the view's name and the zoom (Relief X2).
+
+### Cameras
+
+F1, F2 and F3 set the camera mode, Q steps through them: F1 low over the
+ground (2000 up, looking level; it can tilt, and numpad 5 turns it
+round), F2 isometric (28000 up, 45 degrees down), F3 close-up isometric
+(15000 up, 45 degrees down). The arrows speed up by 80 a step to 6400;
+in F2 and F3 the pointer on the screen's outermost pixels scrolls the
+same way. Z keeps the camera's position (one place; not its direction or
+mode), X goes back to it. Space goes to the next of the side's objects
+with an alert (hit, or a report: everyone beamed down, a mine exhausted),
+in their list order; an alert lasts 41 Tricorder redraws.
+
+### Keys
+
+The game's own: X (camera back; Ctrl+X quits), Escape (quit, with a
+yes / no), F1-F3, 1-5 (a battle group; Shift goes to it, Ctrl makes it),
+P, A, T, S, G (all the side's artillery, APCs, tanks, science vehicles,
+ground scouts), Space, Home (the hub), B (the build window; Shift or
+Ctrl the next building), V (the vehicle yard's; Shift or Ctrl the next
+fighting vehicle), C (the colony's details), Z, Q, Pause, Tab; in
+multiplayer Enter and Ctrl+K, R, F for messages. The arrows and numpad
+are read directly.
+
 ### Stores
 
 Only storage facilities put their store on the side's list, and the
