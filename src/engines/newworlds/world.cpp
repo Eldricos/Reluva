@@ -19,8 +19,13 @@ constexpr float kSpread = 2500;
 // How far past a building's middle a shot reaches it (its walls); a
 // placeholder.
 constexpr float kBuildingReach = 6000;
-// Ticks between a burst's shots; a placeholder.
-constexpr int kBurstGap = 3;
+// Turrets (exe.md#sides-and-combat): they turn speeding up and then
+// slowing down onto their target, at 128 of the game's 65536ths of a turn
+// a tick each tick, and fire only when on it. They look for a target
+// every 8-11 ticks. A shell's reach on flat ground (its speed and gravity).
+constexpr float kTurretPush = 128.0f / 65536 * 2 * 3.14159265f;
+constexpr int kRescan = 8;
+constexpr float kShellReach = 36850;
 // Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
 constexpr int kCloakAfter = 300, kCloakFade = 63;
 // Protecting (exe.md#orders): how often it looks for an attack on the
@@ -408,7 +413,8 @@ void World::combatTick() {
     ++tick_;
     auto distance = [](const Unit& a, const Unit& b) { return std::hypot(b.x - a.x, b.y - a.y); };
     auto inRange = [&](const Unit& u, const Unit& t) {
-        return distance(u, t) <= u.weapon.range + (t.building ? kBuildingReach : 0);
+        const float range = u.weapon.kind == WeaponKind::Artillery ? std::min(u.weapon.range, kShellReach) : u.weapon.range;
+        return distance(u, t) <= range + (t.building ? kBuildingReach : 0);
     };
     for (Unit& u : units_) {
         if (u.cloaks && u.hp > 0) {
@@ -444,7 +450,11 @@ void World::combatTick() {
         const bool onTheMove = firesOnTheMove(u);
         const bool looks = (u.ai || u.building || !u.moving() || onTheMove) &&
                            !(u.cloaks && u.moving() && !(onTheMove && u.order == UnitOrder::EnRoute));
-        if (!t && looks) {
+        // It looks round every few ticks: for the nearest, unless told whom.
+        const bool rescan = (tick_ + u.id) % (kRescan + (u.id & 3)) == 0;
+        if (rescan && t && !u.ordered)
+            t = nullptr;
+        if (!t && looks && (rescan || u.target)) {
             float best = 1e30f;
             for (Unit& v : units_)
                 if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
@@ -456,6 +466,20 @@ void World::combatTick() {
                 t = a;
         if (!t) {
             u.target = 0, u.ordered = false, u.firing = false, u.burstLeft = 0;
+            // Nothing in range: the turret follows the nearest enemy in
+            // its box (a square its range across each way), ready.
+            if (rescan) {
+                u.tracking = 0;
+                float best = 1e30f;
+                if (looks)
+                    for (const Unit& v : units_)
+                        if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 &&
+                            std::abs(v.x - u.x) <= u.weapon.range && std::abs(v.y - u.y) <= u.weapon.range &&
+                            (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && distance(u, v) < best)
+                            best = distance(u, v), u.tracking = v.id;
+            }
+            const Unit* k = u.tracking ? unit(u.tracking) : nullptr;
+            turnTurret(u, k ? std::atan2(k->y - u.y, k->x - u.x) - (u.building ? 0 : u.heading) : 0);
             continue;
         }
         u.target = t->id;
@@ -474,24 +498,26 @@ void World::combatTick() {
         u.firing = true;
         if (!onTheMove)
             u.path.clear();
-        u.turretYaw = std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading);
         // Cloaked, it decloaks to fire; it can't while fading either way.
         if (u.cloaks && (u.cloaked || u.fading > 0)) {
             if (u.cloaked)
                 u.cloaked = false, u.fading = kCloakFade, u.cloaking = false;
+            turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading));
             continue;
         }
+        // On target, or turning onto it.
+        if (!turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading)))
+            continue;
+        // A burst: a pulse a tick, its reload counted from the tick after
+        // the last.
         if (u.burstLeft > 0) {
-            if (--u.burstGap <= 0) {
-                fire(u, *t);
-                --u.burstLeft;
-                u.burstGap = kBurstGap;
-            }
+            fire(u, *t);
+            --u.burstLeft;
         } else if (u.cooldown == 0) {
             fire(u, *t);
-            u.burstLeft = u.weapon.kind == WeaponKind::Burst ? u.weapon.magazine - 1 : 0;
-            u.burstGap = kBurstGap;
-            u.cooldown = u.weapon.reload;
+            const int pulses = u.weapon.kind == WeaponKind::Burst ? std::max(1, u.weapon.magazine) : 1;
+            u.burstLeft = pulses - 1;
+            u.cooldown = u.weapon.reload + (pulses > 1 ? pulses : 0);
         }
     }
     // The destroyed go.
@@ -549,9 +575,31 @@ void World::protectTick(Unit& u) {
     }
 }
 
+// Turns a turret towards an angle (from straight ahead), speeding up and
+// slowing down onto it; true once it's there.
+bool World::turnTurret(Unit& u, float want) {
+    float d = std::remainder(want - u.turretYaw, 2 * 3.14159265f);
+    if (std::abs(d) <= kTurretPush && std::abs(u.turretSpin) <= kTurretPush) {
+        u.turretYaw = std::remainder(want, 2 * 3.14159265f), u.turretSpin = 0;
+        return true;
+    }
+    // Slow down if it couldn't stop in what's left, else speed up.
+    const float stopping = u.turretSpin * u.turretSpin / (2 * kTurretPush);
+    const bool towards = (d > 0) == (u.turretSpin > 0) || u.turretSpin == 0;
+    if (towards && stopping < std::abs(d))
+        u.turretSpin += d > 0 ? kTurretPush : -kTurretPush;
+    else
+        u.turretSpin -= u.turretSpin > 0 ? std::min(kTurretPush, u.turretSpin) : std::max(-kTurretPush, u.turretSpin);
+    u.turretYaw = std::remainder(u.turretYaw + u.turretSpin, 2 * 3.14159265f);
+    return false;
+}
+
 void World::fire(Unit& u, Unit& t) {
-    // (A building still going up takes no harm.)
-    const float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
+    // Each shot: its damage times the shooter's security skill + 1
+    // (artillery's as it is). (A building still going up takes no harm.)
+    float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
+    if (u.weapon.kind != WeaponKind::Artillery && marksmanship_)
+        damage = std::trunc(damage * (marksmanship_(u) + 1));
     if (t.built >= 1)
         t.hp -= damage_ ? damage_(t, damage) : damage;
     t.lastAttacker = u.id;

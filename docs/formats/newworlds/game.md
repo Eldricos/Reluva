@@ -24,6 +24,7 @@ As the first tutorial teaches them:
 | Double click (units selected) on the ground, another side's object, or one of the colony's buildings | the **playbook**: a column of the game's order icons left of the Tricorder (the pointer over one names it); a click gives that order: on the ground attack en route, protect from location, move without attacking, return to the rally point; on another side's object follow and attack, assault, capture (armed APCs on a building), or the three scans (scouts and science vehicles alone); protect area (mobile shield generators on the colony's building). Any other click or Escape puts it away |
 | A building's buttons (its panel) | STAFF (the hub: the officers' cards), BUILD (the hub and construction yard: the build menu; the vehicle yard: its vehicles), RESEARCH (science station, sickbay), - CREW / + CREW (the crew assigned to it) |
 | A click on an officer's card (STAFF), then on one of the colony's buildings or a vehicle that carries officers | moves the officer there |
+| TRAINING (on the STAFF panel), then a course | starts the officer's training |
 | A, then a click on the ground / on a target | attack en route (cloaking units fire too, decloaking) / assault: fire at it from where they stand |
 | P, then a click on the ground / on one of the colony's buildings | protect from location: hold the spot, go after whoever attacks the colony, come back; with a building, mobile shield generators guard it ("protect area") and the rest hold beside it |
 | Y | the selected armed vehicles drive back to the rally point |
@@ -60,7 +61,7 @@ As the first tutorial teaches them:
 The numpad keys work with NumLock on or off. The game's build menu is a
 row of buttons (play-tutorials.md); here it is a numbered list. Not yet
 modelled: bees building (here a building goes up by itself once placed),
-the officers' training, DEMOLISH and the hub's colony overview. The keys
+DEMOLISH and the hub's colony overview. The keys
 A, P, Y, S, M, E and C give the playbook's orders without it.
 
 ## What's modelled
@@ -150,10 +151,14 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
 - **Combat** runs at the game's 20 ticks a second with the executable's
   figures: hit points (the player's own times 1.2 for the Federation, 1.3
   for the Romulans), weapon damage, range and reload; a burst weapon fires
-  its four shots a few ticks apart, artillery a shell. An armed unit or
-  turret finds the nearest enemy in range: a side fires at those it's
-  hostile to, the player's units also at those hostile to the player, and
-  anyone fires back at whoever hit it. The player's units driving
+  its four pulses a tick apart and reloads after the last, artillery a
+  shell (reaching 36850 at most). A shot does its damage times the
+  shooter's security skill + 1 (artillery's as it is). An armed unit or
+  turret looks round every 8-11 ticks for the nearest enemy in range,
+  its turret meanwhile following the nearest in its reach; it fires only
+  once its turret has turned onto the target, at the game's rate: a side
+  fires at those it's hostile to, the player's units also at those
+  hostile to the player, and anyone fires back at whoever hit it. The player's units driving
   somewhere don't stop to fight; sent to attack, they give chase. What
   runs out of hit points is destroyed: a blast, a building left as its
   flattened wreck (and gone from the economy), and the scripts hear
@@ -204,9 +209,13 @@ A, P, Y, S, M, E and C give the playbook's orders without it.
 - **Cloaked units** of the player's own side are drawn see-through, and
   every cloaking unit fades in and out over its fades.
 - **The officers** (the hub's STAFF): a card each, with a portrait (the
-  section's), rank and name, section (Engineering, Security, Medical,
-  Science, Operations) and skill (BASIC 0.25, SKILLED 0.5, HIGHLY
-  SKILLED 0.75 and up), and where they are; a card picked, the next of
+  section's), rank (the mission's, in the race's titles) and name,
+  section (Engineering, Security, Medical, Science, Operations, ...) and
+  skill (BASIC 0.25, SKILLED 0.5, HIGHLY SKILLED 0.75, EXPERT 1), and
+  where they are. TRAINING (lit while a course is left) lists the
+  officers the mission lets train, each a click to start: the side's
+  1000 training points a tick shared between the courses running (7.5 s
+  alone), then the officer a band up; a card picked, the next of
   the colony's buildings or carrying vehicles clicked takes the officer
   (O and Shift+O still board and land a vehicle's). A building's crew
   can be set below its slots (- CREW): those over go back to the hub's
@@ -346,9 +355,10 @@ built, to be put back at the end so play feels as the game's does:
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 | Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
-| A burst's shots | 3 ticks apart | Reluva's |
+| Shots | hit at once; never miss; no power taken | the game's are projectiles that fly and can miss, and each takes 300 units of the shooter's power |
+| Turret arcs | every turret turns all round | the executable's yaw and pitch limits (some APCs' 60° or 90° each way) |
 | Reach on a building | 6000 units past its middle | Reluva's |
-| Target finding | the nearest enemy in range, every tick; AI colonies go only for colonies | Reluva's (F1's recordings for the last) |
+| Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
 | A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
 | Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
@@ -361,7 +371,6 @@ built, to be put back at the end so play feels as the game's does:
 | The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
-| Officers' ranks | Ens. below SKILLED, Lt. above | C8's three officers |
 | Officers' portraits | the section's face (as the messages use) | which face is whose isn't known |
 | What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
 | Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |
@@ -417,11 +426,15 @@ placeholders:
   yard's spot; neither is placed (the game's placement test may refuse
   them too).
 - In J6, K8 and R9 the Metar fire at hubs whose repairs outpace them.
-  Their bursts do 6 a shot after Reluva's divide-by-three reading of the
-  burst damage, which shields and security officers cut to 1-2.
+  Their pulses do 6 (a third of the type's figure, as the executable
+  divides it), which shields and security officers cut to 1-2.
 - A colony left to itself loses F1, F2, F3, R1, R2 and several joint
-  missions within 15 minutes; in F1 to the first assault: a Klingon disruptor tank's 40-point shot kills a phaser tank
-  outright, against the phaser's four 6-point shots (that reading again).
+  missions within 15 minutes; in F1 to the first assault: a Klingon
+  disruptor tank's 40-point shot kills a phaser tank (36 hit points)
+  outright, against the phaser's four 6-point pulses, and the attackers
+  drive in already facing their targets. Left to itself the colony's
+  tanks don't fire until hit (the Federation is neutral to the Klingons
+  in F1); the game leaves that to the player.
 - Groups in the joint missions wait minutes for their yards: the random
   assaults order tanks faster than one yard makes them (about one every
   48 s).

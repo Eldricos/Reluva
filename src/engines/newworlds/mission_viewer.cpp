@@ -412,6 +412,9 @@ void MissionViewer::startPlay() {
         const float security = fieldWork_ && target.slot == playerSlot_ ? fieldWork_->skill(target.id, 2) : 0;
         return shieldedDamage(target, damage, fog_.get(), security);
     });
+    world_->setMarksmanship([this](const Unit& shooter) {
+        return fieldWork_ && shooter.slot == playerSlot_ ? fieldWork_->skill(shooter.id, 2) : 0.0f;
+    });
     scannedSites_.clear();
     playing_ = true;
     interface_ = true;
@@ -483,7 +486,7 @@ void MissionViewer::rollOut() {
             float best = 0;
             for (const FieldWork::OfficerAt& o : fieldWork_->officers())
                 if (o.in == colonyObjects_[i] && o.in > 0 && o.officer->speciality == wanted)
-                    best = std::max(best, o.officer->skill);
+                    best = std::max(best, o.skill);
             economy_->setOfficer(structureIds_[i], best);
             if (const Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
                 economy_->setHealth(structureIds_[i], u->hp / u->maxHp);
@@ -775,7 +778,7 @@ void MissionViewer::showUnits() {
                 const float opacity = u.cloaked ? kCloaked
                                       : u.fading > 0 ? (u.cloaking ? faded : 1 - (1 - kCloaked) * float(u.fading) / 63)
                                                      : 1.0f;
-                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.firing ? u.turretYaw : 0, 0, opacity});
+                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, opacity});
             }
     map_.setUnits(std::move(draw));
 }
@@ -906,6 +909,10 @@ bool MissionViewer::playEvent(const Event& ev) {
     }
     switch (ev.type) {
     case EventType::KeyDown:
+        if (ev.key == key::Escape && trainingView_) {
+            trainingView_ = false;
+            break;
+        }
         if (ev.key == key::Escape && (!playbook_.empty() || staffView_ || pickedOfficer_ >= 0)) {
             playbook_.clear();
             staffView_ = false;
@@ -1860,7 +1867,12 @@ bool MissionViewer::pressButton(int x, int y) {
         const Unit* u = selectedBuilding_ && world_ ? world_->unit(selectedBuilding_) : nullptr;
         if (b.action == "staff") {
             staffView_ = !staffView_;
+            trainingView_ = false;
             pickedOfficer_ = -1;
+        } else if (b.action == "training") {
+            trainingView_ = true;
+        } else if (b.action.rfind("course", 0) == 0 && fieldWork_) {
+            fieldWork_->train(size_t(std::atoi(b.action.c_str() + 6)));
         } else if (b.action == "build") {
             buildMenu_ = !(u && u->name == "vehicle-yard");
             vehicleMenu_ = u && u->name == "vehicle-yard";
@@ -1890,28 +1902,42 @@ std::vector<std::string> MissionViewer::staffCards() const {
     std::vector<std::string> out;
     if (!fieldWork_)
         return out;
-    for (const FieldWork::OfficerAt& o : fieldWork_->officers()) {
-        const float skill = o.officer->skill;
-        // (The recordings' ranks: Ens. at the basic skill, Lt. above.)
-        std::string name = std::string(skill < 0.5f ? "ENS. " : "LT. ") + o.officer->name;
-        for (char& c : name)
+    const char race = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    auto upper = [](std::string v) {
+        for (char& c : v)
             c = char(std::toupper(static_cast<unsigned char>(c)));
-        const int sp = o.officer->speciality;
-        const char* section = sp == 1   ? "ENGINEERING"
-                              : sp == 2 ? "SECURITY"
-                              : sp == 3 ? "MEDICAL"
-                              : sp == 4 ? "SCIENCE"
-                              : sp == 7 ? "OPERATIONS"
-                                        : "COLONY";
-        const char* level = skill >= 0.75f ? "HIGHLY SKILLED" : skill >= 0.5f ? "SKILLED" : "BASIC";
+        return v;
+    };
+    for (const FieldWork::OfficerAt& o : fieldWork_->officers()) {
+        out.push_back(upper(std::string(rankTitle(race, o.officer->rank)) + " " + o.officer->name));
+        out.push_back(std::string(specialityName(o.officer->speciality)) + ", " + skillWord(o.skill));
         std::string where = "IN ORBIT";
         if (const Unit* u = o.in > 0 && world_ ? world_->unit(o.in) : nullptr) {
             const BuildingType* t = u->building ? buildingType(u->name) : nullptr;
             where = t ? t->panel : u->kind.name;
         }
-        out.push_back(name);
-        out.push_back(std::string(section) + ", " + level);
         out.push_back(where);
+    }
+    return out;
+}
+
+// The TRAINING list: a line for each officer's course, as the game's
+// buttons read: who, and train in / training in / trained in their
+// speciality (with how far it has got).
+std::vector<std::string> MissionViewer::trainingLines() const {
+    std::vector<std::string> out;
+    if (!fieldWork_)
+        return out;
+    for (const FieldWork::Course& c : fieldWork_->courses()) {
+        const Officer& o = *fieldWork_->officers()[c.officer].officer;
+        std::string name = o.name;
+        for (char& ch : name)
+            ch = char(std::toupper(static_cast<unsigned char>(ch)));
+        const std::string what = c.finished  ? "TRAINED IN "
+                                 : c.running ? "TRAINING IN "
+                                             : "TRAIN IN ";
+        out.push_back(name + ": " + what + specialityName(o.speciality) +
+                      (c.running ? " " + std::to_string(c.done * 100 / FieldWork::kCoursePoints) + "%" : ""));
     }
     return out;
 }
@@ -2155,9 +2181,11 @@ void MissionViewer::drawInterface() {
             }
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
+        const std::vector<std::string> training = staffView_ && trainingView_ ? trainingLines() : std::vector<std::string>{};
         const int lines = buildMenu_      ? int(menu.size()) + 1
                           : researchMenu_ ? std::max(2, int(offered.size()) + 1)
                           : vehicleMenu_  ? std::max(2, int(vehicles.size()) + 1) + int(std::min<size_t>(jobs, 4))
+                          : trainingView_ && staffView_ ? std::max(2, int(training.size()) + 1)
                           : staffView_    ? int(cards.size()) + 2
                           : !info.empty() ? int(info.size()) + 1 + (pendingOrder_ ? 1 : 0) + (actions.empty() ? 0 : 2)
                                           : economy_ ? 8 : 7;
@@ -2230,12 +2258,31 @@ void MissionViewer::drawInterface() {
                     ui_.drawSmall(screen_, x + 10, ty + lh * line++,
                                   std::string(materialName(m)) + " = " + std::to_string(placing->costFor(side)[size_t(m)]),
                                   economy_->stock()[size_t(m)] >= placing->costFor(side)[size_t(m)] ? text : Color{255, 80, 60});
+        } else if (staffView_ && trainingView_) {
+            // Training: each officer's course; a click starts it.
+            ui_.drawSmall(screen_, x + 10, ty, "TRAINING", bright);
+            if (training.empty())
+                ui_.drawSmall(screen_, x + 10, ty + lh, "NO ONE TO TRAIN", text);
+            for (size_t i = 0; i < training.size(); ++i) {
+                const FieldWork::Course& c = fieldWork_->courses()[i];
+                const int cy = ty + lh * int(i + 1);
+                ui_.drawSmall(screen_, x + 10, cy, training[i], c.running ? bright : text);
+                if (!c.finished && !c.running)
+                    buttons_.push_back({x + 6, cy, w - 12, lh, "course" + std::to_string(i)});
+            }
         } else if (staffView_) {
             // The officers' cards: a portrait by their section, then rank
             // and name, section and skill, and where they are. A click picks
             // one: the next of the colony's buildings or vehicles clicked
             // takes them.
             ui_.drawSmall(screen_, x + 10, ty, pickedOfficer_ >= 0 ? "STAFF: CLICK WHERE TO" : "STAFF", bright);
+            // TRAINING, lit while a course is still to be had.
+            const auto& courses = fieldWork_->courses();
+            if (std::any_of(courses.begin(), courses.end(), [](const FieldWork::Course& c) { return !c.finished; })) {
+                const int bw = ui_.smallWidth("TRAINING") + 8, bx = x + w - bw - 8;
+                ui_.drawSmall(screen_, bx + 4, ty, "TRAINING", ui_.titleColor());
+                buttons_.push_back({bx, ty - 2, bw, lh + 4, "training"});
+            }
             for (size_t i = 0; i * 3 < cards.size(); ++i) {
                 const int cy = ty + lh * int(1 + i * 3);
                 const auto& o = fieldWork_->officers()[i];

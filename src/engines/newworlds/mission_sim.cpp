@@ -115,6 +115,8 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
     world_->setDamage([this](const Unit& target, float damage) {
         return shieldedDamage(target, damage, fog_.get(), target.slot == player_ ? fieldWork_->skill(target.id, 2) : 0);
     });
+    world_->setMarksmanship(
+        [this](const Unit& shooter) { return shooter.slot == player_ ? fieldWork_->skill(shooter.id, 2) : 0.0f; });
 
     // Units placed where they can't move.
     for (const Unit& u : world_->units())

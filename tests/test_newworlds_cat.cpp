@@ -1033,7 +1033,8 @@ void testCombat() {
     const int fed = spawnObject(w, 0, 'F', *phaser, 5 * kTile, 5 * kTile, {});
     const int kli = spawnObject(w, 1, 'K', *disruptor, 6.5f * kTile, 5 * kTile, {});
     CHECK(w.stance(1, 0) == 3 && w.stance(0, 1) == 2 && w.stance(1, 1) == 1);
-    for (int i = 0; i < 10; ++i)
+    // (Once it has looked round and turned its turret half a turn: 1.6 s.)
+    for (int i = 0; i < 25; ++i)
         w.advance(0.1);
     CHECK(!w.unit(fed) && w.unit(kli));
     bool shot = false, destroyed = false;
@@ -1188,10 +1189,12 @@ void testAiSides() {
     }
 
     // The first assault reaches the Federation colony and fights it: shots
-    // both ways, the losses reported as the scripts name them.
+    // both ways (the player's tanks told to fight them: neutral, they'd
+    // answer only once hit), the losses reported as the scripts name them.
     World w2(t);
     AiSides ai2("F1", 0, w2);
     ai2.start();
+    w2.setStance(0, 1, 3);
     const float hubX = 218.0f / 8 * 16384, hubY = 438.0f / 8 * 16384;
     const int hub = spawnObject(w2, 0, 'F', *combatType(23), hubX, hubY, {}, {}, true);
     for (int i = 0; i < 4; ++i)
@@ -1312,6 +1315,34 @@ void testFieldWork() {
     fw.cancel(apc);
     run(0.2);
     CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple") && w.unit(temple)->heldBy == -1);
+}
+
+// Officer training (exe.md#research): C1's Bellah (operations, 0.25) and
+// Dante (engineering, 0.75) may train, Gage may not; a course takes
+// 150000 points at the side's 1000 a tick, shared between those running,
+// and raises its officer a band.
+void testTraining() {
+    Terrain t;
+    t.width = t.height = 8;
+    t.moveClass.assign(64, 1);
+    World w(t);
+    FieldWork fw("C1", 0, w, {});
+    const auto& offs = fw.officers();
+    CHECK(offs.size() == 4 && fw.courses().size() == 2);
+    CHECK(std::string(offs[fw.courses()[0].officer].officer->name) == "Bellah");
+    CHECK(std::string(rankTitle('F', offs[0].officer->rank)) == "Ens." && std::string(rankTitle('F', offs[1].officer->rank)) == "Lt.");
+    CHECK(std::string(rankTitle('F', offs[2].officer->rank)) == "Dr.");
+    CHECK(std::string(skillWord(0.25f)) == "BASIC" && std::string(skillWord(0.75f)) == "HIGHLY SKILLED" &&
+          std::string(skillWord(1)) == "EXPERT");
+    auto handled = [](const ScriptEvent&) { return false; };
+    CHECK(fw.train(0) && !fw.train(0) && fw.train(1));
+    // Two at once: 500 a tick each, 300 ticks (15 s).
+    fw.advance(14.9, handled);
+    CHECK(!fw.courses()[0].finished && fw.courses()[0].running);
+    fw.advance(0.2, handled);
+    CHECK(fw.courses()[0].finished && fw.courses()[1].finished);
+    CHECK(offs[0].skill == 0.5f && offs[1].skill == 1.0f && offs[3].skill == 0.5f);
+    CHECK(!fw.train(0));
 }
 
 void testRivalsAndGroups() {
@@ -1685,7 +1716,7 @@ void testRepairsShieldsCloaking() {
         CHECK(w.unit(rom)->cloaked);
         w.takeEvents();
         const int fed = spawnObject(w, 0, 'F', *combatType(8), 110000, 100000, {});
-        ticks(2);
+        ticks(12);
         CHECK(!w.unit(rom)->cloaked && w.unit(rom)->fading > 0);
         bool romFired = false, fedFired = false;
         for (const WorldEvent& e : w.takeEvents())
@@ -2011,6 +2042,7 @@ int main() {
     testRepairsShieldsCloaking();
     testOrders();
     testRivalsAndGroups();
+    testTraining();
     testModelTextures();
     testRasterizer();
     std::filesystem::remove_all(tmp);

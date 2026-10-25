@@ -73,6 +73,7 @@ public:
     struct OfficerAt {
         const Officer* officer;
         int in;
+        float skill; // now (training raises it)
     };
     const std::vector<OfficerAt>& officers() const { return officers_; }
     // Places the officers in the buildings they start in (the hub if it
@@ -93,6 +94,21 @@ public:
     // vehicle (0 none); a command officer counts for engineering (1) and
     // security (2) at a quarter less, at least a quarter.
     float skill(int unit, int speciality) const;
+
+    // Officer training (exe.md#research): a course for each officer the
+    // mission lets train who isn't yet at the top (1.0), made at the
+    // start. The player starts one; the side's 1000 training points a tick
+    // (its own, not research's) are shared out in whole points between the
+    // courses running, 150000 each. A finished course raises the officer a
+    // band (0.25, to 1.0 at most); it isn't offered again.
+    struct Course {
+        size_t officer; // in officers()
+        int done = 0;
+        bool running = false, finished = false;
+    };
+    static constexpr int kCoursePoints = 150000, kTrainingPerTick = 1000;
+    const std::vector<Course>& courses() const { return courses_; }
+    bool train(size_t course);
 
     // The building's holder (a side slot), or -1.
     int heldBy(int building) const;
@@ -159,6 +175,7 @@ private:
     std::map<int, CaptureOrder> captures_;
     std::map<int, Hold> holds_;
     std::vector<OfficerAt> officers_;
+    std::vector<Course> courses_;
     // Per target: the scan conditions (4-9) it met this tick and the last.
     std::map<int, std::array<int, 10>> scanned_;
     std::map<int, int> session_; // per target, its scan's ticks in a row (the nothing reply)
@@ -172,5 +189,14 @@ private:
     int tick_ = 0;
     const Fog* fog_ = nullptr;
 };
+
+// An officer's title, by race ('F', 'K', 'R') and the mission's rank
+// number (1-8; the Federation's Ens. to Adm., 8 a doctor).
+const char* rankTitle(char race, int rank);
+// A speciality's name (1 ENGINEERING ... 9 PERSONNEL).
+const char* specialityName(int speciality);
+// The word for a skill, by its quarter: UNTRAINED, BASIC, SKILLED,
+// HIGHLY SKILLED, EXPERT (1.0).
+const char* skillWord(float skill);
 
 } // namespace reluva::newworlds

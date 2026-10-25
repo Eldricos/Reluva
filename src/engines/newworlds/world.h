@@ -89,6 +89,8 @@ struct Unit {
     int cooldown = 0, burstLeft = 0, burstGap = 0; // ticks
     bool firing = false; // stopped to shoot
     float turretYaw = 0; // from straight ahead, anticlockwise
+    float turretSpin = 0; // its turning speed, radians a tick
+    int tracking = 0;     // nothing in range: the nearest enemy in its box, its turret kept on it
     int lastAttacker = 0;
     // A cloaking device (exe.md#cloaking): it cloaks after 300 ticks seen,
     // fading 63 ticks either way. Cloaked, other sides don't see it and
@@ -181,11 +183,15 @@ public:
     // What a hit does to its target: the weapon's damage in, the hit points
     // it takes out (shields and security officers lessen it; none: all).
     void setDamage(std::function<float(const Unit& target, float damage)> damage) { damage_ = std::move(damage); }
+    // A shooter's best security skill (its officers'; 0 none): its shots
+    // do (skill + 1) times their damage, artillery's excepted.
+    void setMarksmanship(std::function<float(const Unit& shooter)> skill) { marksmanship_ = std::move(skill); }
 
 private:
     int tileOf(float v) const { return int(v / kTile); }
     void combatTick();
     void fire(Unit& u, Unit& t);
+    bool turnTurret(Unit& u, float want);
     void protectTick(Unit& u);
     // Whom a unit fires at unprovoked: those its side is hostile to (and,
     // for the player's own, those hostile to the player).
@@ -204,6 +210,7 @@ private:
     std::array<std::array<int, 7>, 7> stances_{};
     std::vector<WorldEvent> events_;
     std::function<float(const Unit&, float)> damage_;
+    std::function<float(const Unit&)> marksmanship_;
     double tickClock_ = 0;
     int tick_ = 0;
 

@@ -127,8 +127,10 @@ struct Officer {
     int slot;
     const char* name;
     int building;
+    int rank;       // its race's title (rankTitle)
     int speciality;
     float skill;
+    bool train;     // may train (a band up, once a mission)
 };
 std::vector<const Officer*> officers(std::string_view mission, int slot);
 

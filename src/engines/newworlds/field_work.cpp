@@ -63,8 +63,18 @@ FieldWork::FieldWork(std::string_view mission, int playerSlot, World& world,
         }
     for (const SideInfo* s : slotsOf(mission))
         races_[s->slot] = s->race;
-    for (const Officer* o : reluva::newworlds::officers(mission, playerSlot))
-        officers_.push_back({o, 0});
+    for (const Officer* o : reluva::newworlds::officers(mission, playerSlot)) {
+        if (o->train && o->skill < 1)
+            courses_.push_back({officers_.size()});
+        officers_.push_back({o, 0, o->skill});
+    }
+}
+
+bool FieldWork::train(size_t course) {
+    if (course >= courses_.size() || courses_[course].finished || courses_[course].running)
+        return false;
+    courses_[course].running = true;
+    return true;
 }
 
 bool FieldWork::canScan(const Unit& u) { return u.name == "ground-scout" || u.name == "science-vehicle"; }
@@ -144,12 +154,14 @@ int FieldWork::disembark(int vehicle) {
 
 float FieldWork::skill(int unit, int speciality) const {
     float best = 0;
-    for (const Officer* o : aboard(unit)) {
+    for (const OfficerAt& o : officers_) {
+        if (o.in != unit || unit <= 0)
+            continue;
         float v = 0;
-        if (o->speciality == speciality)
-            v = o->skill;
-        else if (o->speciality == 7 && (speciality == 1 || speciality == 2))
-            v = std::max(o->skill - 0.25f, 0.25f);
+        if (o.officer->speciality == speciality)
+            v = o.skill;
+        else if (o.officer->speciality == 7 && (speciality == 1 || speciality == 2))
+            v = std::max(o.skill - 0.25f, 0.25f);
         best = std::max(best, v);
     }
     return best;
@@ -336,6 +348,16 @@ std::vector<ScriptEvent> FieldWork::advance(double seconds, const std::function<
 
 void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(const ScriptEvent&)>& handled) {
     ++tick_;
+    // Training: the points shared out between the courses running.
+    int running = 0;
+    for (const Course& c : courses_)
+        running += c.running;
+    for (Course& c : courses_)
+        if (c.running && (c.done = std::min(kCoursePoints, c.done + kTrainingPerTick / running)) >= kCoursePoints) {
+            c.running = false, c.finished = true;
+            float& skill = officers_[c.officer].skill;
+            skill = std::min(1.0f, skill + 0.25f);
+        }
     // Scans: in range, a pulse on the target; out of range, drive closer.
     std::set<int> pulsed;
     for (auto it = scans_.begin(); it != scans_.end();) {
@@ -529,6 +551,26 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
     // A scan's own watch ends with it.
     watches_.erase(std::remove_if(watches_.begin(), watches_.end(), [](const Watch& w) { return !w.raid && w.ticks == 0; }),
                    watches_.end());
+}
+
+const char* rankTitle(char race, int rank) {
+    static const char* const kFed[] = {"Ens.", "Lt.", "Lt.Cdr.", "Cdr.", "Capt.", "Comm.", "Adm.", "Dr."};
+    static const char* const kKli[] = {"Mang.", "Sog.'", "La'", "Hod", "Tlh.", "'aj.", "Adm.", "Qel."};
+    static const char* const kRom[] = {"Lgn.", "Trib.", "Cnsl.", "Sntr.", "Gen.", "Imp.", "Adm.", "Srgn."};
+    if (rank < 1 || rank > 8)
+        return "";
+    return (race == 'K' ? kKli : race == 'R' ? kRom : kFed)[rank - 1];
+}
+
+const char* specialityName(int speciality) {
+    static const char* const kNames[] = {"ENGINEERING", "SECURITY", "MEDICAL",    "SCIENCE",  "INTELLIGENCE",
+                                         "MINING",      "OPERATIONS", "LOGISTICS", "PERSONNEL"};
+    return speciality >= 1 && speciality <= 9 ? kNames[speciality - 1] : "";
+}
+
+const char* skillWord(float skill) {
+    static const char* const kWords[] = {"UNTRAINED", "BASIC", "SKILLED", "HIGHLY SKILLED", "EXPERT"};
+    return kWords[std::clamp(int(skill * 4), 0, 4)];
 }
 
 } // namespace reluva::newworlds

@@ -170,11 +170,21 @@ Romulan 2 trans al).
 
 Hit points as the game sets them; for the human player's side in a single
 player game they are raised (Federation x1.2, Romulan x1.3, Klingon x1),
-and a switch doubles them. Weapons hit at once (no travelling shot):
-**burst** weapons fire their shots (4) and reload; each shot does the
-damage shown times (the best crew weapons skill + 1). **Single** weapons
-(Klingon) fire one shot a reload, damage not divided; **artillery** lobs a
-shell. Range in world units (a tile is 8192, a block 16384): 20000 is 1.2
+and a switch (most likely the setup's easy-game box) doubles them.
+**Burst** weapons fire 4 pulses, one a tick, each a third of the type's
+figure (the table's damage), and reload from the tick after the last:
+with a reload of 40 a burst every 44 ticks. **Single** weapons (Klingon)
+fire one shot a reload, damage not divided. Both multiply a shot's
+damage by (the shooter's best security officer's skill + 1, a command
+officer counting a quarter less, at least a quarter) and cut it down;
+vehicles start with no officers, so it's normally 1. **Artillery** lobs a
+shell (speed 350 a tick, gravity 3 a tick squared; the high arc when the
+line of sight is blocked), with no multiplier and no splash; on flat
+ground it can't reach past about 36850 units. Every shot is a real
+projectile (bolts 2700 units a tick, beam pulses a beam's length a tick)
+that hits the first object of another side its path crosses, or misses
+into the ground; a shot also takes 300 units from the shooter's power
+buffer. Range in world units (a tile is 8192, a block 16384): 20000 is 1.2
 blocks. Reload in simulation ticks. Traverse is the turret's yaw limits
 (180,180 turns all round), elevation up and down, in degrees. Pace is the
 game's path steps a tick (how long a step is wasn't found, so no world
@@ -481,9 +491,18 @@ and [Buildings](#buildings): hit points, burst / single / artillery
 weapons with range and reload in ticks. Buildings and the natives'
 structures have hit points too (Taubat house 200, hangar and temple 400,
 Metar hub 400, Hubrin fortress 400 with three guns, Metar starship 800);
-a few natives' types carry several weapons. Not found: how a unit picks
-its target, whether a moving unit fires, and whether a burst's shots are
-spaced.
+a few natives' types carry several weapons.
+
+**Targets.** Each armed object looks round every 8 + (its id mod 4)
+ticks, in a square its turret's range across each way, for live, built,
+uncloaked objects it's hostile to. It takes the nearest in range (range
+plus the target's size), in its turret's arc and in sight; failing that,
+its turret follows the nearest in the square, ready. Whoever is shot at
+turns to the nearest attacker it can hit. A turret fires only when it's
+on its target that tick; it turns speeding up and then slowing down
+onto it, at 128 (yaw) or 64 (pitch) 65536ths of a turn a tick each tick,
+with no top speed: half a turn in about 32 ticks. Moving units fire,
+leading a moving target.
 
 ### Scans and captures
 
@@ -677,8 +696,20 @@ enters into it** (the sickbay and science station named by the messages
 don't take part). A finished topic sends its messages to its targets (the
 script's next step); the game announces nothing of its own. A topic's
 button reads one of three captions: not started, in progress, finished.
-Officer training runs in a second queue the same way ("train staff":
-150000 points). The science station's labs are add-ons bought with
+**Officer training** runs in a queue of its own the same way, with its
+own 1000 points a tick (so it doesn't slow research). The mission marks
+which officers may train (62 of its 346 officer records); each of those
+below 1.0 gets one course, 150000 points, at the start. The player
+starts it with a click on its button (the Operations panel's Training
+tab and the STAFF window's TRAINING button, lit while a course is still
+to be had), which reads the officer's name and train in / training in /
+trained in their speciality. A finished course adds 0.25 to the skill
+(1.0 at most), nothing else: no rank, no message, and it isn't offered
+again. Officers keep working where they are while training. AI sides
+don't train. Skills read by their quarter: UNTRAINED, BASIC, SKILLED,
+HIGHLY SKILLED, EXPERT (1.0). Titles come by race and the record's rank
+number: the Federation's Ens., Lt., Lt.Cdr., Cdr., Capt., Comm., Adm.
+and Dr. (a doctor); the Klingons' and Romulans' their own. The science station's labs are add-ons bought with
 materials, not research.
 
 ### AI colonies
@@ -889,6 +920,5 @@ the NEW WORLDS panel, its class picked by type id:
   2 and 6-8 (read from the orders' names), and the order modes.
 - Which of the posture bits the scan and capture menus test is hostile
   and which neutral; how the player moves officers (the gesture).
-- How the AI picks targets; how far apart the placement test keeps
-  buildings.
+- How far apart the placement test keeps buildings.
 - Several unnamed type ids (natives' units and buildings, effects).
