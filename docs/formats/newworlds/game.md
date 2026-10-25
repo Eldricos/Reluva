@@ -474,8 +474,16 @@ groups, combat), `ai_sides.h` (the other sides and their orders),
 
 ## Headless runs
 
+Play mode and the headless runs share one simulation (`MissionSim`,
+`mission_sim.h`): the world, the economies, the AI, the fog, repairs,
+field work, research, the script's effects, the mission script, and the
+rules between them (officers' skills into efficiency, vehicles out of
+the yards, razing, the scripts' sightings and monitors). The missions
+page only draws it, passes on the player's orders and shows what the
+script says, so what a headless run finds is what play does.
+
 `reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...`
-plays missions on their real maps without a screen (`mission_sim.h`):
+plays missions on their real maps without a screen:
 the player's colony as the mission places it, left to itself, the other
 sides with their AI and economies, the fog, repairs, field work,
 research, the script's effects and the mission script. It then prints

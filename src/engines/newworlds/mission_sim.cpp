@@ -10,6 +10,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <tuple>
 
 namespace reluva::newworlds {
 
@@ -40,80 +41,127 @@ std::string mapPosition(float x, float y) {
     return std::to_string(int(y / kBlock * 8)) + ":" + std::to_string(int(x / kBlock * 8));
 }
 
+std::vector<ColonyBuilding> MissionSim::placedColony(std::string_view mission, char side) {
+    std::vector<ColonyBuilding> out;
+    for (const StartPlacement& p : startPlacements(mission, side))
+        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model) {
+            const ColonyBuilding c{t->name, t->model, p.a, p.b};
+            if (std::string_view(t->name) == "colony-hub")
+                out.insert(out.begin(), c);
+            else
+                out.push_back(c);
+        }
+    if (!out.empty() && out[0].name != "colony-hub")
+        out.clear();
+    return out;
+}
+
+namespace {
+
+// The headless colony: the mission's own, else its hub where the
+// recordings put the colony.
+std::vector<ColonyBuilding> headlessColony(std::string_view mission, char side) {
+    std::vector<ColonyBuilding> out = MissionSim::placedColony(mission, side);
+    if (out.empty())
+        if (const ColonySite site = colonySite(mission, side); site.a >= 0)
+            out.push_back({"colony-hub", buildingModel("colony-hub", side), site.a, site.b});
+    return out;
+}
+
+} // namespace
+
 MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground)
-    : mission_(mission), side_(side), player_(side == 'K' ? 1 : side == 'R' ? 2 : 0) {
-    world_ = std::make_unique<World>(ground.terrain());
-    ColonyMap map{[&ground](int bx, int by) { return ground.depositAt(bx, by); },
-                  [&ground](int bx, int by) { return ground.depositAmount(bx, by); }};
-    Stock stock{500, 1000, 2300, 500, 4000, 5000};
+    : MissionSim(mission, side, ground.terrain(),
+                 ColonyMap{[&ground](int bx, int by) { return ground.depositAt(bx, by); },
+                           [&ground](int bx, int by) { return ground.depositAmount(bx, by); }},
+                 ground.blocksWide(), ground.blocksHigh(), headlessColony(mission, side)) {}
+
+MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, ColonyMap map, int blocksWide,
+                       int blocksHigh, std::vector<ColonyBuilding> colony)
+    : mission_(mission), side_(side), player_(side == 'K' ? 1 : side == 'R' ? 2 : 0), blocksWide_(blocksWide),
+      blocksHigh_(blocksHigh), colony_(std::move(colony)) {
+    world_ = std::make_unique<World>(std::move(terrain));
+    // The game's default stock (exe.md#the-stock), or the mission's own;
+    // the Romulan recordings start a construction yard's cost short.
+    Stock stock = side_ == 'R' ? Stock{500, 988, 2211, 497, 3500, 5000} : Stock{500, 1000, 2300, 500, 4000, 5000};
     startStock(mission_, side_, stock);
     economy_ = std::make_unique<Economy>(side_, stock, 50, map);
     economy_->setOfficers(int(officers(mission_, player_).size()));
-
-    // The player's colony as the mission places it, its hub first (else a
-    // hub where the recordings put the colony); its vehicles.
-    std::vector<StartPlacement> placed = startPlacements(mission_, side_);
-    std::stable_sort(placed.begin(), placed.end(), [](const StartPlacement& a, const StartPlacement& b) {
-        const ObjectType* ta = objectType(a.type);
-        const ObjectType* tb = objectType(b.type);
-        return (ta && std::string_view(ta->name) == "colony-hub") > (tb && std::string_view(tb->name) == "colony-hub");
-    });
-    int hubA = -1, hubB = -1;
-    for (const StartPlacement& p : placed)
-        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model)
-            if (const CombatType* ct = combatType(p.type)) {
-                const auto [x, y] = worldAt(p.a, p.b);
-                const int id = spawnObject(*world_, player_, side_, *ct, x, y, {}, t->model, true);
-                if (buildingType(t->name))
-                    structureOf_[id] = economy_->addBuilt(t->name, x, y);
-                if (hubA < 0 && std::string_view(t->name) == "colony-hub")
-                    hubA = p.a, hubB = p.b;
-            }
-    if (hubA < 0) {
-        const ColonySite site = colonySite(mission_, side_);
-        if (site.a >= 0)
-            for (int id = 1; id < 330; ++id)
-                if (const CombatType* t = combatType(id); t && t->building && t->race == side_ &&
-                                                          std::string_view(t->name) == "colony-hub") {
-                    const auto [x, y] = worldAt(site.a, site.b);
-                    structureOf_[spawnObject(*world_, player_, side_, *t, x, y, {}, {}, true)] =
-                        economy_->addBuilt("colony-hub", x, y);
-                    hubA = site.a, hubB = site.b;
-                    break;
-                }
+    for (const ColonyBuilding& c : colony_) {
+        const auto [x, y] = worldAt(c.a, c.b);
+        structureIds_.push_back(economy_->addBuilt(c.name, x, y));
     }
-    // (Bees on the hub's spot stay inside, and the construction and cargo
-    // bees fly out to work; other vehicles there park round it.)
-    std::map<std::string, int> bees;
-    for (const StartPlacement& p : placed)
-        if (const CombatType* ct = combatType(p.type); ct && isBee(*ct) && p.a == hubA && p.b == hubB)
-            ++bees[ct->name];
-    economy_->setBees(bees["construction-bee"], bees["cargo-bee"]);
-    std::map<std::pair<int, int>, int> onSpot;
-    for (const StartPlacement& p : placed)
-        if (const ObjectType* t = objectType(p.type); t && !t->building && *t->model)
-            if (const CombatType* ct = combatType(p.type); ct && !(isBee(*ct) && p.a == hubA && p.b == hubB)) {
-                const auto [x, y] = worldAt(p.a, p.b);
-                const auto [sx, sy] = parkingSpot(onSpot[{p.a, p.b}]++, x, y, p.a == hubA && p.b == hubB);
-                const auto [px, py] = world_->openSpot(sx, sy);
-                spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true);
-            }
-    for (const SidePlacement* p : sidePlacements(mission_, player_))
-        if (const CombatType* t = combatType(p->type); t && *p->label && t->building && !buildingType(t->name)) {
-            const auto [x, y] = worldAt(p->a, p->b);
-            spawnObject(*world_, player_, side_, *t, x, y, p->label, p->model, true);
-        }
-
+    // The other sides as the mission places them, and the colony's own
+    // buildings as things they can shoot at.
     ai_ = std::make_unique<AiSides>(mission_, player_, *world_);
     ai_->setGround(map);
     ai_->start();
+    for (size_t i = 0; i < colony_.size(); ++i)
+        spawnColonyObject(i);
     script_ = findMissionScript(mission_, side_);
     fieldWork_ = std::make_unique<FieldWork>(mission_, player_, *world_,
                                              script_ ? script_->sites : std::map<std::string, std::pair<int, int>>{});
     fieldWork_->placeOfficers();
     research_ = std::make_unique<Research>(mission_, player_);
     effects_ = std::make_unique<ScriptEffects>(player_, *world_, ai_.get(), economy_.get(), script_);
-    fog_ = std::make_unique<Fog>(ground.blocksWide(), ground.blocksHigh());
+
+    // The mission's own vehicles where it places them (several on one spot
+    // spread a little; bees on the hub's spot inside it, the construction
+    // and cargo bees flying out to work); else four ground scouts in a
+    // row south of the hub. Each on the nearest open tile.
+    float hx = float(blocksWide_) * kBlock / 2, hy = float(blocksHigh_) * kBlock / 2;
+    if (!colony_.empty())
+        std::tie(hx, hy) = worldAt(colony_[0].a, colony_[0].b);
+    auto onHub = [&](const StartPlacement& p) { return !colony_.empty() && p.a == colony_[0].a && p.b == colony_[0].b; };
+    auto bee = [](int type) {
+        const CombatType* ct = combatType(type);
+        return ct && isBee(*ct);
+    };
+    struct Start {
+        UnitKind kind;
+        float x, y;
+        int type;
+    };
+    std::vector<Start> start;
+    std::map<std::pair<int, int>, int> onSpot;
+    for (const StartPlacement& p : startPlacements(mission_, side_)) {
+        const ObjectType* t = objectType(p.type);
+        if (!t || t->building)
+            continue;
+        if (onHub(p) && bee(p.type)) {
+            ++housed_;
+            ++beesHoused_[combatType(p.type)->name];
+        } else if (*t->model) {
+            const auto [x, y] = worldAt(p.a, p.b);
+            const auto [sx, sy] = parkingSpot(onSpot[{p.a, p.b}]++, x, y, onHub(p));
+            start.push_back({UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f}, sx, sy, p.type});
+        }
+    }
+    economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
+    if (start.empty())
+        for (int i = 0; i < 4; ++i)
+            start.push_back({groundScout(side_), hx + (float(i) - 1.5f) * 2500, hy - 1.4f * kTile, 0});
+    for (const Start& at : start) {
+        const auto [px, py] = world_->openSpot(at.x, at.y);
+        if (const CombatType* ct = combatType(at.type)) {
+            const int id = spawnObject(*world_, player_, side_, *ct, px, py, {}, at.kind.model, true);
+            world_->unit(id)->kind = at.kind;
+        } else {
+            world_->unit(world_->addUnit(side_, at.kind, px, py, 3.1416f / 2))->slot = player_;
+        }
+    }
+    // The player's own named objects the colony doesn't cover (K7's escape
+    // pods): placed for the scripts.
+    for (const SidePlacement* p : sidePlacements(mission_, player_))
+        if (const CombatType* t = combatType(p->type); t && *p->label && t->building && !buildingType(t->name)) {
+            const auto [x, y] = worldAt(p->a, p->b);
+            spawnObject(*world_, player_, side_, *t, x, y, p->label, p->model, true);
+        }
+
+    // The fog, marked for everyone placed; repairs; hits lessened by
+    // shield fields and security officers, made stronger by them; the
+    // defensive turrets' power.
+    fog_ = std::make_unique<Fog>(blocksWide_, blocksHigh_);
     fog_->refresh(*world_);
     fieldWork_->setFog(fog_.get());
     repairs_ = std::make_unique<Repairs>(*world_);
@@ -123,8 +171,10 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
     });
     world_->setShotPower([this](const Unit& turret, float power) {
         if (turret.slot == player_) {
-            auto it = structureOf_.find(turret.id);
-            return it == structureOf_.end() || economy_->spend(it->second, power);
+            for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+                if (colonyObjects_[i] == turret.id)
+                    return economy_->spend(structureIds_[i], power);
+            return true;
         }
         return ai_->payShot(turret, power);
     });
@@ -141,8 +191,88 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
     if (script_) {
         run_ = std::make_unique<MissionRun>(*script_, findMissionScript("generic", 'F'));
         const ScriptEvent start{"start", {}};
-        deliver(run_->fire(start));
+        deliver(start, run_->fire(start));
     }
+}
+
+// A colony building as something the other sides can shoot at (its
+// side's type of that name).
+void MissionSim::spawnColonyObject(size_t index) {
+    if (colonyObjects_.size() <= index)
+        colonyObjects_.resize(index + 1, 0);
+    const ColonyBuilding& c = colony_[index];
+    for (int id = 1; id < 330; ++id)
+        if (const CombatType* t = combatType(id); t && t->building && t->race == side_ && c.name == t->name) {
+            const auto [x, y] = worldAt(c.a, c.b);
+            colonyObjects_[index] = spawnObject(*world_, player_, side_, *t, x, y, {}, c.model, true);
+            return;
+        }
+}
+
+int MissionSim::placeBuilding(const std::string& name, const std::string& model, int a, int b) {
+    const auto [x, y] = worldAt(a, b);
+    return placeUpgrade(name, model, a, b, x, y);
+}
+
+int MissionSim::placeUpgrade(const std::string& name, const std::string& model, int a, int b, float x, float y) {
+    const int id = economy_->order(name, x, y, int(x / kTile), int(y / kTile));
+    if (id == 0)
+        return -1;
+    colony_.push_back({name, model, a, b});
+    structureIds_.push_back(id);
+    spawnColonyObject(colony_.size() - 1);
+    return int(colony_.size()) - 1;
+}
+
+bool MissionSim::raze(int unit) {
+    for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i) {
+        if (colonyObjects_[i] != unit || !economy_->raze(structureIds_[i]))
+            continue;
+        // Its officers go to the hub; then it stands empty and is razed.
+        const int hub = colonyObjects_.empty() ? 0 : colonyObjects_[0];
+        for (size_t o = 0; hub > 0 && o < fieldWork_->officers().size(); ++o)
+            if (fieldWork_->officers()[o].in == unit)
+                fieldWork_->moveOfficer(o, hub);
+        razing_.push_back(unit);
+        return true;
+    }
+    return false;
+}
+
+bool MissionSim::razing(int unit) const { return std::find(razing_.begin(), razing_.end(), unit) != razing_.end(); }
+
+void MissionSim::setPosture(int slot, int posture) {
+    const char race = ai_->raceOf(slot);
+    for (int s = 0; s < 7; ++s)
+        if (s != player_ && (s == slot || (race != '?' && ai_->raceOf(s) == race))) {
+            world_->setStance(player_, s, posture);
+            if (posture == 2)
+                touchyNeutral_.insert(s);
+            else
+                touchyNeutral_.erase(s);
+        }
+}
+
+void MissionSim::fireScript(const ScriptEvent& e) {
+    if (run_ && !run_->finished())
+        deliver(e, run_->fire(e));
+}
+
+void MissionSim::runTimers(double seconds) {
+    if (run_ && !run_->finished())
+        deliver({"timer", {}}, run_->advance(seconds));
+}
+
+std::vector<MissionSim::Said> MissionSim::takeSaid() {
+    std::vector<Said> out;
+    out.swap(said_);
+    return out;
+}
+
+std::vector<WorldEvent> MissionSim::takeEvents() {
+    std::vector<WorldEvent> out;
+    out.swap(events_);
+    return out;
 }
 
 void MissionSim::note(const std::string& line) {
@@ -162,74 +292,182 @@ void MissionSim::step(double dt) {
     const bool second = std::floor(clock_) != std::floor(before);
     std::vector<ScriptEvent> happened;
     ai_->advance(dt);
+    repairs_->advance(dt);
     world_->advance(dt);
     for (fogClock_ += dt * 20; fogClock_ >= 1; fogClock_ -= 1)
         fog_->tick(*world_);
-    repairs_->advance(dt);
+    // What combat did: a race set neutral turning hostile at its first
+    // shot at the player; the colony's buildings lost.
     const auto events = world_->takeEvents();
-    for (const WorldEvent& e : events)
-        if (e.kind == WorldEvent::Destroyed) {
-            if (auto it = structureOf_.find(e.what.id); it != structureOf_.end()) {
-                economy_->remove(it->second);
-                structureOf_.erase(it);
+    for (const WorldEvent& e : events) {
+        if (e.kind == WorldEvent::Shot && e.toSlot == player_ && touchyNeutral_.count(e.fromSlot) &&
+            world_->stance(player_, e.fromSlot) == 2)
+            setPosture(e.fromSlot, 3);
+        if (e.kind != WorldEvent::Destroyed)
+            continue;
+        for (size_t i = 0; i < colonyObjects_.size(); ++i)
+            if (colonyObjects_[i] == e.what.id) {
+                colonyObjects_[i] = -1;
+                if (i < structureIds_.size())
+                    economy_->remove(structureIds_[i]);
             }
-            note("destroyed: slot " + std::to_string(e.what.slot) + " " + e.what.name + " at " +
-                 mapPosition(e.what.x, e.what.y));
-        }
+        note("destroyed: slot " + std::to_string(e.what.slot) + " " + e.what.name + " at " +
+             mapPosition(e.what.x, e.what.y));
+    }
+    events_.insert(events_.end(), events.begin(), events.end());
     auto said = ai_->observe(events);
     happened.insert(happened.end(), said.begin(), said.end());
+    rollOut();
+    // Buildings being razed: once empty, gone (the game's own blow,
+    // through the usual destruction).
+    for (auto it = razing_.begin(); it != razing_.end();) {
+        int structure = 0;
+        for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+            if (colonyObjects_[i] == *it)
+                structure = structureIds_[i];
+        if (!structure) {
+            it = razing_.erase(it);
+        } else if (economy_->evacuated(structure)) {
+            if (Unit* u = world_->unit(*it))
+                u->hp = 0;
+            it = razing_.erase(it);
+        } else {
+            ++it;
+        }
+    }
     auto done = effects_->advance(dt);
     happened.insert(happened.end(), done.begin(), done.end());
     auto found = research_->advance(dt);
     happened.insert(happened.end(), found.begin(), found.end());
     auto worked = fieldWork_->advance(dt, [this](const ScriptEvent& e) { return run_ && run_->handles(e); });
     happened.insert(happened.end(), worked.begin(), worked.end());
-    // The player's buildings: health in, progress and efficiency out.
-    for (const auto& [id, structure] : structureOf_)
-        if (const Unit* u = world_->unit(id))
-            economy_->setHealth(structure, u->hp / u->maxHp);
+    if (second)
+        sightings(happened);
+    // The economy: its vehicles (those out and the bees in the hub), then
+    // construction, power, mining; the buildings' progress and efficiency
+    // back on their objects.
     economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
-                                            [&](const Unit& u) { return u.slot == player_ && !u.building; })));
+                                            [&](const Unit& u) { return u.slot == player_ && !u.building; })) +
+                          housed_);
     auto built = economy_->advance(dt);
     happened.insert(happened.end(), built.begin(), built.end());
-    for (const ColonyStructure& c : economy_->structures())
-        for (const auto& [id, structure] : structureOf_)
-            if (structure == c.id)
-                if (Unit* u = world_->unit(id))
+    for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
+        if (Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
+            for (const ColonyStructure& c : economy_->structures())
+                if (c.id == structureIds_[i])
                     u->built = c.progress, u->efficiency = economy_->efficiency(c);
+    // The colony's state for the scripts' monitors: the stock once a
+    // second, its building counts as they change.
     if (second) {
-        // The sites the script knows: seen, scanned (the fog's marks).
-        if (script_)
-            for (const auto& [site, at] : script_->sites) {
-                const int bx = at.second / 8, by = at.first / 8;
-                if (fog_->has(bx, by, Fog::Seen, player_) && seenSites_.insert(site).second)
-                    happened.push_back({"seen", {site}, at.first, at.second});
-                if (fog_->has(bx, by, Fog::Scanned, player_) && scannedSites_.insert(site).second)
-                    happened.push_back({"cell-scanned", {site}, at.first, at.second});
-            }
         const Stock st = economy_->stock();
         for (int m = 0; m < kMaterials; ++m) {
             std::string name = materialName(m);
             std::transform(name.begin(), name.end(), name.begin(), [](unsigned char c) { return char(std::tolower(c)); });
             happened.push_back({"stock", {name, std::to_string(st[size_t(m)])}});
         }
-        std::map<std::string, int> counts;
-        for (const ColonyStructure& c : economy_->structures())
-            counts[c.type] += c.progress >= 1;
-        for (const auto& [type, n] : counts)
-            if (auto it = lastCounts_.find(type); it == lastCounts_.end() || it->second != n)
-                happened.push_back({"count", {type, std::to_string(n)}});
-        lastCounts_ = std::move(counts);
-        watchUnits();
     }
+    std::map<std::string, int> counts;
+    for (const ColonyStructure& c : economy_->structures())
+        counts[c.type] += c.progress >= 1;
+    for (const auto& [type, n] : counts)
+        if (auto it = lastCounts_.find(type); it == lastCounts_.end() || it->second != n)
+            happened.push_back({"count", {type, std::to_string(n)}});
+    for (const auto& [type, n] : lastCounts_)
+        if (!counts.count(type))
+            happened.push_back({"count", {type, "0"}});
+    lastCounts_ = std::move(counts);
+    if (second)
+        watchUnits();
+    // The script hears what happened, and its timers run.
     if (run_ && !run_->finished()) {
         for (const ScriptEvent& e : happened)
-            deliver(run_->fire(e));
-        deliver(run_->advance(dt));
+            deliver(e, run_->fire(e));
+        deliver({"timer", {}}, run_->advance(dt));
     }
 }
 
-void MissionSim::deliver(const std::vector<MissionRun::Output>& out) {
+// The colony's buildings' officer terms (the best officer posted of its
+// speciality) and health; vehicles out of the yards: bees into the hub,
+// the rest beside their yard, armed ones on to the rally point.
+void MissionSim::rollOut() {
+    for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i) {
+        const std::string& type = colony_[i].name;
+        const int wanted = type == "construction-yard" || type == "vehicle-yard"                 ? 1
+                           : type == "security-center"                                          ? 2
+                           : type == "sickbay"                                                  ? 3
+                           : type == "science-station"                                          ? 4
+                           : type == "mining-station" || type == "resource-processor"           ? 6
+                           : type == "colony-hub"                                               ? 7
+                           : type == "storage-facility"                                         ? 8
+                           : type == "accommodation"                                            ? 9
+                                                                                                : 0;
+        float best = 0;
+        for (const FieldWork::OfficerAt& o : fieldWork_->officers())
+            if (o.in == colonyObjects_[i] && o.in > 0 && o.officer->speciality == wanted)
+                best = std::max(best, o.skill);
+        economy_->setOfficer(structureIds_[i], best);
+        if (const Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
+            economy_->setHealth(structureIds_[i], u->hp / u->maxHp);
+    }
+    for (const auto& [type, yard] : economy_->takeVehicles()) {
+        const VehicleType* v = vehicleType(type);
+        if (v && v->bee()) {
+            ++housed_;
+            if (const CombatType* ct = combatType(type))
+                ++beesHoused_[ct->name];
+            economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"]);
+            continue;
+        }
+        float x = float(blocksWide_) * kBlock / 2, y = float(blocksHigh_) * kBlock / 2;
+        for (const ColonyStructure& c : economy_->structures())
+            if (c.id == yard)
+                x = c.x, y = c.y - 1.2f * kTile;
+        const ObjectType* t = objectType(type);
+        const CombatType* ct = combatType(type);
+        if (!t || !ct)
+            continue;
+        const auto [px, py] = world_->openSpot(x, y);
+        const int id = spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true);
+        world_->unit(id)->kind = UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f};
+        // An armed one drives on to the rally point.
+        if (ct->weapon.kind != WeaponKind::None && !colony_.empty()) {
+            const auto [hx, hy] = worldAt(colony_[0].a, colony_[0].b);
+            const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
+            const auto [qx, qy] = world_->openSpot(rx, ry);
+            world_->rally(id, qx, qy);
+        }
+    }
+}
+
+// The scripts' sightings, once each: a site seen or scanned (the fog's
+// marks on its block: the game's cell monitors), and a side's units (by
+// race), or one of the player's units (by kind), near a site (how near is
+// near is Reluva's).
+void MissionSim::sightings(std::vector<ScriptEvent>& happened) {
+    if (!script_)
+        return;
+    constexpr float kNear = 1.5f * kBlock;
+    for (const auto& [site, at] : script_->sites) {
+        const auto [sx, sy] = worldAt(at.first, at.second);
+        const int bx = at.second / 8, by = at.first / 8;
+        if (fog_->has(bx, by, Fog::Seen, player_) && seenSites_.insert(site).second)
+            happened.push_back({"seen", {site}, at.first, at.second});
+        if (fog_->has(bx, by, Fog::Scanned, player_) && scannedSites_.insert(site).second)
+            happened.push_back({"cell-scanned", {site}, at.first, at.second});
+        for (const Unit& u : world_->units()) {
+            if (u.building || std::hypot(u.x - sx, u.y - sy) >= kNear)
+                continue;
+            const std::string who = u.slot == player_ ? u.name : raceName(u.side);
+            if (!who.empty() && approached_.insert({who, site}).second)
+                happened.push_back({"approach", {who, site}, at.first, at.second});
+        }
+    }
+}
+
+// What the script said: the rules' part done here (the AI's orders and
+// postures, research opened, effects, the outcome); everything kept for
+// the screen.
+void MissionSim::deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out) {
     for (const MissionRun::Output& o : out) {
         switch (o.kind) {
         case MissionRun::Output::Won: note("mission won"); break;
@@ -251,6 +489,8 @@ void MissionSim::deliver(const std::vector<MissionRun::Output>& out) {
         default: break;
         }
     }
+    if (!out.empty())
+        said_.push_back({fired, out});
 }
 
 // Each second: a unit still more than half a block from where it's going

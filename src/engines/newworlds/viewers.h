@@ -29,6 +29,7 @@
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/mission_sim.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/string_table.h"
@@ -689,8 +690,10 @@ private:
     std::vector<Texture> systemTextures_; // per texture number
     Rasterizer raster_;
     bool running_ = false, stepOnMap_ = false;
-    // The mission's script, being walked through.
-    std::unique_ptr<MissionRun> run_;
+    // The mission's script, being walked through: in play the
+    // simulation's, on the missions page its own.
+    MissionRun* run_ = nullptr;
+    std::unique_ptr<MissionRun> pageRun_;
     std::vector<ScriptEvent> walk_;
     size_t walkPos_ = 0;
     std::vector<std::pair<std::string, std::string>> log_; // sender, text
@@ -698,14 +701,18 @@ private:
     GameUi ui_;
     char uiSide_ = 0;
     std::unique_ptr<ColonyLayout> colony_;
-    std::unique_ptr<World> world_;
-    std::unique_ptr<Economy> economy_;
-    std::vector<int> structureIds_; // per colony building, its economy structure
-    int housed_ = 0;                // vehicles the mission starts inside the hub
-    std::map<std::string, int> beesHoused_; // of those, the bees by kind ("worker-bee")
+    // In play: the mission being played (mission_sim.h), and its parts.
+    std::unique_ptr<MissionSim> sim_;
+    World* world_ = nullptr;
+    Economy* economy_ = nullptr;
+    // The colony's buildings' world objects (-1 once destroyed) and
+    // economy structures, the bees in the hub (by kind) and all of them.
+    const std::vector<int>& colonyObjects() const;
+    const std::vector<int>& structureIds() const;
+    const std::map<std::string, int>& beesHoused() const;
+    int housed() const { return sim_ ? sim_->housed() : 0; }
     int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
     int razeAsked_ = 0;             // DEMOLISH pressed: the building asked about (yes / no)
-    std::vector<int> razing_;       // buildings being razed (unit ids), destroyed once empty
     // The playbook (exe.md#orders): the orders a double click offers for
     // the selection and what was clicked, as a column of icons beside the
     // Tricorder. Each entry: its icon, its name, and the order (f follow
@@ -736,7 +743,6 @@ private:
     int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
     bool allyOpen_ = false;             // the ALLY page
     int allyPick_ = -1;                 // its race clicked (a slot): the postures offered
-    std::set<int> touchyNeutral_;       // races set neutral on it: hostile at their first shot
     int commsShown_ = -1;               // the message COMMUNICATIONS shows (-1: the latest)
     bool commsClosed_ = false;          // put away with X, until the next message
     bool commandShown_ = true;          // the COMMAND panel (MISSION shows or hides it)
@@ -747,31 +753,25 @@ private:
     int cycledBuilding_ = 0, cycledVehicle_ = 0; // Shift+B / Shift+V: where the camera went last     // JUMP TO: each class's object the camera went to last
     int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
-    std::map<std::string, int> lastCounts_; // the colony's building counts the scripts last heard
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the
     // sites the scripts have heard seen or approached.
-    std::unique_ptr<AiSides> ai_;
+    AiSides* ai_ = nullptr;
     // Scans, captures and officers; a field order waiting for its target
     // (s, m, e: a scan; c: a capture; 0 none).
-    std::unique_ptr<FieldWork> fieldWork_;
-    std::unique_ptr<Research> research_; // the side's research, and its list shown (R)
-    std::unique_ptr<ScriptEffects> effects_; // the script's effects in play
-    std::unique_ptr<Fog> fog_;  // the fog of war
-    std::unique_ptr<Repairs> repairs_;
-    int rallied_ = 0; // vehicles sent to the rally point so far (its parking places in turn)
-    double fogClock_ = 0;
+    FieldWork* fieldWork_ = nullptr;
+    Research* research_ = nullptr;     // the side's research, and its list shown (R)
+    ScriptEffects* effects_ = nullptr; // the script's effects in play
+    Fog* fog_ = nullptr;               // the fog of war
     std::set<int> shownOthers_;  // the other sides' buildings in sight
-    std::set<std::string> scannedSites_;
+    int rallied_ = 0;            // vehicles sent back to the rally point (Y): its parking places in turn
     bool visible(const Unit& u) const;
     bool researchMenu_ = false;
     bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
-    void rollOut();
     char pendingOrder_ = 0;
     void orderOn(int target);
     const char* pendingOrderName() const;
     int playerSlot_ = 0;
-    std::vector<int> colonyObjects_; // -1 once destroyed, 0 if not a target
     size_t shownBuildings_ = 0;
     size_t buildingsShown_ = 0; // all the map's, the colony's first
     std::vector<std::pair<int, float>> otherBuildings_; // the other sides' shown: unit id, progress shown
@@ -787,11 +787,7 @@ private:
         uint64_t start;
     };
     std::vector<Blast> blasts_;
-    std::set<std::string> seenSites_;
-    std::set<std::pair<std::string, std::string>> approached_;
-    void addColonyObject(size_t index);           // a colony building as a target
-    void combatStep(std::vector<ScriptEvent>& happened); // what combat did, for the scripts
-    void sightings(std::vector<ScriptEvent>& happened);  // seen and approach events
+    void combatStep(); // what combat did, to draw
     void drawCombat();
     bool buildMenu_ = false, ghostOk_ = false;
     std::string placing_;            // the type being placed, or empty
