@@ -630,8 +630,6 @@ std::string announcementFor(const ScriptEvent& event, const std::vector<MissionR
         return s + "objmet";
     if (event.kind == "power-low")
         return s + "lowpowr";
-    if ((event.kind == "short-resources" || event.kind == "short-crew") && side == 'F')
-        return "FED002c";
     if (event.kind != "built" || event.args.empty())
         return {};
     // A building's spoken name: its short name in the file's (fab, the

@@ -606,6 +606,8 @@ private:
     const char* buildMenuTitle() const;
     void jumpTo(int slot);
     void selectAllOfKind(char k);
+    void speak(const std::string& what);
+    std::map<std::string, uint64_t> spokenAt_; // each clip, when it last played
     void cycleCamera(bool buildings);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map

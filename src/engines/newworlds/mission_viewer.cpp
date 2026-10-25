@@ -963,7 +963,7 @@ bool MissionViewer::playEvent(const Event& ev) {
         if (ev.key == ' ' && world_) {
             std::vector<const Unit*> alerted;
             for (const Unit& u : world_->units())
-                if (u.slot == playerSlot_ && u.hp > 0 && world_->tick() - u.attackedTick < kAlertTicks)
+                if (u.slot == playerSlot_ && u.hp > 0 && sim_->alerted(u.id))
                     alerted.push_back(&u);
             if (!alerted.empty()) {
                 size_t next = 0;
@@ -1417,6 +1417,8 @@ void MissionViewer::update(uint64_t nowMs) {
         showProgress();
         for (const MissionSim::Said& said : sim_->takeSaid())
             deliver(said.fired, said.out);
+        for (const std::string& v : sim_->takeVoices())
+            speak(v);
         updateGhost(); // the camera may have moved under the pointer
         if (economy_ && nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
             redraw(); // the panels' figures, once a second
@@ -2960,6 +2962,31 @@ void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionR
     }
     if (!out.empty())
         redraw();
+}
+
+// The colony's voices (exe.md#sounds): an officer's report by number,
+// in the player's race's recording (FED002c, KLI002a, ...); "attack" its
+// "under attack" clip. Each at most once in 600 ms, and none over a clip
+// already playing.
+void MissionViewer::speak(const std::string& what) {
+    static const std::map<std::string, std::array<char, 3>> kLetters = {
+        {"001", {'c', 'a', 'b'}}, {"002", {'c', 'a', 'a'}}, {"003", {'b', 'a', 'a'}}, {"004", {'b', 'b', 'a'}},
+        {"005", {'b', 'a', 'a'}}, {"006", {'c', 'd', 'd'}}, {"007", {'a', 'b', 'a'}}, {"008", {'a', 'b', 'b'}}};
+    if (!mixer_ || clipPlaying())
+        return;
+    const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0;
+    std::string clip;
+    if (what == "attack") {
+        clip = std::string(side == 'K' ? "k" : side == 'R' ? "r" : "f") + "atckvoc";
+    } else if (auto it = kLetters.find(what); it != kLetters.end()) {
+        clip = std::string(race == 1 ? "KLI" : race == 2 ? "ROM" : "FED") + what + it->second[size_t(race)];
+    }
+    if (clip.empty() || nowMs_ - spokenAt_[clip] < 600)
+        return;
+    spokenAt_[clip] = nowMs_;
+    if (auto sound = loadSound(clip))
+        clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
 }
 
 void MissionViewer::stopScript() {

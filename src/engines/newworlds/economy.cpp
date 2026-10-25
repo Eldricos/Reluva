@@ -523,6 +523,8 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
         return 0;
     if (!free_ && !affordable(*t)) {
         pendingShort_.push_back({"short-resources", {}});
+        // Engineering's report: construction (002) or an upgrade (003) delayed.
+        pendingShort_.push_back({"officer", {t->upgradeOf.empty() ? "002" : "003"}});
         return 0;
     }
     ColonyStructure s;
@@ -566,6 +568,7 @@ bool Economy::orderVehicle(const VehicleType& v) {
     for (int m = 0; m < kMaterials && !free_; ++m)
         if (!store || store->units[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
             pendingShort_.push_back({"short-resources", {}});
+            pendingShort_.push_back({"officer", {"001"}}); // vehicle manufacture delayed
             return false;
         }
     // The yard with the least work queued.
@@ -586,7 +589,7 @@ bool Economy::orderVehicle(const VehicleType& v) {
         store->units[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
     for (const ColonyStructure& s : structures_)
         if (s.id == yard && s.crew < 1)
-            pendingShort_.push_back({"short-crew", {}});
+            pendingShort_.push_back({"short-crew", {}}), pendingShort_.push_back({"officer", {"001"}});
     const double work = double(v.value) * kWorkPerValue;
     jobs_.push_back({v.type, yard, work, work, -1});
     return true;
@@ -678,6 +681,7 @@ void Economy::requestCrew(ColonyStructure& s) {
         }
     if (has("transporter-pad") && orbit_ >= need) {
         orbit_ -= need;
+        s.beaming = true;
         s.coming.push_back({need, kCrewWalk});
         s.wanted = 0;
     }
@@ -716,7 +720,6 @@ void Economy::retryCrew() {
 // People arriving; an accommodation block filling its pool ten at a time,
 // from the hub's pool or, once that's empty, beamed down.
 void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
-    (void)out;
     bool arrived = false;
     for (auto& c : s.coming)
         if ((c.second -= 1 / kTicksPerSecond) <= 0) {
@@ -729,6 +732,11 @@ void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
         }
     s.coming.erase(std::remove_if(s.coming.begin(), s.coming.end(), [](const auto& c) { return c.second <= 0; }),
                    s.coming.end());
+    // Its people all beamed down: the building reports it (an alert).
+    if (s.beaming && s.coming.empty()) {
+        s.beaming = false;
+        out.push_back({"beamed-down", {std::to_string(s.id)}});
+    }
     const BuildingType* t = buildingType(s.type);
     if (t && s.type == "accommodation" && s.progress >= 1 &&
         std::none_of(s.coming.begin(), s.coming.end(), [](const auto& c) { return c.first < 0; })) {
@@ -797,8 +805,12 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
         if (j.work > 0) {
             // Running above 0.35, stopped below 0.2 (and between, as it was).
             const float eff = efficiency(*s);
-            bool& running = yardRunning_[s->id];
+            bool& running = yardRunning_.try_emplace(s->id, true).first->second;
+            const bool was = running;
             running = eff > kYardStart || (running && eff >= kYardStop);
+            // The yard's reports: suspended (006), back on line (008).
+            if (was != running)
+                out.push_back({"officer", {running ? "008" : "006"}});
             if (!running)
                 continue;
             const float draw = std::min(kYardDraw, s->stored);
@@ -813,6 +825,7 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
             finished_.push_back({j.type, j.yard});
             if (const VehicleType* v = vehicleType(j.type))
                 out.push_back({"vehicle-built", {v->panel}});
+            out.push_back({"officer", {"005"}}); // a vehicle finished
             j.type = -1;
         }
     }
@@ -866,6 +879,8 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             s.stored = t->bufferCap;
             capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
             out.push_back({"built", {s.type}});
+            if (s.type == "colony-hub")
+                out.push_back({"officer", {"004"}}); // a hub finished: Engineering's line
             requestCrew(s);
         }
     }

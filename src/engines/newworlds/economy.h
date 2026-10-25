@@ -118,6 +118,7 @@ struct ColonyStructure {
     int target = -1;     // the crew the player wants in it (-1: all its slots)
     bool evacuating = false; // being razed: its people leaving
     int evacTicks = 0;       // ticks since
+    bool beaming = false;    // its crew on their way down from orbit
     // People on their way to it: how many, and seconds still to walk.
     std::vector<std::pair<int, double>> coming;
 };

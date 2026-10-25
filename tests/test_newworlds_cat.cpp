@@ -718,7 +718,7 @@ void testMissionScripts() {
     CHECK(announcementFor({"built", {"accommodation"}}, {}, 'K') == "A_kacom");
     CHECK(announcementFor({"built", {"sickbay"}}, {}, 'R').empty());
     CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
-    CHECK(announcementFor({"short-crew", {}}, {}, 'F') == "FED002c" && announcementFor({"short-crew", {}}, {}, 'K').empty());
+    CHECK(announcementFor({"short-crew", {}}, {}, 'F').empty()); // the officers say it (MissionSim::takeVoices)
     CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}}, 'R') == "robjmet");
     CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}, {MissionRun::Output::Won, {}, {}, 0, {}}},
                           'F') == "fmiswin");
@@ -933,7 +933,12 @@ void testEconomy() {
     Economy poor('F', {}, 50, map);
     poor.addBuilt("colony-hub", 0, 0);
     CHECK(poor.order("construction-yard", 0, 0, 0, 0) == 0);
-    CHECK(count(poor.advance(0.1), "short-resources") == 1 && poor.structures().size() == 1);
+    {
+        const auto said = poor.advance(0.1);
+        CHECK(count(said, "short-resources") == 1 && poor.structures().size() == 1);
+        // ... and its officer reports construction delayed (exe.md#sounds).
+        CHECK(std::any_of(said.begin(), said.end(), [](const ScriptEvent& ev) { return ev.kind == "officer" && ev.args[0] == "002"; }));
+    }
     // Power: three yards' buffers draining faster than the hub's 600 a tick
     // refills them.
     Economy busy('F', {}, 50, map);
@@ -1797,6 +1802,7 @@ void testCrew() {
     CHECK(few.orderVehicle(*vehicleType(97)));
     const auto told = run(few, 1);
     CHECK(std::any_of(told.begin(), told.end(), [](const ScriptEvent& ev) { return ev.kind == "short-crew"; }));
+    CHECK(std::any_of(told.begin(), told.end(), [](const ScriptEvent& ev) { return ev.kind == "officer" && ev.args[0] == "001"; }));
     run(few, 30);
     CHECK(few.takeVehicles().empty());
 }

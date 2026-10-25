@@ -108,6 +108,14 @@ public:
     };
     std::vector<Said> takeSaid();
     std::vector<WorldEvent> takeEvents();
+    // What the colony says (exe.md#sounds): its officers' reports by
+    // number ("002": construction delayed, ...) and "attack" (one of its
+    // finished buildings hit; at most once in 30 seconds).
+    std::vector<std::string> takeVoices();
+    // The player's objects with an alert (exe.md#cameras: hit, or a
+    // report: everyone beamed down, a mine exhausted), for Space; an
+    // alert lasts 41 ticks.
+    bool alerted(int unit) const;
 
     // What looks wrong now, one line each: "stuck: ..." (units that can't
     // get anywhere, groups that never move on, builds whose spot never
@@ -150,6 +158,9 @@ private:
     std::set<int> touchyNeutral_;
     std::vector<Said> said_;
     std::vector<WorldEvent> events_;
+    std::vector<std::string> voices_;
+    double lastAttackVoice_ = -1e9;
+    std::map<int, int> alerts_; // unit: the world tick its alert was set
     std::map<std::string, int> lastCounts_;
     std::set<std::string> seenSites_, scannedSites_;
     std::set<std::pair<std::string, std::string>> approached_;

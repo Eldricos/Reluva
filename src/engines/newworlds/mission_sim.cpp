@@ -21,6 +21,10 @@ constexpr double kStep = 0.1;
 // How long before something counts as stuck: a unit with a path that
 // hasn't got nearer, a group still gathering, one idle on a leg, a build
 // whose spot hasn't cleared, a unit firing at something it doesn't harm.
+// How long an object's alert lasts (the game's 41 Tricorder redraws,
+// taken as ticks), and the least time between two "under attack" voices.
+constexpr int kAlertTicks = 41;
+constexpr double kAttackVoiceEvery = 30;
 constexpr double kUnitStuck = 30, kGathering = 180, kOnLeg = 240, kBuilding = 120, kHarmless = 120;
 
 std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, float(a) / 8 * kBlock}; }
@@ -269,6 +273,17 @@ std::vector<MissionSim::Said> MissionSim::takeSaid() {
     return out;
 }
 
+std::vector<std::string> MissionSim::takeVoices() {
+    std::vector<std::string> out;
+    out.swap(voices_);
+    return out;
+}
+
+bool MissionSim::alerted(int unit) const {
+    auto it = alerts_.find(unit);
+    return it != alerts_.end() && world_->tick() - it->second < kAlertTicks;
+}
+
 std::vector<WorldEvent> MissionSim::takeEvents() {
     std::vector<WorldEvent> out;
     out.swap(events_);
@@ -303,6 +318,16 @@ void MissionSim::step(double dt) {
         if (e.kind == WorldEvent::Shot && e.toSlot == player_ && touchyNeutral_.count(e.fromSlot) &&
             world_->stance(player_, e.fromSlot) == 2)
             setPosture(e.fromSlot, 3);
+        // A hit: an alert on what it struck; on one of the colony's
+        // finished buildings, the "under attack" voice.
+        if (e.kind == WorldEvent::Hit && e.toSlot == player_) {
+            alerts_[e.to] = world_->tick();
+            if (const Unit* t = world_->unit(e.to); t && t->building && t->built >= 1 &&
+                                                     clock_ - lastAttackVoice_ >= kAttackVoiceEvery) {
+                voices_.push_back("attack");
+                lastAttackVoice_ = clock_;
+            }
+        }
         if (e.kind != WorldEvent::Destroyed)
             continue;
         for (size_t i = 0; i < colonyObjects_.size(); ++i)
@@ -349,8 +374,29 @@ void MissionSim::step(double dt) {
     economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
                                             [&](const Unit& u) { return u.slot == player_ && !u.building; })) +
                           housed_);
-    auto built = economy_->advance(dt);
-    happened.insert(happened.end(), built.begin(), built.end());
+    // What the economy reports: its officers' lines (for the screen), the
+    // reports that raise an alert (a mine exhausted, a crew beamed down),
+    // the rest for the script.
+    for (ScriptEvent& e : economy_->advance(dt)) {
+        if (e.kind == "officer") {
+            voices_.push_back(e.args.empty() ? std::string() : e.args[0]);
+            continue;
+        }
+        auto alertOn = [&](int structure) {
+            for (size_t i = 0; i < structureIds_.size() && i < colonyObjects_.size(); ++i)
+                if (structureIds_[i] == structure && colonyObjects_[i] > 0)
+                    alerts_[colonyObjects_[i]] = world_->tick();
+        };
+        if (e.kind == "beamed-down" && !e.args.empty()) {
+            alertOn(std::atoi(e.args[0].c_str()));
+            continue;
+        }
+        if (e.kind == "mine-exhausted")
+            for (const ColonyStructure& c : economy_->structures())
+                if (c.type == "mining-station" && c.blockY * 8 + 4 == e.a && c.blockX * 8 + 4 == e.b)
+                    alertOn(c.id);
+        happened.push_back(std::move(e));
+    }
     for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i)
         if (Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
             for (const ColonyStructure& c : economy_->structures())
