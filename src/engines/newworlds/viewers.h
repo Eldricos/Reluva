@@ -634,6 +634,7 @@ private:
     std::vector<int> spokenSelection_;  // the selection its first vehicle last answered
     std::minstd_rand rng_{std::random_device{}()};
     std::map<std::string, uint64_t> spokenAt_; // each clip, when it last played
+    audio::SoundHandle stingHandle_ = audio::kNoSound; // the colony's danger music
     void cycleCamera(bool buildings);
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void showColony();  // hands the colony's buildings to the map

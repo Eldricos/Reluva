@@ -457,6 +457,8 @@ void MissionViewer::stopPlay() {
     playing_ = false;
     quitAsked_ = paused_ = false;
     map_.stopFollowing();
+    if (mixer_)
+        mixer_->stop(stingHandle_);
     world_ = nullptr, economy_ = nullptr, ai_ = nullptr, fieldWork_ = nullptr;
     research_ = nullptr, effects_ = nullptr, fog_ = nullptr, run_ = nullptr;
     sim_.reset();
@@ -3142,17 +3144,23 @@ void MissionViewer::speak(const std::string& what) {
     static const std::map<std::string, std::array<char, 3>> kLetters = {
         {"001", {'c', 'a', 'b'}}, {"002", {'c', 'a', 'a'}}, {"003", {'b', 'a', 'a'}}, {"004", {'b', 'b', 'a'}},
         {"005", {'b', 'a', 'a'}}, {"006", {'c', 'd', 'd'}}, {"007", {'a', 'b', 'a'}}, {"008", {'a', 'b', 'b'}}};
-    if (!mixer_ || clipPlaying())
+    if (!mixer_ || (clipPlaying() && what != "attack"))
         return;
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
     const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0;
     std::string clip;
     if (what == "attack") {
+        // The colony's danger sting (Media/Music) with it, over the map's
+        // music.
+        const char* sting = side == 'K' ? "klinColonydan" : side == 'R' ? "RomColonyInDangr" : "fedcoldanger";
+        if (!mixer_->isPlaying(stingHandle_))
+            if (auto sound = loadSound(sting))
+                stingHandle_ = mixer_->play(std::move(sound), audio::SoundType::Music, kMusicVolume);
         clip = std::string(side == 'K' ? "k" : side == 'R' ? "r" : "f") + "atckvoc";
     } else if (auto it = kLetters.find(what); it != kLetters.end()) {
         clip = std::string(race == 1 ? "KLI" : race == 2 ? "ROM" : "FED") + what + it->second[size_t(race)];
     }
-    if (clip.empty() || nowMs_ - spokenAt_[clip] < 600)
+    if (clip.empty() || clipPlaying() || nowMs_ - spokenAt_[clip] < 600)
         return;
     spokenAt_[clip] = nowMs_;
     if (auto sound = loadSound(clip))
