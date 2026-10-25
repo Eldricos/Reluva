@@ -389,6 +389,17 @@ built, to be put back at the end so play feels as the game's does:
   onto blocks the player's side can't see (exe.md#fog-of-war); Reluva
   lets it go anywhere, which helps when checking a map.
 
+## Reluva's own additions, for later
+
+Things the original doesn't have, to be added once play matches it, and
+kept apart from the game's behaviour:
+
+- **Saving and loading a mission.** The game has none: a mission is
+  played through in one sitting. (The executable reads a `SAVEGAME` path
+  from a developer settings file, `GAME.INI`, defaulting to
+  `SAVE_FED.sav`, but nothing uses it; its `save.dat` is a debugging log
+  of the simulation's cycles, written only.)
+
 ## Placeholders
 
 | What | Value | From |
