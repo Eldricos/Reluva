@@ -1814,7 +1814,12 @@ bool Economy::raze(int structure) {
                 ++r;
             }
             s.crew = 0, s.target = 0;
-            if (leaving > 0)
+            // With transports, an unarmed APC comes for them and takes them
+            // to the hub's pool; the building waits for it to go
+            // (exe.md#demolishing). Else they walk.
+            if (leaving > 0 && transports_ && hub())
+                addRides(s.id, hub()->id, leaving, true, false);
+            else if (leaving > 0)
                 walking_.push_back({leaving, kCrewWalk});
             // Its bees fly off.
             if (auto d = depots_.find(s.id); d != depots_.end()) {
@@ -1834,6 +1839,9 @@ bool Economy::evacuated(int structure) const {
     for (const ColonyStructure& s : structures_)
         if (s.id == structure) {
             if (!s.evacuating || s.crew > 0 || !s.coming.empty() || s.evacTicks < kEvacTicks)
+                return false;
+            // Its people still to be taken out.
+            if (std::any_of(rides_.begin(), rides_.end(), [&](const Ride& r) { return r.from == s.id && !r.loaded; }))
                 return false;
             return std::none_of(bees_.begin(), bees_.end(), [&](const Bee& b) {
                 return (b.worker || b.cargo) && b.flight == 0 && std::hypot(b.x - s.x, b.y - s.y) < 1;

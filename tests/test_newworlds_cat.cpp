@@ -1603,6 +1603,22 @@ void testStoresAndRazing() {
     CHECK(e.raze(bay0) && e.walking() > 0 && e.pool() == pool0);
     e.advance(21);
     CHECK(e.walking() == 0 && e.pool() > pool0);
+    // With transports, an unarmed APC takes them out instead: the building
+    // stands until they're aboard.
+    e.setTransports(true);
+    const int bay1 = e.addBuilt("sickbay", 0, -60000);
+    CHECK(e.raze(bay1)); // (those waiting for a ride count as on their way)
+    e.advance(2);
+    CHECK(!e.evacuated(bay1));
+    int ride = 0;
+    for (const Economy::Ride& r : e.rides())
+        if (r.from == bay1)
+            ride = r.id;
+    CHECK(ride != 0);
+    e.rideLoaded(ride);
+    e.advance(0.3);
+    CHECK(e.evacuated(bay1));
+    e.setTransports(false);
     // A building's crew die with it (the sickbay's DEAD); not a razed one's.
     const int bay = e.addBuilt("sickbay", 0, -20000);
     int crew = 0;

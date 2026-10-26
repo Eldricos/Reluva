@@ -457,7 +457,7 @@ kept apart from the game's behaviour:
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 1024 units | the game sends them all to the one point and they pack by their 1024 boxes |
 | Build time | with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83 (timed); shield generator 27, photon turret 22, artillery 31; the Klingons' generator 23, yard 37, shield generator 22, turret 24; the Romulans' generator 28, yard 58, shield generator 48, turret 33, artillery 29; others 40 | the training missions, and the rest from each model's tiles against them (exe.md#bees) |
-| Evacuating a razed building | 5 ticks at least, then as long as its bees take to leave; its people walk back to the hub's pool in 20 s | the game's waits for an unarmed APC to take the crew out (about 30-35 s two blocks from the hub, the crew home 55-65 s; exe.md#demolishing): not done yet |
+| Evacuating a razed building | 5 ticks at least, then until an unarmed APC has taken its crew aboard (they ride to the hub's pool); with no transports, they walk there in 20 s | the executable (exe.md#demolishing) |
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
