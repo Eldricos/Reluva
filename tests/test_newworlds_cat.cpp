@@ -1082,12 +1082,13 @@ void testCombat() {
     const CombatType* phaser = combatType(8);
     const CombatType* house = combatType(114);
     CHECK(disruptor && phaser && house);
-    CHECK(disruptor->weapon.kind == WeaponKind::Single && disruptor->weapon.damage == 40 && disruptor->hp == 60);
-    CHECK(phaser->weapon.kind == WeaponKind::Burst && phaser->weapon.damage == 6 && phaser->weapon.magazine == 4 &&
-          phaser->weapon.reload == 40 && phaser->weapon.range == 20000);
-    CHECK(house->building && house->hp == 200 && std::string(house->name) == "taubat-house");
+    // The figures the game plays with (rewritten at its start-up).
+    CHECK(disruptor->weapon.kind == WeaponKind::Single && disruptor->weapon.damage == 30 && disruptor->hp == 70);
+    CHECK(phaser->weapon.kind == WeaponKind::Burst && phaser->weapon.damage == 10 && phaser->weapon.magazine == 4 &&
+          phaser->weapon.reload == 40 && phaser->weapon.range == 20000 && phaser->hp == 70);
+    CHECK(house->building && house->hp == 600 && std::string(house->name) == "taubat-house");
     // A Klingon tank hostile to the Federation finds the tank in range and
-    // destroys it with its first shot; the Federation (neutral) can't answer.
+    // hits it, 30 a shot; the Federation (neutral) can't answer.
     w.setStance(1, 0, 3);
     const int fed = spawnObject(w, 0, 'F', *phaser, 5 * kTile, 5 * kTile, {});
     const int kli = spawnObject(w, 1, 'K', *disruptor, 6.5f * kTile, 5 * kTile, {});
@@ -1095,33 +1096,41 @@ void testCombat() {
     // (Once it has looked round and turned its turret half a turn: 1.6 s.)
     for (int i = 0; i < 25; ++i)
         w.advance(0.1);
-    CHECK(!w.unit(fed) && w.unit(kli));
-    bool shot = false, destroyed = false;
-    for (const WorldEvent& e : w.takeEvents()) {
+    CHECK(w.unit(fed) && w.unit(fed)->hp == 40 && w.unit(kli) && w.unit(kli)->hp == 70);
+    bool shot = false;
+    for (const WorldEvent& e : w.takeEvents())
         shot = shot || (e.kind == WorldEvent::Shot && e.from == kli && e.weapon == WeaponKind::Single);
-        destroyed = destroyed || (e.kind == WorldEvent::Destroyed && e.what.id == fed && e.what.name == "phaser-tank");
-    }
-    CHECK(shot && destroyed);
+    CHECK(shot);
+    for (int i = 0; i < 60 && w.unit(fed); ++i)
+        w.advance(0.1);
+    CHECK(!w.unit(fed)); // three shots
     // The player's tank (1.2 times the hit points) ordered onto a house:
-    // 24 a burst every 2 s, so 9 bursts for its 200.
+    // 40 a burst every 2.2 s, so 15 bursts for its 600.
+    if (w.unit(kli))
+        w.remove(kli); // (it and the phaser tank, which answered its fire, trade evenly)
     const int mine = spawnObject(w, 0, 'F', *phaser, 12 * kTile, 12 * kTile, {}, {}, true);
     const int home = spawnObject(w, 3, 'T', *house, 14 * kTile, 12 * kTile, "taubat-colony");
-    CHECK(w.unit(mine)->maxHp == 36.0f && !w.unit(mine)->ai);
+    CHECK(w.unit(mine)->maxHp == 84.0f && !w.unit(mine)->ai);
     w.attack({mine}, home);
     for (int i = 0; i < 100; ++i)
         w.advance(0.1);
-    CHECK(w.unit(home) && w.unit(home)->hp < 200);
-    for (int i = 0; i < 120; ++i)
+    CHECK(w.unit(home) && w.unit(home)->hp < 600);
+    for (int i = 0; i < 300; ++i)
         w.advance(0.1);
     CHECK(!w.unit(home));
-    // A neutral answers fire: the Klingon tank, attacked, shoots back.
+    // A Klingon tank hostile to it beside it: they exchange fire.
+    const int kli2 = spawnObject(w, 1, 'K', *disruptor, w.unit(mine)->x, w.unit(mine)->y + 12000, {});
+    CHECK(scriptNames(*w.unit(kli2), 0) == std::vector<std::string>{"klingon-disruptor-tank"});
     w.takeEvents();
-    w.attack({mine}, kli);
-    for (int i = 0; i < 400 && w.unit(mine) && w.unit(mine)->hp >= 36; ++i)
+    bool fired = false, answered = false;
+    for (int i = 0; i < 100 && !(fired && answered); ++i) {
         w.advance(0.1);
-    CHECK(!w.unit(mine) || w.unit(mine)->hp < 36);
-    const auto names = scriptNames(*w.unit(kli), 0);
-    CHECK(names.size() == 1 && names[0] == "klingon-disruptor-tank");
+        for (const WorldEvent& e : w.takeEvents()) {
+            fired = fired || (e.kind == WorldEvent::Shot && e.from == kli2 && e.to == mine);
+            answered = answered || (e.kind == WorldEvent::Shot && e.from == mine && e.to == kli2);
+        }
+    }
+    CHECK(fired && answered);
 }
 
 void testAiSides() {
@@ -1919,7 +1928,7 @@ void testScriptEffects() {
     for (const Unit& u : w.units())
         if (u.label == "raiders") {
             ++raiders;
-            CHECK(u.slot == 1 && u.name == "disruptor-tank" && u.hp == 30);
+            CHECK(u.slot == 1 && u.name == "disruptor-tank" && u.hp == 35); // at half
         }
     CHECK(raiders == 3);
     // The zone sees them; the meteors fall on it.
@@ -1988,7 +1997,7 @@ void testRepairsShieldsCloaking() {
         Repairs r(w);
         r.tick();
         CHECK(w.unit(tank)->hp == 11);
-        for (int i = 0; i < 213; ++i)
+        for (int i = 0; i < 91; ++i) // 6400 / 70
             r.tick();
         CHECK(w.unit(tank)->hp == 11);
         r.tick();
@@ -2001,7 +2010,7 @@ void testRepairsShieldsCloaking() {
     }
     // A building with a construction yard filling the pool: a step every
     // 8 ticks, of 3 points with a skill-1 engineer in it; without a yard
-    // the slow rate (600 hp: a point every 10 / 3 + 1 ticks).
+    // the slow rate (1500 hp: a point every 4 / 3 + 1 ticks, cut down: 2).
     auto hubAfter = [&](bool yard) {
         World w(t);
         const int hub = spawnObject(w, 0, 'F', *combatType(23), 100000, 100000, {});
@@ -2014,7 +2023,7 @@ void testRepairsShieldsCloaking() {
             r.tick();
         return w.unit(hub)->hp;
     };
-    CHECK(hubAfter(true) == 330 && hubAfter(false) == 320);
+    CHECK(hubAfter(true) == 330 && hubAfter(false) == 340);
 
     // Shields: half the damage inside its own side's field, for the kinds
     // it covers; a security officer's skill divides what's left.

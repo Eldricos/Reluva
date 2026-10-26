@@ -168,11 +168,19 @@ Romulan 2 trans al).
 
 ## Vehicles and turrets
 
-Hit points as the game sets them; for the human player's side in a single
-player game they are raised (Federation x1.2, Romulan x1.3, Klingon x1),
-and a switch (most likely the setup's easy-game box) doubles them.
+Hit points and weapon figures as the game plays them: each type's
+constructor reads them from a table the game rewrites once at start-up
+(about 300 of its values change: the phaser tank's hit points 30 to 70
+and its burst 20 to 30, the Federation hub 600 to 1500, the bees 5 to a
+million), so the tables here give the rewritten figures, not the ones
+stored in the file. For the human player's side in a single player game
+hit points are raised again (Federation x1.2, Romulan x1.3, Klingon x1),
+and a switch (most likely the setup's easy-game box) doubles them. The
+Metar starship (262) carries five turrets of its own: a single-shot gun
+and four bursts, each 120 (the bursts 40 a pulse), range 45000, reload
+20; Reluva fires them as one gun of five.
 **Burst** weapons fire 4 pulses, one a tick, each a third of the type's
-figure (the table's damage), and reload from the tick after the last:
+figure, cut down (the table gives a pulse's damage), and reload from the tick after the last:
 with a reload of 40 a burst every 44 ticks. **Single** weapons (Klingon)
 fire one shot a reload, damage not divided. Both multiply a shot's
 damage by (the shooter's best security officer's skill + 1, a command
@@ -181,9 +189,9 @@ vehicles start with no officers, so it's normally 1. **Artillery** lobs a
 shell (speed 350 a tick, gravity 3 a tick squared; the high arc when the
 line of sight is blocked), with no multiplier and no splash; on flat
 ground it can't reach past about 36850 units. Every shot is a real
-projectile (bolts 2700 units a tick, beam pulses a beam's length a tick)
+projectile (bolts 5400 units a tick, beam pulses a beam's length a tick)
 that hits the first object of another side its path crosses, or misses
-into the ground. A fire takes 300 units from the shooter's power buffer
+into the ground (see Aiming and Hits under Sides and combat). A fire takes 300 units from the shooter's power buffer
 (each burst pulse, and the call that starts the reload, so 1500 a burst),
 but only buildings have a real buffer: every vehicle (and the natives'
 guns) has an empty stand-in that always says yes and takes nothing. So
@@ -200,45 +208,45 @@ the size of the area a unit reveals (classes 3 and 4: 5 blocks across; 5:
 
 | id | side | type | hp | weapon: damage / range / reload ticks / shots / traverse / elevation | pace | fog | scan | build value |
 |---|---|---|---|---|---|---|---|---|---|
-| 8 | F | phaser tank | 30 | burst 6 / 20000 / 40 / 4 / 180,180 / 20,-45 | 0.08333 | 3 | - | 640 |
+| 8 | F | phaser tank | 70 | burst 10 / 20000 / 40 / 4 / 180,180 / 20,-45 | 0.08333 | 3 | - | 640 |
 | 55 | F | unarmed APC | 30 | - | 0.08333 | 3 | - | 0 |
-| 56 | F | armed APC | 50 | burst 6 / 20000 / 40 / 4 / 180,180 / 10,-45 | 0.08333 | 3 | - | 240 |
-| 12 | F | worker bee | 5 | - | 0.16667 | - | - | 0 |
-| 13 | F | cargo bee | 5 | - | 0.125 | - | - | 128 |
-| 14 | F | construction bee | 5 | - | 0.125 | - | - | 0 |
+| 56 | F | armed APC | 50 | burst 6 / 18000 / 50 / 4 / 180,180 / 10,-45 | 0.08333 | 3 | - | 240 |
+| 12 | F | worker bee | 1000000 | - | 0.16667 | - | - | 0 |
+| 13 | F | cargo bee | 1000000 | - | 0.125 | - | - | 128 |
+| 14 | F | construction bee | 1000000 | - | 0.125 | - | - | 0 |
 | 97 | F | ground scout | 30 | - | 0.125 | 5 | 60000 | 0 |
-| 47 | F | photon artillery | 50 | artillery 80 / 20000 / 40 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
-| 9 | F | advanced photon artillery | 60 | artillery 80 / 40000 / 20 / 1 / 180,180 / 10,-90 | 0.08333 | 3 | - | 640 |
-| 80 | F | defensive weapon | 200 | burst 26 / 20000 / 40 / 4 / 180,180 / 5,-70 | - | - | - | 0 |
-| 62 | F | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
-| 83 | F | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
-| 154 | F | mobile shield generator | 90 | - | 0.08333 | 2 | shield | 640 |
+| 47 | F | photon artillery | 60 | artillery 55 / 38000 / 100 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
+| 9 | F | advanced photon artillery | 70 | artillery 85 / 45000 / 140 / 1 / 180,180 / 10,-90 | 0.08333 | 3 | - | 640 |
+| 80 | F | defensive weapon | 200 | burst 13 / 30000 / 40 / 4 / 180,180 / 5,-70 | - | - | - | 0 |
+| 62 | F | science vehicle | 40 | - | 0.08333 | 4 | 18000 | 640 |
+| 83 | F | defensive artillery | 200 | artillery 30 / 40000 / 75 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 154 | F | mobile shield generator | 100 | - | 0.08333 | 2 | shield | 640 |
 | 88 | K | unarmed APC | 30 | - | 0.08333 | 3 | - | 240 |
-| 10 | K | disruptor tank | 60 | single 40 / 20000 / 40 / 1 / 180,180 / 5,-60 | 0.125 | 3 | - | 640 |
-| 229 | K | cloaked disruptor tank | 60 | single 40 / 20000 / 40 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
-| 228 | K | disruptor battery | 90 | single 80 / 20000 / 20 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
-| 11 | K | worker bee | 5 | - | 0.16667 | - | - | 0 |
-| 36 | K | photon artillery | 50 | artillery 80 / 20000 / 40 / 1 / 180,180 / 10,-90 | 0.125 | 3 | - | 640 |
+| 10 | K | disruptor tank | 70 | single 30 / 20000 / 40 / 1 / 180,180 / 5,-60 | 0.125 | 3 | - | 640 |
+| 229 | K | cloaked disruptor tank | 75 | single 30 / 20000 / 40 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
+| 228 | K | disruptor battery | 100 | single 60 / 30000 / 80 / 1 / 180,180 / 10,-60 | 0.125 | 3 | - | 640 |
+| 11 | K | worker bee | 1000000 | - | 0.16667 | - | - | 0 |
+| 36 | K | photon artillery | 60 | artillery 55 / 38000 / 100 / 1 / 180,180 / 10,-90 | 0.125 | 3 | - | 640 |
 | 37 | K | ground scout | 30 | - | 0.125 | 5 | 60000 | 128 |
-| 40 | K | armed APC | 30 | single 20 / 20000 / 40 / 1 / 90,-90 / 15,-50 | 0.08333 | 3 | - | 240 |
-| 46 | K | construction bee | 5 | - | 0.125 | - | - | 0 |
-| 61 | K | cargo bee | 5 | - | 0.125 | - | - | 0 |
-| 54 | K | defensive weapon | 200 | single 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
-| 82 | K | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 40 | K | armed APC | 50 | single 20 / 18000 / 50 / 1 / 90,-90 / 15,-50 | 0.08333 | 3 | - | 240 |
+| 46 | K | construction bee | 1000000 | - | 0.125 | - | - | 0 |
+| 61 | K | cargo bee | 1000000 | - | 0.125 | - | - | 0 |
+| 54 | K | defensive weapon | 200 | single 40 / 30000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 82 | K | defensive artillery | 200 | artillery 30 / 40000 / 75 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
 | 95 | K | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
-| 84 | R | defensive artillery | 200 | artillery 80 / 20000 / 40 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
+| 84 | R | defensive artillery | 200 | artillery 30 / 40000 / 75 / 1 / 180,180 / 5,-90 | - | - | - | 0 |
 | 89 | R | unarmed apc | 30 | - | 0.08333 | 3 | - | 0 |
-| 35 | R | cloaked tank | 60 | burst 13 / 20000 / 40 / 4 / 180,180 / 5,-75 | 0.08333 | 3 | - | 640 |
+| 35 | R | cloaked tank | 75 | burst 10 / 20000 / 40 / 4 / 180,180 / 5,-75 | 0.08333 | 3 | - | 640 |
 | 98 | R | ground scout | 30 | - | 0.125 | 5 | 60000 | 0 |
-| 87 | R | photon artillery | 60 | artillery 80 / 20000 / 20 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
-| 81 | R | defensive weapon | 200 | burst 26 / 20000 / 40 / 4 / 180,180 / 5,-90 | - | - | - | 0 |
-| 64 | R | armed APC | 50 | burst 6 / 20000 / 40 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
-| 230 | R | cloaked apc | 50 | burst 6 / 20000 / 40 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
-| 90 | R | cargo bee | 5 | - | 0.125 | - | - | 128 |
-| 91 | R | construction bee | 5 | - | 0.125 | - | - | 0 |
-| 92 | R | worker bee | 5 | - | 0.16667 | - | - | 0 |
+| 87 | R | photon artillery | 60 | artillery 55 / 38000 / 100 / 1 / 180,180 / 0,-90 | 0.08333 | 3 | - | 640 |
+| 81 | R | defensive weapon | 200 | burst 11 / 30000 / 40 / 4 / 180,180 / 5,-90 | - | - | - | 0 |
+| 64 | R | armed APC | 50 | burst 6 / 18000 / 50 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
+| 230 | R | cloaked apc | 75 | burst 11 / 20000 / 20 / 4 / 60,-60 / 15,-45 | 0.08333 | 3 | - | 240 |
+| 90 | R | cargo bee | 1000000 | - | 0.125 | - | - | 128 |
+| 91 | R | construction bee | 1000000 | - | 0.125 | - | - | 0 |
+| 92 | R | worker bee | 1000000 | - | 0.16667 | - | - | 0 |
 | 63 | R | science vehicle | 30 | - | 0.08333 | 4 | 18000 | 640 |
-| 148 | R | tank | 60 | burst 13 / 20000 / 40 / 4 / 180,180 / 30,-60 | 0.08333 | 3 | - | 640 |
+| 148 | R | tank | 70 | burst 10 / 20000 / 40 / 4 / 180,180 / 30,-60 | 0.08333 | 3 | - | 640 |
 
 Cloaking units (Romulan cloaked tank 35 and APC 230, Klingon cloaked
 disruptor tank 229) have no cloak figure: they are given a different
@@ -255,63 +263,63 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
 
 | id | side | type | hp | power buffer / intake a tick | use a tick | output a tick | staff, housing | scan |
 |---|---|---|---|---|---|---|---|---|
-| 16 | F | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 16 | F | security centre | 500 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
 | 21 | F | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
 | 22 | F | power generator | 200 | - | - | 500 | - | 2500 |
-| 23 | F | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
-| 24 | F | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
-| 77 | F | construction yard | 400 | 34000 / 550 | 85 | - | 1, 0 | 5000 |
+| 23 | F | colony hub | 1500 | - | 0 | 500 | 0, 150 | 20000 |
+| 24 | F | vehicle yard | 450 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 77 | F | construction yard | 450 | 34000 / 550 | 85 | - | 1, 0 | 5000 |
 | 26 | F | storage processor | 400 | 24000 / 300 | 60 | - | 1, 0 | 5000 |
-| 122 | F | storage facility | 600 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
-| 27 | F | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
-| 44 | F | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 122 | F | storage facility | 1500 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
+| 27 | F | landing pad | 250 | 44000 / 300 | 60 | - | - | 5000 |
+| 44 | F | accomodation block | 1000 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
 | 45 | F | mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 2500 |
-| 163 | F | advanced mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
+| 163 | F | advanced mining station | 900 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
 | 80 | F | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
 | 83 | F | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
-| 123 | F | sickbay | 200 | 44000 / 550 | 440 | - | 1, 0 | 5000 |
-| 126 | F | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
-| 158 | F | advanced power generator | 200 | - | - | 1500 | - | 5000 |
-| 171 | F | hydroponics farm | 400 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
-| 118 | F | CFD | 30 | - | 0 | - | - | - |
-| 75 | K | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
-| 73 | K | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
-| 28 | K | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
+| 123 | F | sickbay | 400 | 44000 / 550 | 440 | - | 1, 0 | 5000 |
+| 126 | F | science block | 450 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 158 | F | advanced power generator | 350 | - | - | 1500 | - | 5000 |
+| 171 | F | hydroponics farm | 350 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
+| 118 | F | CFD | 2500 | - | 0 | - | - | - |
+| 75 | K | security centre | 500 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 73 | K | landing pad | 250 | 44000 / 300 | 60 | - | - | 5000 |
+| 28 | K | colony hub | 1500 | - | 0 | 500 | 0, 150 | 20000 |
 | 29 | K | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
 | 30 | K | power generator | 200 | - | - | 500 | - | 2500 |
-| 172 | K | advanced power generator | 200 | - | - | 1500 | - | 5000 |
-| 31 | K | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
-| 51 | K | storage processor | 600 | 44000 / 425 | 85 | - | 1, 0 | 5000 |
-| 32 | K | storage facility | 600 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
-| 68 | K | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
-| 50 | K | livestock farm | 400 | 34000 / 425 | 60 | - | 1, 0 | 5000 |
-| 52 | K | mining station | 200 | 44000 / 550 | 110 | - | 1, 0 | 2500 |
-| 189 | K | advanced mining station | 200 | 44000 / 550 | 110 | - | 1, 0 | 1666 |
-| 53 | K | construction yard | 400 | 44000 / 550 | 110 | - | 1, 0 | 5000 |
+| 172 | K | advanced power generator | 350 | - | - | 1500 | - | 5000 |
+| 31 | K | vehicle yard | 450 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 51 | K | storage processor | 1500 | 44000 / 425 | 85 | - | 1, 0 | 5000 |
+| 32 | K | storage facility | 1500 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
+| 68 | K | accomodation block | 1000 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 50 | K | livestock farm | 350 | 34000 / 425 | 60 | - | 1, 0 | 5000 |
+| 52 | K | mining station | 400 | 44000 / 550 | 110 | - | 1, 0 | 2500 |
+| 189 | K | advanced mining station | 900 | 44000 / 550 | 110 | - | 1, 0 | 1666 |
+| 53 | K | construction yard | 450 | 44000 / 550 | 110 | - | 1, 0 | 5000 |
 | 54 | K | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
 | 82 | K | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
 | 124 | K | sickbay | 400 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
-| 127 | K | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
-| 207 | K | CFD | 30 | - | 0 | - | - | - |
+| 127 | K | science block | 400 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 207 | K | CFD | 2500 | - | 0 | - | - | - |
 | 84 | R | defensive artillery | 200 | 64000 / 550 | 160 | - | - | - |
-| 74 | R | security centre | 400 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
+| 74 | R | security centre | 500 | 34000 / 425 | 340 | - | 1, 0 | 20000 |
 | 69 | R | shield generator | 400 | 64000 / 550 | 640 | - | - | - |
-| 71 | R | vehicle yard | 400 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
-| 72 | R | landing pad | 200 | 44000 / 300 | 60 | - | - | 5000 |
-| 43 | R | colony hub | 600 | - | 0 | 500 | 0, 150 | 20000 |
+| 71 | R | vehicle yard | 450 | 34000 / 550 | 60 | - | 3, 0 | 5000 |
+| 72 | R | landing pad | 250 | 44000 / 300 | 60 | - | - | 5000 |
+| 43 | R | colony hub | 1500 | - | 0 | 500 | 0, 150 | 20000 |
 | 81 | R | defensive weapon | 200 | 64000 / 550 | 160 | - | - | - |
-| 66 | R | storage facility | 600 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
+| 66 | R | storage facility | 1500 | 24000 / 300 | 240 | - | 1, 0 | 5000 |
 | 121 | R | storage processor | 400 | 44000 / 425 | 85 | - | 1, 0 | 5000 |
-| 78 | R | construction yard | 400 | 34000 / 425 | 85 | - | 1, 0 | 5000 |
+| 78 | R | construction yard | 450 | 34000 / 425 | 85 | - | 1, 0 | 5000 |
 | 70 | R | power generator | 200 | - | - | 1000 | - | 2500 |
-| 178 | R | advanced power generator | 200 | - | - | 3000 | - | 5000 |
-| 67 | R | accomodation block | 400 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
-| 182 | R | clone farm | 400 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
+| 178 | R | advanced power generator | 350 | - | - | 3000 | - | 5000 |
+| 67 | R | accomodation block | 1000 | 34000 / 300 | 240 | - | 8, 200 | 5000 |
+| 182 | R | clone farm | 350 | 34000 / 425 | 340 | - | 1, 0 | 5000 |
 | 65 | R | mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 2500 |
-| 173 | R | advanced mining station | 400 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
-| 125 | R | sickbay | 200 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
-| 128 | R | science block | 200 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
-| 208 | R | CFD | 30 | - | 0 | - | - | - |
+| 173 | R | advanced mining station | 900 | 24000 / 550 | 110 | - | 1, 0 | 1666 |
+| 125 | R | sickbay | 350 | 44000 / 425 | 340 | - | 1, 0 | 5000 |
+| 128 | R | science block | 450 | 34000 / 550 | 440 | - | 1, 0 | 10000 |
+| 208 | R | CFD | 2500 | - | 0 | - | - | - |
 
 ## The economy
 

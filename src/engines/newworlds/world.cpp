@@ -482,9 +482,11 @@ void World::combatTick() {
         const float rel = std::remainder(std::atan2(t.y - u.y, t.x - u.x) - (u.building ? 0 : u.heading), 2 * 3.14159265f);
         return std::abs(rel) <= u.weapon.arc + 0.01f;
     };
+    // To its edge; a shell no further than it can fly (to the middle).
     auto inRange = [&](const Unit& u, const Unit& t) {
-        const float range = u.weapon.kind == WeaponKind::Artillery ? std::min(u.weapon.range, kShellReach) : u.weapon.range;
-        return distance(u, t) <= range + radiusOf(t); // to its edge
+        if (u.weapon.kind == WeaponKind::Artillery)
+            return distance(u, t) <= std::min(u.weapon.range + radiusOf(t), kShellReach);
+        return distance(u, t) <= u.weapon.range + radiusOf(t);
     };
     for (Unit& u : units_) {
         if (u.cloaks && u.hp > 0) {
@@ -764,6 +766,15 @@ bool World::lineClear(const Unit& u, const Unit& t) {
     const float sx = t.x - u.x, sy = t.y - u.y, len = std::hypot(sx, sy);
     if (len <= 0)
         return true;
+    // The ground: from the shooter's turret to the target's middle (Reluva's
+    // heights: half each one's radius up; the game's are its models').
+    const float z0 = groundAt(u.x, u.y) + radiusOf(u) / 2, z1 = groundAt(t.x, t.y) + radiusOf(t) / 2;
+    const int steps = int(len / 1024);
+    for (int i = 1; i < steps; ++i) {
+        const float f = float(i) / float(steps);
+        if (groundAt(u.x + sx * f, u.y + sy * f) > z0 + (z1 - z0) * f)
+            return false;
+    }
     for (Unit& v : units_) {
         if (v.id == u.id || v.id == t.id || v.hp <= 0)
             continue;
