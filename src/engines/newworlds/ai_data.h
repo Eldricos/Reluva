@@ -10,6 +10,11 @@
 
 namespace reluva::newworlds {
 
+// The game's script second (exe.md#the-simulation-clock): 16 of its 50 ms
+// ticks, so 0.8 s. Script timers, fail delays and AI orders' delays count
+// in these.
+constexpr double kScriptSecond = 0.8;
+
 // What the game's executable says about every side in a mission, not
 // only the player's (docs/formats/newworlds/exe.md#sides-and-combat): the
 // seven side slots (0 Federation, 1 Klingon, 2 Romulan, 3-5 the planet's
@@ -95,7 +100,7 @@ struct NpcOrder {
     int task;
     int type;          // the units' type, or the building's
     int count;
-    int delay;         // mission seconds before it may run (from the start, not its message)
+    int delay;         // script seconds (kScriptSecond) before it may run (from the start, not its message)
     bool human;        // also run when the side is the player's
     int mode;          // how a named group order starts (exe.md#ai-colonies)
     int ways;

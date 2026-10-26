@@ -20,10 +20,13 @@ use it; *guess* otherwise. Unmarked figures are sure.
 - The game advances in fixed steps of **50 ms** (20 a second); an
   options checkbox switches to 66 ms (about 15 a second; which option isn't
   known).
-- The mission scripts count time in **sixteenths of a second**: a script
-  timer of N seconds runs 16N of its units. The vehicle yard's build values
-  (below) fit sixteenths too (128 = 8 s, which is what the tutorial's scout
-  took). How the two clocks relate isn't settled.
+- The mission scripts count time in **script seconds of 16 ticks**: a
+  timer of N runs 16N ticks, 0.8 N s at normal speed. F1's recording fits
+  it to the second (its scout timer of 10 shows 8 s in, its first attack's
+  100 after 80 s), so does K1's pass timer. The AI orders' delays and the
+  briefing steps' lengths use the same unit; the raids' and detectors'
+  delays are raw ticks. A slow machine stretches all of it (the ticks are
+  game ticks, not wall time).
 - Warnings are paced in real time: the low-power warning at most once a
   minute (as measured in C8), "construction delayed" messages 0.6 s apart.
 
@@ -1425,7 +1428,6 @@ the NEW WORLDS panel, its class picked by type id:
 
 - How long a path step is (so units' real speeds), and how many pieces
   each building's model gives its bees to build.
-- How the 50 ms step and the scripts' sixteenths relate.
 - How long bees stay docked (so how fast they carry ore).
 - Placement flags and a third placement phase.
 - How the player moves officers (the gesture).

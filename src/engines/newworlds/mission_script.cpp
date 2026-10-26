@@ -3,6 +3,8 @@
 
 #include "engines/newworlds/mission_script.h"
 
+#include "engines/newworlds/ai_data.h"
+
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
@@ -410,9 +412,10 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
             out.push_back({Output::Won, {}, {}, 0, {}});
         } else if (a.verb == "lose") {
             lost_ = true;
-            out.push_back({Output::Lost, {}, {}, uint32_t(std::atoi(a.args[0].c_str())), {}});
+            failId_ = uint32_t(std::atoi(a.args[0].c_str()));
+            out.push_back({Output::Lost, {}, {}, failId_, {}});
         } else if (a.verb == "timer") {
-            timers_[a.args[0]] = std::atof(a.args[1].c_str());
+            timers_[a.args[0]] = std::atof(a.args[1].c_str()) * kScriptSecond;
         } else if (a.verb == "research") {
             out.push_back({Output::Research, {}, a.args[0], 0, {}});
             follow.push_back({"research-available", {a.args[0]}});
@@ -434,7 +437,7 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
             if (!failing_) {
                 failing_ = true;
                 failId_ = uint32_t(std::atoi(a.args[0].c_str()));
-                timers_[kFailTimer] = a.args.size() > 1 ? std::atof(a.args[1].c_str()) : 20.0;
+                timers_[kFailTimer] = (a.args.size() > 1 ? std::atof(a.args[1].c_str()) : 20.0) * kScriptSecond;
                 out.push_back({Output::Failing, {}, {}, failId_, {}});
             }
         } else if (a.verb == "signal") {

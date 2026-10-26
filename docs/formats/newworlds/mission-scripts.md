@@ -35,7 +35,9 @@ recordings now serve to check them. The scripts are in
   shares: a building finished, a mine exhausted at a position, short of
   power, resources or crew, a rival's hub destroyed or mission failed.
 
-The format is described at the top of `mission_script.h`.
+The format is described at the top of `mission_script.h`. Its timers and
+fail delays count the game's script seconds (16 ticks, 0.8 s;
+[exe.md](exe.md#the-simulation-clock)), so the numbers are the game's own.
 
 ## How far they go
 

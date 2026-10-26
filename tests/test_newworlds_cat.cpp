@@ -611,8 +611,9 @@ void testMissionScripts() {
     auto out = run.fire({"built", {"yard"}}); // the second yard: all built
     CHECK(out.size() == 3 && out[0].text == "Built at <008:016>." && out[0].sender == "Command");
     CHECK(out[1].kind == MissionRun::Output::Completed && out[2].kind == MissionRun::Output::Revealed);
-    CHECK(!run.finished() && run.nextTimer() == 10);
-    out = run.advance(10);
+    // (Script seconds: 0.8 s each.)
+    CHECK(!run.finished() && run.nextTimer() == 8);
+    out = run.advance(8);
     CHECK(run.won() && out.back().kind == MissionRun::Output::Won);
     MissionRun lost(s[0], nullptr);
     CHECK(lost.fire({"destroyed", {"hub"}}).back().kind == MissionRun::Output::Lost && lost.finished());
@@ -635,7 +636,7 @@ void testMissionScripts() {
     out = fl.fire({"destroyed", {"temple"}});
     CHECK(fl.failing() && !fl.finished() && out.size() == 2 && out[0].kind == MissionRun::Output::Failing &&
           out[0].objective == 9 && out[1].text == "Gone.");
-    CHECK(fl.advance(19).empty() && fl.advance(1).back().kind == MissionRun::Output::Lost && fl.finished() && !fl.won());
+    CHECK(fl.advance(15).empty() && fl.advance(1).back().kind == MissionRun::Output::Lost && fl.finished() && !fl.won());
     // A monitor armed late sees the state as it is.
     CHECK(!parseMissionScripts("mission T F\nobjective 1\nobjective 2\non start\n  arm rich\n  arm yard\n"
                                "on stock nitrium 800 as rich dormant\n  complete 1\n"
@@ -655,7 +656,7 @@ void testMissionScripts() {
     walker.walk({"start", {}}, waited);
     CHECK(waited == 0 && walker.waitsOnTimers({"scanned", {"science", "site"}}) && !walker.waitsOnTimers({"built", {"x"}}));
     walker.walk({"scanned", {"science", "site"}}, waited);
-    CHECK(waited == 20 && walker.objectiveState(1) == MissionRun::State::Complete && walker.nextTimer() == 80);
+    CHECK(waited == 16 && walker.objectiveState(1) == MissionRun::State::Complete && walker.nextTimer() == 64);
     CHECK(bool(parseMissionScripts("mission T F\non start\n  arm nothing\n", s))); // no such label
     CHECK(bool(parseMissionScripts("mission T F\non start dormant\n  win\n", s)));  // dormant needs a label
     CHECK(!parseMissionScripts("mission T F\nobjective 5\non start\n  signal hit\n  signal hit\n  timer t 5\n  stop t\n"
@@ -1178,7 +1179,8 @@ void testAiSides() {
     ai.stance("taubat", "hostile");
     CHECK(w.stance(3, 0) == 3 && w.stance(0, 3) == 2);
     // The Klingons' named builds start armed: the construction yard's site
-    // goes up at 60 s (not counted until it stands), free to them.
+    // goes up at 60 script seconds, 48 s (not counted until it stands),
+    // free to them.
     const Economy* kliEco = ai.colony(1);
     CHECK(kliEco && !ai.colony(0) && !ai.colony(3));
     const Stock before = kliEco->stock();
@@ -1188,7 +1190,7 @@ void testAiSides() {
                 return &u;
         return nullptr;
     };
-    for (int i = 0; i < 57; ++i) // (2 s gone already)
+    for (int i = 0; i < 45; ++i) // (2 s gone already)
         ai.advance(1.0);
     CHECK(!yardSite());
     ai.advance(2.0);

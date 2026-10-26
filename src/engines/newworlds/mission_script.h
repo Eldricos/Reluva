@@ -27,7 +27,7 @@ namespace reluva::newworlds {
 //   objective 19 hidden              mission's table; hidden until revealed;
 //   objective 21 optional            optional ones don't hold up the end
 //   lose 21 destroyed colony-hub     lost, with that fail string, on an event
-//   fail 21 destroyed colony-hub     failing: lost 20 s after the event
+//   fail 21 destroyed colony-hub     failing: lost 20 after the event
 //   on <event> <args>...             once, the first time the event happens
 //   every <event> <args>...          each time
 //   ... as <label> [dormant]         (after an on, every, lose or fail line)
@@ -37,6 +37,8 @@ namespace reluva::newworlds {
 //                                    clip's stem the game plays with it)
 //     complete 16 | reveal 19 | win | lose 21
 //     research <topic> | timer <name> <seconds> | stop <timer>
+//                                    (timers and fail delays in the game's
+//                                    script seconds, 0.8 s: kScriptSecond)
 //     arm <label> | disarm <label>   switch the handlers with that label on
 //                                    (a once-only one may fire again) / off
 //     fail <id> [seconds]            the mission is failing: lost after the
@@ -151,6 +153,8 @@ public:
     // scan of something no handler wants gets the "nothing found" reply).
     bool handles(const ScriptEvent& event) const;
     bool failing() const { return failing_; }
+    // The fail criterion that ended (or is ending) it (0 none).
+    uint32_t failedCriterion() const { return failId_; }
     bool won() const { return won_; }
     State objectiveState(uint32_t id) const;
     // Seconds to the next timer, or a negative number if none is running.

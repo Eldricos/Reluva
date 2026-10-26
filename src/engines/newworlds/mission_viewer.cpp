@@ -3444,16 +3444,24 @@ void MissionViewer::drawFlow() {
     }
     const int lh = ui_.smallHeight();
     if (flow_ == Flow::Report) {
-        const auto& screens = flowWon_ ? wins_ : losses_;
-        if (auto it = screens.find(side); it != screens.end())
+        // Won: the race's emblem (the game never shows its f_win tiles);
+        // lost: the lose tiles (exe.md#the-selection-panel).
+        if (auto it = losses_.find(side); !flowWon_ && it != losses_.end())
             blit(it->second, 0, 0, screen_.w, screen_.h);
         else if (auto e = emblems_.find(side); e != emblems_.end())
             blit(e->second, 0, 0, screen_.w, screen_.h);
-        // MISSION REPORT, right of centre: the outcome, then each objective.
+        // MISSION REPORT, right of centre, under the MISSION LOG heading:
+        // won, each objective listed, complete or incomplete; lost, only the
+        // fail criterion that fired.
         std::vector<std::pair<std::string, Color>> lines;
-        lines.push_back({flowWon_ ? "MISSION ACCOMPLISHED" : "MISSION FAILED", ui_.brightColor()});
+        lines.push_back({"MISSION LOG", ui_.brightColor()});
         const int w = std::min(300, screen_.w / 2 - 20);
-        if (const MissionScript* script = findMissionScript(level.shortName, side); script && run_)
+        if (!flowWon_ && run_ && run_->failedCriterion()) {
+            const std::string* t = table_.find(run_->failedCriterion());
+            for (const std::string& l :
+                 ui_.wrapSmall((t ? *t : std::to_string(run_->failedCriterion())) + " - FAILED", w - 24))
+                lines.push_back({l, ui_.textColor()});
+        } else if (const MissionScript* script = findMissionScript(level.shortName, side); flowWon_ && script && run_)
             for (const MissionScript::Objective& o : script->objectives) {
                 const MissionRun::State st = run_->objectiveState(o.id);
                 if (st == MissionRun::State::Hidden)
@@ -3533,15 +3541,13 @@ bool MissionViewer::loadScreen(const std::string& prefix, Texture& screen) const
 void MissionViewer::loadBriefingArt() {
     // The emblem screens are six tiles, three across and two down:
     // 256 + 256 + 128 by 256 + 224, the 640 x 480 screen.
-    // The won and lost screens are cut the same way (f_win01-06, ...).
+    // The lost screens are cut the same way (f_lose01-06, ...).
     const std::pair<char, const char*> sets[] = {{'F', "lbp/gui/ufp00"}, {'K', "lbp/gui/kliemp0"}, {'R', "lbp/gui/romemp0"}};
     for (const auto& [side, prefix] : sets) {
         const char s = char(std::tolower(static_cast<unsigned char>(side)));
         Texture screen;
         if (loadScreen(prefix, screen))
             emblems_[side] = std::move(screen);
-        if (loadScreen(std::string("lbp/gui/") + s + "_win0", screen))
-            wins_[side] = std::move(screen);
         if (loadScreen(std::string("lbp/gui/") + s + "_lose0", screen))
             losses_[side] = std::move(screen);
     }

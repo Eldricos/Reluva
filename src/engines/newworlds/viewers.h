@@ -701,7 +701,7 @@ private:
     StringTable table_;
     std::vector<BriefingStep> script_;
     std::map<char, Texture> emblems_; // 640 x 480, by side
-    std::map<char, Texture> wins_, losses_; // the mission won and lost screens, by side
+    std::map<char, Texture> losses_; // the mission lost screens, by side
     // A mission played through as the game runs it (G): a loading box, the
     // briefing, a loading box, play; once won or lost, the debriefing box,
     // then the won or lost screen with the MISSION REPORT and CONTINUE.

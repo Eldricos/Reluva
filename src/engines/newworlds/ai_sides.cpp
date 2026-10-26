@@ -237,7 +237,7 @@ bool AiSides::ready(const Running& r) const {
     if (o.task == 10)
         return false;
     const bool quick = o.mode == 3 || o.mode == 5 || o.mode == 6;
-    if ((o.task <= 3 || o.task == 9) && clock_ < o.delay && !(quick && o.task <= 2))
+    if ((o.task <= 3 || o.task == 9) && clock_ < o.delay * kScriptSecond && !(quick && o.task <= 2))
         return false;
     if (o.task == 2 && !quick && o.ways > 0) {
         const auto [lx, ly] = wayPoint(o, o.ways - 1);
