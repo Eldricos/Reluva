@@ -556,10 +556,11 @@ void World::combatTick() {
             continue;
         }
         u.target = t->id;
-        // A line blocked: one it chose it gives up (it looks again); one
-        // it was told to attack it drives after, as out of range.
+        // A line blocked: one it chose (or an AI's) it gives up (it looks
+        // again); one the player told it to attack it drives after, as
+        // out of range.
         const bool blocked = !clear(u, *t);
-        if (blocked && !u.ordered) {
+        if (blocked && (!u.ordered || u.ai)) {
             u.target = 0, u.firing = false, u.burstLeft = 0;
             continue;
         }
@@ -571,8 +572,11 @@ void World::combatTick() {
                 u.path.clear();
                 continue;
             }
-            if (!u.building && (u.path.empty() || (tick_ + u.id) % 20 == 0))
+            // (Planned again at most every 20 ticks, as the game re-plans.)
+            if (!u.building && tick_ - u.planTick >= 20) {
+                u.planTick = tick_;
                 setPath(u.id, u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y));
+            }
             continue;
         }
         u.firing = true;

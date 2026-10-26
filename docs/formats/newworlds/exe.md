@@ -644,7 +644,8 @@ until it lands, at most 1000 ticks. Ranges count to the target's edge
 **Lines of fire.** A pulse or bolt turret picks only targets it has a
 clear line to (from its middle) and fires only while it has one (from
 its muzzle, looked at every 8-11 ticks); blocked, it gives up the target
-and looks again (one the player ordered it at, it drives after). A line
+and looks again (one the player ordered it at, it drives after,
+planning its way again at most every 20 ticks). A line
 is blocked by the ground, and by any object other than shooter and
 target whose radius reaches the line: everything not hostile to the
 shooter (its own, allies', neutrals'), and, for the colonies, hostile

@@ -116,6 +116,7 @@ struct Unit {
     mutable float radius = 0;
     // Its line of fire to its target, as last checked (every 8-11 ticks).
     int sightTarget = 0, sightTick = -1000;
+    int planTick = -1000; // when it last planned a way after its target
     bool sightClear = true;
 };
 
