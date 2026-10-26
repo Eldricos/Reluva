@@ -6208,6 +6208,8 @@ on captured taubat-hangar-one
 # tanks, artillery and Orion pirates; watched from the first factory's
 # report on).
 on destroyed taubat-temple
+  timer temple-gone 10
+on timer temple-gone
   say intelligence "The Taubat temple is destroyed."
   signal orion-step
 on destroyed taubat-hangar-one
@@ -6321,15 +6323,15 @@ objective 23
 objective 25 hidden
 
 # --- The other sides' attacks on the colony -------------------------------
-# From 480 s a random Federation, Klingon and Taubat assault every 180 s
+# From 300 a random Federation, Klingon and Taubat assault every 180 s
 # each; Federation assaults at 1200 s and 1260 s; and once we field four
 # armed APCs the Klingons send two assaults.
 on start
   timer fed-assault-romulans-1 1200
   timer fed-assault-romulans-2 1260
-  timer fed-raids-on-rom 480
-  timer kli-raids-on-rom 480
-  timer tau-raids-on-rom 480
+  timer fed-raids-on-rom 300
+  timer kli-raids-on-rom 300
+  timer tau-raids-on-rom 300
 on timer fed-assault-romulans-1
   ai federation fed-assault-romulans-1
 on timer fed-assault-romulans-2
@@ -7298,9 +7300,9 @@ on count armed-apc <= 0 as supply-fail
   fail 13 10
   say operations "Every supply vehicle is lost. The mission has failed."
   say intelligence "The Romulans can't complete their mission."
-# (inferred: the game wires this fail to the core search's "beaten to it" output,
-# which nothing sends)
-on destroyed metar-colony-core
+# The game wires this fail to the core search's "beaten to it" output, which
+# nothing sends: it never fires (the core's destruction isn't watched).
+on beaten metar-colony-core
   fail 15 10
   say intelligence "The colony core is destroyed and the RAS commander is dead. The mission has failed."
   say intelligence "The Romulans can't complete their mission."
@@ -7469,9 +7471,10 @@ every signal metar-raid-8
 
 # Fails: the cause at once, "the Romulans cannot complete their mission" at
 # 5 s, the end at 10 s.
-# (inferred: the game wires this fail to the search's "beaten to it" output,
-# which nothing sends; its line says the block was destroyed)
-on destroyed fed-science-block
+# The game wires this fail to the search's "beaten to it" output, which
+# nothing sends: it never fires (its line says the block was destroyed, but
+# the block's destruction isn't watched).
+on beaten fed-science-block
   fail 13 10
   say intelligence "The science block is destroyed. The mission has failed."
   signal failing

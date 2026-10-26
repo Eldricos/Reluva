@@ -472,18 +472,20 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
         }
         ++it;
     }
-    // Held buildings: the seconds held.
+    // Held buildings: the script seconds held (kScriptSecond, as the
+    // game's capture monitors count them).
     for (auto it = holds_.begin(); it != holds_.end();) {
         if (!world_.unit(it->first)) {
             it = holds_.erase(it);
             continue;
         }
         Hold& h = it->second;
-        const int before = int(h.seconds);
+        const int before = int(h.seconds / kScriptSecond);
         h.seconds += kTick;
-        if (h.slot == player_ && int(h.seconds) != before)
+        const int now = int(h.seconds / kScriptSecond);
+        if (h.slot == player_ && now != before)
             for (const std::string& n : heldNames_[it->first])
-                out.push_back({"held", {n, std::to_string(int(h.seconds))}});
+                out.push_back({"held", {n, std::to_string(now)}});
         ++it;
     }
 
