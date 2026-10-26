@@ -48,19 +48,21 @@ std::string unitLine(int type, int group, int voice, int line) {
         char voices[2];
     };
     static const std::map<int, Set> kSets = [] {
-        const Set fapc{"fapc", {3, 4, 7, 12}, {'a', 'b'}}, ffgs{"ffgs", {2, 3, 9, 10}, {'c', 'd'}},
-            fmsg{"fmsg", {3, 4, 8, 12}, {'b', 'e'}}, fpa{"fpa", {1, 3, 7, 9}, {'a', 'c'}},
-            fpv{"fpv", {4, 5, 7, 8}, {'b', 'd'}}, fsv{"fsv", {1, 5, 10, 11}, {'c', 'e'}};
-        const Set kapc{"kapc", {1, 2, 4, 5}, {'a', 'b'}}, kdt{"kdt", {1, 2, 4, 5}, {'b', 'd'}},
-            kfgs{"kfgs", {1, 2, 4, 5}, {'c', 'd'}}, kmdb{"kmdb", {1, 2, 4, 5}, {'b', 'e'}},
-            kpa{"kpa", {1, 2, 4, 5}, {'a', 'c'}}, ksv{"ksv", {1, 2, 4, 5}, {'c', 'e'}};
-        const Set rapc{"rapc", {3, 4, 7, 12}, {'a', 'b'}}, rct{"rct", {4, 5, 7, 8}, {'b', 'd'}},
-            rfgs{"rfgs", {2, 3, 9, 10}, {'c', 'd'}}, rpa{"rpa", {1, 3, 7, 9}, {'a', 'c'}},
-            rsv{"rsv", {1, 5, 10, 11}, {'c', 'e'}};
-        return std::map<int, Set>{{56, fapc}, {55, fapc}, {97, ffgs}, {154, fmsg}, {47, fpa}, {9, fpa},
-                                  {8, fpv},   {62, fsv},  {88, kapc}, {40, kapc}, {10, kdt},  {229, kdt},
-                                  {228, kmdb}, {36, kpa}, {37, kfgs}, {95, ksv},  {89, rapc}, {64, rapc},
-                                  {230, rapc}, {35, rct}, {148, rct}, {98, rfgs}, {87, rpa},  {63, rsv}};
+        // The voices in the game's order (its first and second recorded
+        // voice); the unarmed APCs, the colony's transports, have none.
+        const Set fapc{"fapc", {3, 4, 7, 12}, {'a', 'b'}}, ffgs{"ffgs", {2, 3, 9, 10}, {'d', 'c'}},
+            fmsg{"fmsg", {3, 4, 8, 12}, {'e', 'b'}}, fpa{"fpa", {1, 3, 7, 9}, {'a', 'c'}},
+            fpv{"fpv", {4, 5, 7, 8}, {'d', 'b'}}, fsv{"fsv", {1, 5, 10, 11}, {'e', 'c'}};
+        const Set kapc{"kapc", {1, 2, 4, 5}, {'a', 'b'}}, kdt{"kdt", {1, 2, 4, 5}, {'d', 'b'}},
+            kfgs{"kfgs", {1, 2, 4, 5}, {'d', 'c'}}, kmdb{"kmdb", {1, 2, 4, 5}, {'e', 'b'}},
+            kpa{"kpa", {1, 2, 4, 5}, {'a', 'c'}}, ksv{"ksv", {1, 2, 4, 5}, {'e', 'c'}};
+        const Set rapc{"rapc", {3, 4, 7, 12}, {'a', 'b'}}, rct{"rct", {4, 5, 7, 8}, {'d', 'b'}},
+            rfgs{"rfgs", {2, 3, 9, 10}, {'d', 'c'}}, rpa{"rpa", {1, 3, 7, 9}, {'a', 'c'}},
+            rsv{"rsv", {1, 5, 10, 11}, {'e', 'c'}};
+        return std::map<int, Set>{{56, fapc}, {97, ffgs}, {154, fmsg}, {47, fpa},  {9, fpa},   {8, fpv},
+                                  {62, fsv},  {40, kapc}, {10, kdt},  {229, kdt},  {228, kmdb}, {36, kpa},
+                                  {37, kfgs}, {95, ksv},  {64, rapc}, {230, rapc}, {35, rct},  {148, rct},
+                                  {98, rfgs}, {87, rpa},  {63, rsv}};
     }();
     const auto it = kSets.find(type);
     if (it == kSets.end() || group < 0 || group > 2)
@@ -71,6 +73,27 @@ std::string unitLine(int type, int group, int voice, int line) {
     char number[4];
     std::snprintf(number, sizeof number, "%03d", set.lines[group * 2 + (line & 1)]);
     return set.stem + std::string(number) + set.voices[voice & 1];
+}
+
+std::pair<std::string, std::string> driveSound(int type) {
+    static const std::map<int, std::pair<const char*, const char*>> kSounds = {
+        {8, {"fedactor.cat", "fpvstart"}},   {117, {"fedactor.cat", "fpvstart"}}, {261, {"fedactor.cat", "fpvstart"}},
+        {264, {"fedactor.cat", "fpvstart"}}, {55, {"fedactor.cat", "fapcstar"}},  {56, {"fedactor.cat", "fapcstar"}},
+        {154, {"fedactor.cat", "fmsgstar"}}, {9, {"fedactor.cat", "fpastart"}},   {47, {"fedactor.cat", "fpastart"}},
+        {97, {"fedactor.cat", "fscostar"}},  {37, {"fedactor.cat", "fscostar"}},  {62, {"fedactor.cat", "fsvstart"}},
+        {199, {"fedactor.cat", "ftugstar"}}, {40, {"kliactor.cat", "kapcstar"}},  {88, {"kliactor.cat", "kapcstar"}},
+        {10, {"kliactor.cat", "kdtstart"}},  {229, {"kliactor.cat", "kdtstart"}}, {36, {"kliactor.cat", "kdtstart"}},
+        {228, {"kliactor.cat", "kmbstar"}},  {95, {"kliactor.cat", "ksvstart"}},  {64, {"romactor.cat", "rapcstar"}},
+        {89, {"romactor.cat", "rapcstar"}},  {230, {"romactor.cat", "rapcstar"}}, {35, {"romactor.cat", "rctstart"}},
+        {148, {"romactor.cat", "rctstart"}}, {149, {"romactor.cat", "rctstart"}}, {200, {"romactor.cat", "rctstart"}},
+        {87, {"romactor.cat", "rpastart"}},  {98, {"romactor.cat", "rscostar"}},  {63, {"romactor.cat", "rsvstart"}},
+        {107, {"foractor.cat", "tgpstart"}}, {111, {"foractor.cat", "tgpstart"}}, {112, {"foractor.cat", "tgpstart"}},
+        {113, {"foractor.cat", "tgpstart"}}, {139, {"foractor.cat", "tgpstart"}}, {140, {"foractor.cat", "tgpstart"}},
+        {141, {"foractor.cat", "tgpstart"}}, {144, {"foractor.cat", "tgpstart"}}, {108, {"foractor.cat", "hstart"}},
+        {227, {"foractor.cat", "mras"}}};
+    const auto it = kSounds.find(type);
+    return it == kSounds.end() ? std::pair<std::string, std::string>{} : std::pair<std::string, std::string>{
+                                                                             it->second.first, it->second.second};
 }
 
 std::pair<std::string, std::string> buildingSound(int type) {

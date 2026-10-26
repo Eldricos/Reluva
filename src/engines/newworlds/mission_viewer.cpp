@@ -524,6 +524,14 @@ void MissionViewer::combatStep() {
     const auto events = sim_->takeEvents();
     bool rebuild = false;
     for (const WorldEvent& e : events) {
+        // A vehicle setting off: its start-up sound from where it set out
+        // (any side's; not over its own still playing).
+        if (e.kind == WorldEvent::Moved) {
+            if (const auto [archive, stem] = driveSound(e.what.type); !archive.empty() &&
+                                                                      !(mixer_ && mixer_->isPlaying(driveHandles_[e.from])))
+                driveHandles_[e.from] = playAt(archive, stem, e.x0, e.y0, 1);
+            continue;
+        }
         if (e.kind == WorldEvent::Hit)
             flashes_.push_back({e.x1, e.y1, e.x1, e.y1, e.weapon, nowMs_ + 200});
         if (e.kind != WorldEvent::Destroyed)
@@ -3182,6 +3190,36 @@ void MissionViewer::unitSpeaks(int unit, int group) {
         clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
 }
 
+// A sound from the game's archives played from a spot on the map, as the
+// game's positional sounds (exe.md#sounds): its volume (65536 - distance /
+// gain) x 127 / 65536 of 127, heard from the camera's spot on the ground,
+// panned by how far to the side it lies; none if it would start below 1.
+audio::SoundHandle MissionViewer::playAt(const std::string& archive, const std::string& stem, float x, float y,
+                                         float gain) {
+    if (!mixer_)
+        return audio::kNoSound;
+    float cx = 0, cy = 0;
+    map_.cameraTarget(cx, cy);
+    const float dx = x - cx, dy = y - cy, d = std::hypot(dx, dy);
+    const int volume = std::clamp(int((65536 - d / gain) * 127 / 65536), 0, 127);
+    if (volume < 1)
+        return audio::kNoSound;
+    auto& cache = archiveSounds_[archive + "/" + stem];
+    if (!cache) {
+        std::vector<uint8_t> data;
+        for (const auto& a : archives_)
+            if (fs::toLower(a->path().filename().string()) == archive)
+                if (const CatEntry* e = a->find("stnwsfx/" + stem + ".wav"); e && !a->read(*e, data))
+                    break;
+        auto sound = std::make_shared<audio::Sound>();
+        if (data.empty() || audio::decodeSound(data, *sound))
+            return audio::kNoSound;
+        cache = std::move(sound);
+    }
+    const float side = d > 0 ? (dx * std::cos(map_.yaw()) + dy * std::sin(map_.yaw())) / d : 0;
+    return mixer_->play(cache, audio::SoundType::Effects, volume * 2, int(std::lround(side * audio::kMaxPan)));
+}
+
 // A double click on one of the player's objects (exe.md#cameras): a
 // finished building plays its own sound (exe.md#sounds), from where it
 // stands: full by the camera's spot, fading out 8 blocks off, panned to
@@ -3191,23 +3229,10 @@ void MissionViewer::doubleClicked(int unit) {
     const Unit* u = world_ ? world_->unit(unit) : nullptr;
     if (!u || u->slot != playerSlot_)
         return;
-    if (const auto [archive, stem] = buildingSound(u->type); mixer_ && !archive.empty() && u->built >= 1) {
-        float cx = 0, cy = 0;
-        map_.cameraTarget(cx, cy);
-        const float dx = u->x - cx, dy = u->y - cy, d = std::hypot(dx, dy);
-        const int volume = std::clamp(int((65536 - d / 2) * 127 / 65536), 0, 127);
-        const float side = d > 0 ? (dx * std::cos(map_.yaw()) + dy * std::sin(map_.yaw())) / d : 0;
-        std::vector<uint8_t> data;
-        for (const auto& a : archives_)
-            if (fs::toLower(a->path().filename().string()) == archive)
-                if (const CatEntry* e = a->find("stnwsfx/" + stem + ".wav"); e && !a->read(*e, data))
-                    break;
-        auto sound = std::make_shared<audio::Sound>();
-        if (volume >= 1 && !data.empty() && !audio::decodeSound(data, *sound)) {
+    if (const auto [archive, stem] = buildingSound(u->type); !archive.empty() && u->built >= 1) {
+        if (mixer_)
             mixer_->stop(objectSoundHandle_);
-            objectSoundHandle_ = mixer_->play(std::move(sound), audio::SoundType::Effects, volume * 2,
-                                              int(std::lround(side * audio::kMaxPan)));
-        }
+        objectSoundHandle_ = playAt(archive, stem, u->x, u->y, 2);
     }
     followInF1(unit);
 }

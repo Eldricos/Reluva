@@ -212,6 +212,11 @@ std::string unitLine(int type, int group, int voice, int line);
 // ("fcomstn"); empty for types without one (every vehicle, the natives).
 std::pair<std::string, std::string> buildingSound(int type);
 
+// A vehicle's start-up sound (exe.md#sounds), played as it sets off on a
+// path: its archive ("fedactor.cat") and stem ("fpvstart"); empty for
+// types without one (bees, buildings).
+std::pair<std::string, std::string> driveSound(int type);
+
 // Where a world point is, as the scripts write it ("<row>:<col>" in
 // eighths of a block).
 std::string mapPosition(float x, float y);

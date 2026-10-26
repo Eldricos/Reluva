@@ -733,9 +733,12 @@ void testMissionScripts() {
     CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
     CHECK(announcementFor({"short-crew", {}}, {}, 'F').empty()); // the officers say it (MissionSim::takeVoices)
     // The vehicles' voices: selected, ordered, refusing.
-    CHECK(unitLine(8, 0, 0, 0) == "fpv004b" && unitLine(8, 1, 1, 1) == "fpv008d" && unitLine(8, 2, 0, 0) == "fneg1");
-    CHECK(unitLine(228, 0, 1, 1) == "kmdb002e" && unitLine(63, 1, 0, 0) == "rsv010c" && unitLine(97, 0, 0, 1) == "ffgs003c");
-    CHECK(unitLine(54, 0, 0, 0).empty());
+    CHECK(unitLine(8, 0, 0, 0) == "fpv004d" && unitLine(8, 1, 1, 1) == "fpv008b" && unitLine(8, 2, 0, 0) == "fneg1");
+    CHECK(unitLine(228, 0, 1, 1) == "kmdb002b" && unitLine(63, 1, 0, 0) == "rsv010e" && unitLine(97, 0, 0, 1) == "ffgs003d");
+    CHECK(unitLine(56, 0, 0, 0) == "fapc003a" && unitLine(54, 0, 0, 0).empty() && unitLine(55, 0, 0, 0).empty());
+    // Their start-up sounds (the unarmed APCs have one, though no voice).
+    CHECK(driveSound(37) == std::make_pair(std::string("fedactor.cat"), std::string("fscostar")));
+    CHECK(driveSound(36).second == "kdtstart" && driveSound(88).second == "kapcstar" && driveSound(12).first.empty());
     // The buildings' own sounds, from their race's build archive; none for vehicles.
     CHECK(buildingSound(23) == std::make_pair(std::string("fedbuild.cat"), std::string("fcomstn")));
     CHECK(buildingSound(69) == std::make_pair(std::string("rombuild.cat"), std::string("fshield")));

@@ -316,9 +316,24 @@ void World::rally(int id, float x, float y) {
         u->order = UnitOrder::Rally;
 }
 
+void World::setPath(int id, std::vector<std::pair<float, float>> path) {
+    Unit* u = unit(id);
+    if (!u)
+        return;
+    u->path = std::move(path);
+    if (!u->path.empty()) {
+        WorldEvent e;
+        e.kind = WorldEvent::Moved;
+        e.from = u->id, e.fromSlot = u->slot;
+        e.x0 = u->x, e.y0 = u->y;
+        e.what = *u;
+        events_.push_back(std::move(e));
+    }
+}
+
 void World::moveTo(int id, float x, float y) {
     if (Unit* u = unit(id); u && !u->building) {
-        u->path = u->flies ? std::vector<std::pair<float, float>>{{x, y}} : findPath(u->x, u->y, x, y);
+        setPath(id, u->flies ? std::vector<std::pair<float, float>>{{x, y}} : findPath(u->x, u->y, x, y));
         u->ordered = false;
         u->target = 0;
         u->firing = false;
@@ -525,7 +540,7 @@ void World::combatTick() {
                 continue;
             }
             if (!u.building && (u.path.empty() || (tick_ + u.id) % 20 == 0))
-                u.path = u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y);
+                setPath(u.id, u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y));
             continue;
         }
         u.firing = true;
@@ -616,13 +631,13 @@ void World::protectTick(Unit& u) {
             u.target = nearest->id;
             u.ordered = true;
         } else {
-            u.path = findPath(u.x, u.y, nearest->x, nearest->y);
+            setPath(u.id, findPath(u.x, u.y, nearest->x, nearest->y));
         }
         return;
     }
     if (!u.moving() && !u.firing && std::hypot(u.x - u.holdX, u.y - u.holdY) > kTile) {
         u.target = 0, u.ordered = false;
-        u.path = findPath(u.x, u.y, u.holdX, u.holdY);
+        setPath(u.id, findPath(u.x, u.y, u.holdX, u.holdY));
     }
 }
 

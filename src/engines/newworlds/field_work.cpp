@@ -409,7 +409,7 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
         } else {
             s.ticks = 0;
             if (!u->moving())
-                u->path = world_.findPath(u->x, u->y, t->x, t->y);
+                world_.setPath(u->id, world_.findPath(u->x, u->y, t->x, t->y));
         }
         ++it;
     }
@@ -449,7 +449,7 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
                 c.state = 2;
                 c.timer = kTeamTicks;
             } else if (!u->moving()) {
-                u->path = world_.findPath(u->x, u->y, t->x, t->y);
+                world_.setPath(u->id, world_.findPath(u->x, u->y, t->x, t->y));
             }
         } else if (c.state == 2 && --c.timer <= 0) {
             c.savedHp = t->hp;

@@ -906,10 +906,32 @@ player's own:
 | 2 (`fapc007` / `012`) | an order is taken (a move's once the first unit has planned its way) |
 | 3 (`fneg1`) | no order fits what was clicked, or the move finds no way |
 
-The sets: Federation `fapc` (types 55, 56), `ffgs` (97), `fmsg` (154),
-`fpa` (9, 47), `fpv` (8), `fsv` (62); Klingon `kapc` (40, 88), `kdt` (10,
+The sets: Federation `fapc` (armed APC 56), `ffgs` (97), `fmsg` (154),
+`fpa` (9, 47), `fpv` (8), `fsv` (62); Klingon `kapc` (40), `kdt` (10,
 229), `kmdb` (228), `kpa` (36), `kfgs` (37), `ksv` (95); Romulan `rapc`
-(64, 89, 230), `rct` (35, 148), `rfgs` (98), `rpa` (87), `rsv` (63).
+(64, 230), `rct` (35, 148), `rfgs` (98), `rpa` (87), `rsv` (63). The
+unarmed APCs (55, 88, 89) have none. Each group is four recordings: its
+two lines in the first voice, then in the second (`ffgs`: `d` then `c`;
+`fmsg`, `kmdb`: `e`, `b`; `fpv`, `kdt`, `rct`: `d`, `b`; `fsv`, `ksv`,
+`rsv`: `e`, `c`; the rest in letter order); a unit keeps both lines of
+its one voice.
+
+Every vehicle (any side's, natives too) plays its start-up sound as it
+sets off on a path: each move order, each re-plan of an attack's
+approach, a scan's or capture's approach, the drive to the rally point,
+a protecting unit's way back to its spot. Once a move, from where it set
+out (it doesn't follow the vehicle), volume (65536 − distance) × 127 /
+65536, so silent from 4 blocks; not over its own still playing; every
+unit of a group its own. The clips: `fpvstart` (8), `fapcstar` (55, 56),
+`fmsgstar` (154), `fpastart` (9, 47), `fscostar` (97, and the Klingon
+scout 37), `fsvstart` (62), `ftugstar` (199) in `fedactor.cat`;
+`kapcstar` (40, 88), `kdtstart` (10, 229, and the Klingon artillery 36),
+`kmbstar` (228), `ksvstart` (95) in `kliactor.cat`; `rapcstar` (64, 89,
+230), `rctstart` (35, 148, 149, 200), `rpastart` (87), `rscostar` (98),
+`rsvstart` (63) in `romactor.cat`; the natives' `tgpstart`, `hstart`
+and `mras` in `foractor.cat`. Bees have none, and nothing loops while a
+vehicle drives. (The game also turns every new sound down when those
+playing already add up past full volume; Reluva's mixer sums them.)
 
 The officers report by number, in the player's race's one recording each
 (Media/Misc): 001 a vehicle delayed (the yard short of crew or
@@ -933,15 +955,11 @@ sound. It plays from the building: volume (65536 − distance / 2) × 127 /
 65536 of the game's 127, so full at the listener and silent from 8 blocks
 off; panned by how far to the side it lies; one at a time (a new one
 stops the last). Reluva listens from the camera's spot on the ground.
-Vehicles' start-up clips are their drives', played as some moves start
-(which moves isn't known yet); Reluva doesn't play them.
+Vehicles' start-up clips are their drives', played as their moves start
+(above).
 
 The executable's sound table pairs each resource id (archive number <<
 24 | the entry's index in it) with a side filter and the slot it fills.
-Read that way, the vehicles' voice slots may sit one entry off from the
-grouping the voice sets above were first read with; the sets as given
-follow the archives' own order (two lines in two voices, twice, then the
-refusal four times), which fits the groups' use.
 
 
 ### The multiselection

@@ -623,6 +623,9 @@ private:
     void doubleClicked(int unit);
     void followInF1(int unit);
     audio::SoundHandle objectSoundHandle_ = audio::kNoSound; // the last double-clicked building's
+    audio::SoundHandle playAt(const std::string& archive, const std::string& stem, float x, float y, float gain);
+    std::map<std::string, std::shared_ptr<const audio::Sound>> archiveSounds_; // decoded, by archive/stem
+    std::map<int, audio::SoundHandle> driveHandles_;                           // each unit's start-up sound
     void cameraTo(const Unit& u);
     int followed_ = 0;                  // the object F1's camera follows
     bool quitAsked_ = false;            // Escape's box up

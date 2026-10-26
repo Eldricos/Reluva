@@ -128,8 +128,10 @@ struct Projectile {
 
 struct WorldEvent {
     // Shot: fired (from, to: its target, the line to where it was aimed);
-    // Hit: a projectile struck (to: what it hit, at x1, y1); Destroyed.
-    enum Kind { Shot, Hit, Destroyed } kind = Shot;
+    // Hit: a projectile struck (to: what it hit, at x1, y1); Destroyed;
+    // Moved: a unit set off on a new path (from, at x0, y0; the game's
+    // start-up sound, exe.md#sounds).
+    enum Kind { Shot, Hit, Destroyed, Moved } kind = Shot;
     int from = 0, to = 0;
     int fromSlot = 0, toSlot = 0;
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
@@ -173,6 +175,8 @@ public:
     void attack(const std::vector<int>& ids, int target);
     // Units sent somewhere: they drop an ordered target.
     void moveTo(int id, float x, float y);
+    // A unit's new path; a Moved event when it has one to follow.
+    void setPath(int id, std::vector<std::pair<float, float>> path);
     // Orders from the playbook (exe.md#orders), for the units named: an
     // assault on a target (firing from where they stand); protecting the
     // spot each stands on, or (a mobile shield generator) the buildings
