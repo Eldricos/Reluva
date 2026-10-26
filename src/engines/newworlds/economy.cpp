@@ -4,6 +4,7 @@
 #include "engines/newworlds/economy.h"
 
 #include <algorithm>
+#include <array>
 #include <numeric>
 #include <set>
 #include <cmath>
@@ -355,6 +356,21 @@ const VehicleType* vehicleType(int type) {
 }
 
 bool VehicleType::bee() const { return std::string_view(panel).find("BEE") != std::string_view::npos; }
+
+// Who is served first when power runs short (after the hub's life
+// support, class 0): 1 the vehicle yard, landing pad, sickbay, shields and
+// defences; 2 the storage facility (the Klingons' and Romulans' processor
+// instead) and the security center; 3 the rest.
+int Economy::powerClass(std::string_view type) const {
+    for (std::string_view t : {"vehicle-yard", "landing-pad", "sickbay", "shield-generator", "photon-turret",
+                               "disruptor-turret", "defensive-artillery"})
+        if (type.rfind(t, 0) == 0)
+            return 1;
+    if (type.rfind("security-center", 0) == 0 ||
+        type.rfind(side_ == 'F' ? "storage-facility" : "resource-processor", 0) == 0)
+        return 2;
+    return 3;
+}
 
 const BuildingType* buildingType(std::string_view id) {
     for (const BuildingType& t : buildingTypes())
@@ -1014,11 +1030,13 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         retryCrew();
     // Power: each built consumer asks to fill its buffer, at most its
     // intake a tick; the supply (with the reserve behind it) is shared out
-    // in proportion; then each uses its standing demand from its buffer.
-    float asked = 0;
+    // class by class (exe.md#the-economy), each class in proportion; then
+    // each uses its standing demand from its buffer.
+    std::array<float, 4> asked{};
     for (ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0)
-            asked += std::min(t->intake, t->bufferCap - s.stored + t->demand);
+            asked[size_t(powerClass(s.type))] += std::min(t->intake, t->bufferCap - s.stored + t->demand);
+    const float askedAll = asked[1] + asked[2] + asked[3];
     // Life support first: everyone on the planet uses 16 a tick; farms add
     // to it; the hub buys back what's used with power, before any other
     // building (its request divided by its efficiency).
@@ -1050,23 +1068,33 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         lifeDraw_ = float(grant);
     }
     double give = supply;
-    if (asked > supply) {
-        const double draw = std::min(reserve_, double(asked) - supply);
+    if (askedAll > supply) {
+        const double draw = std::min(reserve_, double(askedAll) - supply);
         reserve_ -= draw;
         give += draw;
     } else {
-        reserve_ = std::min(kReserveCap, reserve_ + (supply - asked));
+        reserve_ = std::min(kReserveCap, reserve_ + (supply - askedAll));
     }
-    requested_ = asked;
-    met_ = asked > 0 ? float(std::min(1.0, give / asked)) : 1;
+    // Class 1 first, then 2, then 3, each getting what's left.
+    std::array<float, 4> classMet{1, 1, 1, 1};
+    double left = give;
+    for (size_t c = 1; c < 4; ++c)
+        if (asked[c] > 0) {
+            const double g = std::min(double(asked[c]), left);
+            classMet[c] = float(g / asked[c]);
+            left -= g;
+        }
+    requested_ = askedAll;
+    met_ = askedAll > 0 ? float(std::min(1.0, give / askedAll)) : 1;
     // What the colony drew of what it made (the hub panel's consumption).
-    consumption_ = produced > 0 ? float(std::min(1.0, (lifeDraw_ + std::min(double(asked), supply)) / produced)) : 0;
+    consumption_ = produced > 0 ? float(std::min(1.0, (lifeDraw_ + std::min(double(askedAll), supply)) / produced)) : 0;
     for (ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0) {
             const float want = std::min(t->intake, t->bufferCap - s.stored + t->demand);
-            s.stored = std::clamp(s.stored + want * met_ - t->demand, 0.0f, t->bufferCap);
+            const float got = classMet[size_t(powerClass(s.type))];
+            s.stored = std::clamp(s.stored + want * got - t->demand, 0.0f, t->bufferCap);
             s.fill = (s.stored / t->bufferCap + s.fill) * 0.5f; // the game's average, kept at each refill
-            s.supply = (met_ + s.supply) * 0.5f;                  // and of the share granted
+            s.supply = (got + s.supply) * 0.5f;                   // and of the share granted
         }
     if (met_ < kPowerLow && clock_ - lastPowerWarning_ >= kWarnEvery) {
         out.push_back({"power-low", {}});

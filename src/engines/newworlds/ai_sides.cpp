@@ -68,7 +68,7 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     u.label = label;
     u.building = type.building;
     const float tough = player && race == 'F' ? 1.2f : player && race == 'R' ? 1.3f : 1.0f;
-    u.hp = u.maxHp = float(std::max(1, type.hp)) * tough;
+    u.hp = u.maxHp = std::floor(float(std::max(1, type.hp)) * tough); // (the game truncates)
     u.weapon = type.weapon;
     u.ai = !player;
     u.flies = std::string_view(type.name) == "bird-of-prey";

@@ -285,9 +285,10 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   the mission's label as the game gives it, FEDERATION LEVEL 01, JOINT
   LEVEL 03, TUTORIAL, BONUS ROMULAN MISSION; lines for the briefing,
   command routines and officers; the share done), the briefing, a
-  loading box, play; won or lost, the debriefing box, then the side's won
-  or lost screen (`f_win`, `f_lose`, ...) with the MISSION REPORT: each
-  objective COMPLETE or INCOMPLETE, and CONTINUE.
+  loading box, play; won or lost, the debriefing box, then the race's
+  emblem (won) or lose screen (`f_lose`, ...) with the MISSION REPORT
+  under MISSION LOG: won, each objective COMPLETE or INCOMPLETE; lost, the
+  fail criterion that fired, FAILED; and CONTINUE.
 - **Cloaked units** shimmer while they fade (each corner of the model
   thrown about every frame: the player's own most in the middle of a
   fade, another side's most as it nears cloaked); the player's own,
@@ -480,8 +481,7 @@ kept apart from the game's behaviour:
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
-| The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the executable has no fixed text for it; each mission's strings have a pass and a fail line, likely the ones shown, but what picks them wasn't found |
-| The Tricorder's ore colours | Reluva's | not found in the executable |
+| The Tricorder's ore colours | Reluva's | the game's shift the map's own palette per race (exe.md#the-tricorder); not done yet |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |

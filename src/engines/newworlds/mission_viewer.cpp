@@ -2691,7 +2691,15 @@ void MissionViewer::drawInterface() {
             map_.drawMinimap(screen_, mx, my, mw, mh, tiles);
             drawMinerals(mx, my, mw, mh, tiles);
             tricorder_ = {mx, my, mw, mh};
-            // The player's own green, those hostile to it red, the rest yellow.
+            // Each side's own colour, whoever it is to the player
+            // (exe.md#the-tricorder): the Federation blue, the Klingons
+            // orange, the Romulans green, the Taubat and Metar yellow, the
+            // Hubrin magenta, the Orions red; an alerted object red. A blip
+            // is outlined in black, the outline blinking white on the
+            // selected and alerted.
+            static constexpr Color kSideColours[] = {{0, 0, 255},   {255, 128, 0}, {0, 255, 0},  {255, 255, 0},
+                                                     {255, 0, 255}, {255, 255, 0}, {255, 0, 0}};
+            const bool blink = (nowMs_ / 500) % 2 == 1;
             if (world_)
                 for (const Unit& u : world_->units()) {
                     if (!visible(u))
@@ -2699,12 +2707,17 @@ void MissionViewer::drawInterface() {
                     int px = 0, py = 0;
                     if (!map_.minimapPoint(u.x, u.y, mx, my, mw, mh, px, py, tiles))
                         continue;
-                    const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
-                    for (int dy = 0; dy < 2; ++dy)
-                        for (int dx = 0; dx < 2; ++dx)
+                    const bool alerted = u.slot == playerSlot_ && sim_ && sim_->alerted(u.id);
+                    const Color fill = alerted                                     ? Color{255, 0, 0}
+                                       : u.slot >= 0 && u.slot < int(std::size(kSideColours)) ? kSideColours[u.slot]
+                                                                                   : Color{0, 0, 255};
+                    const Color edge = blink && (u.selected || alerted) ? Color{255, 255, 255} : Color{0, 0, 0};
+                    for (int dy = -1; dy < 3; ++dy)
+                        for (int dx = -1; dx < 3; ++dx)
                             if (px + dx >= 0 && py + dy >= 0 && px + dx < screen_.w && py + dy < screen_.h) {
+                                const Color c = dx < 0 || dy < 0 || dx > 1 || dy > 1 ? edge : fill;
                                 uint8_t* p = screen_.row(py + dy) + (px + dx) * 4;
-                                p[0] = own ? 120 : 255, p[1] = own ? 255 : enemy ? 70 : 230, p[2] = own ? 120 : 60;
+                                p[0] = c.r, p[1] = c.g, p[2] = c.b;
                             }
                 }
             ui_.drawSmall(screen_, x + 10, y + h - 14 - 2 * lh, tricorderReadout(mx, my, mw, mh, tiles), text);

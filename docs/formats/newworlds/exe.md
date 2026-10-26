@@ -177,8 +177,12 @@ constructor reads them from a table the game rewrites once at start-up
 and its burst 20 to 30, the Federation hub 600 to 1500, the bees 5 to a
 million), so the tables here give the rewritten figures, not the ones
 stored in the file. For the human player's side in a single player game
-hit points are raised again (Federation x1.2, Romulan x1.3, Klingon x1),
-and a switch (most likely the setup's easy-game box) doubles them. The
+hit points are raised again (Federation x1.2, Romulan x1.3, Klingon x1,
+truncated), for every object of its race as it is made, built later too;
+the setup's Cadet box doubles them instead. That is the whole of the
+difficulty: there is no difficulty setting (the "novice / average /
+expert" of the readme are the races), and nothing else changes stock,
+size, enemies or speeds. The
 Metar starship (262) carries five turrets of its own: a single-shot gun
 and four bursts, each 120 (the bursts 40 a pulse), range 45000, reload
 20; Reluva fires them as one gun of five.
@@ -363,8 +367,14 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   can't build while the colony is at its capacity.
 - **Power.** Each side has a pool with a reserve of 640000 (the panel's
   RESERVE % is reserve / 6400). Each tick generators add their output x
-  efficiency; buildings ask to refill their buffers (at most their intake)
-  in four priority classes; DEMAND MET is what was granted over what was
+  efficiency, once built (the reserve full, the rest is lost); buildings
+  ask to refill their buffers (at most their intake) in four priority
+  classes, each getting what's left after the one before: 0 the hub's
+  life support, 1 vehicle yards, landing pads, sickbays, shield generators
+  and defences, 2 the security center and the Federation's storage
+  facility (the Klingons' and Romulans' processor), 3 the rest. The
+  shares apply on the next tick. A shortfall only drains the buffers,
+  so lowers efficiency; building isn't held up. DEMAND MET is what was granted over what was
   asked, CONSUMPTION what was drawn over what was produced. Outputs: hub
   500, Federation and Klingon generator 500, Romulan 1000; advanced 1500
   and 3000. The LOW / MED labels are fixed per building type. The colony is
@@ -989,6 +999,17 @@ that race (through the order queue, as a script's posture switch does),
 theirs unchanged; set Neutral, it turns Hostile at the first shot that
 race fires at the player (a provocation limit of 1).
 
+**Colours.** Blips are each side's colour, whatever the player's posture
+to it: side 0 (the Federation) blue, 1 (Klingon) orange, 2 (Romulan)
+green, 3 (Taubat) and 5 (Metar) yellow, 4 (Hubrin) magenta, 6 (Orion)
+red. Alerted objects are red. Blips are outlined in black, the outline
+blinking white every 10 redraws on the selected and alerted. The ground
+and ores are the map's own palette, in bands of 20 entries shifted in
+hue, saturation and brightness per race (the ores alike for all races:
+dilithium +270 degrees, talgonite +30, silicon +210, kelbonite +330,
+magnesite +90, dolamide +150, brightened 1.33-1.5 times); the background
+is a dark blue, brown or green by race.
+
 Its line names what's under the pointer: an object, by the player's
 posture to its side (Friendly, Neutral, Hostile) and its class
 (defenses, structure, unit), "Debris" for one gone; Impassable ground;
@@ -1421,8 +1442,17 @@ the NEW WORLDS panel, its class picked by type id:
   queues use the small 32 x 32 one.
 - **Loading boxes** have no set time: they stay while the loading lasts.
   The briefing and debriefing wait for their button, with no time-out.
-  The mission report window lists each objective with incomplete,
-  complete or failed, four a page.
+  The mission report window has a fixed "Mission Log" heading (no
+  accomplished or failed line: every mission ends with the same two
+  scenes, and the missions' own pass and fail strings are never shown),
+  four rows a page: won, each objective, complete or incomplete; lost,
+  only the fail criteria that fired, failed. Behind it, the race's
+  emblem on a win (the `f_win` tiles are never used), the lose tiles on
+  a loss.
+- **COMMAND** (the objective list): four rows a page, an icon and each
+  objective, incomplete or complete; hidden objectives join when a
+  message first names them; no fail criteria. It rebuilds every 10
+  ticks while open; its button only opens it.
 
 ## Still open
 

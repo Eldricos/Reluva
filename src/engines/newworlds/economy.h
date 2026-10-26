@@ -399,6 +399,7 @@ private:
     static Units unitsOf(const Stock& s);
 
     char side_;
+    int powerClass(std::string_view type) const;
     std::vector<Store> stores_;
     Units refined_{}; // at the processor, waiting to go to storage
     int capacity_, vehicles_ = 0;
