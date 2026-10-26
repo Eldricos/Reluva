@@ -111,3 +111,21 @@ Romulans. The others: `r_narok`, `r_plyr`, `jathek`, and the natives'
 `hubrin`, `metar`, `orion`, `taubat`; the Hubrin's messages show their
 emblem, not a face (C11).
 
+## Multiplayer Setup
+
+The multiplayer screen (from a screenshot of the original): the title
+Multiplayer Setup over a frame like the other menus'. Left, **Number of
+Players** with up and down arrows (2 shown) and **Alignment**, three
+buttons Federation, Romulan, Klingon. Right, **Select Game**, a scrolling
+list of the joint missions by title (Into the Arena, Absent Friends, The
+Mask Slips, Cry Havoc, Keep your Friends Close, The Jaws of Death,
+Checkmate, The Lost Tribes) then the head-to-head maps (Head to Head:
+Lupercal Jade, Nemphos, Lestrigon, Karalute, Xix Xix, Pellion Red; see
+[level.md](level.md)). Below, the connection: **Game Name** (the computer's
+name by default), **Service Provider/Protocol** (a drop-down of DirectPlay's:
+Internet TCP/IP, IPX, Modem and Serial connections), then fields for the
+chosen one: **IP address/Comp. name** and **Port number** for TCP/IP, a
+**Modem** drop-down and **Phone number** for a modem. A **Status** line,
+and **Create**, **Join** (dimmed until a game can be made or found) and
+**Cancel**. Reluva has no multiplayer.
+

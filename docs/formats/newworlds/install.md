@@ -27,8 +27,20 @@ release, and of the same install with an unofficial fan patch applied
 - `game.ini`, `level.dat`, `olevel.dat`, `kapla.rse`: the screen size and side numbers, and the mission lists; see [level.md](level.md).
 - `Media/`: standard MP3 and WAV files (voice per faction in `FedVO`,
   `KlingVO`, `RomVO`; `Music`; `Misc` sound effects and tutorial voice).
-- `SFC2.BIK` plus the movies on the CD: Bink video. A clean install doesn't
-  copy the `MOVIES` folder to the hard disk.
+- `SFC2.BIK` plus the movies on the CD: Bink video (Bink 1, 640 × 480, with
+  Bink audio). A clean install doesn't copy the `MOVIES` folder to the hard
+  disk: the launcher plays them from the CD, through the CD's own
+  `BINKPLAY.EXE` (asking for the CD, and checking it's the original,
+  first).
+
+  | Movie | Length | When |
+  |---|---|---|
+  | `LOGOS.BIK` | 43 s | the first launch screen, then `STNW.BIK` (not when started for a multiplayer game, nor with a setting off) |
+  | `STNW.BIK` | 2:15 | the intro: after the logos, and the launcher's intro button |
+  | `FEDWIN.BIK`, `KLIWIN.BIK`, `ROMWIN.BIK` | 3:49-3:56 | the race's campaign won (the race the player last chose; the launcher plays it on its return) |
+  | `SFC2.BIK` | 1:06 | never: the executable doesn't name it (a trailer for another game, as `KAPROMO.EXE` is) |
+- `Manual.pdf` on the CD (`Manual/`, with an Acrobat Reader installer):
+  the printed manual.
 
 ## Not needed by Reluva
 

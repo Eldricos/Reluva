@@ -58,7 +58,6 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
 ## 3. Interface
 
-- **Multiplayer setup** [shot]: the multiplayer screens, never opened.
 - **The star in star-system views** [shot]: in each briefing's star-system
   view, which body is the star and which is the mission's planet (J1R, J2R,
   J3R, J7R, J8R, R2, R9, R12): the models don't say which texture goes on
@@ -103,9 +102,10 @@ message's text and trigger but not the order the counter shows.
 
 ## 5. Missing data files
 
-- **Other archives** [shot]: a full listing of the game folder and the CD
-  (including `MOVIES`), for anything beyond install.md's list (head-to-head
-  `d1`-`d6` maps). ([install.md](install.md), [level.md](level.md))
+- **The installer's archive** [shot]: a listing of the CD's `DATA1.CAB`
+  (an InstallShield archive, 212 MB; no tool here opens it), to check it
+  holds nothing the install doesn't copy. The game folder and the CD's
+  other files are listed now. ([install.md](install.md))
 
 ## 6. Left in Reluva (no VM needed)
 
