@@ -56,6 +56,13 @@ std::pair<float, float> parkingSpot(int n, float x, float y, bool building) {
     return {x + std::cos(angle) * r, y + std::sin(angle) * r};
 }
 
+namespace {
+bool gCadet = false;
+} // namespace
+
+void setCadetMode(bool on) { gCadet = on; }
+bool cadetMode() { return gCadet; }
+
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model, bool player) {
     UnitKind kind{type.name, model.empty() ? type.model : model,
@@ -67,7 +74,11 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     u.name = type.name;
     u.label = label;
     u.building = type.building;
-    const float tough = player && race == 'F' ? 1.2f : player && race == 'R' ? 1.3f : 1.0f;
+    const float tough = !player             ? 1.0f
+                        : gCadet            ? 2.0f
+                        : race == 'F'       ? 1.2f
+                        : race == 'R'       ? 1.3f
+                                            : 1.0f;
     u.hp = u.maxHp = std::floor(float(std::max(1, type.hp)) * tough); // (the game truncates)
     u.weapon = type.weapon;
     u.ai = !player;

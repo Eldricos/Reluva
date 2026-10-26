@@ -47,6 +47,9 @@ public:
     // An officer's face (its small portrait), by the index the mission
     // gives it in the race's list of 40 (exe.md#crew-and-efficiency).
     const Texture* officerFace(int index) const;
+    // A message's face: the large portrait for its officer number (the
+    // list's entry number - 1; exe.md#the-tricorder), or null.
+    const Texture* messageFace(int number) const;
     const Texture* icon(std::string_view name) const; // "logo32", "shldicon", "pbattack", "science", ...
     // A building's or vehicle's small portrait by its picture's name
     // ("fhub", "fcy", "fpv"; gui.md#pictures), or none.
@@ -65,6 +68,7 @@ private:
     std::map<std::string, Texture> icons_;
     std::vector<Texture> crew_;
     std::vector<Texture> officerFaces_; // the race's 40 (empty where one is missing)
+    std::vector<Texture> largeFaces_;   // the same 40, large (the messages')
     std::map<std::string, Texture> faces_; // by section, where known
     std::map<std::string, Texture, std::less<>> objects_; // the small building and craft portraits
     std::map<std::string, Texture> natives_;

@@ -23,6 +23,12 @@ namespace reluva::newworlds {
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model = {}, bool player = false);
 
+// The setup's Cadet box (exe.md#vehicles-and-turrets): the player's objects
+// get twice their hit points instead of the race's bonus. A setting for the
+// game, as the game keeps it; read as each object is made.
+void setCadetMode(bool on);
+bool cadetMode();
+
 // Where the n-th of the units a mission places on one spot stands: round
 // the spot ring by ring (eight to a ring), clear of a building standing on
 // it (the game parks a colony's vehicles round its hub).

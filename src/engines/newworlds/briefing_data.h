@@ -29,4 +29,15 @@ struct BriefingRow {
 // A mission's steps for a side, in order (empty if the table has none).
 std::vector<const BriefingRow*> briefingRows(std::string_view mission, char side);
 
+// The officer number a section's messages carry in a mission ("science",
+// "intelligence", ...; 0 none known): their face is the large portrait
+// at that number less one in the race's list (exe.md#the-tricorder).
+struct MessageFace {
+    const char* mission;
+    char side;
+    const char* section;
+    int number;
+};
+int messageOfficer(std::string_view mission, char side, std::string_view section);
+
 } // namespace reluva::newworlds

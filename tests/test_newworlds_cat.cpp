@@ -7,6 +7,7 @@
 #include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/arf.h"
 #include "engines/newworlds/briefing.h"
+#include "engines/newworlds/briefing_data.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
@@ -597,6 +598,10 @@ void testBriefing() {
           std::abs(steps[4].minimum - 8) < 1e-9);
     CHECK(steps[8].clip == "F1009" && steps[8].siteA == 438 && steps[8].siteB == 218); // the colony hub
     CHECK(steps[10].view == BriefingView::Model && steps[10].model == "geo/bad/tt.geo"); // the temple
+    // The officer numbers the mission's mail carries, by section (a
+    // message's face is the portrait at that number less one).
+    CHECK(messageOfficer("F1", 'F', "science") == 5 && messageOfficer("f1", 'F', "engineering") == 3 &&
+          messageOfficer("F1", 'F', "nobody") == 0);
     CHECK(missionSides("C10") == std::vector<char>{'K'} && missionSides("C11") == std::vector<char>{'R'});
 }
 
@@ -1115,6 +1120,12 @@ void testCombat() {
     const int mine = spawnObject(w, 0, 'F', *phaser, 12 * kTile, 12 * kTile, {}, {}, true);
     const int home = spawnObject(w, 3, 'T', *house, 14 * kTile, 12 * kTile, "taubat-colony");
     CHECK(w.unit(mine)->maxHp == 84.0f && !w.unit(mine)->ai);
+    // Cadet mode: twice the hit points instead of the race's bonus.
+    setCadetMode(true);
+    const int cadet = spawnObject(w, 0, 'F', *phaser, 12 * kTile, 20 * kTile, {}, {}, true);
+    setCadetMode(false);
+    CHECK(w.unit(cadet)->maxHp == 140.0f);
+    w.remove(cadet);
     w.attack({mine}, home);
     for (int i = 0; i < 100; ++i)
         w.advance(0.1);

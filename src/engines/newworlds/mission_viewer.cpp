@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "engines/newworlds/briefing_data.h"
 #include "engines/newworlds/model_render.h"
 #include "engines/newworlds/star_system.h"
 #include "engines/newworlds/start_data.h"
@@ -1372,6 +1373,7 @@ void MissionViewer::handleEvent(const Event& ev) {
             --page_, briefing_ = true;
         break;
     case 'b': briefing_ = !briefing_; break;
+    case 'k': setCadetMode(!cadetMode()); break; // the next mission played
     case key::Return:
         if (running_)
             startStep(step_ + 1);
@@ -1694,6 +1696,7 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
                     (level.maxPlayers == 1 ? " player" : " players") + (level.commentedOut ? " (not listed)" : "");
     if (sides.size() > 1)
         t += std::string(", as ") + sideName(sides[size_t(side_)]) + " (J: side)";
+    t += cadetMode() ? "; Cadet mode (K)" : "";
     t += hasMap_ ? "; " + mapName_ : "";
     if (!mapNote_.empty())
         t += " (" + mapNote_ + ")";
@@ -2791,7 +2794,14 @@ void MissionViewer::drawInterface() {
         } else {
             const auto& [sender, message] = log_[size_t(shown)];
             const std::string natives = level.shortName == "C9" ? "orion" : "taubat";
-            if (const Texture* p = ui_.portraitFor(sender, natives))
+            // The face the message's officer number gives (the mission's
+            // mail for that section), else the section's.
+            std::string section = sender.substr(0, sender.find(' '));
+            for (char& c : section)
+                c = char(std::tolower(static_cast<unsigned char>(c)));
+            const char race = missionSides(level.shortName)[size_t(side_)];
+            const Texture* face = ui_.messageFace(messageOfficer(level.shortName, race, section));
+            if (const Texture* p = face ? face : ui_.portraitFor(sender, natives))
                 ui_.drawPicture(screen_, *p, x + 10, y + 13, 44, 41);
             std::string up = sender + ":";
             std::transform(up.begin(), up.end(), up.begin(), [](unsigned char c) { return char(std::toupper(c)); });

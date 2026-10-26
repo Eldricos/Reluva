@@ -109,6 +109,22 @@ bool GameUi::load(const Archives& archives, char side) {
             if (loadPicture(archives, std::string("lbp/gui/") + f + "/ptrt/crew/sm/" + stem + ".lbp", t))
                 break;
         officerFaces_.push_back(std::move(t));
+        // The large one: the same name without "_s" (three are spelt
+        // otherwise).
+        std::string large = stem;
+        if (large == "f_sarek_")
+            large = "f_sarek";
+        else if (large == "kirgat_s")
+            large = "k_kirgat";
+        else if (large == "r_nark_s")
+            large = "r_narok";
+        else if (large.size() > 2 && large.compare(large.size() - 2, 2, "_s") == 0)
+            large.resize(large.size() - 2);
+        Texture l;
+        for (const char* f : {folder.c_str(), "fed", "kln", "rom"})
+            if (loadPicture(archives, std::string("lbp/gui/") + f + "/ptrt/crew/lg/" + large + ".lbp", l))
+                break;
+        largeFaces_.push_back(std::move(l));
     }
     // The portraits of the side's buildings and craft, small ("fhub_s") and large ("fhub").
     for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/", "ptrt/build/lg/", "ptrt/craft/lg/"}) {
@@ -273,6 +289,12 @@ const Texture* GameUi::officerFace(int index) const {
     if (index < 0 || size_t(index) >= officerFaces_.size() || officerFaces_[size_t(index)].rgba.empty())
         return nullptr;
     return &officerFaces_[size_t(index)];
+}
+
+const Texture* GameUi::messageFace(int number) const {
+    if (number < 1 || size_t(number) > largeFaces_.size() || largeFaces_[size_t(number - 1)].rgba.empty())
+        return nullptr;
+    return &largeFaces_[size_t(number - 1)];
 }
 
 const Texture* GameUi::objectPortrait(std::string_view name) const {
