@@ -221,9 +221,12 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   come: an assault takes its count of the type from the side's idle units
   (or beams them in where the game's attack group does), asks the side's
   vehicle yards for any it lacks, and once it has them all drives along
-  its waypoints, fighting what it meets, then goes for the nearest enemy;
-  a guard holds its spot and goes for enemies near it; a patrol goes
-  round; `abort` stops an order. The orders the game runs from the start
+  its waypoints, fighting what it meets, then goes for the nearest object
+  of its target side, each unit first after whoever attacks it; a guard
+  holds its spot (protecting its whole side, in mode 4); a patrol goes
+  round and round, a sweep goes once and again when enemies are near its
+  end, and in modes 5 and 6 both end as guards; `abort` stops a patrol or
+  sweep, while guards and assaults take any message as their trigger. The orders the game runs from the start
   (the natives' patrols, the named builds) start with play, and those it
   runs for a human side too move the player's units (R8's
   prepositioners).
@@ -285,10 +288,12 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   loading box, play; won or lost, the debriefing box, then the side's won
   or lost screen (`f_win`, `f_lose`, ...) with the MISSION REPORT: each
   objective COMPLETE or INCOMPLETE, and CONTINUE.
-- **Cloaked units** of the player's own side are drawn see-through, and
-  every cloaking unit fades in and out over its fades.
+- **Cloaked units** shimmer while they fade (each corner of the model
+  thrown about every frame: the player's own most in the middle of a
+  fade, another side's most as it nears cloaked); the player's own,
+  cloaked, are drawn as they are, another side's not at all.
 - **The officers** (the hub's STAFF): a card each, with a portrait (the
-  section's), rank (the mission's, in the race's titles) and name,
+  officer's own, as the mission gives it), rank (the mission's, in the race's titles) and name,
   section (Engineering, Security, Medical, Science, Operations, ...) and
   skill (BASIC 0.25, SKILLED 0.5, HIGHLY SKILLED 0.75, EXPERT 1), and
   where they are. TRAINING (lit while a course is left) lists the
@@ -303,8 +308,9 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   move fires on the way without stopping; attack en route does the same,
   cloaking units included; an assault fires from where the units stand,
   never closing in; protecting holds a spot, checks every 8 ticks for
-  anything of the side under attack and goes after the nearest attacker,
-  then comes back (a mobile shield generator, which can't fire, drives
+  anything of the side with a live attacker (one that hit it and is still
+  alive, uncloaked and hostile, however far off) and goes after the
+  nearest, then the next, coming back once there are none (a mobile shield generator, which can't fire, drives
   its field up to the attacker of the building it guards). Units with
   nothing to do fire from where they stand. New armed vehicles drive to
   the side's **rally point**, a 4 x 4 grid of parking places in the
@@ -442,7 +448,7 @@ kept apart from the game's behaviour:
 | Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
 | Animation speed | 10 frames a second | Reluva's (arf.md) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
-| F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking 9 degrees down | the game's offsets; its look angle isn't known |
+| F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking at the object (9 degrees down) | the executable (exe.md#cameras) |
 | Escape's box | "LEAVE THIS MISSION?" | Reluva's wording |
 | A transport's stop | in through the building's dock and out to RELEASE, at a spot 1.2 tiles south of the building | the dock times are the game's; it drives to the dock's ARRIVAL point, which Reluva doesn't place |
 | Docks and yards | the model's points as they are in the model, the building not turned | the game turns them with the building; Reluva's colony buildings aren't turned |
@@ -474,17 +480,9 @@ kept apart from the game's behaviour:
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
-| The menus' portraits | 48 pixels across | the game's are 64 × 60 |
-| The comms panel's X | away until the next message | what brings it back in the game isn't known |
-| Your own cloaked units | drawn at 35 % (fading over the 63-tick fades) | the game draws them see-through; how much isn't known |
-| The loading boxes | 3 s (2.5 s before play); Reluva's own wording | the recordings show them 3-10 s; their lines are the game's text, not copied |
-| The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the recordings show a short first line, not read |
+| The mission report's first line | MISSION ACCOMPLISHED / MISSION FAILED | the executable has no fixed text for it; each mission's strings have a pass and a fail line, likely the ones shown, but what picks them wasn't found |
 | The Tricorder's ore colours | Reluva's | not found in the executable |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
-| Officers' portraits | the section's face (as the messages use) | which face is whose isn't known |
-| What counts as under attack, for protecting | hit in the last 100 ticks (5 s) by something still alive | Reluva's: the game asks whether the attacker is still about |
-| Follow and attack giving up | doesn't: it chases until the target is gone | the game re-plans after 20 ticks without a shot |
-| Guards | go for enemies within 2 blocks of their spot, back past 4 | Reluva's |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
 | Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |

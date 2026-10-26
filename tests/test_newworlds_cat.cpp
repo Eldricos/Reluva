@@ -1159,6 +1159,9 @@ void testAiSides() {
     CHECK(has(first, "klingon-hub", 1) && has(first, "taubat-house", -1) && has(first, "taubat-colony", -1));
     CHECK(ai.observe({}).empty()); // nothing changed
     CHECK(!ai.order("klingon", "no-such-order"));
+    // (An assault runs only while its target side has anything: a
+    // Federation building far off.)
+    spawnObject(w, 0, 'F', *combatType(23), 60 * kTile, 100 * kTile, {});
     CHECK(ai.order("klingon", "initial-assault-one"));
     const auto running = ai.running();
     CHECK(std::count(running.begin(), running.end(), "initial-assault-one") == 1);
@@ -1167,10 +1170,11 @@ void testAiSides() {
     for (const Unit& u : w.units())
         driving += u.slot == 1 && u.moving();
     CHECK(driving >= 2);
+    // An assault doesn't read its message: an abort is a trigger too.
     CHECK(ai.order("klingon", "abort initial-assault-one"));
     ai.advance(1.0);
     const auto after = ai.running();
-    CHECK(std::count(after.begin(), after.end(), "initial-assault-one") == 0);
+    CHECK(std::count(after.begin(), after.end(), "initial-assault-one") >= 1);
     ai.stance("taubat", "hostile");
     CHECK(w.stance(3, 0) == 3 && w.stance(0, 3) == 2);
     // The Klingons' named builds start armed: the construction yard's site
@@ -1226,7 +1230,8 @@ void testAiSides() {
         made = kliTanks() > tanksBefore;
     }
     CHECK(made && kliEco->stock() == before);
-    ai.advance(2.0);
+    for (int i = 0; i < 4; ++i)
+        ai.advance(0.5), w.advance(0.5);
     bool off = false;
     for (const Unit& u : w.units())
         off = off || (u.slot == 1 && u.type == 10 && u.moving());
@@ -1317,6 +1322,11 @@ void testFieldWork() {
     FieldWork fw("F1", 0, w, sites);
     fw.placeOfficers();
     CHECK(fw.officers().size() == 5);
+    // Each officer wears its own face from the race's list (C1's Bellah 14).
+    {
+        const auto c1 = officers("C1", 0);
+        CHECK(!c1.empty() && std::string(c1[0]->name) == "Bellah" && c1[0]->face == 14);
+    }
     std::set<std::string> wanted{"scan-started science taubat-mine", "scanned science taubat-mine",
                                  "scanned strong-medical taubat-colony", "entered taubat-temple",
                                  "captured taubat-temple", "held temple 10", "vacated taubat-temple"};

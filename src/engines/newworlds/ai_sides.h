@@ -106,6 +106,7 @@ public:
     struct OrderStatus {
         const NpcOrder* order;
         bool started, gathered, hunting;
+        bool guarding;      // holding where its waypoints ended
         int units, awaited; // its units now, those asked of the yards
         int leg;
         double legSeconds;  // since its leg began (since it started, while gathering)
@@ -125,6 +126,8 @@ private:
         bool started = false, gathered = false, hunting = false, done = false;
         int awaited = 0; // units asked of the yards and not yet out
         int site = 0;    // a build order's building, once put up
+        int groups = 0;  // groups sent and lost (it tries three in all)
+        bool guarding = false; // its units hold their spot now (a guard, a patrol ending as one)
     };
     struct Colony {
         std::unique_ptr<Economy> economy;
@@ -136,6 +139,8 @@ private:
     void build(Running& r);
     void colonies(double seconds);
     void steer(Running& r);
+    bool ready(const Running& r) const;
+    void rearm(Running& r);
     std::pair<float, float> wayPoint(const NpcOrder& o, int leg) const;
     std::pair<float, float> openSpot(float x, float y) const;
     bool home(int slot, float& x, float& y) const;

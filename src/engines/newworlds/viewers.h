@@ -263,11 +263,14 @@ public:
         // Its turret turned from straight ahead (anticlockwise) and its gun
         // raised, in radians, for a model with one.
         float turretYaw = 0, gunPitch = 0;
-        float opacity = 1; // below 1 see-through (a cloaked unit)
+        // A cloaking unit's shimmer (exe.md#cloaking): each corner of its
+        // model is thrown up to this far (world units) each frame.
+        float shimmer = 0;
         float lift = 0;    // above the ground (a bee in flight)
     };
     void setUnits(std::vector<UnitDraw> units) {
         units_ = std::move(units);
+        ++shimmerFrame_;
         dirty_ = true;
     }
     // The ground's height at a world point (0 off the map); the map's size
@@ -414,6 +417,7 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
+    uint32_t shimmerFrame_ = 0; // a new throw for each set of units drawn
     std::function<void()> overlay_;
     std::function<std::string(const std::string&)> titleFilter_;
 };
@@ -703,7 +707,9 @@ private:
     // then the won or lost screen with the MISSION REPORT and CONTINUE.
     enum class Flow { None, Loading, Briefing, Starting, Playing, Debriefing, Report };
     Flow flow_ = Flow::None;
-    static constexpr uint64_t kLoadingMs = 3000, kStartingMs = 2500; // Reluva's: the recordings' boxes show 3-10 s
+    // The loading boxes stay only while the loading lasts, as the game's
+    // do (the recordings' 3-10 s were the player's clicks): here a frame.
+    static constexpr uint64_t kLoadingMs = 1, kStartingMs = 1;
     static constexpr uint64_t kFlowUnstarted = ~uint64_t(0);
     uint64_t flowStartMs_ = 0;
     bool flowWon_ = false;

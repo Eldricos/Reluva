@@ -229,6 +229,10 @@ public:
     // one, 6000 for buildings and 1000 for vehicles.
     void setRadius(std::function<float(const Unit&)> radius) { radius_ = std::move(radius); }
     float radiusOf(const Unit& u) const;
+    // An object's live attacker (exe.md#orders): the one it recorded, while
+    // that's alive, built, uncloaked and hostile to it; no timer, no
+    // distance.
+    const Unit* liveAttacker(const Unit& v) const;
     // Whether u has a clear line of fire to t: no object it doesn't count
     // as an enemy in the way (nor, for the colonies, an enemy's building).
     bool lineClear(const Unit& u, const Unit& t);

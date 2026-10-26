@@ -28,6 +28,27 @@ constexpr std::pair<const char*, const char*> kRomulanFaces[] = {
     {"Science", "r_c21"},    {"Security", "r_c20"},
 };
 
+// Each race's 40 officer faces, the small portraits (ptrt/crew/sm) in the
+// order the game lists them: the mission gives each officer an index here.
+// Some are shared with the natives or another race's folder.
+constexpr const char* kFaces[3][40] = {
+    {"f_c9_s",  "f_c33_s", "f_c7_s",  "f_c20_s", "f_c21_s",  "f_c32_s",  "f_c23_s", "f_c1_s",
+     "k_plyr_s", "r_plyr_s", "taubat", "hubrin", "metar",   "orion",    "f_c31_s",  "f_c3_s",
+     "f_c4_s",  "f_c5_s",  "f_c8_s",  "f_c11_s", "f_c12_s",  "f_c13_s",  "f_c14_s", "f_c34_s",
+     "f_c16_s", "f_c19_s", "fairbk_s", "f_sarek_", "f_fox_s", "hubrin",  "f_c9_s",  "f_c33_s",
+     "f_c1_s",  "f_c20_s", "f_c21_s", "f_c32_s", "f_c23_s",  "taubat",   "orion",   "hubrin"},
+    {"k_c1_s",  "k_c2_s",  "k_c3_s",  "k_c4_s",  "k_c5_s",   "k_c6_s",   "k_c27_s", "f_c7_s",
+     "k_plyr_s", "r_plyr_s", "taubat", "hubrin", "metar",   "orion",    "k_c7_s",   "k_c8_s",
+     "k_c9_s",  "k_c10_s", "k_c11_s", "k_c12_s", "k_c13_s",  "k_c14_s",  "k_c15_s", "k_c16_s",
+     "k_c17_s", "k_c18_s", "k_c19_s", "k_c20_s", "k_c21_s",  "kirgat_s", "k_c1_s",  "k_c2_s",
+     "k_c3_s",  "k_c4_s",  "k_c5_s",  "k_c6_s",  "k_c27_s",  "taubat",   "orion",   "hubrin"},
+    {"r_c17_s", "r_c18_s", "r_c19_s", "r_c20_s", "r_c21_s",  "r_c24_s",  "r_c25_s", "f_c7_s",
+     "k_plyr_s", "r_plyr_s", "taubat", "hubrin", "metar",   "orion",    "r_c1_s",   "r_c2_s",
+     "r_c3_s",  "r_c4_s",  "r_c5_s",  "r_c6_s",  "r_c7_s",   "r_c8_s",   "r_c9_s",  "r_c10_s",
+     "r_c11_s", "r_c12_s", "r_c13_s", "r_c14_s", "r_c15_s",  "jathek_s", "r_nark_s", "r_c18_s",
+     "r_c19_s", "r_c20_s", "r_c21_s", "r_c24_s", "r_c25_s",  "taubat",   "orion",   "hubrin"},
+};
+
 // Sections in the order the side's crew portraits are handed out.
 constexpr const char* kSections[] = {"Command",      "Operations",   "Engineering",   "Science",
                                      "Medical",      "Security",     "Intelligence",  "Communications"};
@@ -79,6 +100,16 @@ bool GameUi::load(const Archives& archives, char side) {
             if (loadPicture(archives, base + "ptrt/crew/lg/" + stem + ".lbp", t))
                 faces_[section] = std::move(t);
         }
+    // The officers' faces: from the side's own folder, else whichever
+    // race's has the picture (f_c7 in the Klingon and Romulan lists, the
+    // other races' player faces).
+    for (const char* stem : kFaces[side == 'K' ? 1 : side == 'R' ? 2 : 0]) {
+        Texture t;
+        for (const char* f : {folder.c_str(), "fed", "kln", "rom"})
+            if (loadPicture(archives, std::string("lbp/gui/") + f + "/ptrt/crew/sm/" + stem + ".lbp", t))
+                break;
+        officerFaces_.push_back(std::move(t));
+    }
     // The portraits of the side's buildings and craft, small ("fhub_s") and large ("fhub").
     for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/", "ptrt/build/lg/", "ptrt/craft/lg/"}) {
         const std::string under = base + folder;
@@ -130,18 +161,20 @@ void GameUi::blit(Surface& s, const Texture& t, int dx, int dy, bool flipX, bool
     }
 }
 
-void GameUi::drawPicture(Surface& s, const Texture& t, int x0, int y0, int w, int h) const {
+void GameUi::drawPicture(Surface& s, const Texture& t, int x0, int y0, int w, int h, bool clipped) const {
+    if (clipped)
+        w = std::min(w, t.width), h = std::min(h, t.height);
     if (t.rgba.empty() || w <= 0 || h <= 0)
         return;
     for (int y = 0; y < h; ++y) {
         if (y0 + y < 0 || y0 + y >= s.h)
             continue;
         uint8_t* row = s.row(y0 + y);
-        const int sy = y * t.height / h;
+        const int sy = clipped ? y : y * t.height / h;
         for (int x = 0; x < w; ++x) {
             if (x0 + x < 0 || x0 + x >= s.w)
                 continue;
-            putPixel(row + (x0 + x) * 4, t, size_t(sy) * size_t(t.width) + size_t(x * t.width / w));
+            putPixel(row + (x0 + x) * 4, t, size_t(sy) * size_t(t.width) + size_t(clipped ? x : x * t.width / w));
         }
     }
 }
@@ -234,6 +267,12 @@ const Texture* GameUi::portraitFor(std::string_view sender, std::string_view nat
             return &it->second;
     }
     return icon("logo32");
+}
+
+const Texture* GameUi::officerFace(int index) const {
+    if (index < 0 || size_t(index) >= officerFaces_.size() || officerFaces_[size_t(index)].rgba.empty())
+        return nullptr;
+    return &officerFaces_[size_t(index)];
 }
 
 const Texture* GameUi::objectPortrait(std::string_view name) const {

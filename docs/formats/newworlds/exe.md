@@ -802,6 +802,13 @@ build without crew ("not enough crew"). C7's hub pool of 128 is the 150
 less the five officers and the crews of the starting buildings and
 vehicles.
 
+**Faces.** Each officer has a portrait index in the mission's data, into
+the race's list of 40 small (32 x 32, `ptrt/crew/sm`) and large (64 x 64,
+`ptrt/crew/lg`) pictures; the card and the training list show the small
+one. A message numbered N shows the large picture N - 1 of the same
+list. The list mixes the race's crew, the natives', the other races'
+player faces and a few repeats.
+
 **Life support.** Everyone on the planet uses 16 units a tick of a
 life-support pool (655360); farms add 2048 × their efficiency; the hub
 buys the rest back with power before any other building, (what's
@@ -898,6 +905,31 @@ How a side the computer plays builds and makes units:
   side**. Without a yard the request just waits; only the attack-group
   script objects beam units in. The group sets off once it has them all.
   A human side's pool passes on only requests for worker bees.
+- **The tasks.** An order's task code says what it does: 1 a patrol
+  that loops (back to its first waypoint after its last, for good; with
+  one waypoint it goes there and stays); 2 a sweep, one pass along its
+  waypoints, ready again once it's done (outside modes 3, 5 and 6, only
+  while a hostile, alive, built and uncloaked object stands within 50000
+  across and up of its last waypoint); 3 and 9 builds; 4 a guard of its
+  first waypoint; 5-8 an assault on side 0-3 (task less 5); 10 inert,
+  never ready. Delays apply to tasks 1-3 and 9 (patrols and sweeps in
+  modes 3, 5 and 6 go at once); guards and assaults have none, and an
+  assault is ready only while its target side has anything left.
+- **Legs.** Each unit sets off on the first leg as soon as the group has
+  it; the later legs wait for the whole group. A patrol or sweep in mode
+  5 or 6 ends as a guard at its last waypoint: mode 5 of its side's
+  objects within 30000 across and up of the unit as it gets there, mode
+  6 of itself. A guard in mode 4 protects every object of its side; in
+  modes 2 and 3 it holds its spot, firing at what comes in range. An
+  assault, past its waypoints, goes for the nearest object of its target
+  side, each unit first chasing a live attacker of its own (no fog test),
+  until the side has nothing left.
+- **Messages.** Patrols and sweeps read theirs (`Abort` ends the group);
+  guards and assaults don't read the text, so any message, `Abort`
+  included, triggers them.
+- **Done and lost.** A wiped-out group is followed by another, up to
+  three in all, except in modes 3, 5 and 6; an assault instead waits for
+  a new message.
 - **Nothing else.** No building list, unit production or repairs of the
   AI's own were found; it builds only what its orders say, and rebuilds
   only through task 9. Every side has the same commander, ministries and
@@ -944,7 +976,10 @@ scale: X2 at the start, then X1, then X4, round again; the small map is
 32, 64 or 16 tiles across round the camera (the full-screen one, Tab,
 twice as many). **COMMS** opens the communications panel (a log of the
 messages: one at a time with the sender's portrait and i/n, Delete,
-Done, Mission; again it doesn't close it). **ALLY** lists the other races
+Done, Mission; again it doesn't close it). Its X only hides the panel,
+keeping the log; any new message for the player, COMMS or a chat line
+brings it back (sliding in from the top in F1, from the bottom in F2
+and F3). No key opens it. **ALLY** lists the other races
 in the mission (from its Defence database), each a click to pick
 Friendly, Neutral or Hostile: it sets only the player's posture towards
 that race (through the order queue, as a script's posture switch does),
@@ -971,7 +1006,10 @@ in their list order; an alert lasts 41 Tricorder redraws.
 
 A double click on one of the side's own objects in F1 puts a camera on
 it: behind it at 5 times its model's radius (times distance / 800), 0.8
-radii up, turning as it turns. The distance starts at 1000; Up and Down
+radii up, turning as it turns, and looks at the object's origin with the
+up kept vertical: 9.1 degrees down at any distance (the offset is capped
+at 12288 before the scaling) until 7 / 9 / 1 / 3 move it. The view's
+width doesn't change. The distance starts at 1000; Up and Down
 bring it in and out between 800 and 2000. Numpad 4 / 6 orbit the object,
 7 / 9 raise and 1 / 3 lower the camera; the other arrows and edge
 scrolling do nothing. F1, F2, F3 or Q, or the object's loss, end it.
@@ -1249,6 +1287,14 @@ Types 35 (and 272), 229, 230, 200 and 149 carry a cloaking device:
   seen from the first) and can't fire while fading either way. Once seen
   the count starts again, firing or not, so in a long fight it cycles:
   63 ticks decloaking, 300 firing, 63 cloaking.
+- **How it looks.** Each unit keeps a fade step (0-63) and, for its
+  own side and the others, a pair of 64-entry tables. While it fades,
+  every vertex of its model is thrown a random distance each frame, up
+  to about 100 world units: for the player's own most in the middle of
+  the fade (about 97), for another side's growing to about 98 as it nears
+  cloaked. Fully cloaked or fully seen, it doesn't shimmer. An own unit
+  also gets an opacity of one half plus step / 128, but nothing reads
+  it: cloaked, it is drawn as it is.
 - Cloaked, other sides don't draw it or show it on the Tricorder, and
   every automatic target search passes it by (as it does units dead or
   still being built); a hit still counts if something aims at it. No scan
@@ -1267,9 +1313,17 @@ selection; each unit staggers its start by 0-11 ticks):
 | Assault enemy/location | target kind 2 | brakes and fires at the targets from where it stands; no approach |
 | Attack en route | location kind 2 | moves, and every 8-11 ticks each turret picks the nearest hostile, seen, uncloaked target within the unit's weapon range (or its attacker); never stops or chases |
 | Move without attacking (and a plain click on the ground) | location kind 1 | the same, except that cloaking types (35, 149, 200, 229, 230) don't fire |
-| Protect from location (limited range) | location kind 4 | drives to the spot and holds, firing within weapon range; every 8 ticks, if anything of the side has a live attacker, chases the nearest, then returns |
+| Protect from location (limited range) | location kind 4 | drives to the spot and holds, firing within weapon range; every 8 ticks, if anything of the side has a live attacker, chases the nearest, with no leash, until it dies, cloaks or stops being hostile, then the next, and returns only when none is left |
 | Protect area (mobile shield generator) | target kind 5 | guards the clicked buildings from where it stands; when one is attacked it drives to the attacker, its field with it, and returns; it never fires |
 | Return to vehicle rally point | no order | the unit is handed to the side's field marshal |
+
+**Live attackers.** Each object remembers one attacker: the shooter of
+the last shot at it, replacing the one it has only if nearer. It stays
+"live" until it dies, cloaks, stops being hostile or is being captured;
+no time, distance or fog is tested, so a unit that shot once and drove
+off still counts. Follow and attack ends only when its target fails the
+same test; the 20 ticks without a shot just make it look for a new
+firing position.
 
 Units with nothing to do fire from where they stand at hostiles within
 weapon range, retaliate when they can reach the attacker, and neither
@@ -1357,6 +1411,15 @@ the NEW WORLDS panel, its class picked by type id:
   storage, an unfinished or evacuating building); the hub a roster window
   and a toggle to the colony overview (size, stock, JUMP TO); the sickbay
   and science block a window and an assign button.
+- **The build and vehicle menus** have three cells a page, each 90 x 60;
+  a picture is drawn at its own size, cut to the cell, so the buildings'
+  64-pixel portraits show 64 x 60. They come from the large per-type
+  list, which only these menus use; JUMP TO, the multiselection and the
+  queues use the small 32 x 32 one.
+- **Loading boxes** have no set time: they stay while the loading lasts.
+  The briefing and debriefing wait for their button, with no time-out.
+  The mission report window lists each objective with incomplete,
+  complete or failed, four a page.
 
 ## Still open
 
@@ -1364,6 +1427,5 @@ the NEW WORLDS panel, its class picked by type id:
   each building's model gives its bees to build.
 - How the 50 ms step and the scripts' sixteenths relate.
 - How long bees stay docked (so how fast they carry ore).
-- Placement flags, a third placement phase, the AI order task codes 1,
-  2 and 6-8 (read from the orders' names), and the order modes.
+- Placement flags and a third placement phase.
 - How the player moves officers (the gesture).

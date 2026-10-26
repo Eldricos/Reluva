@@ -931,7 +931,7 @@ std::vector<std::string> MissionSim::problems() const {
             out.push_back("waits: group gathering for " +
                           std::to_string(int(s.legSeconds)) + " s (has " + std::to_string(s.units) + ", " +
                           std::to_string(s.awaited) + " being made; " + why + "): " + orderName(o));
-        } else if (s.gathered && !s.hunting && o.task != 4 && s.units > 0 && s.legSeconds >= kOnLeg &&
+        } else if (s.gathered && !s.hunting && !s.guarding && o.task != 4 && s.units > 0 && s.legSeconds >= kOnLeg &&
                    std::none_of(s.ids.begin(), s.ids.end(), [&](int id) {
                        const Unit* u = world_->unit(id);
                        return u && (u->moving() || u->firing);

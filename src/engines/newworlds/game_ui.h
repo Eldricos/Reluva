@@ -36,13 +36,17 @@ public:
     // Word-wraps text into lines of at most width pixels in the small font.
     std::vector<std::string> wrapSmall(std::string_view text, int width) const;
     // A picture, scaled to w x h, see-through where colour-keyed.
-    void drawPicture(Surface& s, const Texture& t, int x, int y, int w, int h) const;
+    // Scaled to w x h; clipped: at its own size, cut to w x h.
+    void drawPicture(Surface& s, const Texture& t, int x, int y, int w, int h, bool clipped = false) const;
 
     // A message sender's portrait: a crew member for each section (the
     // Romulans' as their recordings show; the others' isn't known: the
     // side's first portraits in turn), the natives'
     // for an incoming message, the side's emblem otherwise.
     const Texture* portraitFor(std::string_view sender, std::string_view natives) const;
+    // An officer's face (its small portrait), by the index the mission
+    // gives it in the race's list of 40 (exe.md#crew-and-efficiency).
+    const Texture* officerFace(int index) const;
     const Texture* icon(std::string_view name) const; // "logo32", "shldicon", "pbattack", "science", ...
     // A building's or vehicle's small portrait by its picture's name
     // ("fhub", "fcy", "fpv"; gui.md#pictures), or none.
@@ -60,6 +64,7 @@ private:
     Texture corner_, border_, wallpaper_;
     std::map<std::string, Texture> icons_;
     std::vector<Texture> crew_;
+    std::vector<Texture> officerFaces_; // the race's 40 (empty where one is missing)
     std::map<std::string, Texture> faces_; // by section, where known
     std::map<std::string, Texture, std::less<>> objects_; // the small building and craft portraits
     std::map<std::string, Texture> natives_;

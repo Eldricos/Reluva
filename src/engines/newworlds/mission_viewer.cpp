@@ -113,10 +113,14 @@ int menuRank(std::string_view id) {
 // whose portrait each slot shows: the hub, the mining stations, the
 // defensive weapons, the defensive artillery, the fighting vehicles.
 constexpr int kJumpRows = 2; // an icon's height, in lines
-constexpr int kMenuIcon = 48;
-constexpr int kTricorderTiles = 16;
+// The build and vehicle menus' portraits: at their own size, cut to the
+// game's 64 x 60 (its cells are 90 x 60).
+constexpr int kMenuIconW = 64, kMenuIcon = 60;
+constexpr int kTricorderTiles = 16; // tiles across the small Tricorder at its closest (X4)
 constexpr float kEdgeRamp = 80, kEdgeTop = 6400; // edge scrolling, units a tick
-constexpr int kAlertTicks = 41; // how long a hit object stays among Space's alerts (Reluva's: the game's 41 Tricorder redraws) // tiles across the small Tricorder at its closest (X4) // the menus' portraits (the game's are 64 x 60)
+// How long a hit object stays among Space's alerts (Reluva's: the game's 41
+// Tricorder redraws).
+constexpr int kAlertTicks = 41;
 constexpr int kJumpIcons[3][5] = {{23, 45, 80, 83, 56}, {28, 52, 54, 82, 40}, {43, 65, 81, 84, 64}};
 
 constexpr Color kHeadingColor{255, 220, 90};
@@ -704,14 +708,16 @@ void MissionViewer::showUnits() {
     if (world_)
         for (const Unit& u : world_->units())
             if (!u.building && !u.kind.model.empty() && visible(u)) {
-                // A cloaking unit fades over its 63 ticks; the side's own,
-                // cloaked, stays faintly seen, as the game draws them.
-                constexpr float kCloaked = 0.35f;
-                const float faded = 1 - (1 - kCloaked) * float(63 - u.fading) / 63;
-                const float opacity = u.cloaked ? kCloaked
-                                      : u.fading > 0 ? (u.cloaking ? faded : 1 - (1 - kCloaked) * float(u.fading) / 63)
-                                                     : 1.0f;
-                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, opacity});
+                // A cloaking unit shimmers over its 63-tick fades, then is
+                // drawn as it is (the side's own; others' are gone): its
+                // own side's most at the middle of a fade, another side's
+                // most as it nears cloaked (exe.md#cloaking).
+                float shimmer = 0;
+                if (u.fading > 0) {
+                    const float towards = float(u.cloaking ? 63 - u.fading : u.fading) / 63;
+                    shimmer = u.slot == playerSlot_ ? 97 * std::sin(3.14159265f * towards) : 98 * towards;
+                }
+                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, shimmer});
             }
     // The colony's bees out of the hub: flying (rising off and settling
     // back down), or docked at a mine or the processor; those at work on a
@@ -2508,7 +2514,7 @@ void MissionViewer::drawInterface() {
                     buttons_.push_back({x + 6, cy, w - 12, lh, "course" + std::to_string(i)});
             }
         } else if (staffView_) {
-            // The officers' cards: a portrait by their section, then rank
+            // The officers' cards: each one's own face, then rank
             // and name, section and skill, and where they are. A click picks
             // one: the next of the colony's buildings or vehicles clicked
             // takes them.
@@ -2523,13 +2529,7 @@ void MissionViewer::drawInterface() {
             for (size_t i = 0; i * 3 < cards.size(); ++i) {
                 const int cy = ty + lh * int(1 + i * 3);
                 const auto& o = fieldWork_->officers()[i];
-                const int sp = o.officer->speciality;
-                if (const Texture* face = ui_.portraitFor(sp == 1   ? "Engineering"
-                                                          : sp == 2 ? "Security"
-                                                          : sp == 3 ? "Medical"
-                                                          : sp == 4 ? "Science"
-                                                                    : "Operations",
-                                                          {}))
+                if (const Texture* face = ui_.officerFace(o.officer->face))
                     ui_.drawPicture(screen_, *face, x + 8, cy, lh * 3 - 2, lh * 3 - 2);
                 for (int k = 0; k < 3; ++k)
                     ui_.drawSmall(screen_, x + 12 + lh * 3, cy + lh * k, cards[i * 3 + size_t(k)],
@@ -2879,28 +2879,28 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
         const Item& it = items[size_t(i)];
         const int ix = x + 10;
         if (const Texture* t = ui_.objectPortrait(it.portrait))
-            ui_.drawPicture(screen_, *t, ix, iy, kMenuIcon, kMenuIcon * 60 / 64);
+            ui_.drawPicture(screen_, *t, ix, iy, kMenuIconW, kMenuIcon, true);
         const bool flash = menuFlash_.first == i && nowMs_ - menuFlash_.second < 300;
         const bool over = mouseX_ >= ix && mouseX_ < x + w - 6 && mouseY_ >= iy && mouseY_ < iy + kMenuIcon;
         if (over)
             shown = i;
         const Color frame = flash ? Color{255, 60, 255} : over ? bright : dim;
-        for (int xx = ix - 1; xx <= ix + kMenuIcon; ++xx)
+        for (int xx = ix - 1; xx <= ix + kMenuIconW; ++xx)
             for (int yy : {iy - 1, iy + kMenuIcon})
                 if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
                     uint8_t* px = screen_.row(yy) + xx * 4;
                     px[0] = frame.r, px[1] = frame.g, px[2] = frame.b;
                 }
         for (int yy = iy - 1; yy <= iy + kMenuIcon; ++yy)
-            for (int xx : {ix - 1, ix + kMenuIcon})
+            for (int xx : {ix - 1, ix + kMenuIconW})
                 if (xx >= 0 && yy >= 0 && xx < screen_.w && yy < screen_.h) {
                     uint8_t* px = screen_.row(yy) + xx * 4;
                     px[0] = frame.r, px[1] = frame.g, px[2] = frame.b;
                 }
         ui_.drawSmall(screen_, ix + 2, iy + 1, std::to_string((i + 1) % 10), bright);
         int ny = iy;
-        for (const std::string& l : ui_.wrapSmall(it.name, w - kMenuIcon - 26)) {
-            ui_.drawSmall(screen_, ix + kMenuIcon + 6, ny, l, !it.open ? dim : it.pays ? bright : text);
+        for (const std::string& l : ui_.wrapSmall(it.name, w - kMenuIconW - 26)) {
+            ui_.drawSmall(screen_, ix + kMenuIconW + 6, ny, l, !it.open ? dim : it.pays ? bright : text);
             ny += lh;
         }
         buttons_.push_back({ix, iy, w - 16, kMenuIcon, "menu-item" + std::to_string(i)});

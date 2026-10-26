@@ -18,7 +18,6 @@ namespace {
 constexpr float kBlock = 16384;
 // Placeholders (not found in the executable): how far guards go after
 // what comes near their spot, and how near a waypoint counts as reached.
-constexpr float kGuardReach = 2 * kBlock;
 constexpr float kArrived = 0.6f * kBlock;
 // Units placed on one spot stand this far apart, and this far out from a
 // building there.
@@ -224,8 +223,49 @@ std::pair<float, float> AiSides::wayPoint(const NpcOrder& o, int leg) const {
 
 void AiSides::queue(const NpcOrder& o) {
     running_.push_back(Running{&o, {}});
-    if (clock_ >= o.delay)
+    if (ready(running_.back()))
         fire(running_.back());
+}
+
+// Whether an order may start now (exe.md#ai-colonies): its delay passed
+// (patrols, sweeps and builds; guards and assaults have none); a sweep
+// (task 2, but for modes 3, 5 and 6) only with an enemy within 50000 of
+// its last waypoint; an assault only while its target side has anything
+// left; task 10 never.
+bool AiSides::ready(const Running& r) const {
+    const NpcOrder& o = *r.order;
+    if (o.task == 10)
+        return false;
+    const bool quick = o.mode == 3 || o.mode == 5 || o.mode == 6;
+    if ((o.task <= 3 || o.task == 9) && clock_ < o.delay && !(quick && o.task <= 2))
+        return false;
+    if (o.task == 2 && !quick && o.ways > 0) {
+        const auto [lx, ly] = wayPoint(o, o.ways - 1);
+        return std::any_of(world_.units().begin(), world_.units().end(), [&](const Unit& v) {
+            return v.hp > 0 && v.built >= 1 && !v.cloaked && world_.stance(o.slot, v.slot) == 3 &&
+                   std::abs(v.x - lx) <= 50000 && std::abs(v.y - ly) <= 50000;
+        });
+    }
+    if (o.task >= 5 && o.task <= 8)
+        return std::any_of(world_.units().begin(), world_.units().end(),
+                           [&](const Unit& v) { return v.slot == o.task - 5 && v.hp > 0; });
+    return true;
+}
+
+// Ready again for a new group: after a sweep's pass, or a group lost (up to
+// three groups in all, but for modes 3, 5 and 6; an assault waits for a
+// new message instead).
+void AiSides::rearm(Running& r) {
+    const NpcOrder& o = *r.order;
+    const bool quick = o.mode == 3 || o.mode == 5 || o.mode == 6;
+    const bool lost = r.units.empty();
+    if (lost && (quick || ++r.groups >= 3 || (o.task >= 5 && o.task <= 8))) {
+        r.done = true;
+        return;
+    }
+    const int groups = r.groups;
+    r = Running{r.order, {}};
+    r.groups = groups;
 }
 
 // An order's time has come: a build tries its spot; a group gathers its
@@ -249,6 +289,10 @@ void AiSides::fire(Running& r) {
             const float angle = float(n) * 1.1f;
             const auto [sx, sy] = openSpot(x + std::cos(angle) * kSpacing, y + std::sin(angle) * kSpacing);
             r.units.push_back(spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, sx, sy, {}));
+            if (o.ways > 0) {
+                const auto [wx, wy] = wayPoint(o, 0);
+                world_.moveTo(r.units.back(), wx, wy);
+            }
         }
     }
     gather(r);
@@ -273,8 +317,15 @@ void AiSides::gather(Running& r) {
         if (u.slot == o.slot && u.type == o.type && !u.building && !busy.count(u.id))
             idle.push_back({wx < 0 ? 0 : std::hypot(u.x - wx, u.y - wy), u.id});
     std::sort(idle.begin(), idle.end());
-    for (size_t i = 0; i < idle.size() && int(r.units.size()) + r.awaited < o.count; ++i)
+    // Each unit sets off on the first leg as soon as it's the group's; the
+    // later legs wait for all of them.
+    for (size_t i = 0; i < idle.size() && int(r.units.size()) + r.awaited < o.count; ++i) {
         r.units.push_back(idle[i].second);
+        if (wx >= 0 && o.ways > 0) {
+            const float angle = float(r.units.size()) * 2.4f, off = float(r.units.size() > 1) * kSpacing;
+            world_.moveTo(idle[i].second, wx + std::cos(angle) * off, wy + std::sin(angle) * off);
+        }
+    }
     auto colony = colonies_.find(o.slot);
     const VehicleType* v = vehicleType(o.type);
     while (colony != colonies_.end() && v && int(r.units.size()) + r.awaited < o.count &&
@@ -410,7 +461,9 @@ bool AiSides::order(const std::string& side, const std::string& text) {
             found = o;
     if (!found)
         return false;
-    if (abort) {
+    // An abort ends a patrol's or sweep's group, or disarms a build; a guard
+    // or an assault doesn't read its message: any is a trigger to it.
+    if (abort && !(found->task == 4 || (found->task >= 5 && found->task <= 8))) {
         for (Running& r : running_)
             if (r.order == found)
                 r.done = true;
@@ -430,20 +483,44 @@ void AiSides::stance(const std::string& side, const std::string& verb) {
         world_.setStance(slot, player_, p);
 }
 
-// An order's units each second: each to its leg's waypoint, unless it's
-// fighting; when they're all there, the next leg (a patrol round again).
-// Assaults past their last leg go for the nearest enemy; guards for what
-// comes near.
+// An order's units each second (exe.md#ai-colonies): each to its leg's
+// waypoint, unless it's fighting; when they're all there, the next leg. At
+// the end a looping patrol (task 1) goes round again, a sweep (2) lets its
+// units go and waits to sweep again, a patrol or sweep in mode 5 or 6
+// becomes a guard there, and an assault (5-8) goes for its target side,
+// nearest first, each unit dealing first with what attacks it. A guard
+// (4) goes to its spot and holds it (mode 4: protecting all its side).
 void AiSides::steer(Running& r) {
     const NpcOrder& o = *r.order;
     r.units.erase(std::remove_if(r.units.begin(), r.units.end(), [&](int id) { return !world_.unit(id); }),
                   r.units.end());
-    // A group wiped out is over.
-    if (r.units.empty())
-        r.done = true;
-    if (r.units.empty() || o.ways == 0)
+    // A group wiped out: another tried, up to three.
+    if (r.units.empty()) {
+        rearm(r);
         return;
-    const bool guard = o.task == 4, patrol = o.task == 1 || o.task == 2;
+    }
+    if (o.ways == 0 || r.guarding)
+        return;
+    auto spread = [&](int n, float x, float y) {
+        const float angle = float(n) * 2.4f, off = float(n > 1) * kSpacing;
+        return std::pair{x + std::cos(angle) * off, y + std::sin(angle) * off};
+    };
+    // A guard holds its spot: mode 4 protecting every object of its side
+    // (after their live attackers, anywhere), modes 2 and 3 firing at what
+    // comes in range.
+    if (o.task == 4) {
+        const auto [wx, wy] = wayPoint(o, 0);
+        int n = 0;
+        for (int id : r.units) {
+            const auto [tx, ty] = spread(++n, wx, wy);
+            world_.moveTo(id, tx, ty);
+            if (o.mode == 4)
+                world_.protect({id});
+        }
+        r.guarding = true;
+        return;
+    }
+    const bool patrol = o.task == 1 || o.task == 2;
     auto [wx, wy] = wayPoint(o, r.leg);
     float cx = 0, cy = 0;
     bool allThere = true;
@@ -456,50 +533,70 @@ void AiSides::steer(Running& r) {
             allThere = false;
     }
     // (A leg's first seconds don't count: its units are only setting off.)
-    if (!guard && allThere && !r.hunting && r.legClock >= 2) {
+    if (allThere && !r.hunting && r.legClock >= 2) {
         r.legClock = 0;
         if (r.leg + 1 < o.ways) {
             ++r.leg;
         } else if (o.slot == player_) {
             r.done = true; // the player's units, placed, are theirs again
             return;
-        } else if (patrol)
+        } else if (patrol && (o.mode == 5 || o.mode == 6)) {
+            // A guard there: mode 5 of its side's objects within 30000 of
+            // each unit as it gets there, mode 6 of itself.
+            for (int id : r.units) {
+                const Unit& u = *world_.unit(id);
+                std::vector<int> them;
+                if (o.mode == 6)
+                    them = {id};
+                else
+                    for (const Unit& v : world_.units())
+                        if (v.slot == o.slot && v.hp > 0 && std::abs(v.x - u.x) <= 30000 && std::abs(v.y - u.y) <= 30000)
+                            them.push_back(v.id);
+                world_.protect({id}, them);
+            }
+            r.guarding = true;
+            return;
+        } else if (o.task == 1) {
+            if (o.ways == 1) { // one waypoint: there it stays
+                r.guarding = true;
+                return;
+            }
             r.leg = 0;
-        else
+        } else if (o.task == 2) {
+            rearm(r); // its units let go; it sweeps again when it's ready
+            return;
+        } else {
             r.hunting = true;
+        }
         std::tie(wx, wy) = wayPoint(o, r.leg);
     }
-    // What to go for: an assault's nearest enemy at the end of its route;
-    // a guard's, near its spot.
+    // An assault's prey: the nearest object of its target side.
     const Unit* prey = nullptr;
-    if (r.hunting || guard) {
-        float best = r.hunting ? 1e30f : kGuardReach;
+    if (r.hunting) {
+        float best = 1e30f;
         for (const Unit& v : world_.units())
-            if (world_.prey(o.slot, v.slot) && v.hp > 0 && !v.cloaked && v.built >= 1) {
-                const float d = r.hunting ? std::hypot(v.x - cx, v.y - cy) : std::hypot(v.x - wx, v.y - wy);
-                if (d < best)
+            if (v.slot == o.task - 5 && v.hp > 0 && !v.cloaked && v.built >= 1)
+                if (const float d = std::hypot(v.x - cx, v.y - cy); d < best)
                     best = d, prey = &v;
-            }
+        if (!prey) { // nothing left of it: over
+            r.done = true;
+            return;
+        }
     }
     int n = 0;
     for (int id : r.units) {
         Unit& u = *world_.unit(id);
         ++n;
-        // A guard drawn too far from its spot goes back.
-        if (guard && std::hypot(u.x - wx, u.y - wy) > 2 * kGuardReach) {
-            world_.moveTo(id, wx, wy);
-            continue;
-        }
         if (u.firing || (u.ordered && u.target))
             continue;
-        if (prey) {
-            world_.attack({id}, prey->id);
+        if (r.hunting) {
+            const Unit* a = world_.liveAttacker(u);
+            world_.attack({id}, a ? a->id : prey->id);
             continue;
         }
         if (u.moving())
             continue;
-        const float angle = float(n) * 2.4f, off = float(n > 1) * kSpacing;
-        const float tx = wx + std::cos(angle) * off, ty = wy + std::sin(angle) * off;
+        const auto [tx, ty] = spread(n, wx, wy);
         if (std::hypot(u.x - tx, u.y - ty) > kSpacing)
             world_.moveTo(id, tx, ty);
     }
@@ -519,7 +616,7 @@ void AiSides::advance(double seconds) {
             if (r.done)
                 continue;
             if (!r.started) {
-                if (clock_ >= r.order->delay)
+                if (ready(r))
                     fire(r);
             } else if (r.order->task == 9 || r.order->task == 3) {
                 build(r);
@@ -630,7 +727,7 @@ std::vector<AiSides::OrderStatus> AiSides::status() const {
             case PlaceFail::None: break;
             }
         }
-        out.push_back({r.order, r.started, r.gathered, r.hunting, int(r.units.size()), r.awaited, r.leg,
+        out.push_back({r.order, r.started, r.gathered, r.hunting, r.guarding, int(r.units.size()), r.awaited, r.leg,
                        r.gathered ? r.legClock : r.clock, r.site, blocker, refusal, r.units});
     }
     return out;

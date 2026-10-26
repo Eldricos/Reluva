@@ -931,7 +931,7 @@ void MapViewer::render() {
     // about origin; ground is the tile it is, for terrain codes, or null.
     auto drawModel = [&](const TileModel& m, const Vec& origin, float c, float s, const GmfMap::Tile* ground,
                          const uint8_t* tint = nullptr, float scale = 1, float rise = 1, const Pose* pose = nullptr,
-                         float opacity = 1) {
+                         float opacity = 1, float shimmer = 0) {
         for (size_t fi = 0; fi < m.geo.faces.size(); ++fi) {
             const auto& face = m.geo.faces[fi];
             const auto& verts = m.geo.parts[face.part].vertices;
@@ -941,7 +941,16 @@ void MapViewer::render() {
             const Vec3 fn = pp ? pp->turn(m.faceNormals[fi]) : m.faceNormals[fi];
             poly.clear();
             for (const auto& corner : face.corners) {
-                const Vec3 v = pp ? pp->apply(verts[corner.vertex]) : verts[corner.vertex];
+                Vec3 v = pp ? pp->apply(verts[corner.vertex]) : verts[corner.vertex];
+                if (shimmer > 0) { // the same throw for a corner each face shares
+                    auto jitter = [&](uint32_t k) {
+                        uint32_t h = (uint32_t(corner.vertex) * 2654435761u) ^ (shimmerFrame_ * 40503u) ^ (k * 97u) ^
+                                     uint32_t(face.part) * 7919u;
+                        h ^= h >> 15, h *= 2246822519u, h ^= h >> 13;
+                        return (float(h & 0xffff) / 32767.5f - 1) * shimmer / scale;
+                    };
+                    v.x += jitter(1), v.y += jitter(2), v.z += jitter(3);
+                }
                 const float x = (c * v.x - s * v.y) * scale, y = (s * v.x + c * v.y) * scale;
                 // For terrain codes, (u, v) is the position across the
                 // tile, in map orientation.
@@ -1148,7 +1157,7 @@ void MapViewer::render() {
         if (u.turretYaw != 0 || u.gunPitch != 0)
             if (const Motion& motion = motionOf(u.model); motion.turret)
                 pose = turretPose(m.geo, motion.mdl, u.turretYaw, u.gunPitch);
-        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose, u.opacity);
+        drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose, 1, u.shimmer);
     }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
     // close the gap with flat, unlit quads. The game draws something there

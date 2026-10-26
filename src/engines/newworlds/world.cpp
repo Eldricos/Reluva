@@ -55,9 +55,8 @@ constexpr float kBuildingRadius = 6000, kVehicleRadius = 1000;
 // Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
 constexpr int kCloakAfter = 300, kCloakFade = 63;
 // Protecting (exe.md#orders): how often it looks for an attack on the
-// side, and how lately an object must have been hit to count (Reluva's:
-// the game asks whether its attacker is still about).
-constexpr int kProtectEvery = 8, kUnderAttack = 100;
+// side (an object counts as attacked while its attacker is live).
+constexpr int kProtectEvery = 8;
 
 // Whether a unit keeps driving while it fires: one moving on the
 // player's move or attack-en-route order (a cloaking unit not on a move).
@@ -560,7 +559,8 @@ void World::combatTick() {
         // A line blocked: one it chose (or an AI's) it gives up (it looks
         // again); one the player told it to attack it drives after, as
         // out of range.
-        const bool blocked = !clear(u, *t);
+        // (Out of range, the line doesn't matter yet: it drives after it.)
+        const bool blocked = inRange(u, *t) && !clear(u, *t);
         if (blocked && (!u.ordered || u.ai)) {
             u.target = 0, u.firing = false, u.burstLeft = 0;
             continue;
@@ -644,7 +644,9 @@ void World::combatTick() {
 // side (or of the buildings it guards) while one is about; back to its
 // spot once none is.
 void World::protectTick(Unit& u) {
-    if (Unit* c = u.chasing ? unit(u.chasing) : nullptr; c && c->hp > 0 && !c->cloaked) {
+    // Chasing an attacker: until it fails the game's target test (gone,
+    // cloaked, unbuilt, no longer hostile); no leash.
+    if (Unit* c = u.chasing ? unit(u.chasing) : nullptr; c && c->hp > 0 && !c->cloaked && stance(u.slot, c->slot) == 3) {
         if (u.weapon.kind == WeaponKind::None && (u.path.empty() || std::hypot(u.path.back().first - c->x,
                                                                                u.path.back().second - c->y) > kTile))
             u.path = findPath(u.x, u.y, c->x, c->y); // a shield generator brings its field along
@@ -654,11 +656,11 @@ void World::protectTick(Unit& u) {
     const Unit* nearest = nullptr;
     float best = 1e30f;
     for (const Unit& v : units_) {
-        if (v.slot != u.slot || v.hp <= 0 || tick_ - v.attackedTick > kUnderAttack)
+        if (v.slot != u.slot || v.hp <= 0)
             continue;
         if (u.order == UnitOrder::ProtectArea && std::find(u.protects.begin(), u.protects.end(), v.id) == u.protects.end())
             continue;
-        if (const Unit* a = unit(v.lastAttacker); a && a->hp > 0 && !a->cloaked && a->slot != u.slot)
+        if (const Unit* a = liveAttacker(v))
             if (const float d = std::hypot(a->x - u.x, a->y - u.y); d < best)
                 best = d, nearest = a;
     }
@@ -672,7 +674,7 @@ void World::protectTick(Unit& u) {
         }
         return;
     }
-    if (!u.moving() && !u.firing && std::hypot(u.x - u.holdX, u.y - u.holdY) > kTile) {
+    if (!u.moving() && !u.firing && std::hypot(u.x - u.holdX, u.y - u.holdY) > 256) {
         u.target = 0, u.ordered = false;
         setPath(u.id, findPath(u.x, u.y, u.holdX, u.holdY));
     }
@@ -747,7 +749,11 @@ void World::fire(Unit& u, Unit& t) {
     }
     projectiles_.push_back(p);
     // The target's turrets learn who fired at them.
-    t.lastAttacker = u.id;
+    // The target records its attacker: a new one replaces the one it has
+    // only if nearer (or that one is no longer live).
+    if (const Unit* now = liveAttacker(t);
+        !now || std::hypot(u.x - t.x, u.y - t.y) < std::hypot(now->x - t.x, now->y - t.y))
+        t.lastAttacker = u.id;
     WorldEvent e;
     e.kind = WorldEvent::Shot;
     e.from = u.id, e.to = t.id;
@@ -758,6 +764,13 @@ void World::fire(Unit& u, Unit& t) {
 }
 
 float World::groundAt(float x, float y) const { return terrain_.heightAt ? terrain_.heightAt(x, y) : 0; }
+
+const Unit* World::liveAttacker(const Unit& v) const {
+    const Unit* a = v.lastAttacker ? unit(v.lastAttacker) : nullptr;
+    if (!a || a->hp <= 0 || a->built < 1 || a->cloaked || stance(v.slot, a->slot) != 3)
+        return nullptr;
+    return a;
+}
 
 float World::radiusOf(const Unit& u) const {
     if (u.radius <= 0)
@@ -848,8 +861,6 @@ void World::flyProjectiles() {
             if (hit->built >= 1)
                 hit->hp -= damage_ ? damage_(*hit, p.damage) : p.damage;
             hit->attackedTick = tick_;
-            if (hit->lastAttacker == 0 || !unit(hit->lastAttacker))
-                hit->lastAttacker = p.from;
             WorldEvent e;
             e.kind = WorldEvent::Hit;
             e.from = p.from, e.to = hit->id;

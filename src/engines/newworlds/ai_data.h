@@ -134,6 +134,7 @@ struct Officer {
     int speciality;
     float skill;
     bool train;     // may train (a band up, once a mission)
+    int face;       // its portrait in its race's list (GameUi::officerFace)
 };
 std::vector<const Officer*> officers(std::string_view mission, int slot);
 
