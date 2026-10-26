@@ -1,14 +1,15 @@
 # Star Trek: New Worlds: what to collect in the game
 
-A checklist for playing the original game in the VM to fill the gaps the
-recordings left (the open questions of the [play-*.md](play.md) pages and the
-format pages, and the steps the mission scripts infer). Highest value first.
+A checklist for playing the original game in the VM, cut down to what the
+executable and the game's data can't answer: what only shows on the screen
+(which message number is which, who destroys what, a few models) and a few
+figures the code gives only roughly. Everything else the earlier lists asked
+for is now read from the executable and the mission data
+([exe.md](exe.md), [game.md](game.md)). Highest value first.
 
-**Have running:** screen recording with sound (the briefings' clips are
-matched by audio, so leave game sound on and talk over nothing), and the
-Tricorder panel visible so its position readout is in every frame. Start
-each mission from the campaign screen so the loading box and the whole
-briefing are recorded; don't press NEXT during briefings.
+**Have running:** screen recording with sound, and the Tricorder panel
+visible so its position readout is in every frame. Start each mission from
+the campaign screen.
 
 **Conventions:** map positions `<a:b>` are eighths of a block, row first
 (0-511 on a 64-block map; a block's middle is 8n + 4), as the Tricorder
@@ -19,238 +20,118 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 
 ## 1. Game-wide mechanics
 
-- **Compass and row 0** [shot]: at any start, point the camera along the
-  compass's north and read the Tricorder at two points along that line;
-  note which way row numbers grow. ([gmf.md](gmf.md#map-positions-in-the-game))
-- **Other sites** [shot]: read the Tricorder over the places messages name:
-  K1 Taubat temple and the four groups of ruins (R1 too), R9 Federation and
-  Klingon bases, J4R Klingon arsenal, C11 Hubrin fortress, J2 transporter
-  (F/R read <112:280>, K <112:260>). ([play-r1.md](play-r1.md),
-  [play-r9.md](play-r9.md), [play-j4r.md](play-j4r.md),
-  [play-c11.md](play-c11.md), [play-j2r.md](play-j2r.md))
+- **Compass and row 0** [shot]: the data says rows grow northward and the
+  default camera looks north; one screenshot of the compass strip with the
+  camera looking up-screen, to see which letter it shows.
+  ([gmf.md](gmf.md#map-positions-in-the-game))
 - **Tricorder mineral rule** [shot]: over one kind-1 (dilithium) block,
   hover the main view at high and at ground-level camera, then the relief
-  inset; note when the ore name appears instead of plain terrain. Repeat on
-  a kind-2 block (talgonite, J3R) and a kind-5 block with the whole readout
-  in frame (magnesite: C11, J6R <200:253>, <212:254>, R9).
-  ([play-j9r.md](play-j9r.md), [play-c11.md](play-c11.md), [gmf.md](gmf.md#resource-deposits))
-- **Build times** [rec]: how long each building takes to go up is the one
-  economy figure the executable doesn't fix (its bees build it); the
-  Federation's are timed ([play-vm-tutorials.md](play-vm-tutorials.md)).
-  Still wanted: a Klingon and a Romulan building or two, a defence (turret
-  or artillery) and a shield generator (Reluva guesses 40 s for both, and
-  for the AI's), and whether more construction bees build faster.
-  ([exe.md](exe.md#the-economy))
-- **Unit speeds** [rec]: send a ground scout and a tank a known distance
-  over flat ground (read the Tricorder at both ends) and time it: the
-  executable gives each type's pace in path steps but not a step's
-  length. ([exe.md](exe.md#vehicles-and-turrets))
-- **Power** [shot]: COLONY DETAILS before and after a generator is built,
-  to check the power rules read from the executable
-  ([exe.md](exe.md#the-economy)).
-- **Camera** [rec]: lowest and highest heights, whether the view follows a
-  selection (the keys are confirmed by C1), and whether the camera can be
-  scrolled over blocks you haven't seen yet or is held to the seen ones
-  (try scrolling into the black at a mission's start).
-  ([play-tutorials.md](play-tutorials.md#open-questions))
-- **Shield cover** [rec]: what turns a building's shield cover from BASIC to
-  HIGH (J9R between 7:49 and 11:03). ([play-j9r.md](play-j9r.md))
-
-- **Left alone** [rec]: start F1 and touch nothing for 15 minutes, the
-  camera on the hub. When does the first Klingon attack come, and do the
-  attacks keep coming until the colony falls (Reluva's does now, at about
-  13 minutes)? Do they stop to fight the Taubat on the way?
-  ([exe.md](exe.md#ai-colonies))
-- **Order timing** [rec]: in the same run, note the time of every Klingon
-  group setting off; the orders' delays are in sixteenths of something,
-  and these times pin how the game's 50 ms step and the scripts' clock
-  relate. ([exe.md](exe.md#still-open))
-- **Bees at work** [rec]: follow a cargo bee from a mine to the processor
-  and back: how long it stays docked at each end and how much ore the
-  stock gains per trip. ([exe.md](exe.md#docking))
-- **Transports** [rec]: build something far from the hub and watch the
-  unarmed APC bring its crew: which side of the building it stops at,
-  how far off, and how long it waits. ([exe.md](exe.md#transports))
-- **Roll-out and demolition** [rec]: the time from the vehicle yard's bar
-  filling to the tank rolling out; and from DEMOLISH to the building
-  gone, and to its crew being back in the hub's pool (COLONY DETAILS).
-- **Placement** [shot]: can buildings be turned when placed (does the
-  hologram rotate)? Then park a tank on a free spot and move the hologram
-  towards it: how close can it come before the hologram turns red?
-  ([exe.md](exe.md#building-placement))
-- **Turning to fire** [rec]: order a tank to attack something straight
-  behind it: does it turn on the spot, and how long does a half turn take?
-- **Groups** [shot]: send six tanks to one point and screenshot them from
-  above when they've stopped: how far apart they stand.
-- **Scans and officers** [rec]: how close a science vehicle drives before
-  a scan starts; a scan of something no mission cares about (how long
-  until the reply); and how an officer is moved into a vehicle or
-  building (drag of the card? a click and then the target?).
-  ([exe.md](exe.md#scans-and-captures))
-- **Repairs at the start** [shot]: COLONY DETAILS (or the hub's panel) at
-  the very start of a mission: is there a repair pool or value already?
-- **Animation speed** [rec]: ten seconds of a working building's
-  animation (a generator or the processor) close up, to count its
-  frames a second (Reluva plays 10). ([arf.md](arf.md))
+  inset; note when the ore name appears instead of plain terrain.
+  ([gmf.md](gmf.md#resource-deposits))
+- **Build times** [rec]: the executable gives how the bees build (tiles,
+  four sections at once) but its time a tile doesn't match the Federation's
+  timed builds. Time one Klingon or Romulan building (a power generator or
+  vehicle yard) and one defence from the order to finished, with four
+  construction bees; and the same building with one bee.
+  ([exe.md](exe.md#bees))
 
 ## 2. Buildings and units (model matching)
 
 Select each item and screenshot it close up, from two sides, with the
 selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
-- **Federation** [shot]: power generator, advanced generator, mining
-  station (close), photon turret, defence artillery, shield generator,
-  landing pad, food storage. ([play-f1.md](play-f1.md#buildings-and-their-models))
-- **Romulan buildings** [shot]: most are matched now by their panel
-  portraits ([colony.md](colony.md#romulan-matches)); still to confirm close
-  up: the order of the two hub upgrades (`rch_b` tower first, `rch_c`
-  spiked plate second?), the utility hospital upgrade (`ruh_b`?), the
+- **Federation** [shot]: the storage facility and the Klingon defensive
+  artillery (their building models are guesses: `prost`, `kdwsp`), and the
+  power generator, advanced generator, mining station, photon turret,
+  defence artillery, shield generator and landing pad close up.
+  ([play-f1.md](play-f1.md#buildings-and-their-models))
+- **Romulan buildings** [shot]: the order of the two hub upgrades
+  (`rch_b` tower first, `rch_c` spiked plate second?: the data names them
+  but not their models), the utility hospital upgrade (`ruh_b`?), and the
   transporter pad (`rbcs`), shield generator (`rcss`), static disruptor
-  (`rdds`) and photon defense (`rpds`) on the ground rather than by portrait,
-  and the security centre (`risb`, never selected; is it J7R's tall finned
-  tower?). ([play-r1.md](play-r1.md), [play-r2.md](play-r2.md),
-  [play-j7r.md](play-j7r.md))
-- **Romulan units** [shot]: the cloaked assault vehicle (full name, and
-  whether it is `rapc` drawn cloaked), the surveillance squad (same portrait
-  as the ground scout: the same craft?), the six starting units of J4R
-  (forked icons: tanks?). ([play-j6r.md](play-j6r.md), [play-j4r.md](play-j4r.md))
-- **Natives** [shot]: Metar temple and starship (`mss`); the Taubat phaser
-  turret (`tsg`?); the Hubrin guide (`h`?) and the magenta map marker
-  (J7R); Orion units (C11; `odv`?); what R2's black many-legged unit at
-  36:30 is (only pale `ta` artillery craft and their dark shadows found).
-  Settled: Metar colony core and spires `mch`, active portal `mport`, the
-  grey slashed pods `th`, Taubat hangar `tw`, Taubat temple `tt`, R9's
-  device `mad` (likely). ([play-r12.md](play-r12.md), [play-r14.md](play-r14.md), [play-j7r.md](play-j7r.md), [play-c11.md](play-c11.md))
-- **Klingon buildings** [shot]: the shield generator (Reluva uses `ksg`;
-  play-k1.md read it as a gun), and an AI colony's mining station: does it
-  stand on a deposit (J-missions' Klingon colonies)?
-  ([play-k1.md](play-k1.md))
+  (`rdds`) and photon defense (`rpds`) on the ground. ([colony.md](colony.md#romulan-matches))
+- **Natives** [shot]: R2's black many-legged unit at 36:30 (an Orion tank
+  `odv` or a Taubat tank `tgp`?), and J7R's magenta map marker.
+  ([play-r2.md](play-r2.md), [play-j7r.md](play-j7r.md))
+- **Klingon buildings** [shot]: an AI colony's mining station in a joint
+  mission: does it stand on a deposit? ([play-k1.md](play-k1.md))
 
 ## 3. Interface
 
-- **Difficulty and Cadet mode** [rec]: start the same mission at each
-  difficulty and with Cadet mode; note starting stock, size and enemy
-  strength. ([play-tutorials.md](play-tutorials.md#main-menu-and-setup-screens))
-- **Panels never opened** [shot]: Multiplayer setup, and in play the
-  COMMAND objective list at start, midway and end (K1, R1, C11), plus the
-  campaign missions' MISSION REPORT pages (About and the training
-  missions' reports are seen now). Note the report's first line on a
-  win and on a loss: whether it is the same fixed line in every mission
-  or the mission's own. ([play-k1.md](play-k1.md#still-to-look-at), [play-r1.md](play-r1.md))
-- **Portraits per officer** [shot]: the cards' faces now come from the
-  executable (each officer's own). Still to check: open COMMUNICATIONS on
-  a few messages and note each one's number (`i/n`) and face, to confirm
-  a message's face follows its number rather than its section (J1R, J2R,
-  R9, R12 and any Federation or Klingon mission). ([gui.md](gui.md))
-- **Cloaked units** [rec]: in a Klingon or Romulan mission, record your own
-  cloaking unit close up as it cloaks and decloaks: is it see-through
-  once cloaked, or solid, and does it shimmer while fading? The same for
-  an enemy one if you see it go. ([exe.md](exe.md#cloaking))
-- **Tricorder colours** [shot]: the full-screen Tricorder (Tab) over each
-  ore kind, for the colours it uses (not found in the executable).
-- **Bonus loading box** [shot]: does C9's and C10's loading box name a bonus
-  mission like C11's? ([play-c11.md](play-c11.md))
+- **Multiplayer setup** [shot]: the multiplayer screens, never opened.
 - **The star in star-system views** [shot]: in each briefing's star-system
   view, which body is the star and which is the mission's planet (J1R, J2R,
-  J3R, J7R, J8R, R2, R9, R12). ([play-j1r.md](play-j1r.md), [play-r12.md](play-r12.md))
+  J3R, J7R, J8R, R2, R9, R12): the models don't say which texture goes on
+  which body. ([play-j1r.md](play-j1r.md), [play-r12.md](play-r12.md))
 
 ## 4. Per mission
 
-Record every briefing in full. A "clip" is the briefing's voice clip; note
-which page and view are on screen when it starts.
-([media.md](media.md#open-questions), `src/engines/newworlds/briefing.cpp`)
+Message numbers are the COMMUNICATIONS counter (`i/n`); the data gives each
+message's text and trigger but not the order the counter shows.
 
 **Federation**
 
-- **F1** [rec]: messages 5-6, 14, 16, 23-24; the length of the Taubat deadline (inferred timer). ([play-f1.md](play-f1.md#still-to-look-at))
-- **F3** [rec]: how the Romulan saboteurs objective is met (inferred).
-- **F8** [rec]: clip `F8005`'s page. ([play-f8.md](play-f8.md))
-- **F12** [rec]: clips `F12005` and `F12009`. ([play-f12.md](play-f12.md))
-- **F14** [rec]: clip `F14013`. ([play-f14.md](play-f14.md))
-- **J1F** [rec]: clip `J1F010`; the colony-size and radiation-scan objectives (both inferred). ([play-j1f.md](play-j1f.md))
-- **J2F** [rec]: play to the end (recording stopped before the last objective); re-read the mine at 196, 436. ([play-j2r.md](play-j2r.md))
-- **J4F** [rec]: clip `J4F006`. ([play-j4f.md](play-j4f.md))
-- **J6F** [rec]: clips `J6F013`, `J6F014`. ([play-j6f.md](play-j6f.md))
-- **J7F** [rec]: clips `J7F005`, `006`, `009`, `014`; when the Hubrin guide counts as arrived. ([play-j7f.md](play-j7f.md))
-- **J8F** [rec]: the whole mission (recording ended minutes in); the anomaly device research step. ([play-j8f.md](play-j8f.md))
-- **C9** [rec]: its map (forest: `f3` or `j3`; read the hub position); how the Orion objective ends. ([play-c9.md](play-c9.md))
+- **F1** [rec]: which messages are 5-6, 14, 16 and 23-24 (the data narrows
+  them to the processor line, the temple warning, the weak scans' lines and
+  the Taubat-building line). ([play-f1.md](play-f1.md#still-to-look-at))
+- **J2F** [shot]: re-read the mine at 196, 436. ([play-j2r.md](play-j2r.md))
 
 **Klingon**
 
-- **K1** [rec]: messages 3-6, 8-9, 12, 15-17, 19, 24, 27; COMMAND panel and mission report. ([play-k1.md](play-k1.md#still-to-look-at))
-- **K8** [rec]: clips `K8006`-`K8009` (and the empty heading pages 7-9); all eight messages (seven unseen); how the Metar objective is met. ([play-k8.md](play-k8.md))
-- **K14** [rec]: clips `K14007`, `K14009`; the messages beyond the four seen. ([play-k14.md](play-k14.md))
-- **J2K** [rec]: play to the end; is the tenth message (new orders) on this side too? ([play-j2r.md](play-j2r.md))
-- **J7K** [rec]: when the Hubrin guide counts as arrived; starting size. ([play-j7r.md](play-j7r.md))
-- **J8K** [shot]: starting stock. ([play-j8r.md](play-j8r.md))
+- **K1** [rec]: the counter numbers of messages 3-6, 8-9, 12, 15-17, 19, 24
+  and 27 (the data gives which lines they can be).
+  ([play-k1.md](play-k1.md#still-to-look-at))
+- **J7K** [shot]: the starting colony size (COLONY SIZE). ([play-j7r.md](play-j7r.md))
 
 **Romulan**
 
-- **R1** [rec]: messages 5, 6, 12, 18; does the objective page show during clip `R1007`; are mission pass/fail pages and the planet stardate line shown; the alien-building scan (inferred). ([play-r1.md](play-r1.md))
-- **R2** [rec]: messages 3, 7, 8, 13, 23; the opening colony's buildings; is the rescue-prisoners objective listed or tracked; what triggers the Orion taunt (scripted as a 4-minute timer); receiving page and mission-pass page. ([play-r2.md](play-r2.md))
-- **J1R** [rec]: does the briefing end on signing on or after the last clip (pages 10-17); the reactor repair (scripted as an 80 s wait); the two messages near 29:07 and 33:00 with their numbers; does the APC capture option give the 30 % capture. ([play-j1r.md](play-j1r.md))
-- **J2R** [rec]: the tenth message and whether it's won; who destroys the Klingon hub; the 5:43 counter. ([play-j2r.md](play-j2r.md))
-- **J3R** [rec]: clip `J3R005` (galaxy step); message 7 (36:47-37:22); the ADDITIONAL page and objective 13; the spire in the weapon step; the active portal. ([play-j3r.md](play-j3r.md))
-- **J4R** [rec]: does the second relief step play `J4R011` again and where does `J4R014` go; MISSION PARAMETERS page; messages before 21:03; were the Klingons still in, and does the security-center failure apply. ([play-j4r.md](play-j4r.md))
-- **R9** [rec]: are `R9013`/`R9014` two steps (change near 3:11); the briefing's device and the red-white vehicle; how the science-block failure works (scripted as its destruction); does the device's blast destroy the Klingon colony. ([play-r9.md](play-r9.md))
-- **J6R** [rec]: STELLAR CARTOGRAPHY page and clip `J6R005`; messages 4, 5, 9; the ground views and the council chamber; what destroys the Klingon hub and why that failure doesn't apply; the Federation-failed message. ([play-j6r.md](play-j6r.md))
-- **J7R** [rec]: why backdrops lag the pages; message 5 (24:14-24:32, the transalumin quota?); first mine 188 or 180, 324; who destroys the Federation hub; the grey-blue crystal units and red-white fliers. ([play-j7r.md](play-j7r.md))
-- **R12** [rec]: clip `R12005`; any step after page 6; messages 3/4 order and 9 (64:45-66:20); what ends the mission at 66:20; who kills the Hubrin observer. ([play-r12.md](play-r12.md))
-- **J8R** [rec]: the white-and-red fliers and the big grey flier; the cratered pad; the device in flight and where it goes off; the mission report; polycomp after 5:29. ([play-j8r.md](play-j8r.md))
-- **R14** [rec]: is the final Intelligence message the pass page; the mission report; who flies the white-and-red craft from 7:00; the briefing model under page 4 (pillar or spire). ([play-r14.md](play-r14.md))
-- **J9R** [rec]: page 6's model; the captured starship; the octagonal green-topped tower; the ring at 5:18; duranium at 2:46, thermoconc at 12:40; the Metar temple failure (inferred); a campaign-end screen after the report. ([play-j9r.md](play-j9r.md))
-- **C11** [rec]: message 13 (16:46-18:30); is there a time limit; which ambassador beams up and when each ambassador objective ticks; when the man counts as located; the Orion/Taubat structures message; the Hubrin fortress objective (scripted as met when it falls); the grey spires; the 75 capacity step. ([play-c11.md](play-c11.md))
-
-**Tutorials** ([play-tutorials.md](play-tutorials.md#open-questions))
-
-- **C4-C8** [rec]: which clip plays with each in-game message: the VM recording's sound was too poor after C5's briefing; a recording with clearer sound would settle `tut-2_05`-`07`, `12`, `17`, `22`, `27`.
-- **Map** [shot]: Tricorder readings at the map's far corners in C1 and C5 (size past 64 blocks; same map for C1 and C5-C8?).
-
-C1, C6, the C7 and C8 briefing views, the `Tutor07` model, the options
-screen and the Communications panel are answered by the VM recordings
-([play-vm-tutorials.md](play-vm-tutorials.md)).
+- **R1** [rec]: the counter numbers of messages 5, 6 and 18. ([play-r1.md](play-r1.md))
+- **R2** [rec]: messages 3, 7, 8 and 23. ([play-r2.md](play-r2.md))
+- **J1R** [rec]: the numbers of the two messages near 29:07 and 33:00 (the
+  Federation's fail line and the temple scan's). ([play-j1r.md](play-j1r.md))
+- **J2R** [rec]: who destroys the Klingon hub (the Federation's random
+  raids or the Hubrin's?). ([play-j2r.md](play-j2r.md))
+- **J6R** [rec]: messages 4 and 5. ([play-j6r.md](play-j6r.md))
+- **J7R** [rec]: who destroys the Federation hub; the grey-blue crystal
+  units and the red-white fliers. ([play-j7r.md](play-j7r.md))
+- **R12** [rec]: message 9 (64:45-66:20); who kills the Hubrin observer.
+  ([play-r12.md](play-r12.md))
+- **J8R** [rec]: the white-and-red fliers; the starting stock (2:46 reads
+  about 30 % above the data's, the same on every side: what adds it?).
+  ([play-j8r.md](play-j8r.md))
+- **C11** [rec]: message 13 (16:46-18:30). ([play-c11.md](play-c11.md))
 
 ## 5. Missing data files
 
-- **Last joint clips** [rec]: `Media/RomVO` holds 113 files (confirmed), so
-  J1R, J2R, J8R and J9R simply have fewer clips than the other sides; just
-  check their briefings end where the recordings do.
-  ([media.md](media.md#voice-overs-fedvo-klingvo-romvo))
 - **Other archives** [shot]: a full listing of the game folder and the CD
   (including `MOVIES`), for anything beyond install.md's list (head-to-head
   `d1`-`d6` maps). ([install.md](install.md), [level.md](level.md))
 
-## 6. R8 (no recording)
-
-- **R8** [rec]: record the whole mission, the seventh Romulan one (after
-  J4R, on `icewrld`'s `r8` map): loading box, the full briefing (clips
-  `R8005`-`R8014`, page and view per clip), the starting colony from above
-  with its Tricorder position, starting stock and size, every message
-  (open each), selections of new buildings and units, the COMMAND panel,
-  and the end through the mission report. ([play-r9.md](play-r9.md),
-  [media.md](media.md))
-
-## 7. Left in Reluva (no VM needed)
+## 6. Left in Reluva (no VM needed)
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **Camera kept to seen blocks** [code]: hold the camera to the blocks
-  you've seen (held for the end; the Camera item above settles whether
-  the game does it).
 - **Saving and loading** [code]: the game has none; a Reluva feature for
   later.
-- **Turned buildings** [code]: the game turns a building's dock and yard
-  points with the building; Reluva's colony buildings aren't turned (the
-  Placement item says whether the player can turn them).
-- **Transport stops** [code]: drive to the dock's arrival point, which
-  Reluva doesn't place yet.
-- **Turret elevation** [code]: the executable's pitch limits aren't
-  applied (Reluva's shots treat the map as flat).
-- **Hit size of attached parts** [code]: the game grows an object's size
-  to shots over its attached parts; Reluva uses the model's radius.
-- **The mission report's first line** [code]: what in the executable
-  picks each mission's pass or fail line wasn't found.
+- **Demolition by APC** [code]: the game's razed building waits for an
+  unarmed APC to take its crew out (exe.md#demolishing); Reluva's bees
+  leave and the crew walk.
+- **The Cadet box** [code]: a setup option doubling the player's hit points
+  instead of the race's bonus.
+- **Message faces by number** [code]: each message's face is the large
+  portrait its own number gives; Reluva's paraphrased messages carry the
+  section's.
+- **Held briefing scenes** [code]: some briefing steps wait for the
+  mission's briefing script to play a scene (F1's shuttle); Reluva plays
+  them without it.
+- **The Tricorder's ground colours** [code]: the map's own palette shifted
+  per race (exe.md#the-tricorder).
+- **Turret elevation and attached parts** [code]: the pitch limits and an
+  object's size over its attached parts aren't applied.
 
-Already settled without the VM: AI orders, guards and attacks, posture,
-natives, cloaking, officer faces, menu portraits and loading boxes now
-follow the executable ([exe.md](exe.md), [game.md](game.md)).
+Settled from the executable and the data since the last list: the camera
+(it isn't held to seen blocks), speeds, docks, bees, roll-out, demolition,
+placement, turning to fire, groups, transports, scans, officers, repairs,
+animation speed, the script clock, power, shield cover, difficulty and
+Cadet mode, the mission report, COMMAND, message faces, Tricorder colours,
+bonus labels, every briefing (R8's too) and most missions' questions.
