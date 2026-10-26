@@ -37,38 +37,61 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 - **Build times** [rec]: how long each building takes to go up is the one
   economy figure the executable doesn't fix (its bees build it); the
   Federation's are timed ([play-vm-tutorials.md](play-vm-tutorials.md)).
-  Still wanted: a Klingon and a Romulan building or two, and whether more
-  construction bees build faster. ([exe.md](exe.md#the-economy))
+  Still wanted: a Klingon and a Romulan building or two, a defence (turret
+  or artillery) and a shield generator (Reluva guesses 40 s for both, and
+  for the AI's), and whether more construction bees build faster.
+  ([exe.md](exe.md#the-economy))
 - **Unit speeds** [rec]: send a ground scout and a tank a known distance
   over flat ground (read the Tricorder at both ends) and time it: the
   executable gives each type's pace in path steps but not a step's
   length. ([exe.md](exe.md#vehicles-and-turrets))
-- **Combat** [rec]: in F1, park the four phaser tanks south of the hub and
-  record the first Klingon attack (at about 100 s): whether units fire on
-  the move, how a burst's four shots are spaced, how quickly each side's
-  units find a target, whether the tanks fire at the Klingons before
-  they're hit (F1's Federation is neutral to them), and how many hits a
-  tank takes. Then send the tanks at a Klingon tank and note whether its
-  neighbours join in. ([exe.md](exe.md#sides-and-combat))
-- **AI armies** [rec]: in F1 (or K1), watch the Klingon (Taubat) colony
-  from a scout for ten minutes: whether its parked tanks leave for the
-  attacks, whether new ones come out of its vehicle yard, and whether its
-  attacks fight the Taubat they pass. ([exe.md](exe.md#sides-and-combat))
-- **Scans and captures** [rec]: in F1, a science scan of the Taubat mine
-  by the science vehicle alone and again with the science officer aboard
-  (how the officer is moved: a drag of the officer card?), timing each
-  message; whether a scan of the right target also gets the "nothing
-  unusual" reply; a capture of the temple with one armed APC (does it
-  fire on the temple first; how long until "the away team is inside").
-  ([exe.md](exe.md#scans-and-captures))
 - **Power** [shot]: COLONY DETAILS before and after a generator is built,
   to check the power rules read from the executable
   ([exe.md](exe.md#the-economy)).
 - **Camera** [rec]: lowest and highest heights, whether the view follows a
-  selection (the keys are confirmed by C1).
+  selection (the keys are confirmed by C1), and whether the camera can be
+  scrolled over blocks you haven't seen yet or is held to the seen ones
+  (try scrolling into the black at a mission's start).
   ([play-tutorials.md](play-tutorials.md#open-questions))
 - **Shield cover** [rec]: what turns a building's shield cover from BASIC to
   HIGH (J9R between 7:49 and 11:03). ([play-j9r.md](play-j9r.md))
+
+- **Left alone** [rec]: start F1 and touch nothing for 15 minutes, the
+  camera on the hub. When does the first Klingon attack come, and do the
+  attacks keep coming until the colony falls (Reluva's does now, at about
+  13 minutes)? Do they stop to fight the Taubat on the way?
+  ([exe.md](exe.md#ai-colonies))
+- **Order timing** [rec]: in the same run, note the time of every Klingon
+  group setting off; the orders' delays are in sixteenths of something,
+  and these times pin how the game's 50 ms step and the scripts' clock
+  relate. ([exe.md](exe.md#still-open))
+- **Bees at work** [rec]: follow a cargo bee from a mine to the processor
+  and back: how long it stays docked at each end and how much ore the
+  stock gains per trip. ([exe.md](exe.md#docking))
+- **Transports** [rec]: build something far from the hub and watch the
+  unarmed APC bring its crew: which side of the building it stops at,
+  how far off, and how long it waits. ([exe.md](exe.md#transports))
+- **Roll-out and demolition** [rec]: the time from the vehicle yard's bar
+  filling to the tank rolling out; and from DEMOLISH to the building
+  gone, and to its crew being back in the hub's pool (COLONY DETAILS).
+- **Placement** [shot]: can buildings be turned when placed (does the
+  hologram rotate)? Then park a tank on a free spot and move the hologram
+  towards it: how close can it come before the hologram turns red?
+  ([exe.md](exe.md#building-placement))
+- **Turning to fire** [rec]: order a tank to attack something straight
+  behind it: does it turn on the spot, and how long does a half turn take?
+- **Groups** [shot]: send six tanks to one point and screenshot them from
+  above when they've stopped: how far apart they stand.
+- **Scans and officers** [rec]: how close a science vehicle drives before
+  a scan starts; a scan of something no mission cares about (how long
+  until the reply); and how an officer is moved into a vehicle or
+  building (drag of the card? a click and then the target?).
+  ([exe.md](exe.md#scans-and-captures))
+- **Repairs at the start** [shot]: COLONY DETAILS (or the hub's panel) at
+  the very start of a mission: is there a repair pool or value already?
+- **Animation speed** [rec]: ten seconds of a working building's
+  animation (a generator or the processor) close up, to count its
+  frames a second (Reluva plays 10). ([arf.md](arf.md))
 
 ## 2. Buildings and units (model matching)
 
@@ -98,6 +121,10 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
   Settled: Metar colony core and spires `mch`, active portal `mport`, the
   grey slashed pods `th`, Taubat hangar `tw`, Taubat temple `tt`, R9's
   device `mad` (likely). ([play-r12.md](play-r12.md), [play-r14.md](play-r14.md), [play-j7r.md](play-j7r.md), [play-c11.md](play-c11.md))
+- **Klingon buildings** [shot]: the shield generator (Reluva uses `ksg`;
+  play-k1.md read it as a gun), and an AI colony's mining station: does it
+  stand on a deposit (J-missions' Klingon colonies)?
+  ([play-k1.md](play-k1.md))
 
 ## 3. Interface
 
@@ -107,12 +134,20 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 - **Panels never opened** [shot]: Multiplayer setup, and in play the
   COMMAND objective list at start, midway and end (K1, R1, C11), plus the
   campaign missions' MISSION REPORT pages (About and the training
-  missions' reports are seen now). ([play-k1.md](play-k1.md#still-to-look-at), [play-r1.md](play-r1.md))
-- **Portraits per officer** [shot]: open STAFF on each side's hub and
-  screenshot every officer card (face, name, section, post); then note each
-  message's face and section. Settles which face goes with which section,
-  and the Romulans' doubles (J1R, J2R, J3R, J7R, J8R, J9R, R9, R12, R14).
-  ([gui.md](gui.md), [play-j2r.md](play-j2r.md))
+  missions' reports are seen now). Note the report's first line on a
+  win and on a loss: whether it is the same fixed line in every mission
+  or the mission's own. ([play-k1.md](play-k1.md#still-to-look-at), [play-r1.md](play-r1.md))
+- **Portraits per officer** [shot]: the cards' faces now come from the
+  executable (each officer's own). Still to check: open COMMUNICATIONS on
+  a few messages and note each one's number (`i/n`) and face, to confirm
+  a message's face follows its number rather than its section (J1R, J2R,
+  R9, R12 and any Federation or Klingon mission). ([gui.md](gui.md))
+- **Cloaked units** [rec]: in a Klingon or Romulan mission, record your own
+  cloaking unit close up as it cloaks and decloaks: is it see-through
+  once cloaked, or solid, and does it shimmer while fading? The same for
+  an enemy one if you see it go. ([exe.md](exe.md#cloaking))
+- **Tricorder colours** [shot]: the full-screen Tricorder (Tab) over each
+  ore kind, for the colours it uses (not found in the executable).
 - **Bonus loading box** [shot]: does C9's and C10's loading box name a bonus
   mission like C11's? ([play-c11.md](play-c11.md))
 - **The star in star-system views** [shot]: in each briefing's star-system
@@ -194,3 +229,28 @@ screen and the Communications panel are answered by the VM recordings
   (open each), selections of new buildings and units, the COMMAND panel,
   and the end through the mission report. ([play-r9.md](play-r9.md),
   [media.md](media.md))
+
+## 7. Left in Reluva (no VM needed)
+
+Work on Reluva's side, listed so the whole picture is in one place.
+
+- **Camera kept to seen blocks** [code]: hold the camera to the blocks
+  you've seen (held for the end; the Camera item above settles whether
+  the game does it).
+- **Saving and loading** [code]: the game has none; a Reluva feature for
+  later.
+- **Turned buildings** [code]: the game turns a building's dock and yard
+  points with the building; Reluva's colony buildings aren't turned (the
+  Placement item says whether the player can turn them).
+- **Transport stops** [code]: drive to the dock's arrival point, which
+  Reluva doesn't place yet.
+- **Turret elevation** [code]: the executable's pitch limits aren't
+  applied (Reluva's shots treat the map as flat).
+- **Hit size of attached parts** [code]: the game grows an object's size
+  to shots over its attached parts; Reluva uses the model's radius.
+- **The mission report's first line** [code]: what in the executable
+  picks each mission's pass or fail line wasn't found.
+
+Already settled without the VM: AI orders, guards and attacks, posture,
+natives, cloaking, officer faces, menu portraits and loading boxes now
+follow the executable ([exe.md](exe.md), [game.md](game.md)).
