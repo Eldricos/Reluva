@@ -1100,8 +1100,15 @@ the hatch's gaps in the ground's. Each quarter of a block takes one of 16
 windows of that tile, by which of the four blocks round its outer corner
 share its class: four of them a solid quarter, none an empty one (a lone
 ore block shows as ground); a block out of view counts as sharing any
-class, plain ground never does. (Two other schemes, a dot and grid
-lines, are used only by some briefing scenes' model views.)
+class, plain ground never does. Two other schemes draw the tiles
+otherwise: a dot (a 5 x 5 square in each 8 x 8 cell over the ground,
+classes compared without the view, the border a block of unsurveyed) and
+grid lines (each cell's top row and left column clear, the rest the
+class over a grid-coloured fill, in which plain ground in view shows
+whole). The Tricorder starts every mission in the ring; only briefing
+steps set another (16 steps set the grid, mostly relief views, none the
+dot), for both Tricorders at once. The relief view of the briefings is
+drawn with the same class tiles on the ground.
 
 Its line names what's under the pointer: an object, by the player's
 posture to its side (Friendly, Neutral, Hostile) and its class

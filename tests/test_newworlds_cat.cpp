@@ -598,6 +598,8 @@ void testBriefing() {
           std::abs(steps[4].minimum - 8) < 1e-9);
     CHECK(steps[8].clip == "F1009" && steps[8].siteA == 438 && steps[8].siteB == 218); // the colony hub
     CHECK(steps[10].view == BriefingView::Model && steps[10].model == "geo/bad/tt.geo"); // the temple
+    // F1012's relief view draws its ground in grid lines (scheme 2); the rest the ring.
+    CHECK(steps[11].clip == "F1012" && steps[11].scheme == 2 && steps[10].scheme == 0);
     // F1's shuttle scene: the ground steps after the held star system
     // follow the briefing shuttle along its path.
     CHECK(steps[6].scene >= 0 && steps[7].scene == steps[6].scene && briefingScene(steps[6].scene) &&

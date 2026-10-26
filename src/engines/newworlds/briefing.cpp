@@ -75,6 +75,7 @@ std::vector<BriefingStep> briefingScript(std::string_view shortName, char side, 
                 step.model = t->model;
             step.minimum = r->minimum * kScriptSecond;
             step.scene = r->scene;
+            step.scheme = r->scheme;
             out.push_back(std::move(step));
         }
         return out;

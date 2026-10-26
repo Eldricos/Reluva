@@ -40,6 +40,9 @@ struct BriefingStep {
     double minimum = 0;
     // The briefing scene's unit the camera follows (briefingScene; -1 none).
     int scene = -1;
+    // How the Tricorder and the relief view draw the ground meanwhile (0
+    // the ring hatch, 1 the dot, 2 grid lines; exe.md#the-tricorder).
+    int scheme = 0;
 };
 
 // The briefing of a mission played as a side ('F', 'K', 'R'): the

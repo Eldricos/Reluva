@@ -214,6 +214,19 @@ public:
     void drawTricorder(Surface& s, int x, int y, int w, int h, int tiles, char race,
                        const std::function<int(int bx, int by)>& cellClass,
                        const std::function<bool(int bx, int by)>& inView);
+    // The class and view sources the Tricorder's colours use (the relief
+    // view too, once set), and its scheme (0 the ring hatch, 1 the dot, 2
+    // grid lines: a briefing step's).
+    void setTricorder(char race, std::function<int(int bx, int by)> cellClass, std::function<bool(int bx, int by)> inView) {
+        tricorderRace_ = race, tricorderClass_ = std::move(cellClass), tricorderInView_ = std::move(inView);
+    }
+    void setTricorderScheme(int scheme) {
+        if (tricorderScheme_ != scheme)
+            tricorderScheme_ = scheme, dirty_ = true;
+    }
+    // A point's Tricorder colour, at (fx, fy) in tiles; false where there's
+    // no ground (the background).
+    bool tricorderColour(float fx, float fy, uint8_t* out) const;
     // A world point's pixel on a minimap drawn at x, y, w, h (false if
     // it's outside it), and the world point under a pixel.
     bool minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py, int tiles = 0) const;
@@ -428,6 +441,11 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
+    char tricorderRace_ = 'F';
+    int tricorderScheme_ = 0;
+    std::function<int(int, int)> tricorderClass_;
+    std::function<bool(int, int)> tricorderInView_;
+    float reliefTileX_ = 0, reliefTileY_ = 0; // the ground tile being drawn (for the relief's colours)
     uint32_t shimmerFrame_ = 0; // a new throw for each set of units drawn
     std::function<void()> overlay_;
     std::function<std::string(const std::string&)> titleFilter_;

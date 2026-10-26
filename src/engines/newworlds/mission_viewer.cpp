@@ -391,6 +391,7 @@ bool MissionViewer::hubPosition(float& x, float& y) const {
 // scouts, as F1 and R1 start with four vehicles of one kind), the game's
 // camera over it, the interface up.
 void MissionViewer::startPlay() {
+    map_.setTricorderScheme(0); // play draws the ring hatch (the game's setup)
     if (!hasMap_ || running_)
         return;
     const Level& level = missions_[size_t(current_)];
@@ -3407,6 +3408,15 @@ void MissionViewer::startStep(int step) {
     const BriefingStep& s = script_[size_t(step)];
     if (s.scene < 0 && !playing_)
         map_.setUnits({});
+    // The relief and the Tricorder drawn as the step's scene says, the
+    // ground's classes from the map's deposits (nobody's view yet).
+    map_.setTricorder(missionSides(missions_[size_t(current_)].shortName)[size_t(side_)],
+                      [this](int bx, int by) {
+                          const int kind = map_.depositAt(bx, by);
+                          return kind >= 1 && kind <= 6 && map_.depositAmount(bx, by) > 0 ? 1 + kind : 0;
+                      },
+                      {});
+    map_.setTricorderScheme(s.scheme);
     stepOnMap_ = hasMap_ && (s.view == BriefingView::Ground || s.view == BriefingView::Relief);
     if (stepOnMap_) {
         map_.setColouring(s.view == BriefingView::Relief ? 1 : 0);

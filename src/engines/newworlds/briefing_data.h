@@ -25,6 +25,7 @@ struct BriefingRow {
     int type;           // a model view's object type (0 unknown)
     bool hold;          // waits for the mission script's show (a scene played out)
     int scene;          // the briefing scene's unit it follows (briefingScene; -1 none)
+    int scheme;         // the Tricorder's and relief's drawing (0 ring hatch, 1 dot, 2 grid lines)
 };
 
 // A briefing scene's unit: what the mission's briefing script flies over

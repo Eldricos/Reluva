@@ -252,23 +252,85 @@ constexpr int8_t kCorner[4][4][2] = {{{-1, 1}, {0, 1}, {0, 0}, {-1, 0}},
                                      {{0, 0}, {1, 0}, {1, -1}, {0, -1}},
                                      {{-1, 0}, {0, 0}, {0, -1}, {-1, -1}}};
 
+bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
+    // The race's shifts for each class's band (hue, saturation, value):
+    // ground, unsurveyed, the six ores, the border, the grey band, the
+    // grid scheme's fill (exe.md#the-tricorder); and its background.
+    struct Shift {
+        float hue, sat, val;
+    };
+    const int r = tricorderRace_ == 'K' ? 1 : tricorderRace_ == 'R' ? 2 : 0;
+    static constexpr Shift kRaced[3][3] = {
+        {{0, 1, 0.8f}, {0, 1.2f, 0.53f}, {0, 1, 0.4f}},
+        {{180, 0.7f, 0.8f}, {180, 0.8f, 0.63f}, {180, 0.6f, 0.31f}},
+        {{300, 1, 0.9f}, {300, 1.2f, 0.63f}, {300, 1.2f, 0.31f}}};
+    static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
+                                       {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
+    static constexpr Shift kGrid[3] = {{0, 0.75f, 0.8f}, {180, 0.6f, 0.9f}, {300, 1, 0.9f}};
+    static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
+    const int bx = int(std::floor(fx)) / 2, by = int(std::floor(fy)) / 2;
+    const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
+    const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
+                              ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
+                                            std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
+                              : 0;
+    if (!code || code >= map_.palette.size()) {
+        out[0] = kBackground[r][0], out[1] = kBackground[r][1], out[2] = kBackground[r][2];
+        return false;
+    }
+    auto classAt = [&](int x, int y) { return tricorderClass_ ? std::clamp(tricorderClass_(x, y), 0, 7) : 0; };
+    auto inView = [&](int x, int y) { return !tricorderInView_ || tricorderInView_(x, y); };
+    const int scheme = tricorderScheme_;
+    const int fill = scheme == 2 ? 10 : 0;
+    // The quarter of its block (its tile), and the pixel in it (8 x 8, from
+    // its top left).
+    const bool right = (int(std::floor(fx)) & 1) != 0, top = (int(std::floor(fy)) & 1) != 0;
+    const int q = top ? (right ? 1 : 0) : (right ? 2 : 3);
+    const int u = std::clamp(int((fx - std::floor(fx)) * 8), 0, 7);
+    const int v = std::clamp(7 - int((fy - std::floor(fy)) * 8), 0, 7);
+    // The map's border: the dark class (the dot scheme: unsurveyed, a block
+    // deep), its tile solid; else the block's own, cut by its corner's window.
+    const int edge = scheme == 1 ? 1 : 5;
+    const bool border = bx < edge || by < edge || bx >= map_.width - edge || by >= map_.height - edge;
+    int c = border ? (scheme == 1 ? 1 : 8) : classAt(bx, by);
+    bool shape = true;
+    if (!border) {
+        int mask = 0;
+        for (int bit = 0; bit < 4; ++bit) {
+            const int nx = bx + kCorner[q][bit][0], ny = by + kCorner[q][bit][1];
+            const bool off = nx < 0 || ny < 0 || nx >= map_.width || ny >= map_.height;
+            const int nc = off ? -1 : classAt(nx, ny);
+            const bool same = off || (nc != 0 && nc == c) || (scheme != 1 && !inView(nx, ny));
+            mask |= same ? 1 << bit : 0;
+        }
+        const uint8_t wr = kEdgeWindow[mask][q][0], wc = kEdgeWindow[mask][q][1];
+        shape = (((v < 4 ? wr : wc) >> (u < 4 ? 1 : 0)) & 1) != 0;
+    }
+    // The hatch: the ring (unsurveyed and the border solid), the dot, or
+    // grid lines; set, the class's band, else the fill's.
+    bool hatch = true;
+    if (c != 1 && !(scheme == 0 && c == 8)) {
+        if (scheme == 0)
+            hatch = v < 2 || v == 7 || u < 2 || u == 7;
+        else if (scheme == 1)
+            hatch = v >= 2 && v <= 6 && u >= 2 && u <= 6;
+        else
+            hatch = v != 0 && u != 0;
+    }
+    if (!shape || !hatch)
+        c = fill;
+    const Shift sh = c == 10 ? kGrid[r] : c == 8 ? kRaced[r][2] : c == 9 ? Shift{0, 0, 1} : c >= 2 ? kOres[c - 2] : kRaced[r][c];
+    const auto shifted = shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
+    out[0] = shifted[0], out[1] = shifted[1], out[2] = shifted[2];
+    return true;
+}
+
 void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tiles, char race,
                               const std::function<int(int bx, int by)>& cellClass,
                               const std::function<bool(int bx, int by)>& inView) {
     if (map_.width <= 0 || map_.height <= 0)
         return;
-    // The race's shifts for each class (hue, saturation, value): the band
-    // the game builds for it from the map's own colours; and its background.
-    struct Shift {
-        float hue, sat, val;
-    };
-    const int r = race == 'K' ? 1 : race == 'R' ? 2 : 0;
-    static constexpr Shift kGround[3] = {{0, 1, 0.8f}, {180, 0.7f, 0.8f}, {300, 1, 0.9f}};
-    static constexpr Shift kUnsurveyed[3] = {{0, 1.2f, 0.53f}, {180, 0.8f, 0.63f}, {300, 1.2f, 0.63f}};
-    static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
-                                       {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
-    static constexpr Shift kBorder[3] = {{0, 1, 0.4f}, {180, 0.6f, 0.31f}, {300, 1.2f, 0.31f}};
-    static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
+    setTricorder(race, cellClass, inView);
     float ox = 0, oy = 0, tw = 1, th = 1;
     minimapWindow(w, h, tiles, ox, oy, tw, th);
     for (int y = 0; y < h; ++y) {
@@ -276,52 +338,9 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
             continue;
         const float fy = oy + (float(h - 1 - y) + 0.5f) / float(h) * th; // tiles; row 0 at the bottom
         uint8_t* row = s.row(y0 + y);
-        for (int x = 0; x < w; ++x) {
-            if (x0 + x < 0 || x0 + x >= s.w)
-                continue;
-            const float fx = ox + (float(x) + 0.5f) / float(w) * tw;
-            uint8_t* p = row + (x0 + x) * 4;
-            const int bx = int(fx) / 2, by = int(fy) / 2;
-            // The colour: the map's own for the terrain code there, in the
-            // band of the block's class; code 0 (and off the map) is the
-            // background.
-            const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
-            const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
-                                      ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
-                                                    std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
-                                      : 0;
-            if (!code || code >= map_.palette.size()) {
-                p[0] = kBackground[r][0], p[1] = kBackground[r][1], p[2] = kBackground[r][2];
-                continue;
-            }
-            // Blocks within 5 of the map's edge are drawn dark, as the game's.
-            const bool border = bx < 5 || by < 5 || bx >= map_.width - 5 || by >= map_.height - 5;
-            int c = std::clamp(cellClass(bx, by), 0, 7);
-            if (!border && c != 0) {
-                // The quarter (its tile in the block), the pixel in it (8 x 8,
-                // from its top left), and the window its corner gives.
-                const bool right = (int(fx) & 1) != 0, top = (int(fy) & 1) != 0;
-                const int q = top ? (right ? 1 : 0) : (right ? 2 : 3);
-                const int u = std::clamp(int((fx - std::floor(fx)) * 8), 0, 7);
-                const int v = std::clamp(7 - int((fy - std::floor(fy)) * 8), 0, 7);
-                int mask = 0;
-                for (int bit = 0; bit < 4; ++bit) {
-                    const int nx = bx + kCorner[q][bit][0], ny = by + kCorner[q][bit][1];
-                    const bool same = nx < 0 || ny < 0 || nx >= map_.width || ny >= map_.height || !inView(nx, ny) ||
-                                      std::clamp(cellClass(nx, ny), 0, 7) == c;
-                    mask |= same ? 1 << bit : 0;
-                }
-                const uint8_t wr = kEdgeWindow[mask][q][0], wc = kEdgeWindow[mask][q][1];
-                const bool shape = (((v < 4 ? wr : wc) >> (u < 4 ? 1 : 0)) & 1) != 0;
-                // The hatch: a ring with a 5 x 5 hole; unsurveyed blocks solid.
-                const bool hatch = c == 1 || v < 2 || v == 7 || u < 2 || u == 7;
-                if (!shape || !hatch)
-                    c = 0; // the gaps and what's outside the shape: ground
-            }
-            const Shift sh = border ? kBorder[r] : c == 0 ? kGround[r] : c == 1 ? kUnsurveyed[r] : kOres[c - 2];
-            const auto out = shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
-            p[0] = out[0], p[1] = out[1], p[2] = out[2];
-        }
+        for (int x = 0; x < w; ++x)
+            if (x0 + x >= 0 && x0 + x < s.w)
+                tricorderColour(ox + (float(x) + 0.5f) / float(w) * tw, fy, row + (x0 + x) * 4);
     }
     int cx = 0, cy = 0;
     minimapPoint(targetX_, targetY_, x0, y0, w, h, cx, cy, tiles);
@@ -1124,7 +1143,13 @@ void MapViewer::render() {
             auto shade = [&](float u, float v, float intensity, uint8_t* out) {
                 static const uint8_t plain[3] = {170, 180, 195};
                 const uint8_t* col = plain;
-                if (codes) {
+                uint8_t tricorder[3];
+                if (codes && tricorderClass_) {
+                    // The relief as the game draws it: the Tricorder's class
+                    // tiles on the ground.
+                    if (tricorderColour(reliefTileX_ + u, reliefTileY_ + v, tricorder))
+                        col = tricorder;
+                } else if (codes) {
                     const unsigned code =
                         terrainCode(*ground, std::clamp(int(u * 8), 0, 7), std::clamp(int(v * 8), 0, 7));
                     if (code && code < map_.palette.size())
@@ -1205,6 +1230,7 @@ void MapViewer::render() {
                 const int deposit = map_.cells[size_t(by) * size_t(map_.width) + size_t(bx)].deposit();
                 const uint8_t* tint =
                     textured_ && colouring_ == 2 && deposit >= 1 && deposit <= 6 ? kDepositColours[deposit - 1] : nullptr;
+                reliefTileX_ = float(bx * 2 + kSlotX[slot]), reliefTileY_ = float(by * 2 + kSlotY[slot]);
                 drawModel(m, origin, kCos[tile.rotation], kSin[tile.rotation], &tile, tint);
             }
         }
