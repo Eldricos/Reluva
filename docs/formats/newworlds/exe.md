@@ -655,6 +655,17 @@ the line after the look is hit.
 
 ### Scans and captures
 
+**What the playbook offers, by posture.** The game keeps a relation byte
+per pair of sides beside the postures (friendly bit 1, hostile bit 2,
+neutral bit 4). On another side's object a scout or science vehicle gets
+the three scans when the player is hostile or neutral to it (a plain
+click is a science scan); other vehicles get the attacks only on what
+the player is hostile to; an armed APC gets capture only on a hostile
+side's building that can be captured. A friendly side's objects get none
+of these. Props (class 0x800000: the wrecked USS Explorer's two halves,
+types 134 and 135, and the Metar SAD, 120) are in no menu and take no
+cells of the building grid.
+
 **Scans.** Ground scouts and science vehicles scan (their playbook offers
 science, medical and engineering scans; a science scan is their default
 action on another side's unit or building). The range is the type's
@@ -1355,6 +1366,4 @@ the NEW WORLDS panel, its class picked by type id:
 - How long bees stay docked (so how fast they carry ore).
 - Placement flags, a third placement phase, the AI order task codes 1,
   2 and 6-8 (read from the orders' names), and the order modes.
-- Which of the posture bits the scan and capture menus test is hostile
-  and which neutral; how the player moves officers (the gesture).
-- Several unnamed type ids (natives' units and buildings, effects).
+- How the player moves officers (the gesture).

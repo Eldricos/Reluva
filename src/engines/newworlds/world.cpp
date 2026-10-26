@@ -472,7 +472,8 @@ void World::combatTick() {
         }
         return u.sightClear;
     };
-    auto pickable = [&](const Unit& v) { return (classOf(v) & kNotHit) == 0; };
+    // (Nor props, class 0x800000: the Explorer's wreck, the Metar SAD.)
+    auto pickable = [&](const Unit& v) { return (classOf(v) & (kNotHit | 0x800000)) == 0; };
     auto distance = [](const Unit& a, const Unit& b) { return std::hypot(b.x - a.x, b.y - a.y); };
     // Within the turret's arc (exe.md#sides-and-combat: some turn only so
     // far each way from straight ahead).

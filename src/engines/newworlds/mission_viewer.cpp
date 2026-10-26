@@ -509,6 +509,10 @@ void MissionViewer::orderOn(int target) {
             continue;
         attackers.push_back(id);
     }
+    // Attacks only on what the player is hostile to.
+    const Unit* t = world_->unit(target);
+    if (t && world_->stance(playerSlot_, t->slot) != 3)
+        attackers.clear();
     if (!attackers.empty() && pendingOrder_ == 'a')
         world_->assault(attackers, target);
     else if (!attackers.empty() && pendingOrder_ != 's' && pendingOrder_ != 'm' && pendingOrder_ != 'e')
@@ -1789,14 +1793,22 @@ void MissionViewer::openPlaybook(int target, float gx, float gy) {
             shields = shields || u->name == "mobile-shield-generator";
         }
     const Unit* t = target ? world_->unit(target) : nullptr;
-    if (t && t->slot != playerSlot_) {
+    // By the player's posture towards it (exe.md#scans-and-captures): on a
+    // hostile one, scans (scouts and science vehicles) or attacks, and a
+    // building's capture (armed APCs); on a neutral one only the scans; on
+    // a friendly one nothing (as the ground). Props offer nothing.
+    const int posture = t && t->slot != playerSlot_ ? world_->stance(playerSlot_, t->slot) : 1;
+    const CombatType* ct = t ? combatType(t->type) : nullptr;
+    if (t && ct && (ct->mask & 0x800000))
+        t = nullptr;
+    if (t && t->slot != playerSlot_ && (posture == 3 || (posture == 2 && scanners))) {
         if (scanners)
             playbook_ = {{"science", "SCIENCE SCAN", 's'}, {"medical", "MEDICAL SCAN", 'm'}, {"engine", "ENGINEERING SCAN", 'e'}};
         else
             playbook_ = {{"pbattack", "FOLLOW AND ATTACK ENEMY", 'f'}, {"pbbombrd", "ASSAULT ENEMY/LOCATION", 'b'}};
-        if (!scanners && apcs && t->building)
+        if (!scanners && apcs && t->building && posture == 3)
             playbook_.push_back({"pbcaptre", "CAPTURE BUILDING", 'c'});
-    } else if (t && t->building && shields) {
+    } else if (t && t->building && t->slot == playerSlot_ && shields) {
         playbook_ = {{"pbprotct", "PROTECT AREA", 'a'}};
     } else {
         t = nullptr;
