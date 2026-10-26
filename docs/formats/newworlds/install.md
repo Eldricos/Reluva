@@ -39,6 +39,10 @@ release, and of the same install with an unofficial fan patch applied
   | `STNW.BIK` | 2:15 | the intro: after the logos, and the launcher's intro button |
   | `FEDWIN.BIK`, `KLIWIN.BIK`, `ROMWIN.BIK` | 3:49-3:56 | the race's campaign won (the race the player last chose; the launcher plays it on its return) |
   | `SFC2.BIK` | 1:06 | never: the executable doesn't name it (a trailer for another game, as `KAPROMO.EXE` is) |
+- The CD's installer archive `DATA1.CAB` (InstallShield, 212 MB) holds
+  655 files in three groups (program files, help files, and `SerialEXE`, a
+  second `STNW.exe` byte for byte the installed one): all of them are in
+  the install, at the same sizes. Nothing ships only in the installer.
 - `Manual.pdf` on the CD (`Manual/`, with an Acrobat Reader installer):
   the printed manual.
 

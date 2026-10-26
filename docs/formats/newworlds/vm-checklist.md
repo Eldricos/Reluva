@@ -97,10 +97,8 @@ message's text and trigger but not the order the counter shows.
 
 ## 5. Missing data files
 
-- **The installer's archive** [shot]: a listing of the CD's `DATA1.CAB`
-  (an InstallShield archive, 212 MB; no tool here opens it), to check it
-  holds nothing the install doesn't copy. The game folder and the CD's
-  other files are listed now. ([install.md](install.md))
+- **Nothing left here**: the game folder, the CD and its installer archive
+  are all listed and checked against the install ([install.md](install.md)).
 
 ## 6. Left in Reluva (no VM needed)
 
