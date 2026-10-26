@@ -97,7 +97,6 @@ void MapViewer::show(int index) {
         status_ = err2.message;
     if (!status_.empty())
         map_ = GmfMap{};
-    tricorderTop_ = 0;
     placeScenery();
     buildings_.clear();
     buildingAreas_.clear();
@@ -236,8 +235,8 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
                               const std::function<int(int bx, int by)>& cellClass) {
     if (map_.width <= 0 || map_.height <= 0)
         return;
-    // The race's shifts for each class (hue, saturation, value), and its
-    // background.
+    // The race's shifts for each class (hue, saturation, value): the band
+    // the game builds for it from the map's own colours; and its background.
     struct Shift {
         float hue, sat, val;
     };
@@ -246,13 +245,8 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
     static constexpr Shift kUnsurveyed[3] = {{0, 1.2f, 0.53f}, {180, 0.8f, 0.63f}, {300, 1.2f, 0.63f}};
     static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
                                        {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
+    static constexpr Shift kBorder[3] = {{0, 1, 0.4f}, {180, 0.6f, 0.31f}, {300, 1.2f, 0.31f}};
     static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
-    if (tricorderTop_ <= 0) // the map's height range, sampled once
-        for (int j = 0; j < 64; ++j)
-            for (int i = 0; i < 64; ++i)
-                tricorderTop_ = std::max(tricorderTop_, groundHeight((float(i) + 0.5f) / 64 * worldWidth(),
-                                                                      (float(j) + 0.5f) / 64 * worldHeight()));
-    const float top = std::max(1.0f, tricorderTop_);
     float ox = 0, oy = 0, tw = 1, th = 1;
     minimapWindow(w, h, tiles, ox, oy, tw, th);
     for (int y = 0; y < h; ++y) {
@@ -266,36 +260,24 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
             const float fx = ox + (float(x) + 0.5f) / float(w) * tw;
             uint8_t* p = row + (x0 + x) * 4;
             const int bx = int(fx) / 2, by = int(fy) / 2;
-            if (fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height) {
+            // The colour: the map's own for the terrain code there, in the
+            // band of the block's class; code 0 (and off the map) is the
+            // background.
+            const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
+            const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
+                                      ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
+                                                    std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
+                                      : 0;
+            if (!code || code >= map_.palette.size()) {
                 p[0] = kBackground[r][0], p[1] = kBackground[r][1], p[2] = kBackground[r][2];
                 continue;
             }
+            // Blocks within 5 of the map's edge are drawn dark, as the game's.
+            const bool border = bx < 5 || by < 5 || bx >= map_.width - 5 || by >= map_.height - 5;
             const int c = std::clamp(cellClass(bx, by), 0, 7);
-            const float wx = fx / 2 * kBlockUnits, wy = fy / 2 * kBlockUnits;
-            const int shade = std::clamp(1 + int(groundHeight(wx, wy) / top * 18), 1, 19);
-            const size_t entry = size_t((c + 1) * 20 + shade);
-            const Shift sh = c == 0 ? kGround[r] : c == 1 ? kUnsurveyed[r] : kOres[c - 2];
-            // The band's colour in the game's 256-entry palette; Reluva's map
-            // palette has only the terrain codes' colours, so the colour of
-            // the ground there is shifted instead.
-            const uint8_t* base = nullptr;
-            if (entry < map_.palette.size()) {
-                base = map_.palette[entry].data();
-            } else {
-                const int t = tileAt(int(fx), int(fy));
-                const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
-                                          ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
-                                                        std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
-                                          : 0;
-                if (code && code < map_.palette.size())
-                    base = map_.palette[code].data();
-            }
-            if (base) {
-                const auto out = shiftHsv(base, sh.hue, sh.sat, sh.val);
-                p[0] = out[0], p[1] = out[1], p[2] = out[2];
-            } else {
-                p[0] = p[1] = p[2] = 20;
-            }
+            const Shift sh = border ? kBorder[r] : c == 0 ? kGround[r] : c == 1 ? kUnsurveyed[r] : kOres[c - 2];
+            const auto out = shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
+            p[0] = out[0], p[1] = out[1], p[2] = out[2];
         }
     }
     int cx = 0, cy = 0;

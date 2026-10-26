@@ -204,9 +204,9 @@ public:
     // (the Tricorder's zoom); 0 the whole map.
     void drawMinimap(Surface& s, int x, int y, int w, int h, int tiles = 0) const;
     // The Tricorder's map as the game draws it (exe.md#the-tricorder): each
-    // block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6) in that
-    // class's band of the map's palette, shaded by height, the band's hue,
-    // saturation and brightness shifted for the player's race.
+    // block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6) gives a
+    // hue, saturation and brightness shift, for the player's race, of the
+    // map's own colour for the terrain code there.
     void drawTricorder(Surface& s, int x, int y, int w, int h, int tiles, char race,
                        const std::function<int(int bx, int by)>& cellClass);
     // A world point's pixel on a minimap drawn at x, y, w, h (false if
@@ -423,7 +423,6 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
-    float tricorderTop_ = 0; // the map's highest ground, for the Tricorder's shades
     uint32_t shimmerFrame_ = 0; // a new throw for each set of units drawn
     std::function<void()> overlay_;
     std::function<std::string(const std::string&)> titleFilter_;

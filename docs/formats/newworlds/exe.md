@@ -1084,11 +1084,18 @@ to it: side 0 (the Federation) blue, 1 (Klingon) orange, 2 (Romulan)
 green, 3 (Taubat) and 5 (Metar) yellow, 4 (Hubrin) magenta, 6 (Orion)
 red. Alerted objects are red. Blips are outlined in black, the outline
 blinking white every 10 redraws on the selected and alerted. The ground
-and ores are the map's own palette, in bands of 20 entries shifted in
-hue, saturation and brightness per race (the ores alike for all races:
+and ores come from the map file's own colour table (its last 1024 bytes,
+the terrain codes' colours): the Tricorder copies those 19 colours into
+twelve bands of 20, each band shifted in hue, saturation and brightness
+for its class and the player's race (the ores alike for all races:
 dilithium +270 degrees, talgonite +30, silicon +210, kelbonite +330,
-magnesite +90, dolamide +150, brightened 1.33-1.5 times); the background
-is a dark blue, brown or green by race.
+magnesite +90, dolamide +150, brightened 1.33-1.5 times), entry 0 of each
+band the race's background (a dark blue, brown or green). A pixel is the
+terrain code there in its block's class band (surveyed ground,
+unsurveyed, an ore), so code 0 shows the background. Blocks within 5 of
+the map's edge are drawn in the dark border band; class changes between
+blocks are blended through 16 edge shapes, and unsurveyed blocks are
+hatched (a ring, a dot or grid lines by the map scheme).
 
 Its line names what's under the pointer: an object, by the player's
 posture to its side (Friendly, Neutral, Hostile) and its class

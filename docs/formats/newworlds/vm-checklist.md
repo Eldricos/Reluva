@@ -113,14 +113,11 @@ Work on Reluva's side, listed so the whole picture is in one place.
 
 - **Saving and loading** [code]: the game has none; a Reluva feature for
   later.
-- **The Tricorder's palette** [code]: the game shifts a 256-entry palette
-  of its map's for the Tricorder's bands; Reluva hasn't found it and shifts
-  the ground's own colours by the same rules.
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
-briefings' scenes (their units flying their paths), the Tricorder's colour
-rules, and the guns' pitch limits.
+briefings' scenes (their units flying their paths), the Tricorder's colours
+(the map's own, shifted as the game does), and the guns' pitch limits.
 
 Settled from the executable and the data since the last list: the camera
 (it isn't held to seen blocks), speeds, docks, bees, roll-out, demolition,
