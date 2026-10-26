@@ -1436,6 +1436,10 @@ void MissionViewer::update(uint64_t nowMs) {
     // The briefing moves on when its step's clip ends, or its time is up.
     if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying() && nowMs >= stepMinimumMs_))
         startStep(step_ + 1);
+    // A briefing scene's unit flies its path (from when the camera first
+    // follows it), the camera with it.
+    if (running_ && stepOnMap_ && script_[size_t(step_)].scene >= 0)
+        flyScene(script_[size_t(step_)].scene, nowMs);
     // The galaxy and models turn slowly too.
     if (running_ && !stepOnMap_ &&
         (script_[size_t(step_)].view == BriefingView::Galaxy || script_[size_t(step_)].view == BriefingView::Model) &&
@@ -3343,6 +3347,7 @@ void MissionViewer::startBriefing() {
     savedColouring_ = map_.colouring();
     running_ = true;
     briefing_ = true;
+    scene_ = -1; // its scenes start afresh
     startStep(0);
 }
 
@@ -3356,10 +3361,57 @@ void MissionViewer::stopBriefing() {
         flowStartMs_ = nowMs_;
     }
     stopClip();
+    if (!playing_)
+        map_.setUnits({}); // (a scene's unit gone with it)
+    scene_ = -1;
     map_.setColouring(savedColouring_);
     map_.resetCamera();
     redraw();
     updateTitle();
+}
+
+// A briefing scene's unit (briefing_data.h): the mission's briefing script
+// flies it from its start along its waypoints, at its height, 100 a tick
+// (the shuttles' flight speed). Its model by type: the races' shuttles
+// (the Federation's 6, the Romulans' 93, the Klingons' 94 and 38: matched
+// by race and speed), else the type's own.
+void MissionViewer::flyScene(int index, uint64_t nowMs) {
+    const BriefingScene* sc = briefingScene(index);
+    if (!sc)
+        return;
+    auto at = [](int a, int b) { return std::pair{float(b) / 8 * MapViewer::kBlockUnits, float(a) / 8 * MapViewer::kBlockUnits}; };
+    if (scene_ != index) {
+        scene_ = index, sceneLeg_ = 0, sceneMs_ = nowMs;
+        std::tie(sceneX_, sceneY_) = at(sc->a, sc->b);
+    }
+    double left = double(nowMs - sceneMs_) / 1000 * 2000; // units to fly
+    sceneMs_ = nowMs;
+    float heading = 0;
+    while (left > 0 && sceneLeg_ < sc->ways) {
+        const auto [wx, wy] = at(sc->way[sceneLeg_][0], sc->way[sceneLeg_][1]);
+        const float dx = wx - sceneX_, dy = wy - sceneY_, d = std::hypot(dx, dy);
+        if (d > 1)
+            heading = std::atan2(dy, dx);
+        if (d <= left) {
+            sceneX_ = wx, sceneY_ = wy, left -= d, ++sceneLeg_;
+        } else {
+            sceneX_ += dx / d * float(left), sceneY_ += dy / d * float(left), left = 0;
+        }
+    }
+    if (heading != 0)
+        sceneHeading_ = heading;
+    std::string model = sc->type == 6 ? "geo/fed/shuttle.geo"
+                        : sc->type == 93 ? "geo/rom/rs.geo"
+                        : sc->type == 94 || sc->type == 38 ? "geo/kln/kcs.geo"
+                                                           : "";
+    if (model.empty())
+        if (const CombatType* t = combatType(sc->type))
+            model = t->model;
+    MapViewer::UnitDraw d{model, sceneX_, sceneY_, sceneHeading_};
+    d.lift = sc->height;
+    map_.setUnits({d});
+    map_.centreOn(sceneX_, sceneY_);
+    dirty_ = true;
 }
 
 void MissionViewer::startStep(int step) {
@@ -3370,6 +3422,8 @@ void MissionViewer::startStep(int step) {
     }
     step_ = step;
     const BriefingStep& s = script_[size_t(step)];
+    if (s.scene < 0 && !playing_)
+        map_.setUnits({});
     stepOnMap_ = hasMap_ && (s.view == BriefingView::Ground || s.view == BriefingView::Relief);
     if (stepOnMap_) {
         map_.setColouring(s.view == BriefingView::Relief ? 1 : 0);

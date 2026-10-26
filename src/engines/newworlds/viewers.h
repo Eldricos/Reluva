@@ -626,6 +626,7 @@ private:
     void unitSpeaks(int unit, int group);
     void doubleClicked(int unit);
     void followInF1(int unit);
+    void flyScene(int index, uint64_t nowMs);
     audio::SoundHandle objectSoundHandle_ = audio::kNoSound; // the last double-clicked building's
     audio::SoundHandle playAt(const std::string& archive, const std::string& stem, float x, float y, float gain);
     std::map<std::string, std::shared_ptr<const audio::Sound>> archiveSounds_; // decoded, by archive/stem
@@ -843,6 +844,11 @@ private:
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
     uint64_t stepMinimumMs_ = 0; // a step with a clip lasts at least until then
+    // The briefing scene playing (-1 none): its unit's place, heading, next
+    // waypoint, and when it last moved.
+    int scene_ = -1, sceneLeg_ = 0;
+    float sceneX_ = 0, sceneY_ = 0, sceneHeading_ = 0;
+    uint64_t sceneMs_ = 0;
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
     std::string musicName_;
 };

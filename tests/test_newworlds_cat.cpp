@@ -598,6 +598,10 @@ void testBriefing() {
           std::abs(steps[4].minimum - 8) < 1e-9);
     CHECK(steps[8].clip == "F1009" && steps[8].siteA == 438 && steps[8].siteB == 218); // the colony hub
     CHECK(steps[10].view == BriefingView::Model && steps[10].model == "geo/bad/tt.geo"); // the temple
+    // F1's shuttle scene: the ground steps after the held star system
+    // follow the briefing shuttle along its path.
+    CHECK(steps[6].scene >= 0 && steps[7].scene == steps[6].scene && briefingScene(steps[6].scene) &&
+          briefingScene(steps[6].scene)->type == 6 && briefingScene(steps[6].scene)->ways == 2);
     // The officer numbers the mission's mail carries, by section (a
     // message's face is the portrait at that number less one).
     CHECK(messageOfficer("F1", 'F', "science") == 5 && messageOfficer("f1", 'F', "engineering") == 3 &&

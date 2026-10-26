@@ -38,6 +38,8 @@ struct BriefingStep {
     // How long it lasts at least, in seconds (it lasts the longer of this
     // and its clip).
     double minimum = 0;
+    // The briefing scene's unit the camera follows (briefingScene; -1 none).
+    int scene = -1;
 };
 
 // The briefing of a mission played as a side ('F', 'K', 'R'): the

@@ -593,15 +593,21 @@ played in order. A step gives:
   or a star system), or the side's emblem;
 - one or two **named objects** (placements or groups; with two the camera
   works between them) and a camera mode;
-- a **hold** flag: the step waits until the mission's briefing script
-  sends `show` (F1's shuttle flight).
+- a **hold** flag: at its end the step tells the mission's briefing
+  script (its phase 2) the scene may start, and waits for its `show`. Seven
+  steps hold (F1006, F2006, F3006, J4R005, J4R009, R2006 and MarkL1's
+  F1006): the script then flies a unit placed for the briefing (a shuttle,
+  R2's Bird of Prey) along its waypoints at a set height (9000-12000), and
+  the steps after follow it.
 
 Every briefing opens with silent emblem steps (2 s, the incoming
 transmission page 5 s, 2 s) and ends with a short silent one. The tables
 settle what the recordings couldn't: some clips are never played (F14013,
 K14009, K8006-K8008, J1F007-J1F010, J7F014), some twice (f14005, k14007,
 J4R011), and R8's, never recorded, is all there. Reluva plays the tables
-as they are (`briefing_data.cpp`, generated), without the held scenes.
+as they are (`briefing_data.cpp`, generated), the scenes' units flying
+their paths from the first step that follows them, at the shuttles' 100 a
+tick (their models by race: `shuttle`, `kcs`, `rs`, likely).
 
 ### Sides and combat
 

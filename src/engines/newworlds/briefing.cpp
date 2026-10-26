@@ -74,6 +74,7 @@ std::vector<BriefingStep> briefingScript(std::string_view shortName, char side, 
             if (const CombatType* t = r->type ? combatType(r->type) : nullptr)
                 step.model = t->model;
             step.minimum = r->minimum * kScriptSecond;
+            step.scene = r->scene;
             out.push_back(std::move(step));
         }
         return out;

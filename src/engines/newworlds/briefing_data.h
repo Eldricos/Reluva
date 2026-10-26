@@ -24,7 +24,20 @@ struct BriefingRow {
     int a, b;           // where a map view looks (map position; -1 the whole map)
     int type;           // a model view's object type (0 unknown)
     bool hold;          // waits for the mission script's show (a scene played out)
+    int scene;          // the briefing scene's unit it follows (briefingScene; -1 none)
 };
+
+// A briefing scene's unit: what the mission's briefing script flies over
+// the map while the briefing plays (F1's shuttle): its type, where it
+// starts (map position), its height, and the waypoints it flies to.
+struct BriefingScene {
+    int type;
+    int a, b;
+    float height;
+    int ways;
+    int way[8][2];
+};
+const BriefingScene* briefingScene(int index);
 
 // A mission's steps for a side, in order (empty if the table has none).
 std::vector<const BriefingRow*> briefingRows(std::string_view mission, char side);
