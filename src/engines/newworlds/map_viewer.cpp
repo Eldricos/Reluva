@@ -231,8 +231,30 @@ std::array<uint8_t, 3> shiftHsv(const uint8_t* rgb, float hue, float sat, float 
 
 } // namespace
 
+// The Tricorder's edge windows (exe.md#the-tricorder): for a block's
+// quarter q (0 top left, 1 top right, 2 bottom right, 3 bottom left) and
+// which of the four blocks round its outer corner share its class (bit 1
+// up left, 2 up right, 4 down right, 8 down left), the window of its
+// class tile drawn, as (row, column): each a pair of bits, the window's
+// top half by the row (1 its right half set, 2 its left), its bottom half
+// by the column.
+constexpr uint8_t kEdgeWindow[16][4][2] = {
+    {{0, 0}, {0, 0}, {0, 0}, {0, 0}}, {{0, 0}, {0, 0}, {2, 0}, {0, 0}}, {{0, 0}, {0, 0}, {0, 0}, {1, 0}},
+    {{0, 0}, {0, 0}, {3, 0}, {3, 0}}, {{0, 1}, {0, 0}, {0, 0}, {0, 0}}, {{0, 1}, {0, 0}, {2, 0}, {0, 0}},
+    {{1, 1}, {0, 0}, {0, 0}, {1, 1}}, {{1, 1}, {0, 0}, {3, 0}, {3, 1}}, {{0, 0}, {0, 2}, {0, 0}, {0, 0}},
+    {{0, 0}, {2, 2}, {2, 2}, {0, 0}}, {{0, 0}, {0, 2}, {0, 0}, {1, 0}}, {{0, 0}, {2, 2}, {3, 2}, {3, 0}},
+    {{0, 3}, {0, 3}, {0, 0}, {0, 0}}, {{0, 3}, {2, 3}, {2, 2}, {0, 0}}, {{1, 3}, {0, 3}, {0, 0}, {1, 1}},
+    {{3, 3}, {3, 3}, {3, 3}, {3, 3}}};
+// The blocks round each quarter's outer corner, for bits 1, 2, 4, 8:
+// (right, up) from the quarter's own block.
+constexpr int8_t kCorner[4][4][2] = {{{-1, 1}, {0, 1}, {0, 0}, {-1, 0}},
+                                     {{0, 1}, {1, 1}, {1, 0}, {0, 0}},
+                                     {{0, 0}, {1, 0}, {1, -1}, {0, -1}},
+                                     {{-1, 0}, {0, 0}, {0, -1}, {-1, -1}}};
+
 void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tiles, char race,
-                              const std::function<int(int bx, int by)>& cellClass) {
+                              const std::function<int(int bx, int by)>& cellClass,
+                              const std::function<bool(int bx, int by)>& inView) {
     if (map_.width <= 0 || map_.height <= 0)
         return;
     // The race's shifts for each class (hue, saturation, value): the band
@@ -274,7 +296,28 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
             }
             // Blocks within 5 of the map's edge are drawn dark, as the game's.
             const bool border = bx < 5 || by < 5 || bx >= map_.width - 5 || by >= map_.height - 5;
-            const int c = std::clamp(cellClass(bx, by), 0, 7);
+            int c = std::clamp(cellClass(bx, by), 0, 7);
+            if (!border && c != 0) {
+                // The quarter (its tile in the block), the pixel in it (8 x 8,
+                // from its top left), and the window its corner gives.
+                const bool right = (int(fx) & 1) != 0, top = (int(fy) & 1) != 0;
+                const int q = top ? (right ? 1 : 0) : (right ? 2 : 3);
+                const int u = std::clamp(int((fx - std::floor(fx)) * 8), 0, 7);
+                const int v = std::clamp(7 - int((fy - std::floor(fy)) * 8), 0, 7);
+                int mask = 0;
+                for (int bit = 0; bit < 4; ++bit) {
+                    const int nx = bx + kCorner[q][bit][0], ny = by + kCorner[q][bit][1];
+                    const bool same = nx < 0 || ny < 0 || nx >= map_.width || ny >= map_.height || !inView(nx, ny) ||
+                                      std::clamp(cellClass(nx, ny), 0, 7) == c;
+                    mask |= same ? 1 << bit : 0;
+                }
+                const uint8_t wr = kEdgeWindow[mask][q][0], wc = kEdgeWindow[mask][q][1];
+                const bool shape = (((v < 4 ? wr : wc) >> (u < 4 ? 1 : 0)) & 1) != 0;
+                // The hatch: a ring with a 5 x 5 hole; unsurveyed blocks solid.
+                const bool hatch = c == 1 || v < 2 || v == 7 || u < 2 || u == 7;
+                if (!shape || !hatch)
+                    c = 0; // the gaps and what's outside the shape: ground
+            }
             const Shift sh = border ? kBorder[r] : c == 0 ? kGround[r] : c == 1 ? kUnsurveyed[r] : kOres[c - 2];
             const auto out = shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
             p[0] = out[0], p[1] = out[1], p[2] = out[2];

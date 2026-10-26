@@ -1776,7 +1776,7 @@ void MissionViewer::drawTricorderMap(int x, int y, int w, int h, int tiles) {
             return 1;
         const int kind = map_.depositAt(bx, by);
         return kind >= 1 && kind <= 6 && map_.depositAmount(bx, by) > 0 ? 1 + kind : 0;
-    });
+    }, [&](int bx, int by) { return !fog_ || fog_->has(bx, by, Fog::Seen, playerSlot_); });
 }
 
 // The playbook a double click opens (exe.md#orders): for another side's

@@ -1093,9 +1093,15 @@ magnesite +90, dolamide +150, brightened 1.33-1.5 times), entry 0 of each
 band the race's background (a dark blue, brown or green). A pixel is the
 terrain code there in its block's class band (surveyed ground,
 unsurveyed, an ore), so code 0 shows the background. Blocks within 5 of
-the map's edge are drawn in the dark border band; class changes between
-blocks are blended through 16 edge shapes, and unsurveyed blocks are
-hatched (a ring, a dot or grid lines by the map scheme).
+the map's edge are drawn in the dark border band. Each block's class has
+a 32 x 32 tile: its hatch (in play, a ring an 8 x 8 cell with a 5 x 5
+hole; unsurveyed blocks and the border solid) drawn in the class's band,
+the hatch's gaps in the ground's. Each quarter of a block takes one of 16
+windows of that tile, by which of the four blocks round its outer corner
+share its class: four of them a solid quarter, none an empty one (a lone
+ore block shows as ground); a block out of view counts as sharing any
+class, plain ground never does. (Two other schemes, a dot and grid
+lines, are used only by some briefing scenes' model views.)
 
 Its line names what's under the pointer: an object, by the player's
 posture to its side (Friendly, Neutral, Hostile) and its class

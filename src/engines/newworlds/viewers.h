@@ -207,8 +207,13 @@ public:
     // block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6) gives a
     // hue, saturation and brightness shift, for the player's race, of the
     // map's own colour for the terrain code there.
+    // Each block is drawn from its class's tile: a hatch (a ring; solid for
+    // unsurveyed blocks and the border), cut at its edges by which of the
+    // blocks round each corner share its class (a block out of view counts
+    // as sharing it).
     void drawTricorder(Surface& s, int x, int y, int w, int h, int tiles, char race,
-                       const std::function<int(int bx, int by)>& cellClass);
+                       const std::function<int(int bx, int by)>& cellClass,
+                       const std::function<bool(int bx, int by)>& inView);
     // A world point's pixel on a minimap drawn at x, y, w, h (false if
     // it's outside it), and the world point under a pixel.
     bool minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py, int tiles = 0) const;
