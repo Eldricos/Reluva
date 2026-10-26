@@ -1106,11 +1106,15 @@ its site down with the full cost back.
   not hit. It's out only with a job, or on its way home. On a human side
   the vehicle yard builds worker bees when asked for one; construction
   and cargo bees are never made on demand, the jobs wait for one that's
-  free. All bees have 5 hit points.
+  free. Bees can't be hit (their hit points are set out of reach at
+  start-up).
 - **Flying.** Bees fly straight (no paths), a timed flight speeding up and
   slowing down, of distance / speed ticks and at least 10: 150 units a
-  tick for construction and cargo bees, 200 for worker bees. (The paces
-  in the table are for driving units.)
+  tick for construction and cargo bees, 200 for worker bees; construction
+  and cargo bees cruise in eight lanes 9000 to 12500 up (each the
+  least-used), worker bees 500 up between their building and its yard.
+  (The paces in the table are for driving units.) In and out of a
+  building they go through its dock (below).
 - **Building.** A site asks for four construction bees; each takes a free
   spot at its corners (2000 units out each way). The building is put
   together a piece at a time: its model's four corner sections, each cut
@@ -1123,20 +1127,55 @@ its site down with the full cost back.
   the way is replaced; the work done stays. No power or crew enters into
   it.
 - **Carrying.** Goods go in cargo pods (types 19, 60 and 79), 80 t the
-  Federation's and 160 t the Klingons' and Romulans'. A mine that holds a
-  pod's worth packs its stock into pods, evenly; it stops while four
-  wait. Every mine, processor and storage facility has a worker bee of
-  its own, which only moves pods between its building and a parking pad
-  beside it. Ore goes to the first processor with room (the list's order,
-  not the nearest), refined goods to a storage facility; a processor
-  packs its refined stock for storage every 32 ticks. A building with
-  more than one pod coming asks for a cargo bee, which carries two pods
-  a trip. Lost bees are asked for again. While the starting colony is
-  set up, pods arrive at once.
+  Federation's and 160 t the Klingons' and Romulans'; drawn as the
+  Federation's crate (`crate_l`), the Klingons' `kwbc` and the Romulans'
+  `rc`, each with its `_s` shadow. A mine that holds a pod's worth packs
+  its stock into pods, evenly; it stops while four wait. Every mine,
+  processor and storage facility has a worker bee of its own, which only
+  moves pods between its building and its **yard**: 16 places in an L
+  along the two outer edges of the quarter block its dock's RELEASE
+  point is in (256 in from the edges, 992 apart, the corner the ninth),
+  filled from the far end; aligned to the map, whatever way the building
+  faces. Docked inside, the worker bee takes a pod out when the yard has
+  two places free more than pods are coming: out of the dock, to the
+  place, a tick and a 30-tick lift to set it down, back in. Ore goes to
+  the first processor with room (the list's order, not the nearest),
+  refined goods to a storage facility; a processor packs its refined
+  stock for storage every 32 ticks. A building with more than one pod
+  coming asks for a cargo bee, which carries two a trip: it waits
+  (checking every 16 ticks) until its building's yard has two places
+  free and two pods are ready (after 64 checks, about 51 s, it goes for
+  one), flies to them, takes each up (a tick, a 50-tick climb), flies to
+  its own building's yard and sets each down (a tick, a 30-tick lift, a
+  50-tick climb). It never docks there: the building's worker bee takes
+  each pod in (out of its dock, to the pod, a tick, back in; the pod's
+  contents go into the store and the pod is gone). Lost bees are asked
+  for again. While the starting colony is set up, pods arrive at once.
 - Not found: the number of tiles each building's model gives (so the
-  build times; the training missions' timings stand in, with four bees),
-  and how long a bee stays docked, so a cargo trip's length (the
-  training missions' 2 t a second per mine stands in).
+  build times; the training missions' timings stand in, with four bees).
+
+### Docking
+
+Every building has a dock: its model's points VEHICLE_DOCK_ARRIVAL,
+_CAPTURE, _LOCK (where a vehicle parks inside), _RELEASE and
+_DEPARTURE. Going in: a tick, the flight from ARRIVAL to CAPTURE, the
+lock leg to LOCK, 5 ticks; coming out: a tick, the release leg to
+RELEASE, the flight to DEPARTURE (an unarmed APC stops at RELEASE). Each
+leg takes its length over the vehicle's speed (construction and cargo
+bees 150, worker bees 200, unarmed APCs 500), at least 10 ticks; the
+lock and release legs three times that (and play the building's door).
+At a level dock (CAPTURE to LOCK not within 10 degrees of straight up:
+hubs, yards, processors, pads) the heights on those legs don't count; a
+mine's and a sickbay's are vertical. So a bee takes about 111 ticks into
+the Federation hub and 122 out (ARRIVAL 6514 out along the model's −y
+and 5300 up; LOCK at its middle), a worker bee 46 into a mine, an APC 47
+into the hub and 42 out. Only one vehicle uses a dock at a time, coming
+or going; others wait where they are (a bee hovers), those leaving
+first. So four construction bees leave the hub about six seconds apart.
+Reluva reads the points from each building's model (`MissionSim::
+useModels`) and keeps each dock to one vehicle at a time; without the
+models (the tests) a dock takes 20 ticks each way.
+
 
 ### Repairs
 

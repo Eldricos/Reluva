@@ -444,13 +444,12 @@ kept apart from the game's behaviour:
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
 | F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking 9 degrees down | the game's offsets; its look angle isn't known |
 | Escape's box | "LEAVE THIS MISSION?" | Reluva's wording |
-| A transport's stops | 4 s to take people on or set them down, at a spot 1.2 tiles south of the building | the game's 80 ticks at a building without a dock; its docks' steps aren't timed, nor where its doors are |
+| A transport's stop | in through the building's dock and out to RELEASE, at a spot 1.2 tiles south of the building | the dock times are the game's; it drives to the dock's ARRIVAL point, which Reluva doesn't place |
+| Docks and yards | the model's points as they are in the model, the building not turned | the game turns them with the building; Reluva's colony buildings aren't turned |
+| A pod aboard | hangs under its bee, 400 lower | the game hangs it at the bee's BAY_n_LOCK point |
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
-| Bees | fly 1500 units up; a cargo bee docks 1 s | Reluva's: the game's dock times weren't timed |
-| A pad's places | 16, in a ring 6000 out round the building | the game lays out 80 round it |
-| Cargo pods' model | the Federation's small crate (`crate_s`) | the game's model for them isn't named in its tables |
 | Evacuating a razed building | 5 ticks at least, then as long as its bees take to leave; its people walk back to the hub's pool in 20 s | the game asks its parts each tick whether they can let go; the walk's time is Reluva's crew walk |
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |

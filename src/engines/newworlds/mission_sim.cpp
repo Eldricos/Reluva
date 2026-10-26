@@ -5,6 +5,7 @@
 
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/mdl.h"
 #include "engines/newworlds/placement.h"
 #include "engines/newworlds/start_data.h"
 
@@ -624,6 +625,43 @@ void MissionSim::rollOut() {
 }
 
 void MissionSim::useModels(const Archives& archives) {
+    // Each building's dock (exe.md#docking): its model's dock points, by
+    // the .mdl's names for the .geo's attachments.
+    economy_->setDocks([&archives, side = side_](const std::string& type) {
+        Economy::DockPoints d;
+        const std::string geoName = buildingModel(type, side);
+        if (geoName.rfind("geo/", 0) != 0)
+            return d;
+        const std::string mdlName = "mdl/" + geoName.substr(4, geoName.size() - 8) + ".mdl";
+        GeoModel geo;
+        MdlModel mdl;
+        bool haveGeo = false, haveMdl = false;
+        for (const auto& a : archives) {
+            std::vector<uint8_t> data;
+            if (const CatEntry* e = !haveGeo ? a->find(geoName) : nullptr; e && !a->read(*e, data))
+                haveGeo = !parseGeo(data, geo);
+            if (const CatEntry* e = !haveMdl ? a->find(mdlName) : nullptr; e && !a->read(*e, data))
+                haveMdl = !parseMdl(data, mdl);
+        }
+        if (!haveGeo || !haveMdl)
+            return d;
+        auto point = [&](const char* name, std::array<float, 3>& out) {
+            for (const MdlModel::Name& n : mdl.points)
+                if (n.name == name && n.value >= 0 && size_t(n.value) < geo.attachments.size()) {
+                    const auto& p = geo.attachments[size_t(n.value)].position;
+                    out = {p.x, p.y, p.z};
+                    return true;
+                }
+            return false;
+        };
+        d.known = point("VEHICLE_DOCK_ARRIVAL", d.arrival) && point("VEHICLE_DOCK_CAPTURE", d.capture) &&
+                  point("VEHICLE_DOCK_LOCK", d.lock) && point("VEHICLE_DOCK_RELEASE", d.release) &&
+                  point("VEHICLE_DOCK_DEPARTURE", d.departure);
+        // Vertical: CAPTURE to LOCK within 10 degrees of straight up or down.
+        const float dx = d.lock[0] - d.capture[0], dy = d.lock[1] - d.capture[1], dz = d.lock[2] - d.capture[2];
+        d.vertical = d.known && std::abs(dz) >= std::cos(10 * 3.14159265f / 180) * std::hypot(std::hypot(dx, dy), dz);
+        return d;
+    });
     auto radii = std::make_shared<std::map<std::string, float>>();
     world_->setRadius([&archives, radii](const Unit& u) {
         const CombatType* t = combatType(u.type);
@@ -653,7 +691,13 @@ void MissionSim::useModels(const Archives& archives) {
 // down and drives home into the hub. One lost on the way loses its
 // passengers; a hub lost loses those inside it.
 void MissionSim::runTransports(double dt) {
-    constexpr double kStop = 4; // 80 ticks at a building (the game's, without a dock)
+    // A stop: in through the building's dock and out again (an unarmed
+    // APC as far as RELEASE), at 500 a tick (exe.md#docking).
+    constexpr float kApcSpeed = 500;
+    auto stop = [&](int id) {
+        const ColonyStructure* c = economy_->structure(id);
+        return c ? (economy_->dockIn(*c, kApcSpeed) + economy_->dockOut(*c, kApcSpeed, false)) / 20.0 : 4.0;
+    };
     const ColonyStructure* hub = economy_->hub();
     if (!hub)
         garage_ = 0;
@@ -716,7 +760,7 @@ void MissionSim::runTransports(double dt) {
         const bool arrived = !u->moving() && (there || sh.tries >= 3);
         float x = 0, y = 0;
         if (sh.leg == 0 && arrived) {
-            sh.leg = 1, sh.wait = kStop;
+            sh.leg = 1, sh.wait = r ? stop(r->from) : 0;
         } else if ((sh.leg == 1 || sh.leg == 3) && (sh.wait -= dt) <= 0) {
             if (sh.leg == 1 && r) {
                 economy_->rideLoaded(sh.ride);
@@ -730,7 +774,7 @@ void MissionSim::runTransports(double dt) {
                     goTo(sh, hub->x, hub->y);
             }
         } else if (sh.leg == 2 && arrived) {
-            sh.leg = 3, sh.wait = kStop;
+            sh.leg = 3, sh.wait = r ? stop(r->to) : 0;
         } else if (sh.leg == 4 && arrived && hub) {
             world_->remove(sh.unit);
             ++garage_;

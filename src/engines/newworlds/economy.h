@@ -296,7 +296,11 @@ public:
         int spot = 0;         // its corner of the site (0-3)
         bool working = false; // at its spot, building
         bool loaded = false;  // a cargo bee on its way to the processor
-        int dock = 0;         // ticks still docked
+        int dock = 0;         // ticks still docked (or waiting: it doesn't fly meanwhile)
+        bool inside = false;  // a worker bee: docked in its building
+        bool docking = false; // going into the hub (home when its dock is done)
+        int fetching = 0;     // a worker bee: the pod on its yard it's on its way to take in
+        int retries = 0;      // a cargo bee: checks spent waiting for a second pod
         float fromX = 0, fromY = 0, toX = 0, toY = 0;
         int flown = 0, flight = 0; // ticks: 0 flight when not flying
         std::vector<int> pods;     // the pods aboard (a worker's one, a cargo bee's two)
@@ -322,9 +326,34 @@ public:
         int origin = 0, dest = 0; // structures (dest 0: no taker yet)
         enum State { Queued, Parked, Aboard } state = Queued;
         float x = 0, y = 0;       // parked: where
-        int slot = -1;            // its place on its pad
+        int pad = 0;              // the building whose yard it stands on (or is being set down on)
+        int slot = -1;            // its place there (-1 none)
+        bool inbound = false;     // aboard a worker bee taking it in to its building
     };
     const std::vector<Pod>& pods() const { return pods_; }
+
+    // Docks (exe.md#docking): each building's from its model's dock
+    // points (from its middle, world units): a vehicle flies in from
+    // ARRIVAL to CAPTURE and LOCK, out to RELEASE and DEPARTURE, each leg
+    // its distance over the vehicle's speed (at least 10 ticks; the lock
+    // and release legs three times that). One vehicle at a time. Without
+    // them, 20 ticks each way.
+    struct DockPoints {
+        bool known = false, vertical = false;
+        std::array<float, 3> arrival{}, capture{}, lock{}, release{}, departure{};
+    };
+    void setDocks(std::function<DockPoints(const std::string& type)> docks) {
+        docks_ = std::move(docks);
+        dockCache_.clear();
+    }
+    int dockIn(const ColonyStructure& s, float speed) const;
+    // (An unarmed APC stops at RELEASE: toDeparture false.)
+    int dockOut(const ColonyStructure& s, float speed, bool toDeparture = true) const;
+    const ColonyStructure* structure(int id) const;
+    // A mine's, processor's or storage facility's yard (exe.md#bees): its
+    // 16 places, an L along the outer edges of the quarter block its dock
+    // lets out into.
+    std::pair<float, float> padPlace(const ColonyStructure& s, int slot) const;
     // A mine's own store: the ore it has dug and not yet packed, tonnes by
     // ore kind - 1.
     std::array<float, kOres> mineStock(int structure) const;
@@ -402,6 +431,14 @@ private:
     ColonyStructure* structureById(int id);
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
+    std::function<DockPoints(const std::string&)> docks_;
+    mutable std::map<std::string, DockPoints> dockCache_;
+    const DockPoints& dockOf(const ColonyStructure& s) const;
+    std::map<int, int> dockFree_; // each building's dock: the bee tick it's next free
+    int beeClock_ = 0;
+    // A vehicle's turn at a building's dock, taking so many ticks: how long
+    // until it's through (its wait for the dock included).
+    int dockTurn(int structure, int ticks);
     bool free_ = false;
     bool beesModelled_ = false;
     std::vector<Bee> bees_;

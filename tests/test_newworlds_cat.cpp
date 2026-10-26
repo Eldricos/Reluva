@@ -1433,18 +1433,20 @@ void testBees() {
     e.addBuilt("colony-hub", 0, 0);
     e.setBees(4, 0);
     CHECK(e.bees().size() == 4 && e.bees()[0].home);
-    // A yard (45 s with four) 15000 off: the bees fly 4.4-5.7 s first.
+    // A yard (45 s with four) 15000 off: the bees leave the hub one at a
+    // time through its dock (1 s each without its model's points) and fly
+    // 4.4-5.7 s.
     const int yard = e.order("construction-yard", 15000, 0, 0, 0);
     const int second = e.order("construction-yard", -15000, 0, 0, 0);
     CHECK(yard && second);
     CHECK(built(e, 3) == 0 && e.beesAt(yard) == 0);
-    CHECK(built(e, 3) == 0 && e.beesAt(yard) == 4 && e.beesAt(second) == 0);
-    CHECK(built(e, 43) == 0);
-    CHECK(built(e, 2) == 1);
+    CHECK(built(e, 7) == 0 && e.beesAt(yard) == 4 && e.beesAt(second) == 0);
+    CHECK(built(e, 38) == 0);
+    CHECK(built(e, 6) == 1);
     // On to the second (30000 away: 9-11 s), all four, its 45 s.
-    CHECK(built(e, 52) == 0 && e.beesAt(second) == 4);
-    CHECK(built(e, 3) == 1);
-    built(e, 8);
+    CHECK(built(e, 48) == 0 && e.beesAt(second) == 4);
+    CHECK(built(e, 6) == 1);
+    built(e, 14); // home, in through the hub's dock one at a time
     CHECK(std::all_of(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.home; }));
     // One bee: four times as long.
     Economy one('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
@@ -1497,6 +1499,22 @@ void testBees() {
         }
         for (const Economy::Pod& p : m.pods())
             CHECK(p.load[size_t(4)] > 0 || p.refined); // magnesite (kind 5) in every ore pod
+    }
+    // A yard: an L round the outer corner of the quarter block its dock
+    // lets out into (here the building's middle, without a model: the
+    // block's north-east quarter), 256 in from the edges, 992 apart.
+    {
+        Economy y('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        const int st = y.addBuilt("storage-facility", 2.5f * 16384, 3.5f * 16384);
+        const ColonyStructure* c = y.structure(st);
+        CHECK(c != nullptr);
+        if (c) {
+            const float ox = 2.5f * 16384, oy = 3.5f * 16384;
+            CHECK(y.padPlace(*c, 0) == std::make_pair(ox + 7936, oy + 0.0f));
+            CHECK(y.padPlace(*c, 8) == std::make_pair(ox + 7936, oy + 7936));
+            CHECK(y.padPlace(*c, 15) == std::make_pair(ox + 992, oy + 7936));
+            CHECK(y.dockIn(*c, 150) == 20 && y.dockOut(*c, 150) == 20); // no model: 20 ticks
+        }
     }
     // Without bees nothing goes up.
     Economy none('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);

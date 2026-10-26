@@ -711,29 +711,36 @@ void MissionViewer::showUnits() {
             }
     // The colony's bees out of the hub: flying (rising off and settling
     // back down), or docked at a mine or the processor; those at work on a
-    // site the map draws at its corners.
+    // site the map draws at its corners. Construction and cargo bees cruise
+    // in eight lanes 9000-12500 up (exe.md#docking), worker bees 500 up
+    // between their building and its yard; a pod aboard hangs under its bee.
     if (economy_) {
-        constexpr float kBeeHeight = 1500;
         const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
         const char* conBee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
-        const char* cargoBee = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rwbc.geo" : "geo/fed/fcarb.geo";
+        const char* cargoBee = side == 'K' ? "geo/kln/kwb.geo" : side == 'R' ? "geo/rom/rwbc.geo" : "geo/fed/fcarb.geo";
         const char* workBee = side == 'K' ? "geo/kln/kwb.geo" : side == 'R' ? "geo/rom/rwb.geo" : "geo/fed/workbee.geo";
+        // The pods: the Federation's crate, the Klingons' and Romulans' own.
+        const char* pod = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rc.geo" : "geo/fed/crate_l.geo";
         for (const Economy::Bee& b : economy_->bees()) {
             // (A worker bee waiting at its building is docked inside it.)
             if (b.home || b.working || (b.worker && b.flight == 0 && b.pods.empty()))
                 continue;
             const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
-            const float lift = b.flight > 0 ? kBeeHeight * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
+            const float height = b.worker ? 500.0f : 9000.0f + 500.0f * float(b.id % 8);
+            const float lift = b.flight > 0 ? height * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
             MapViewer::UnitDraw d{b.worker ? workBee : b.cargo ? cargoBee : conBee, b.x, b.y, b.heading};
             d.lift = lift;
             draw.push_back(d);
+            for (size_t k = 0; k < b.pods.size(); ++k) {
+                MapViewer::UnitDraw c{pod, b.x + float(k) * 600, b.y, b.heading};
+                c.lift = std::max(0.0f, lift - 400);
+                draw.push_back(c);
+            }
         }
-        // The cargo pods parked on their pads (Reluva draws them as the
-        // Federation's small crate: which model the game's pods use isn't
-        // known).
+        // The cargo pods standing on the yards.
         for (const Economy::Pod& p : economy_->pods())
             if (p.state == Economy::Pod::Parked)
-                draw.push_back({"geo/fed/crate_s.geo", p.x, p.y, 0});
+                draw.push_back({pod, p.x, p.y, 0});
     }
     map_.setUnits(std::move(draw));
 }

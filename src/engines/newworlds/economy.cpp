@@ -51,8 +51,8 @@ constexpr int kShipEvery = 32;
 // pad's places round its building (the game lays out 80), how far out;
 // most coming to one building; how long a worker bee waits to load; a
 // worker bee's speed.
-constexpr int kPodsWaiting = 4, kPadPlaces = 16, kMostIncoming = 17, kWorkerLoad = 4;
-constexpr float kPadRing = 6000, kWorkerSpeed = 200;
+constexpr int kPodsWaiting = 4, kPadPlaces = 16, kMostIncoming = 17;
+constexpr float kWorkerSpeed = 200;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
 // x 300 power units; each tick a running yard takes up to 300 from its
 // buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
@@ -1290,6 +1290,78 @@ void Economy::unload(const Pod& p) {
     deposit(p.load);
 }
 
+const Economy::DockPoints& Economy::dockOf(const ColonyStructure& s) const {
+    auto [it, fresh] = dockCache_.try_emplace(s.type);
+    if (fresh && docks_)
+        it->second = docks_(s.type);
+    return it->second;
+}
+
+namespace {
+// A dock leg's ticks: its length over the speed, at least 10.
+int leg(const std::array<float, 3>& a, const std::array<float, 3>& b, float speed, bool level) {
+    const float d = level ? std::hypot(b[0] - a[0], b[1] - a[1])
+                          : std::hypot(std::hypot(b[0] - a[0], b[1] - a[1]), b[2] - a[2]);
+    return std::max(10, int(d / speed));
+}
+} // namespace
+
+// In: a tick's wait for its slot, ARRIVAL to CAPTURE, the lock leg (three
+// times as long; at a level dock the heights don't count), then 5 ticks.
+// Out: a tick, the release leg (three times), RELEASE to DEPARTURE.
+int Economy::dockIn(const ColonyStructure& s, float speed) const {
+    const DockPoints& d = dockOf(s);
+    if (!d.known)
+        return kDockTicks;
+    return 1 + leg(d.arrival, d.capture, speed, false) + 3 * leg(d.capture, d.lock, speed, !d.vertical) + 5;
+}
+
+int Economy::dockOut(const ColonyStructure& s, float speed, bool toDeparture) const {
+    const DockPoints& d = dockOf(s);
+    if (!d.known)
+        return kDockTicks;
+    return 1 + 3 * leg(d.lock, d.release, speed, !d.vertical) + (toDeparture ? leg(d.release, d.departure, speed, false) : 0);
+}
+
+const ColonyStructure* Economy::structure(int id) const {
+    for (const ColonyStructure& s : structures_)
+        if (s.id == id)
+            return &s;
+    return nullptr;
+}
+
+int Economy::dockTurn(int structure, int ticks) {
+    int& free = dockFree_[structure];
+    const int start = std::max(beeClock_, free);
+    free = start + ticks;
+    return free - beeClock_;
+}
+
+std::pair<float, float> Economy::padPlace(const ColonyStructure& s, int slot) const {
+    // The quarter block the dock's RELEASE point is in (the building's
+    // middle without one), and the L round its outer corner: 256 in from
+    // the edges, 992 apart; places 0-8 along one edge to the corner, 9-15
+    // along the other.
+    const DockPoints& d = dockOf(s);
+    const float px = s.x + (d.known ? d.release[0] : 0), py = s.y + (d.known ? d.release[1] : 0);
+    constexpr float kBlockSize = 16384, kQuarter = 8192;
+    const float bx = std::floor(px / kBlockSize) * kBlockSize, by = std::floor(py / kBlockSize) * kBlockSize;
+    const bool east = px - bx >= kQuarter, north = py - by >= kQuarter;
+    const float ox = bx + (east ? kQuarter : 0), oy = by + (north ? kQuarter : 0);
+    const int i = std::clamp(slot, 0, kPadPlaces - 1);
+    const float along = i <= 8 ? 992.0f * float(i) : 1248.0f + 992.0f * float(i - 9);
+    float x = 0, y = 0;
+    if (!east && !north) // the outer edges: west and south
+        std::tie(x, y) = i <= 8 ? std::pair{256.0f, 8192 - along} : std::pair{1248.0f + 992.0f * float(i - 9), 256.0f};
+    else if (east && !north) // south and east
+        std::tie(x, y) = i <= 8 ? std::pair{along, 256.0f} : std::pair{7936.0f, 1248.0f + 992.0f * float(i - 9)};
+    else if (east && north) // east and north
+        std::tie(x, y) = i <= 8 ? std::pair{7936.0f, along} : std::pair{6944.0f - 992.0f * float(i - 9), 7936.0f};
+    else // north and west
+        std::tie(x, y) = i <= 8 ? std::pair{8192 - along, 7936.0f} : std::pair{256.0f, 6944.0f - 992.0f * float(i - 9)};
+    return {ox + x, oy + y};
+}
+
 // The pods' tick: each building's worker bee (given one, or asked of
 // the yard), flying its pods out to its pad; the pods offered to whoever
 // takes them; cargo bees for buildings with more than one coming,
@@ -1300,10 +1372,6 @@ void Economy::podTick() {
             if (s.id == id)
                 return &s;
         return nullptr;
-    };
-    auto padPlace = [&](const ColonyStructure& s, int slot) {
-        const float a = float(slot) * 2 * 3.14159265f / kPadPlaces;
-        return std::pair{s.x + kPadRing * std::cos(a), s.y + kPadRing * std::sin(a)};
     };
     auto at = [](const Bee& b, float x, float y) { return std::hypot(b.x - x, b.y - y) < 1; };
     auto flyWorker = [&](Bee& b, float x, float y) {
@@ -1333,29 +1401,80 @@ void Economy::podTick() {
                     break;
                 }
     }
-    // Each worker bee: a pod from its building out to a free place on the
-    // pad, then back.
+    // A building's yard: its places taken (by pods standing there or being
+    // set down there), and the pods on their way to it.
+    auto yardUsed = [&](int id) {
+        std::array<bool, kPadPlaces> used{};
+        for (const Pod& p : pods_)
+            if (p.pad == id && p.slot >= 0)
+                used[size_t(p.slot)] = true;
+        return used;
+    };
+    auto freePlace = [&](int id) { // the highest free place (the game fills them from the far end), or -1
+        const auto used = yardUsed(id);
+        for (int k = kPadPlaces - 1; k >= 0; --k)
+            if (!used[size_t(k)])
+                return k;
+        return -1;
+    };
+    auto freeCount = [&](int id) {
+        const auto used = yardUsed(id);
+        return int(std::count(used.begin(), used.end(), false));
+    };
+    auto podById = [&](int id) -> Pod* {
+        for (Pod& q : pods_)
+            if (q.id == id)
+                return &q;
+        return nullptr;
+    };
+    // Each worker bee (exe.md#bees): docked in its building, it takes in a
+    // pod set down on its yard (out of the dock, to the pod, a tick to take
+    // it, back and in: its contents go into the store), or takes one of its
+    // own out (with two places free more than are coming): out of the dock,
+    // to the highest free place, a tick and a 30-tick lift to set it down,
+    // back and in.
     for (Bee& w : bees_) {
         if (!w.worker || !w.site || w.flight || w.dock)
             continue;
         const ColonyStructure* s = find(w.site);
         if (!s) {
-            w.site = 0;
+            w.site = 0, w.inside = false;
+            continue;
+        }
+        if (w.fetching) { // at the pod it went for
+            Pod* p = podById(w.fetching);
+            w.fetching = 0;
+            if (p && p->state == Pod::Parked && at(w, p->x, p->y)) {
+                p->state = Pod::Aboard, p->inbound = true, p->pad = 0, p->slot = -1;
+                w.pods = {p->id};
+                w.dock = 1;
+            }
+            flyWorker(w, s->x, s->y);
             continue;
         }
         if (!w.pods.empty()) {
-            if (Pod* p = [&]() -> Pod* {
-                    for (Pod& q : pods_)
-                        if (q.id == w.pods[0])
-                            return &q;
-                    return nullptr;
-                }();
-                p && at(w, p->x, p->y)) {
+            Pod* p = podById(w.pods[0]);
+            if (!p) {
+                w.pods.clear();
+            } else if (p->inbound) {
+                if (at(w, s->x, s->y)) { // in through the dock with it
+                    w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
+                    w.inside = true;
+                    w.pods.clear();
+                    for (auto it = pods_.begin(); it != pods_.end(); ++it)
+                        if (it->id == p->id) {
+                            unload(*it);
+                            pods_.erase(it);
+                            break;
+                        }
+                } else {
+                    flyWorker(w, s->x, s->y);
+                }
+            } else if (at(w, p->x, p->y)) { // set down on its place
                 p->state = Pod::Parked;
                 w.pods.clear();
+                w.dock = 31;
                 flyWorker(w, s->x, s->y);
-            } else if (!p) {
-                w.pods.clear();
             }
             continue;
         }
@@ -1363,22 +1482,38 @@ void Economy::podTick() {
             flyWorker(w, s->x, s->y);
             continue;
         }
-        std::array<bool, kPadPlaces> used{};
-        for (const Pod& p : pods_)
-            if (p.origin == s->id && p.slot >= 0)
-                used[size_t(p.slot)] = true;
-        const auto free = std::find(used.begin(), used.end(), false);
-        if (free == used.end())
+        if (!w.inside) {
+            w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
+            w.inside = true;
+            continue;
+        }
+        // A pod for it on its yard first.
+        Pod* in = nullptr;
+        for (Pod& p : pods_)
+            if (p.state == Pod::Parked && p.pad == s->id && p.dest == s->id) {
+                in = &p;
+                break;
+            }
+        if (in) {
+            w.inside = false;
+            w.fetching = in->id;
+            flyWorker(w, in->x, in->y);
+            w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
+            continue;
+        }
+        const int coming = int(std::count_if(pods_.begin(), pods_.end(),
+                                             [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }));
+        if (freeCount(s->id) - coming < 2)
             continue;
         for (Pod& p : pods_)
             if (p.origin == s->id && p.state == Pod::Queued) {
                 p.state = Pod::Aboard;
-                p.slot = int(free - used.begin());
+                p.pad = s->id, p.slot = freePlace(s->id);
                 std::tie(p.x, p.y) = padPlace(*s, p.slot);
                 w.pods = {p.id};
-                w.dock = kWorkerLoad;
-                fly(w, p.x, p.y);
-                w.flight = std::max(10, int(std::hypot(p.x - w.fromX, p.y - w.fromY) / kWorkerSpeed));
+                w.inside = false;
+                flyWorker(w, p.x, p.y);
+                w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
                 break;
             }
     }
@@ -1409,8 +1544,12 @@ void Economy::podTick() {
                 break;
             }
     }
-    // Each cargo bee: to the pods for its building, two aboard, back, and
-    // their contents into its store.
+    // Each cargo bee (exe.md#bees): it waits (checking every 16 ticks)
+    // until its building's yard has two places free and two pods are ready
+    // (after 64 checks it goes for one); flies to them, takes up to two (a
+    // tick each, a 50-tick climb), flies to its building's yard and sets
+    // each down (a tick, a 30-tick lift, a 50-tick climb), for the
+    // building's worker bee to take in. It never docks there.
     for (Bee& b : bees_) {
         if (!b.cargo || !b.site || b.flight || b.dock)
             continue;
@@ -1420,45 +1559,52 @@ void Economy::podTick() {
             continue;
         }
         if (!b.pods.empty()) {
-            if (!at(b, s->x, s->y)) {
-                fly(b, s->x, s->y);
+            const auto [cx, cy] = padPlace(*s, 8);
+            if (!at(b, cx, cy)) {
+                fly(b, cx, cy);
+                continue;
+            }
+            if (freeCount(s->id) < int(b.pods.size())) {
+                b.dock = 16;
                 continue;
             }
             for (int id : b.pods)
-                for (auto it = pods_.begin(); it != pods_.end(); ++it)
-                    if (it->id == id) {
-                        unload(*it);
-                        pods_.erase(it);
-                        break;
-                    }
+                if (Pod* p = podById(id)) {
+                    p->state = Pod::Parked, p->pad = s->id, p->slot = freePlace(s->id);
+                    std::tie(p->x, p->y) = padPlace(*s, p->slot);
+                }
+            b.dock = 81 * int(b.pods.size());
             b.pods.clear();
-            b.dock = kDockTicks;
             continue;
         }
-        Pod* next = nullptr;
+        std::vector<Pod*> ready;
         for (Pod& p : pods_)
-            if (p.dest == s->id && p.state == Pod::Parked) {
-                next = &p;
-                break;
-            }
-        if (!next) {
+            if (p.dest == s->id && p.state == Pod::Parked && p.pad != s->id)
+                ready.push_back(&p);
+        if (ready.empty()) {
             // Nothing ready: free again, unless more are on their way.
-            if (std::none_of(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s->id; }))
-                b.site = 0, depots_[s->id].cargo = 0;
+            if (std::none_of(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }))
+                b.site = 0, depots_[s->id].cargo = 0, b.retries = 0;
             continue;
         }
-        if (!at(b, next->x, next->y)) {
-            fly(b, next->x, next->y);
+        const int origin = ready[0]->pad;
+        const bool two = std::count_if(ready.begin(), ready.end(), [&](const Pod* p) { return p->pad == origin; }) >= 2;
+        if (freeCount(s->id) < 2 || (!two && b.retries < 64)) {
+            ++b.retries;
+            b.dock = 16;
             continue;
         }
-        // Two aboard: this one and another for the same building on this pad.
-        const int origin = next->origin;
-        for (Pod& p : pods_)
-            if (b.pods.size() < 2 && p.dest == s->id && p.state == Pod::Parked && p.origin == origin) {
-                p.state = Pod::Aboard, p.slot = -1;
-                b.pods.push_back(p.id);
+        if (!at(b, ready[0]->x, ready[0]->y)) {
+            fly(b, ready[0]->x, ready[0]->y);
+            continue;
+        }
+        for (Pod* p : ready)
+            if (b.pods.size() < 2 && p->pad == origin) {
+                p->state = Pod::Aboard, p->pad = 0, p->slot = -1;
+                b.pods.push_back(p->id);
             }
-        b.dock = kDockTicks;
+        b.retries = 0;
+        b.dock = 51 * int(b.pods.size());
     }
     // Pods aboard move with their bee.
     for (const Bee& b : bees_)
@@ -1481,14 +1627,18 @@ const ColonyStructure* Economy::hub() const {
 }
 
 void Economy::fly(Bee& b, float x, float y) {
-    if (const ColonyStructure* h = b.home ? hub() : nullptr)
+    const ColonyStructure* h = b.home ? hub() : nullptr;
+    if (h)
         b.x = h->x, b.y = h->y; // out of the hub
-    b.home = false, b.working = false;
+    b.home = false, b.working = false, b.docking = false;
     b.fromX = b.x, b.fromY = b.y, b.toX = x, b.toY = y;
     b.flown = 0;
     b.flight = std::max(kShortestFlight, int(std::hypot(x - b.x, y - b.y) / kBeeSpeed));
     if (x != b.x || y != b.y)
         b.heading = std::atan2(y - b.y, x - b.x);
+    // Out through the hub's dock first, in its turn.
+    if (h)
+        b.dock = dockTurn(h->id, dockOut(*h, b.worker ? kWorkerSpeed : kBeeSpeed));
 }
 
 // A tick of the bees: flights on, then each idle one given work: a site
@@ -1501,17 +1651,20 @@ void Economy::beeTick() {
                 return &s;
         return nullptr;
     };
-    const ColonyStructure* processor = nullptr;
-    for (const ColonyStructure& s : structures_)
-        if (s.type == "resource-processor" && s.progress >= 1)
-            processor = &s;
+    ++beeClock_;
     for (Bee& b : bees_) {
-        if (b.home)
-            continue;
-        if (b.dock > 0) {
-            --b.dock;
+        if (b.home) {
+            if (b.dock > 0)
+                --b.dock; // (a cargo bee waiting in the hub for its pods)
             continue;
         }
+        if (b.dock > 0) {
+            if (--b.dock == 0 && b.docking)
+                b.home = true, b.docking = false; // in through the hub's dock
+            continue;
+        }
+        if (b.docking)
+            continue;
         if (b.flight == 0)
             continue;
         // Speeding up and slowing down along the way (the game's curve).
@@ -1520,13 +1673,18 @@ void Economy::beeTick() {
         if (b.flown < b.flight)
             continue;
         b.flight = 0;
+        // Home: in through the hub's dock, in its turn.
+        auto dockHome = [&] {
+            b.dock = dockTurn(h->id, dockIn(*h, b.worker ? kWorkerSpeed : kBeeSpeed));
+            b.docking = true;
+        };
         if (b.cargo || b.worker) {
             if (!b.site && h && std::hypot(b.x - h->x, b.y - h->y) < 1)
-                b.home = true;
+                dockHome();
         } else if (b.site) {
             b.working = true;
         } else if (h && std::hypot(b.x - h->x, b.y - h->y) < 1) {
-            b.home = true;
+            dockHome();
         }
     }
     // A site gone (or done) lets its bees go.
@@ -1559,7 +1717,7 @@ void Economy::beeTick() {
     podTick();
     // Idle ones home.
     for (Bee& b : bees_)
-        if (!b.site && !b.home && b.flight == 0 && b.dock == 0 && h)
+        if (!b.site && !b.home && !b.docking && b.flight == 0 && b.dock == 0 && h)
             fly(b, h->x, h->y);
 }
 
