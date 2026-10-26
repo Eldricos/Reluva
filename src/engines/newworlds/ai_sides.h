@@ -111,6 +111,7 @@ public:
         double legSeconds;  // since its leg began (since it started, while gathering)
         int site;           // a build's building, once put up (its unit id)
         int blocker;        // a build's: what stands on its spot instead (unit id; 0 none)
+        std::string refusal; // else why its spot fails the placement test (empty: it passes)
         std::vector<int> ids; // its units
     };
     std::vector<OrderStatus> status() const;

@@ -613,13 +613,25 @@ std::vector<AiSides::OrderStatus> AiSides::status() const {
         if (r.done)
             continue;
         int blocker = 0;
+        std::string refusal;
         if ((r.order->task == 3 || r.order->task == 9) && r.order->ways > 0 && !r.site) {
             const auto [wx, wy] = wayPoint(*r.order, 0);
-            blocker = placementBlocker(world_, r.order->type, (std::floor(wx / kTile) + 0.5f) * kTile,
-                                       (std::floor(wy / kTile) + 0.5f) * kTile);
+            const float tx = (std::floor(wx / kTile) + 0.5f) * kTile, ty = (std::floor(wy / kTile) + 0.5f) * kTile;
+            blocker = placementBlocker(world_, r.order->type, tx, ty);
+            const int slot = r.order->slot;
+            const auto seen = [&](int bx, int by) { return !seen_ || seen_(slot, bx, by); };
+            switch (placementTest(world_, r.order->type, tx, ty, slot, seen)) {
+            case PlaceFail::Edge: refusal = "at the map's edge"; break;
+            case PlaceFail::Ground: refusal = "not ground it can stand on"; break;
+            case PlaceFail::Unseen: refusal = "not seen by its side"; break;
+            case PlaceFail::Taken: refusal = "taken"; break;
+            case PlaceFail::Units: refusal = "units in the way"; break;
+            case PlaceFail::Deposit: refusal = "no ore"; break;
+            case PlaceFail::None: break;
+            }
         }
         out.push_back({r.order, r.started, r.gathered, r.hunting, int(r.units.size()), r.awaited, r.leg,
-                       r.gathered ? r.legClock : r.clock, r.site, blocker, r.units});
+                       r.gathered ? r.legClock : r.clock, r.site, blocker, refusal, r.units});
     }
     return out;
 }

@@ -863,7 +863,8 @@ std::vector<std::string> MissionSim::problems() const {
                 out.push_back("stuck: build never placed (its spot " + std::to_string(o.way[0][0]) + ":" +
                               std::to_string(o.way[0][1]) + " " +
                               (b ? "has slot " + std::to_string(b->slot) + "'s " + b->name + " at " + mapPosition(b->x, b->y)
-                                 : std::string("refused by the economy")) +
+                                 : !s.refusal.empty() ? s.refusal
+                                                      : std::string("refused by the economy")) +
                               "): " + orderName(o));
             }
             continue;

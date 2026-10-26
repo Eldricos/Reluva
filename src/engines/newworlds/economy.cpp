@@ -522,7 +522,9 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
 
 int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     const BuildingType* t = buildingType(type);
-    if (!t || (free_ ? !t->upgradeOf.empty() || !t->sides[size_t(sideIndex())] : !available(*t)))
+    // (An AI's build order may name an advanced building outright: in the
+    // game those are types of their own, the AI's 189 an advanced mine.)
+    if (!t || (free_ ? !t->sides[size_t(sideIndex())] : !available(*t)))
         return 0;
     if (!free_ && !affordable(*t)) {
         pendingShort_.push_back({"short-resources", {}});
