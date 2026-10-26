@@ -40,16 +40,11 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 Select each item and screenshot it close up, from two sides, with the
 selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
-- **Federation** [shot]: the storage facility and the Klingon defensive
-  artillery (their building models are guesses: `prost`, `kdwsp`), and the
-  power generator, advanced generator, mining station, photon turret,
-  defence artillery, shield generator and landing pad close up.
-  ([play-f1.md](play-f1.md#buildings-and-their-models))
-- **Romulan buildings** [shot]: the order of the two hub upgrades
-  (`rch_b` tower first, `rch_c` spiked plate second?: the data names them
-  but not their models), the utility hospital upgrade (`ruh_b`?), and the
-  transporter pad (`rbcs`), shield generator (`rcss`), static disruptor
-  (`rdds`) and photon defense (`rpds`) on the ground. ([colony.md](colony.md#romulan-matches))
+- **Romulan hub upgrades** [shot]: the manual supports `rch_b` (a tower)
+  as the first upgrade and `rch_c` (a base under it) the second; one
+  close-up of an upgraded Romulan hub would confirm it. The manual's
+  pictures settled the other model guesses (the storage facility, turrets,
+  shield generators, transporter pad and utility hospital; colony.md).
 - **Natives** [shot]: R2's black many-legged unit at 36:30 (an Orion tank
   `odv` or a Taubat tank `tgp`?), and J7R's magenta map marker.
   ([play-r2.md](play-r2.md), [play-j7r.md](play-j7r.md))

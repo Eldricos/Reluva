@@ -103,7 +103,9 @@ them ([play-f1.md](play-f1.md), [play-k1.md](play-k1.md); the Romulan
 column from the Romulan recordings, see [Romulan matches](#romulan-matches)
 below). Those marked *name* aren't matched in a recording yet but are named
 so by the game's own metamodels (below); the turrets marked *guess* by their
-models' names alone.
+models' names alone. The manual's pictures (pre-release builds, but each
+captioned) settle the turrets, shield generators, transporter pad, storage
+facility and utility hospital as marked.
 
 | Building | Federation | Klingon | Romulan |
 |---|---|---|---|
@@ -116,19 +118,17 @@ models' names alone.
 | Advanced generator | `fpgs2` *name* | `kpgs2` | `rps2` |
 | Mining station | `fms` *name* | `kms` | `rms` |
 | Accommodation (the Klingons' Arsenal) | `accom` | `kab` | `rab` *name* |
-| Sickbay (the Romulans' utility hospital) | `fsb` | `ksb_a` | `ruh_a` (upgrade `ruh_b`, likely) |
+| Sickbay (the Romulans' utility hospital) | `fsb` | `ksb_a` | `ruh_a` (upgrades `ruh_b`: the manual's picture, p. 111, shows the slatted tower on the base) |
 | Science station | `fss_a` *name* | `kss_a` | `rsb_a` |
 | Science station upgrade | `fss_b` *name* | `kss_b` *name* | `rsb_b` |
 | Security center | `fsc` | `ksc` *name* | `risb` *name* |
 | Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
-| Storage facility (the Romulans' material storage) | | `ksf` | `rsf` |
+| Storage facility (the Romulans' material storage) | `prostor` (the manual's picture, p. 47) | `ksf` | `rsf` |
 | Landing pad | `landpad` *name* | | |
-| Transporter pad | | | `rbcs` |
-| Photon turret | `fpdt` *guess* | | |
-| Disruptor turret | | `ksg` | |
-| Static disruptor | | `kdws` *guess* | `rdds` |
-| Photon defense (not a script name) | | | `rpds` |
-| Shield generator (not a script name) | | | `rcss` |
+| Transporter pad | | | `rbcs` (the manual, p. 113) |
+| Photon turret (the Klingons' photon launcher, the Romulans' photon defense) | `fpdt` *guess* | `kdwsp` (the manual, p. 86) | `rpds` (the manual, p. 117) |
+| Disruptor turret (the Romulans' static disruptor) | | `kdws` (the manual, p. 85) | `rdds` (the manual, p. 116) |
+| Shield generator | `fsg` | `ksg` (the manual, p. 87: not the disruptor turret) | `rcss` (the manual, p. 118) |
 
 ### The game's names for the buildings
 

@@ -57,7 +57,7 @@ constexpr ObjectType kTypes[] = {
     {83, true, "defensive-artillery", "geo/fed/fpds.geo", 0},
     {84, true, "defensive-artillery", "geo/rom/rpds.geo", 0},
     {121, true, "resource-processor", "geo/rom/rrpp_a.geo", 0},
-    {122, true, "storage-facility", "", 0},
+    {122, true, "storage-facility", "geo/fed/prostor.geo", 0}, // (the manual's picture)
     {123, true, "sickbay", "geo/fed/fsb.geo", 0},
     {124, true, "sickbay", "geo/kln/ksb_a.geo", 0},
     {125, true, "sickbay", "geo/rom/ruh_a.geo", 0},

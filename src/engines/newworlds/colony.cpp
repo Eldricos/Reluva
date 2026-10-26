@@ -83,15 +83,15 @@ constexpr ModelEntry kModels[] = {
     {"hydroponics-farm", "FHF", "", ""},
     {"livestock-farm", "", "KLF", ""},
     {"clone-farm", "", "", "rcbf"},
-    {"storage-facility", "", "KSF", "RSF"},
+    {"storage-facility", "PROSTOR", "KSF", "RSF"},
     {"landing-pad", "landpad", "", ""},
     {"transporter-pad", "landpad", "", "RBCS"},
     {"farm", "FHF", "KLF", "rcbf"},
     {"photon-turret", "fpdt", "", ""},
-    {"disruptor-turret", "", "KSG", ""},
+    {"disruptor-turret", "", "KDWS", ""},
     {"static-disruptor", "", "kdws", "RDDS"},
     // The economy's defences, by the models the game's tables give their
-    // types (the Klingon shield generator's is likely: ksg pairs with fsg).
+    // types (the Klingon shield generator's ksg, as the manual shows it).
     {"shield-generator", "fsg", "ksg", "rcss"},
     {"defensive-weapon", "fpdt", "kdws", "rdds"},
     {"defensive-artillery", "fpds", "kdwsp", "rpds"},

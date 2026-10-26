@@ -477,7 +477,7 @@ kept apart from the game's behaviour:
 | A unit in a building's way | its position inside the spot's box (half the footprint and 512 more) | the game keeps a box per unit as it moves; their size isn't known |
 | Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
 | Defences' build time | 40 s | Reluva's: not timed |
-| The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
+| The Klingon shield generator's model | `ksg` | the manual's picture (p. 87, a hooked arm) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
 | The Tricorder's ground and ore colours | each point's terrain colour shifted for its block's class and the race; ores hatched in rings and blended at their edges by the blocks round each corner, unsurveyed blocks solid, the border dark | the executable (exe.md#the-tricorder) |
