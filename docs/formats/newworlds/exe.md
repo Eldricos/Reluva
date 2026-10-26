@@ -424,6 +424,53 @@ So spots several sides share in the data (C1's 322:338 for the Klingon
 and Romulan tanks, the Klingon bees at another map's hub, 424:71 in
 D1-E3, R9's 352:320) are never where those units start.
 
+### Building placement
+
+One test decides where a building can go, for the player's hologram
+(green or red) and the AI's build orders alike. Each type has a
+footprint, snapped to its middle:
+
+- **a block** (16384 across): hubs, vehicle yards, the Federation and
+  Romulan construction yards, accommodation blocks, sickbays, security
+  centres (but the Romulan one), the hydroponics farm, the Romulan
+  storage processor and science block;
+- **a tile** (8192): the Klingon construction yard, storage processors and
+  facilities, landing pads, the Federation and Klingon science blocks,
+  advanced power generators, the livestock and clone farms, the Romulan
+  security centre;
+- **a quarter of a tile** (4096): every defensive weapon and artillery,
+  shield generators, plain power generators;
+- mining stations take a block of their own kind (below).
+
+A spot must be inside the map and not in its outermost ring of blocks; a
+block or tile footprint needs all four tiles of its block to be building
+ground (a quarter needs nothing of the ground, so turrets go on slopes
+or water); the side must see the block now (there is no build radius and
+no distance from the hub: anywhere it sees); its part of the block must
+be free, and for a tile or quarter the block no other side's; and no
+unit may stand in a box round the spot (half the footprint and 512 more
+each way, the next block too if it reaches over). Buildings may touch
+edge to edge. Ground comes from the map: each tile record's bytes 15-17
+mark the colonies' pad ground (model 32), natural building ground
+(37-40) and open ground (6-8, 33-36), the same on every map; no slope or
+height figure is used. A mining station needs a whole empty block of
+open ground and none of building ground; for the player (not the AI)
+the block must also hold ore.
+
+An AI build order takes the middle of its waypoint's tile, tests it the
+same way each time its turn comes, and builds once it passes; it never
+tries another spot and never gives up. The buildings a mission places at
+the start skip the test but are snapped to their footprint's middle
+(F3's Klingon hub, given as 240:308, stands at 244:308). So F3's Klingon
+construction yard goes up at 238:310, against the hub's edge, but its
+defensive artillery, ordered inside the hub's own block, never does
+while the hub stands; J2's Klingon defensive artillery is ordered onto
+the construction yard's tile and waits for as long as the yard stands.
+
+Reluva follows this (`placement.h`): the occupancy is read from what
+stands, sites included (a building's cells free once it's gone; the
+game's freeing wasn't traced), and units' boxes are their positions.
+
 ### Transports
 
 The unarmed APC (Federation 55, Klingon 88, Romulan 89) is the colony's
@@ -1270,5 +1317,4 @@ the NEW WORLDS panel, its class picked by type id:
   2 and 6-8 (read from the orders' names), and the order modes.
 - Which of the posture bits the scan and capture menus test is hostile
   and which neutral; how the player moves officers (the gesture).
-- How far apart the placement test keeps buildings.
 - Several unnamed type ids (natives' units and buildings, effects).

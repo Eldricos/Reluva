@@ -797,7 +797,8 @@ void MissionViewer::updateGhost() {
     bool ok = false;
     if (map_.screenToGround(mouseX_, mouseY_, x, y)) {
         const int pa = int(y / MapViewer::kBlockUnits * 8), pb = int(x / MapViewer::kBlockUnits * 8);
-        if (!colony_->spotAt(placing_, pa, pb, a, b, ok))
+        // In play, the game's own test (exe.md#building-placement).
+        if (sim_ ? !sim_->placementSpot(placing_, x, y, a, b, ok) : !colony_->spotAt(placing_, pa, pb, a, b, ok))
             a = b = -1;
     }
     if (a == ghostA_ && b == ghostB_ && ok == ghostOk_)
@@ -811,9 +812,9 @@ void MissionViewer::placeBuilding() {
     if (placing_.empty() || !colony_ || !economy_ || !ghostOk_ || ghostA_ < 0)
         return;
     const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
-    if (!sim_ || sim_->placeBuilding(placing_, buildingModel(placing_, side), ghostA_, ghostB_) < 0 ||
-        !colony_->addAt(placing_, ghostA_, ghostB_))
+    if (!sim_ || sim_->placeBuilding(placing_, buildingModel(placing_, side), ghostA_, ghostB_) < 0)
         return;
+    colony_->put(placing_, ghostA_, ghostB_);
     placing_.clear();
     map_.setGhost({}, 0, 0, false);
     showColony();

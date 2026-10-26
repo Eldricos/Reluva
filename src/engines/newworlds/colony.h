@@ -71,6 +71,8 @@ public:
     bool spotAt(std::string_view building, int a, int b, int& ma, int& mb, bool& fits) const;
     // Adds it there if it fits.
     bool addAt(std::string_view building, int a, int b);
+    // Adds it there whether it fits or not (the game's own test passed it).
+    bool put(std::string_view building, int a, int b);
     const std::vector<ColonyBuilding>& buildings() const { return buildings_; }
     // The concrete the colony starts on, as tile positions (x east, y
     // north): its ground within two tiles of the hub. Recordings show the

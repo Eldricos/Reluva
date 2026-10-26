@@ -127,6 +127,13 @@ their outlines (transparency), not light maps.
 
 ## Tiles and ground models
 
+A tile record's bytes 15, 16 and 17 (after the u16 at 12 whose bits
+14-15 are the rotation, and the byte at 14) say what may be built on it
+([exe.md](exe.md#building-placement)): byte 15 the colonies' pad ground
+(only model 32, `hole_02`), byte 16 natural building ground (models
+37-40), byte 17 open ground for mines and vehicles' rally places (6-8,
+33-36); the same on all 31 maps.
+
 Checked on all 31 maps of the six planet archives (`icewrld`, `deswrld`,
 `alpwrld`, `alnwrld`, `redwrld`, `vlcwrld`):
 

@@ -94,6 +94,10 @@ public:
     // map position (its middle): the cost taken, its site put up; its
     // index in colony(), or -1 if the economy refuses it.
     int placeBuilding(const std::string& name, const std::string& model, int a, int b);
+    // Where a building ordered near a world point would stand (its
+    // footprint's middle, as a map position) and whether it can go there
+    // (exe.md#building-placement); false if the side has no such building.
+    bool placementSpot(const std::string& name, float x, float y, int& a, int& b, bool& fits) const;
     // An upgrade, ordered on its building's spot (x, y), shown at a, b.
     int placeUpgrade(const std::string& name, const std::string& model, int a, int b, float x, float y);
     // DEMOLISH (exe.md#demolishing): half its cost back, its officers to
@@ -152,6 +156,7 @@ private:
     char side_;
     int player_;
     int blocksWide_, blocksHigh_;
+    ColonyMap ground_; // the deposits, for mines' spots
     std::unique_ptr<World> world_;
     std::unique_ptr<Economy> economy_;
     std::unique_ptr<AiSides> ai_;

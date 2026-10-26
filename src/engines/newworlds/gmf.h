@@ -26,6 +26,10 @@ struct GmfMap {
         // Bit 24 of flags: set only on hole_02 in icewrld, whose texture is
         // transparent around the hole, so presumably "draw ground under it".
         bool underlay = false;
+        // What may stand on it (exe.md#building-placement; bytes 15-17):
+        // the colonies' pad ground, natural building ground, open ground
+        // (mines, and vehicles' rally places).
+        bool padGround = false, buildGround = false, openGround = false;
         // Layers of terrain codes: 8 x 8 cells each, row by row from the
         // south, columns from the west (after the tile's rotation); 0 for
         // none, otherwise an index into the map's colour table. The first row

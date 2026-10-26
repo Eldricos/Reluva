@@ -30,7 +30,11 @@ struct Terrain {
     int width = 0, height = 0; // in tiles
     std::vector<int> moveClass; // width x height, row by row from the south
     std::function<float(float x, float y)> heightAt;
+    // What may be built on each tile (as moveClass; empty: not known): its
+    // map flags (exe.md#building-placement).
+    std::vector<uint8_t> ground;
 };
+constexpr uint8_t kPadGround = 1, kBuildGround = 2, kOpenGround = 4;
 
 // A tile can be entered if its class isn't 0 and the ground doesn't climb
 // more than half this in a quarter tile on the way from its neighbour (a

@@ -5,6 +5,7 @@
 
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/placement.h"
 #include "engines/newworlds/start_data.h"
 
 #include <algorithm>
@@ -137,7 +138,9 @@ std::vector<ColonyBuilding> MissionSim::placedColony(std::string_view mission, c
     std::vector<ColonyBuilding> out;
     for (const StartPlacement& p : startPlacements(mission, side))
         if (const ObjectType* t = objectType(p.type); t && t->building && *t->model) {
-            const ColonyBuilding c{t->name, t->model, p.a, p.b};
+            // On its footprint's middle, as the game puts it (exe.md#building-placement).
+            const auto [x, y] = snapped(footprintOf(p.type), worldAt(p.a, p.b).first, worldAt(p.a, p.b).second);
+            const ColonyBuilding c{t->name, t->model, int(std::lround(y / kBlock * 8)), int(std::lround(x / kBlock * 8))};
             if (std::string_view(t->name) == "colony-hub")
                 out.insert(out.begin(), c);
             else
@@ -171,7 +174,7 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
 MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, ColonyMap map, int blocksWide,
                        int blocksHigh, std::vector<ColonyBuilding> colony)
     : mission_(mission), side_(side), player_(side == 'K' ? 1 : side == 'R' ? 2 : 0), blocksWide_(blocksWide),
-      blocksHigh_(blocksHigh), colony_(std::move(colony)) {
+      blocksHigh_(blocksHigh), ground_(map), colony_(std::move(colony)) {
     world_ = std::make_unique<World>(std::move(terrain));
     // The game's default stock (exe.md#the-stock), or the mission's own;
     // the Romulan recordings start a construction yard's cost short.
@@ -268,6 +271,7 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     // shield fields and security officers, made stronger by them; the
     // defensive turrets' power.
     fog_ = std::make_unique<Fog>(blocksWide_, blocksHigh_);
+    ai_->setSeen([this](int slot, int bx, int by) { return fog_->has(bx, by, Fog::Seen, slot); });
     fog_->refresh(*world_);
     fieldWork_->setFog(fog_.get());
     repairs_ = std::make_unique<Repairs>(*world_);
@@ -303,20 +307,47 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
 
 // A colony building as something the other sides can shoot at (its
 // side's type of that name).
+namespace {
+// The side's building of that name.
+const CombatType* buildingOfSide(const std::string& name, char side) {
+    for (int id = 1; id < 330; ++id)
+        if (const CombatType* t = combatType(id); t && t->building && t->race == side && name == t->name)
+            return t;
+    return nullptr;
+}
+} // namespace
+
 void MissionSim::spawnColonyObject(size_t index) {
     if (colonyObjects_.size() <= index)
         colonyObjects_.resize(index + 1, 0);
     const ColonyBuilding& c = colony_[index];
-    for (int id = 1; id < 330; ++id)
-        if (const CombatType* t = combatType(id); t && t->building && t->race == side_ && c.name == t->name) {
-            const auto [x, y] = worldAt(c.a, c.b);
-            colonyObjects_[index] = spawnObject(*world_, player_, side_, *t, x, y, {}, c.model, true);
-            return;
-        }
+    if (const CombatType* t = buildingOfSide(c.name, side_)) {
+        const auto [x, y] = worldAt(c.a, c.b);
+        colonyObjects_[index] = spawnObject(*world_, player_, side_, *t, x, y, {}, c.model, true);
+    }
+}
+
+bool MissionSim::placementSpot(const std::string& name, float x, float y, int& a, int& b, bool& fits) const {
+    const CombatType* t = buildingOfSide(name, side_);
+    if (!t)
+        return false;
+    const auto [sx, sy] = snapped(footprintOf(t->id), x, y);
+    a = int(std::lround(sy / kBlock * 8)), b = int(std::lround(sx / kBlock * 8));
+    const auto seen = [this](int bx, int by) { return fog_->has(bx, by, Fog::Seen, player_); };
+    const auto ore = [this](int bx, int by) {
+        return ground_.depositKind && ground_.depositAmount && ground_.depositKind(bx, by) > 0 &&
+               ground_.depositAmount(bx, by) > 0;
+    };
+    fits = placementTest(*world_, t->id, x, y, player_, seen, ore) == PlaceFail::None;
+    return true;
 }
 
 int MissionSim::placeBuilding(const std::string& name, const std::string& model, int a, int b) {
     const auto [x, y] = worldAt(a, b);
+    int sa = 0, sb = 0;
+    bool fits = false;
+    if (placementSpot(name, x, y, sa, sb, fits) && !fits)
+        return -1;
     return placeUpgrade(name, model, a, b, x, y);
 }
 

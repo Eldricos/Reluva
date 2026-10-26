@@ -24,6 +24,7 @@
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/mission_sim.h"
+#include "engines/newworlds/placement.h"
 #include "engines/newworlds/model_pose.h"
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
@@ -1375,7 +1376,7 @@ void testFieldWork() {
     CHECK(w.unit(temple) && w.unit(temple)->hp <= w.unit(temple)->maxHp * 0.8f);
     run(15);
     CHECK(fw.heldBy(temple) == -1 && !heardIt("entered taubat-temple"));
-    run(15);
+    run(18);
     CHECK(fw.heldBy(temple) == 0 && w.unit(temple)->hp == w.unit(temple)->maxHp);
     CHECK(heardIt("entered taubat-temple") && heardIt("held temple 10") && heardIt("captured taubat-temple"));
     // The temple is all of its side's colony: held, the share is whole.
@@ -2369,6 +2370,48 @@ void testTransports() {
             CHECK(c.crew == crew);
 }
 
+// Building placement (exe.md#building-placement): footprints of a block,
+// a tile or a quarter; building ground for the first two, open ground for
+// mines, anything for a quarter; the map's outer ring out; seen blocks
+// only; a block's parts taken by what stands there (another side's block
+// closed to the smaller ones); no unit in the way.
+void testPlacement() {
+    Terrain t;
+    t.width = t.height = 20; // 10 x 10 blocks
+    t.moveClass.assign(400, 1);
+    t.ground.assign(400, kBuildGround);
+    for (int ty = 0; ty < 20; ++ty)
+        for (int tx = 12; tx < 14; ++tx) // block column 6: open ground
+            t.ground[size_t(ty) * 20 + size_t(tx)] = kOpenGround;
+    World w(t);
+    const float B = 16384;
+    auto at = [&](float bx, float by) { return std::make_pair(bx * B, by * B); };
+    auto test = [&](int type, std::pair<float, float> p, int slot = 0) {
+        return placementTest(w, type, p.first, p.second, slot, [](int, int) { return true; });
+    };
+    CHECK(footprintOf(23) == Footprint::Block && footprintOf(53) == Footprint::Tile &&
+          footprintOf(80) == Footprint::Quarter && footprintOf(45) == Footprint::Mine);
+    CHECK(snapped(Footprint::Block, 3.2f * B, 3.9f * B) == std::make_pair(3.5f * B, 3.5f * B));
+    CHECK(snapped(Footprint::Tile, 3.2f * B, 3.9f * B) == std::make_pair(3.25f * B, 3.75f * B));
+    CHECK(test(23, at(0.5f, 3.5f)) == PlaceFail::Edge && test(23, at(9.5f, 3.5f)) == PlaceFail::Edge);
+    CHECK(test(23, at(3.5f, 3.5f)) == PlaceFail::None);
+    CHECK(test(23, at(6.5f, 3.5f)) == PlaceFail::Ground && test(45, at(6.5f, 3.5f)) == PlaceFail::None &&
+          test(45, at(3.5f, 3.5f)) == PlaceFail::Ground && test(80, at(6.2f, 3.2f)) == PlaceFail::None);
+    CHECK(placementTest(w, 23, 3.5f * B, 3.5f * B, 0, [](int, int) { return false; }) == PlaceFail::Unseen);
+    // A hub in block 3,3 fills it; a yard tile beside it in block 3,4 fits,
+    // and a gun's quarter next to the yard; another side's tile there doesn't.
+    spawnObject(w, 0, 'F', *combatType(23), 3.5f * B, 3.5f * B, {});
+    CHECK(test(53, at(3.25f, 3.25f)) == PlaceFail::Taken && test(80, at(3.1f, 3.1f)) == PlaceFail::Taken);
+    spawnObject(w, 0, 'K', *combatType(53), 3.25f * B, 4.25f * B, {});
+    CHECK(test(53, at(3.25f, 4.25f)) == PlaceFail::Taken && test(80, at(3.6f, 4.1f)) == PlaceFail::None);
+    CHECK(test(53, at(3.75f, 4.75f), 1) == PlaceFail::Taken && test(53, at(3.75f, 4.75f), 0) == PlaceFail::None);
+    CHECK(test(23, at(3.5f, 4.5f)) == PlaceFail::Taken);
+    CHECK(placementBlocker(w, 82, 3.25f * B, 4.25f * B) != 0 && placementBlocker(w, 82, 4.25f * B, 4.25f * B) == 0);
+    // A unit standing on the spot.
+    spawnObject(w, 0, 'F', *combatType(8), 5.5f * B, 5.5f * B, {});
+    CHECK(test(23, at(5.5f, 5.5f)) == PlaceFail::Units && test(23, at(4.5f, 7.5f)) == PlaceFail::None);
+}
+
 void testRasterizer() {
     Surface surf;
     surf.create(16, 16, PixelFormat::RGBA32);
@@ -2458,6 +2501,7 @@ int main() {
     testBees();
     testStoresAndRazing();
     testTransports();
+    testPlacement();
     testProjectiles();
     testModelTextures();
     testRasterizer();

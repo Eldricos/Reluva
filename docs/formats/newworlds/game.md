@@ -469,7 +469,7 @@ kept apart from the game's behaviour:
 | Turrets' pitch limits | not applied | the executable's elevation limits (the map is flat to Reluva's shots) |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
-| A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
+| A unit in a building's way | its position inside the spot's box (half the footprint and 512 more) | the game keeps a box per unit as it moves; their size isn't known |
 | Defences and shield generators going up (AI) | 40 s | Reluva's: the economy has no figures for them |
 | Defences' build time | 40 s | Reluva's: not timed |
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |

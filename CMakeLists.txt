@@ -104,6 +104,7 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/repairs.cpp
     src/engines/newworlds/ground.cpp
     src/engines/newworlds/mission_sim.cpp
+    src/engines/newworlds/placement.cpp
     src/engines/newworlds/model_viewer.cpp
     src/engines/newworlds/texture_viewer.cpp
     src/engines/newworlds/sound_viewer.cpp

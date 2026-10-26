@@ -38,10 +38,17 @@ Terrain terrainOf(const GmfMap& map, std::function<float(float x, float y)> heig
     t.width = map.width * 2;
     t.height = map.height * 2;
     t.moveClass.resize(size_t(t.width) * size_t(t.height));
+    t.ground.resize(t.moveClass.size());
     for (int ty = 0; ty < t.height; ++ty)
         for (int tx = 0; tx < t.width; ++tx) {
             const int r = tileAt(map, tx, ty);
-            t.moveClass[size_t(ty) * size_t(t.width) + size_t(tx)] = r < 0 ? 0 : int((map.tiles[size_t(r)].flags >> 16) & 3);
+            const size_t i = size_t(ty) * size_t(t.width) + size_t(tx);
+            t.moveClass[i] = r < 0 ? 0 : int((map.tiles[size_t(r)].flags >> 16) & 3);
+            if (r >= 0) {
+                const GmfMap::Tile& tile = map.tiles[size_t(r)];
+                t.ground[i] = uint8_t((tile.padGround ? kPadGround : 0) | (tile.buildGround ? kBuildGround : 0) |
+                                      (tile.openGround ? kOpenGround : 0));
+            }
         }
     t.heightAt = std::move(heightAt);
     return t;

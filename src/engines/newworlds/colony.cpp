@@ -368,4 +368,13 @@ bool ColonyLayout::addAt(std::string_view building, int a, int b) {
     return true;
 }
 
+bool ColonyLayout::put(std::string_view building, int a, int b) {
+    std::string model;
+    Rect r{};
+    if (!spotRect(building, a, b, model, r))
+        return false;
+    place(building, model, r);
+    return true;
+}
+
 } // namespace reluva::newworlds

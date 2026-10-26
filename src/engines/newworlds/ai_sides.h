@@ -71,6 +71,8 @@ public:
     void start();
     // The ground, for the AI colonies' mining stations (before start).
     void setGround(ColonyMap ground) { ground_ = std::move(ground); }
+    // Whether a side sees a block now (its build orders wait for it).
+    void setSeen(std::function<bool(int slot, int bx, int by)> seen) { seen_ = std::move(seen); }
     // An AI colony's economy; nullptr for the player's slot and natives.
     const Economy* colony(int slot) const;
     // A defensive turret's shot paid for from its colony's power (true if
@@ -147,6 +149,7 @@ private:
     std::map<int, int> rallied_;         // per slot: vehicles sent to its rally point so far
     std::map<int, int> colonyBase_, colonyShare_, colonyTotal_; // per slot: colony size at the start, its shares last told
     ColonyMap ground_;
+    std::function<bool(int slot, int bx, int by)> seen_;
     std::map<std::string, int> counts_;
     double clock_ = 0;
 };

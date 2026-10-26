@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/ai_sides.h"
 
+#include "engines/newworlds/placement.h"
 #include "engines/newworlds/start_data.h"
 
 #include <algorithm>
@@ -23,10 +24,8 @@ constexpr float kArrived = 0.6f * kBlock;
 // building there.
 constexpr float kSpacing = 2500;
 constexpr float kHubClear = 12000;
-// Placeholders: how far from another building a build order's spot must
-// be, centre to centre (the game uses its placement test), and how long
-// a building the economy doesn't know (defences, shield generators) takes to go up.
-constexpr float kBuildClear = 0.3f * kBlock;
+// A placeholder: how long a building the economy doesn't know (defences,
+// shield generators) takes to go up.
 constexpr double kOtherBuildSeconds = 40;
 
 std::pair<float, float> worldAt(int a, int b) { return {float(b) / 8 * kBlock, float(a) / 8 * kBlock}; }
@@ -165,6 +164,8 @@ void AiSides::start() {
                 (!*t->model && !*p->model && !*p->label && std::string_view(t->name) != "shield-generator"))
                 continue;
             auto [x, y] = worldAt(p->a, p->b);
+            if (t->building) // on its footprint's middle (exe.md#building-placement)
+                std::tie(x, y) = snapped(footprintOf(t->id), x, y);
             if (!t->building && joinsRallyGroup(*t) && rallied_[slot] < 16) {
                 // The first 16 on the rally group's places in the hub's
                 // block, whatever spot the mission gives.
@@ -297,17 +298,22 @@ void AiSides::build(Running& r) {
     }
     if (r.site && world_.unit(r.site))
         return;
-    const auto [x, y] = wayPoint(o, 0);
-    for (const Unit& u : world_.units())
-        if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear) {
-            // Its own building already there (placed at the start): kept.
-            if (u.slot == o.slot && u.type == o.type) {
-                r.site = u.id;
-                if (o.task == 3)
-                    r.done = true;
-            }
-            return;
-        }
+    // Its spot: the middle of its waypoint's tile, tested as the player's
+    // hologram is (exe.md#building-placement); not clear, it waits for its
+    // next turn (no other spot is tried).
+    const auto [wx, wy] = wayPoint(o, 0);
+    const float tx = (std::floor(wx / kTile) + 0.5f) * kTile, ty = (std::floor(wy / kTile) + 0.5f) * kTile;
+    // Its own building already there (placed at the start): kept.
+    if (const Unit* u = world_.unit(placementBlocker(world_, o.type, tx, ty)); u && u->slot == o.slot && u->type == o.type) {
+        r.site = u->id;
+        if (o.task == 3)
+            r.done = true;
+        return;
+    }
+    const auto seen = [&](int bx, int by) { return !seen_ || seen_(o.slot, bx, by); };
+    if (placementTest(world_, o.type, tx, ty, o.slot, seen) != PlaceFail::None)
+        return;
+    const auto [x, y] = snapped(footprintOf(o.type), tx, ty);
     int structure = 0;
     auto colony = colonies_.find(o.slot);
     const BuildingType* b = buildingType(t->name);
@@ -608,10 +614,9 @@ std::vector<AiSides::OrderStatus> AiSides::status() const {
             continue;
         int blocker = 0;
         if ((r.order->task == 3 || r.order->task == 9) && r.order->ways > 0 && !r.site) {
-            const auto [x, y] = wayPoint(*r.order, 0);
-            for (const Unit& u : world_.units())
-                if (u.building && u.hp > 0 && std::hypot(u.x - x, u.y - y) < kBuildClear)
-                    blocker = u.id;
+            const auto [wx, wy] = wayPoint(*r.order, 0);
+            blocker = placementBlocker(world_, r.order->type, (std::floor(wx / kTile) + 0.5f) * kTile,
+                                       (std::floor(wy / kTile) + 0.5f) * kTile);
         }
         out.push_back({r.order, r.started, r.gathered, r.hunting, int(r.units.size()), r.awaited, r.leg,
                        r.gathered ? r.legClock : r.clock, r.site, blocker, r.units});
