@@ -25,7 +25,7 @@ enum class BriefingView {
 
 // One step of a mission's briefing: a voice clip (its stem, e.g. "K1005";
 // empty for a silent step), the string table's page shown (its id; 0 for
-// none) and the view behind it. Each step lasts as long as its clip.
+// none) and the view behind it.
 struct BriefingStep {
     std::string clip;
     uint32_t page = 0;
@@ -35,19 +35,23 @@ struct BriefingStep {
     int siteA = -1, siteB = -1;
     // For a model view, the model shown ("geo/bad/tt.geo"); empty if unknown.
     std::string model;
+    // How long it lasts at least, in seconds (it lasts the longer of this
+    // and its clip).
+    double minimum = 0;
 };
 
-// The briefing of a mission played as a side ('F', 'K', 'R'): as seen in
-// recordings of play where there's one, else built by the rule those
-// showed: the clips in number order, one per step, given to the table's
-// heading pages in order (leaving out the transmission, pass and fail
-// pages and empty ones), the first over the galaxy, the second over the
-// star system, the rest over the map; clips left over play over the emblem.
+// The briefing of a mission played as a side ('F', 'K', 'R'): the
+// executable's own step table (briefing_data.h; every mission has one);
+// for one without, built by the rule the recordings showed: the clips in
+// number order, one per step, given to the table's heading pages in order
+// (leaving out the transmission, pass and fail pages and empty ones), the
+// first over the galaxy, the second over the star system, the rest over
+// the map; clips left over play over the emblem.
 // clips: the mission's voice clips (stems), sorted.
 std::vector<BriefingStep> briefingScript(std::string_view shortName, char side, const StringTable& table,
                                          const std::vector<std::string>& clips);
 
-// Whether a mission's briefing was scripted from a recording.
+// Whether the executable has a mission's briefing table.
 bool hasRecordedBriefing(std::string_view shortName, char side);
 
 // The order clips play in: by number, a lettered clip right after its

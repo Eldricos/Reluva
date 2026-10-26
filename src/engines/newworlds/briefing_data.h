@@ -1,0 +1,32 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Copyright (C) 2026 The Reluva contributors
+
+#pragma once
+
+#include <algorithm>
+#include <cctype>
+#include <cstdint>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace reluva::newworlds {
+
+// A step of a mission's briefing as the executable's table gives it
+// (exe.md#briefings): it lasts the longer of its minimum and its clip.
+struct BriefingRow {
+    const char* mission;
+    char side;          // 'F', 'K', 'R'
+    int minimum;        // script seconds (kScriptSecond)
+    const char* clip;   // the voice clip's stem ("F1005"; "" silent)
+    uint32_t page;      // the string shown (0 none)
+    int view;           // 0 relief, 1 ground, 2 model, 3 galaxy, 4 star system, 5 emblem
+    int a, b;           // where a map view looks (map position; -1 the whole map)
+    int type;           // a model view's object type (0 unknown)
+    bool hold;          // waits for the mission script's show (a scene played out)
+};
+
+// A mission's steps for a side, in order (empty if the table has none).
+std::vector<const BriefingRow*> briefingRows(std::string_view mission, char side);
+
+} // namespace reluva::newworlds

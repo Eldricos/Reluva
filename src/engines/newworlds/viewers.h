@@ -842,6 +842,7 @@ private:
     bool interface_ = false;
     int step_ = 0, savedColouring_ = 0;
     uint64_t nowMs_ = 0, stepEndMs_ = 0, lastTurnMs_ = 0; // stepEndMs_: when a step without a playing clip ends
+    uint64_t stepMinimumMs_ = 0; // a step with a clip lasts at least until then
     audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
     std::string musicName_;
 };

@@ -291,6 +291,12 @@ void MissionViewer::loadSide() {
             clips_.push_back(stem);
     std::sort(clips_.begin(), clips_.end(), clipBefore);
     script_ = briefingScript(level.shortName, side, table_, clips_);
+    // Clips a step names from elsewhere in the game folder (the tutorials'
+    // own, in MISC) join the mission's.
+    for (const BriefingStep& st : script_)
+        if (!st.clip.empty() && mediaFiles_.count(st.clip) &&
+            std::find(clips_.begin(), clips_.end(), st.clip) == clips_.end())
+            clips_.push_back(st.clip);
     loadStarSystem();
     startColony();
 }
@@ -1426,7 +1432,7 @@ void MissionViewer::update(uint64_t nowMs) {
         return;
     nowMs_ = nowMs;
     // The briefing moves on when its step's clip ends, or its time is up.
-    if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying()))
+    if (running_ && (stepEndMs_ ? nowMs >= stepEndMs_ : !clipPlaying() && nowMs >= stepMinimumMs_))
         startStep(step_ + 1);
     // The galaxy and models turn slowly too.
     if (running_ && !stepOnMap_ &&
@@ -3360,8 +3366,10 @@ void MissionViewer::startStep(int step) {
         map_.lookAt(s.siteA, s.siteB, s.view == BriefingView::Ground);
         lastTurnMs_ = nowMs_;
     }
-    // Its clip, if the game folder has it; else the step is shown a while.
-    stepEndMs_ = nowMs_ + 5000;
+    // Its clip, if the game folder has it; it lasts the longer of the
+    // clip and its minimum (5 s if it has neither).
+    stepEndMs_ = nowMs_ + uint64_t(1000 * (s.minimum > 0 ? s.minimum : 5.0));
+    stepMinimumMs_ = stepEndMs_;
     const auto it = std::find(clips_.begin(), clips_.end(), s.clip);
     if (!s.clip.empty() && it != clips_.end()) {
         playClip(int(it - clips_.begin()));

@@ -576,6 +576,33 @@ Klingons attack on a schedule (100, 500, 800 and 1100 s, and a random
 assault every 300 s) and build to a timetable. The scripts are to be
 rewritten from the executable's graphs.
 
+### Briefings
+
+Each mission's registration points to a briefing table per side (the
+Federation's, the Klingons', the Romulans'), a list of 60-byte steps
+played in order. A step gives:
+
+- its **minimum length** in script seconds: it lasts the longer of that
+  and its clip;
+- its **clip** (looked up in the side's voice folder; `nospeech` silent;
+  the tutorials' in `MISC`);
+- the **page**: a string of the mission's table, and where its box goes
+  (no box: the page isn't shown), plus an inset box;
+- the **view**: the relief map, the ground camera on a named object, that
+  object's model turning on the grid, space (the galaxy, `~Tabula Rasa`,
+  or a star system), or the side's emblem;
+- one or two **named objects** (placements or groups; with two the camera
+  works between them) and a camera mode;
+- a **hold** flag: the step waits until the mission's briefing script
+  sends `show` (F1's shuttle flight).
+
+Every briefing opens with silent emblem steps (2 s, the incoming
+transmission page 5 s, 2 s) and ends with a short silent one. The tables
+settle what the recordings couldn't: some clips are never played (F14013,
+K14009, K8006-K8008, J1F007-J1F010, J7F014), some twice (f14005, k14007,
+J4R011), and R8's, never recorded, is all there. Reluva plays the tables
+as they are (`briefing_data.cpp`, generated), without the held scenes.
+
 ### Sides and combat
 
 Every slot of every mission, not only the player's, is in the

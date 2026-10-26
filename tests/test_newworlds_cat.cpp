@@ -577,24 +577,26 @@ void testBriefing() {
                                   {5, "~SPEECH~ "},
                                   {6, "~OBJECTIVE~Do it"},
                                   {7, "~MISSION PASS~Done"}})));
-    // No recording of R8: the general rule.
-    auto steps = briefingScript("R8", 'R', table, {"R8007", "R8005", "R8006", "R8008"});
-    CHECK(steps.size() == 4 && steps[0].clip == "R8005" && steps[0].page == 3 &&
+    // A mission the executable has no table for: the general rule.
+    auto steps = briefingScript("Z1", 'F', table, {"Z1007", "Z1005", "Z1006", "Z1008"});
+    CHECK(steps.size() == 4 && steps[0].clip == "Z1005" && steps[0].page == 3 &&
           steps[0].view == BriefingView::Galaxy);
     CHECK(steps[1].page == 4 && steps[1].view == BriefingView::StarSystem);
-    CHECK(steps[2].clip == "R8007" && steps[2].page == 6 && steps[2].view == BriefingView::Ground);
-    CHECK(steps[3].clip == "R8008" && steps[3].page == 0 && steps[3].view == BriefingView::Emblem);
-    CHECK(!hasRecordedBriefing("R8", 'R') && hasRecordedBriefing("R1", 'R') && hasRecordedBriefing("k12", 'K') && hasRecordedBriefing("J1", 'K'));
-    // A recorded one: K12's lettered clip as its own step; a joint mission's
-    // clips carry the side's letter; J8 opens with a silent step.
+    CHECK(steps[2].clip == "Z1007" && steps[2].page == 6 && steps[2].view == BriefingView::Ground);
+    CHECK(steps[3].clip == "Z1008" && steps[3].page == 0 && steps[3].view == BriefingView::Emblem);
+    CHECK(!hasRecordedBriefing("Z1", 'F') && hasRecordedBriefing("R8", 'R') && hasRecordedBriefing("k12", 'K'));
+    // The executable's tables: K12's lettered clip as its own step; a
+    // joint mission's clips carry the side's letter; each opens with the
+    // silent transmission page; each step its minimum (script seconds).
     steps = briefingScript("K12", 'K', table, {});
-    CHECK(steps.size() == 10 && steps[5].clip == "K12009A" && steps[6].clip == "K12010");
+    CHECK(steps.size() == 14 && steps[8].clip == "K12009A" && steps[9].clip == "K12010");
     steps = briefingScript("J8", 'K', table, {});
-    CHECK(steps[0].clip.empty() && steps[0].page == 7 && steps[1].clip == "J8K005");
+    CHECK(steps[1].clip.empty() && steps[1].page == 7 && steps[3].clip == "J8K005");
     steps = briefingScript("F1", 'F', table, {});
-    CHECK(steps[0].clip.empty() && steps[0].page == 3); // the silent transmission page first
-    CHECK(steps[5].clip == "F1009" && steps[5].siteA == 407 && steps[5].siteB == 209); // the colony site
-    CHECK(steps[1].siteA == -1 && steps[7].view == BriefingView::Model && steps[7].model == "geo/bad/tt.geo");
+    CHECK(steps[0].clip.empty() && steps[0].page == 3 && steps[4].view == BriefingView::Galaxy &&
+          std::abs(steps[4].minimum - 8) < 1e-9);
+    CHECK(steps[8].clip == "F1009" && steps[8].siteA == 438 && steps[8].siteB == 218); // the colony hub
+    CHECK(steps[10].view == BriefingView::Model && steps[10].model == "geo/bad/tt.geo"); // the temple
     CHECK(missionSides("C10") == std::vector<char>{'K'} && missionSides("C11") == std::vector<char>{'R'});
 }
 
