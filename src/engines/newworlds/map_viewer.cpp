@@ -97,6 +97,7 @@ void MapViewer::show(int index) {
         status_ = err2.message;
     if (!status_.empty())
         map_ = GmfMap{};
+    tricorderTop_ = 0;
     placeScenery();
     buildings_.clear();
     buildingAreas_.clear();
@@ -201,6 +202,109 @@ void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h, int tiles)
             if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
                 uint8_t* p = s.row(py) + px * 4;
                 p[0] = 255, p[1] = 255, p[2] = 255;
+            }
+}
+
+namespace {
+
+// An RGB colour turned in HSV: hue added (degrees), saturation and value
+// scaled.
+std::array<uint8_t, 3> shiftHsv(const uint8_t* rgb, float hue, float sat, float val) {
+    const float r = rgb[0] / 255.0f, g = rgb[1] / 255.0f, b = rgb[2] / 255.0f;
+    const float mx = std::max({r, g, b}), mn = std::min({r, g, b}), d = mx - mn;
+    float h = 0;
+    if (d > 0)
+        h = mx == r ? 60 * std::fmod((g - b) / d, 6.0f) : mx == g ? 60 * ((b - r) / d + 2) : 60 * ((r - g) / d + 4);
+    float s = mx > 0 ? d / mx : 0, v = mx;
+    h = std::fmod(h + hue + 720, 360.0f), s = std::clamp(s * sat, 0.0f, 1.0f), v = std::clamp(v * val, 0.0f, 1.0f);
+    const float c = v * s, x = c * (1 - std::fabs(std::fmod(h / 60, 2.0f) - 1)), m = v - c;
+    float rr = 0, gg = 0, bb = 0;
+    switch (int(h / 60) % 6) {
+    case 0: rr = c, gg = x; break;
+    case 1: rr = x, gg = c; break;
+    case 2: gg = c, bb = x; break;
+    case 3: gg = x, bb = c; break;
+    case 4: rr = x, bb = c; break;
+    default: rr = c, bb = x; break;
+    }
+    return {uint8_t((rr + m) * 255 + 0.5f), uint8_t((gg + m) * 255 + 0.5f), uint8_t((bb + m) * 255 + 0.5f)};
+}
+
+} // namespace
+
+void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tiles, char race,
+                              const std::function<int(int bx, int by)>& cellClass) {
+    if (map_.width <= 0 || map_.height <= 0)
+        return;
+    // The race's shifts for each class (hue, saturation, value), and its
+    // background.
+    struct Shift {
+        float hue, sat, val;
+    };
+    const int r = race == 'K' ? 1 : race == 'R' ? 2 : 0;
+    static constexpr Shift kGround[3] = {{0, 1, 0.8f}, {180, 0.7f, 0.8f}, {300, 1, 0.9f}};
+    static constexpr Shift kUnsurveyed[3] = {{0, 1.2f, 0.53f}, {180, 0.8f, 0.63f}, {300, 1.2f, 0.63f}};
+    static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
+                                       {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
+    static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
+    if (tricorderTop_ <= 0) // the map's height range, sampled once
+        for (int j = 0; j < 64; ++j)
+            for (int i = 0; i < 64; ++i)
+                tricorderTop_ = std::max(tricorderTop_, groundHeight((float(i) + 0.5f) / 64 * worldWidth(),
+                                                                      (float(j) + 0.5f) / 64 * worldHeight()));
+    const float top = std::max(1.0f, tricorderTop_);
+    float ox = 0, oy = 0, tw = 1, th = 1;
+    minimapWindow(w, h, tiles, ox, oy, tw, th);
+    for (int y = 0; y < h; ++y) {
+        if (y0 + y < 0 || y0 + y >= s.h)
+            continue;
+        const float fy = oy + (float(h - 1 - y) + 0.5f) / float(h) * th; // tiles; row 0 at the bottom
+        uint8_t* row = s.row(y0 + y);
+        for (int x = 0; x < w; ++x) {
+            if (x0 + x < 0 || x0 + x >= s.w)
+                continue;
+            const float fx = ox + (float(x) + 0.5f) / float(w) * tw;
+            uint8_t* p = row + (x0 + x) * 4;
+            const int bx = int(fx) / 2, by = int(fy) / 2;
+            if (fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height) {
+                p[0] = kBackground[r][0], p[1] = kBackground[r][1], p[2] = kBackground[r][2];
+                continue;
+            }
+            const int c = std::clamp(cellClass(bx, by), 0, 7);
+            const float wx = fx / 2 * kBlockUnits, wy = fy / 2 * kBlockUnits;
+            const int shade = std::clamp(1 + int(groundHeight(wx, wy) / top * 18), 1, 19);
+            const size_t entry = size_t((c + 1) * 20 + shade);
+            const Shift sh = c == 0 ? kGround[r] : c == 1 ? kUnsurveyed[r] : kOres[c - 2];
+            // The band's colour in the game's 256-entry palette; Reluva's map
+            // palette has only the terrain codes' colours, so the colour of
+            // the ground there is shifted instead.
+            const uint8_t* base = nullptr;
+            if (entry < map_.palette.size()) {
+                base = map_.palette[entry].data();
+            } else {
+                const int t = tileAt(int(fx), int(fy));
+                const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
+                                          ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
+                                                        std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
+                                          : 0;
+                if (code && code < map_.palette.size())
+                    base = map_.palette[code].data();
+            }
+            if (base) {
+                const auto out = shiftHsv(base, sh.hue, sh.sat, sh.val);
+                p[0] = out[0], p[1] = out[1], p[2] = out[2];
+            } else {
+                p[0] = p[1] = p[2] = 20;
+            }
+        }
+    }
+    int cx = 0, cy = 0;
+    minimapPoint(targetX_, targetY_, x0, y0, w, h, cx, cy, tiles);
+    for (int d = -3; d <= 3; ++d)
+        for (const auto& [px, py] : {std::pair{cx + d, cy}, std::pair{cx, cy + d}})
+            if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
+                uint8_t* q = s.row(py) + px * 4;
+                q[0] = 255, q[1] = 255, q[2] = 255;
             }
 }
 

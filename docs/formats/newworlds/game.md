@@ -481,7 +481,7 @@ kept apart from the game's behaviour:
 | The Klingon shield generator's model | `ksg` | likely: it pairs with the Federation's `fsg` and no other Klingon building uses it (play-k1.md read it as a gun) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
-| The Tricorder's ore colours | Reluva's | the game's shift the map's own palette per race (exe.md#the-tricorder); not done yet |
+| The Tricorder's ground and ore colours | the game's per-race shifts of each class (ground, unsurveyed, the six ores), applied to the ground's own colour at each point | the game shifts its map's 256-entry palette by those rules (exe.md#the-tricorder); Reluva hasn't found that palette (the map's own has only its terrain codes' colours) |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |

@@ -203,6 +203,12 @@ public:
     // tiles: how many tiles across it shows, round the camera's target
     // (the Tricorder's zoom); 0 the whole map.
     void drawMinimap(Surface& s, int x, int y, int w, int h, int tiles = 0) const;
+    // The Tricorder's map as the game draws it (exe.md#the-tricorder): each
+    // block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6) in that
+    // class's band of the map's palette, shaded by height, the band's hue,
+    // saturation and brightness shifted for the player's race.
+    void drawTricorder(Surface& s, int x, int y, int w, int h, int tiles, char race,
+                       const std::function<int(int bx, int by)>& cellClass);
     // A world point's pixel on a minimap drawn at x, y, w, h (false if
     // it's outside it), and the world point under a pixel.
     bool minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py, int tiles = 0) const;
@@ -417,6 +423,7 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
+    float tricorderTop_ = 0; // the map's highest ground, for the Tricorder's shades
     uint32_t shimmerFrame_ = 0; // a new throw for each set of units drawn
     std::function<void()> overlay_;
     std::function<std::string(const std::string&)> titleFilter_;
@@ -600,7 +607,7 @@ private:
     void updateGhost();
     void placeBuilding();
     void showProgress();
-    void drawMinerals(int x, int y, int w, int h, int tiles = 0);
+    void drawTricorderMap(int x, int y, int w, int h, int tiles = 0);
     std::string tricorderReadout(int mx, int my, int mw, int mh, int tiles) const;
     std::vector<int> allyRaces() const;
     // A selected object's panel lines, as the game's (exe.md#the-selection-panel),

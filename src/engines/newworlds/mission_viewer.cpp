@@ -1766,32 +1766,17 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
     return sound;
 }
 
-// The deposits the side has surveyed, coloured on a Tricorder map by ore
-// (the game's "mineral deposits appear as colored areas"; its colours
-// aren't known: these are Reluva's).
-void MissionViewer::drawMinerals(int x, int y, int w, int h, int tiles) {
-    if (!fog_)
-        return;
-    static constexpr uint8_t kOre[6][3] = {{255, 70, 200}, {255, 200, 40}, {170, 170, 190},
-                                           {80, 220, 90},  {230, 110, 40}, {80, 200, 255}};
-    for (int by = 0; by < map_.blocksHigh(); ++by)
-        for (int bx = 0; bx < map_.blocksWide(); ++bx) {
-            const int kind = map_.depositAt(bx, by);
-            if (kind < 1 || kind > 6 || map_.depositAmount(bx, by) <= 0 || !fog_->has(bx, by, Fog::Surveyed, playerSlot_))
-                continue;
-            int px0 = 0, py0 = 0, px1 = 0, py1 = 0;
-            map_.minimapPoint(float(bx) * MapViewer::kBlockUnits, float(by) * MapViewer::kBlockUnits, x, y, w, h, px0, py0,
-                              tiles);
-            map_.minimapPoint(float(bx + 1) * MapViewer::kBlockUnits, float(by + 1) * MapViewer::kBlockUnits, x, y, w, h, px1,
-                              py1, tiles);
-            for (int py = std::min(py0, py1); py <= std::max(py0, py1); ++py)
-                for (int px = std::min(px0, px1); px <= std::max(px0, px1); ++px)
-                    if (px >= x && py >= y && px < x + w && py < y + h && px < screen_.w && py < screen_.h) {
-                        uint8_t* p = screen_.row(py) + px * 4;
-                        for (int c = 0; c < 3; ++c)
-                            p[c] = uint8_t((p[c] + 2 * kOre[kind - 1][c]) / 3);
-                    }
-        }
+// The Tricorder's map (exe.md#the-tricorder): blocks the side hasn't
+// surveyed, its surveyed ground, and the deposits it has surveyed by ore,
+// in the map's palette shifted for the race.
+void MissionViewer::drawTricorderMap(int x, int y, int w, int h, int tiles) {
+    const char race = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
+    map_.drawTricorder(screen_, x, y, w, h, tiles, race, [&](int bx, int by) {
+        if (fog_ && !fog_->has(bx, by, Fog::Surveyed, playerSlot_))
+            return 1;
+        const int kind = map_.depositAt(bx, by);
+        return kind >= 1 && kind <= 6 && map_.depositAmount(bx, by) > 0 ? 1 + kind : 0;
+    });
 }
 
 // The playbook a double click opens (exe.md#orders): for another side's
@@ -2342,8 +2327,7 @@ void MissionViewer::drawPlay() {
         }
         // (Twice as many tiles across as the small one.)
         const int tiles = kTricorderTiles << (tricorderZoom_ + 1);
-        map_.drawMinimap(screen_, x0, y0, size, size, tiles);
-        drawMinerals(x0, y0, size, size, tiles);
+        drawTricorderMap(x0, y0, size, size, tiles);
         // What the side sees: its own green (selected orange), those
         // hostile to it red, the rest yellow.
         if (world_)
@@ -2709,8 +2693,7 @@ void MissionViewer::drawInterface() {
         const int mx = x + 12, my = y + 14, mw = w - 24, mh = h - 34 - 2 * lh;
         const int tiles = kTricorderTiles << tricorderZoom_;
         if (hasMap_) {
-            map_.drawMinimap(screen_, mx, my, mw, mh, tiles);
-            drawMinerals(mx, my, mw, mh, tiles);
+            drawTricorderMap(mx, my, mw, mh, tiles);
             tricorder_ = {mx, my, mw, mh};
             // Each side's own colour, whoever it is to the player
             // (exe.md#the-tricorder): the Federation blue, the Klingons
