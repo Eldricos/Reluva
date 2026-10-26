@@ -71,6 +71,12 @@ struct BuildingType {
     // accommodation 200).
     int required = 0, crewSlots = 0, poolSlots = 0;
     double buildSeconds = 40; // order to finished
+    // The Klingons' and Romulans' where their models build faster or
+    // slower (0: the same).
+    double kliSeconds = 0, romSeconds = 0;
+    double secondsFor(char side) const {
+        return side == 'K' && kliSeconds > 0 ? kliSeconds : side == 'R' && romSeconds > 0 ? romSeconds : buildSeconds;
+    }
     const Stock& costFor(char side) const;
     const std::vector<std::string>& needsFor(char side) const;
 };

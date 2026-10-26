@@ -13,7 +13,7 @@ namespace {
 
 // Placeholder: a ground scout crosses a block in about four seconds, by
 // eye from the recordings; to be timed in the game.
-constexpr float kScoutSpeed = 4000;
+constexpr float kScoutSpeed = 0.3f * kPaceSpeed; // the scouts' pace
 // Spacing of units sent to one point.
 constexpr float kSpread = 2500;
 // Turrets (exe.md#sides-and-combat): they turn speeding up and then

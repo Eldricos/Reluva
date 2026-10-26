@@ -38,10 +38,11 @@ constexpr float kPowerLow = 0.75f;
 //   staffed (the panel's 120 %);
 // - the colony's capacity never passes 90.
 constexpr int kCapacityCap = 90;
-// Bees (exe.md#bees): their flying speed (units a tick), the shortest
-// flight, how far a site's spots are from its middle, and the most at a
-// site. A cargo bee's stay at a dock is Reluva's (not found).
-constexpr float kBeeSpeed = 150;
+// Bees (exe.md#bees): their flying speeds (units a tick, as the game's
+// start-up rewrite sets them: construction bees 1000, cargo bees 600), the
+// shortest flight, how far a site's spots are from its middle, and the
+// most at a site. A cargo bee's stay at a dock is Reluva's (not found).
+constexpr float kBeeSpeed = 1000, kCargoSpeed = 600;
 constexpr int kShortestFlight = 10;
 constexpr float kBeeSpot = 2000;
 constexpr int kBeesASite = 4;
@@ -53,15 +54,20 @@ constexpr int kShipEvery = 32;
 // most coming to one building; how long a worker bee waits to load; a
 // worker bee's speed.
 constexpr int kPodsWaiting = 4, kPadPlaces = 16, kMostIncoming = 17;
-constexpr float kWorkerSpeed = 200;
+constexpr float kWorkerSpeed = 400;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
 // x 300 power units; each tick a running yard takes up to 300 from its
 // buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
-// Then the vehicle rolls out: a placeholder from the recordings' scout,
-// whose value is 0 yet takes about 8 s.
+// Then the vehicle rolls out through the yard's dock (exe.md#docking), by
+// its dock legs: a tank about 9.5 s from the Federation's yard, 4 s from
+// the Klingons', 7.3 s from the Romulans'; a scout, quicker, about two
+// thirds of that.
 constexpr double kWorkPerValue = 300;
 constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
-constexpr double kRollout = 8;
+double rolloutSeconds(char side, int type) {
+    const double tank = side == 'K' ? 4 : side == 'R' ? 7.3 : 9.5;
+    return type == 97 || type == 37 || type == 98 ? tank * 6.5 / 9.5 : tank;
+}
 // People (exe.md#crew-and-efficiency): a race's roster, an accommodation
 // block's batches, life support's use a person a tick and its rate of
 // exchange with power, a farm's output. How long crew take to walk to
@@ -120,8 +126,11 @@ const std::vector<BuildingType>& buildingTypes() {
     // thermoconc, trans al, nitrium, duranium). Power figures are the
     // Federation's (the other sides' differ a little; exe.md#buildings).
     // Build times as the training missions timed them, order to finished
-    // (play-vm-tutorials.md#build-times): the game builds with its bees,
-    // at a pace the executable doesn't fix as a number; others 40 s.
+    // (play-vm-tutorials.md#build-times). The game's bees build a model's
+    // tiles, one each a cycle, in four sections at once (exe.md#bees), so
+    // the rest follow from their models' tiles, against those timed: the
+    // defences and shield generators, and the other races' generators and
+    // yards.
     static const std::vector<BuildingType> kTypes = [] {
         std::vector<BuildingType> t;
         auto add = [&](const char* id, const char* panel, std::array<Stock, 3> cost,
@@ -145,10 +154,12 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 2, 0, 0}},
                      {yard, yard, yard}, 65),
                  34000, 550, 60);
+        t.back().kliSeconds = 37, t.back().romSeconds = 58;
         add("power-generator", "POWER GENERATOR",
             {Stock{35, 1, 35, 0, 800, 0}, Stock{35, 1, 30, 0, 850, 0}, Stock{35, 1, 30, 0, 850, 0}}, {yard, yard, yard},
             30)
             .output = {500, 500, 1000};
+        t.back().kliSeconds = 23, t.back().romSeconds = 28;
         add("advanced-generator", "ADVANCED GENERATOR",
             {Stock{50, 2, 40, 0, 850, 0}, Stock{50, 2, 37, 0, 870, 0}, Stock{50, 2, 37, 0, 870, 0}},
             {{{"construction-yard-advanced", "colony-hub-upgrade"},
@@ -201,29 +212,31 @@ const std::vector<BuildingType>& buildingTypes() {
                      83),
                  34000, 425, 340);
         // Defences: the shield generator (its field halves the colony's
-        // damage; exe.md#shields) and the two turrets. No build times were
-        // timed: 40 s.
+        // damage; exe.md#shields) and the two turrets, by their models.
         consumer(add("shield-generator", "SHIELD GENERATOR",
                      {Stock{20, 2, 40, 0, 0, 800}, Stock{20, 2, 20, 0, 0, 800}, Stock{20, 2, 20, 0, 0, 800}},
                      {{{"construction-yard-upgrade", "shield-buffer-lab", "security-center"},
                        {"construction-yard-upgrade", "security-center", "shield-buffer-lab"},
                        {"construction-yard-upgrade", "science-station", "shield-buffer-lab"}}},
-                     40),
+                     27),
                  64000, 550, 640);
+        t.back().kliSeconds = 22, t.back().romSeconds = 48;
         consumer(add("defensive-weapon", "DEFENSIVE WEAPON",
                      {Stock{0, 0, 92, 12, 0, 500}, Stock{0, 0, 92, 12, 0, 500}, Stock{0, 0, 92, 12, 0, 500}},
                      {{{"construction-yard-upgrade", "colony-hub-upgrade", "shield-generator"},
                        {"construction-yard-upgrade", "shield-generator", "disruptor-matrix", "security-center"},
                        {"construction-yard-upgrade", "security-center", "shield-generator"}}},
-                     40),
+                     22),
                  64000, 550, 160);
+        t.back().kliSeconds = 24, t.back().romSeconds = 33;
         consumer(add("defensive-artillery", "DEFENSIVE ARTILLERY",
                      {Stock{0, 0, 93, 13, 250, 500}, Stock{0, 0, 93, 11, 250, 500}, Stock{0, 0, 93, 11, 250, 500}},
                      {{{"construction-yard-advanced", "colony-hub-advanced", "security-center"},
                        {"construction-yard-advanced", "shield-generator", "tracking-systems"},
                        {"construction-yard-upgrade", "colony-hub-advanced", "security-center", "energy-lab"}}},
-                     40),
+                     31),
                  64000, 550, 160);
+        t.back().romSeconds = 29;
         // Upgrades: fitted to their building, no placing. An advanced one
         // follows the improved one.
         auto upgrade = [&](const char* id, const char* panel, const char* of, Stock f, Stock k, Stock r,
@@ -939,7 +952,7 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
             continue;
         }
         if (j.rollout < 0)
-            j.rollout = kRollout;
+            j.rollout = rolloutSeconds(side_, j.type);
         j.rollout -= 1 / kTicksPerSecond;
         if (j.rollout <= 0) {
             finished_.push_back({j.type, j.yard});
@@ -989,7 +1002,7 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             continue;
         const BuildingType* t = buildingType(s.type);
         const double share = beesModelled_ ? double(beesAt(s.id)) / kBeesASite : 1;
-        s.progress = float(std::min(1.0, s.progress + share / (std::max(1.0, t->buildSeconds) * kTicksPerSecond)));
+        s.progress = float(std::min(1.0, s.progress + share / (std::max(1.0, t->secondsFor(side_)) * kTicksPerSecond)));
         if (s.progress >= 1) {
             if (s.type == "storage-facility")
                 addStore(s.id);
@@ -1661,12 +1674,12 @@ void Economy::fly(Bee& b, float x, float y) {
     b.home = false, b.working = false, b.docking = false;
     b.fromX = b.x, b.fromY = b.y, b.toX = x, b.toY = y;
     b.flown = 0;
-    b.flight = std::max(kShortestFlight, int(std::hypot(x - b.x, y - b.y) / kBeeSpeed));
+    b.flight = std::max(kShortestFlight, int(std::hypot(x - b.x, y - b.y) / (b.cargo ? kCargoSpeed : kBeeSpeed)));
     if (x != b.x || y != b.y)
         b.heading = std::atan2(y - b.y, x - b.x);
     // Out through the hub's dock first, in its turn.
     if (h)
-        b.dock = dockTurn(h->id, dockOut(*h, b.worker ? kWorkerSpeed : kBeeSpeed));
+        b.dock = dockTurn(h->id, dockOut(*h, b.worker ? kWorkerSpeed : b.cargo ? kCargoSpeed : kBeeSpeed));
 }
 
 // A tick of the bees: flights on, then each idle one given work: a site
@@ -1703,7 +1716,7 @@ void Economy::beeTick() {
         b.flight = 0;
         // Home: in through the hub's dock, in its turn.
         auto dockHome = [&] {
-            b.dock = dockTurn(h->id, dockIn(*h, b.worker ? kWorkerSpeed : kBeeSpeed));
+            b.dock = dockTurn(h->id, dockIn(*h, b.worker ? kWorkerSpeed : b.cargo ? kCargoSpeed : kBeeSpeed));
             b.docking = true;
         };
         if (b.cargo || b.worker) {

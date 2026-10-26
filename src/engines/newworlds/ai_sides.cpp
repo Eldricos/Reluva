@@ -59,7 +59,7 @@ std::pair<float, float> parkingSpot(int n, float x, float y, bool building) {
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model, bool player) {
     UnitKind kind{type.name, model.empty() ? type.model : model,
-                  type.building ? 0 : groundScout('F').speed * type.pace / 0.125f};
+                  type.building ? 0 : kPaceSpeed * type.pace};
     const int id = world.addUnit(race, kind, x, y, 3.1416f / 2);
     Unit& u = *world.unit(id);
     u.slot = slot;

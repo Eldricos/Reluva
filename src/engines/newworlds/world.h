@@ -51,6 +51,11 @@ struct UnitKind {
     float speed = 0;
 };
 
+// A unit's speed, world units a second, for each path step a tick of its
+// pace (exe.md#vehicles-and-turrets): a step is a 1024-unit cell, at the
+// game's 20 ticks a second.
+constexpr float kPaceSpeed = 1024.0f * 20;
+
 // The side's ground scout: the four vehicles each recorded colony starts
 // with are of one kind (F1, R1; which kind isn't known).
 UnitKind groundScout(char side);

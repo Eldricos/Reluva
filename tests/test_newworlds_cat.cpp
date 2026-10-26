@@ -1447,17 +1447,33 @@ void testBees() {
     CHECK(e.bees().size() == 4 && e.bees()[0].home);
     // A yard (45 s with four) 15000 off: the bees leave the hub one at a
     // time through its dock (1 s each without its model's points) and fly
-    // 4.4-5.7 s.
+    // 15 ticks (1000 a tick).
     const int yard = e.order("construction-yard", 15000, 0, 0, 0);
     const int second = e.order("construction-yard", -15000, 0, 0, 0);
     CHECK(yard && second);
-    CHECK(built(e, 3) == 0 && e.beesAt(yard) == 0);
-    CHECK(built(e, 7) == 0 && e.beesAt(yard) == 4 && e.beesAt(second) == 0);
-    CHECK(built(e, 38) == 0);
-    CHECK(built(e, 6) == 1);
-    // On to the second (30000 away: 9-11 s), all four, its 45 s.
-    CHECK(built(e, 48) == 0 && e.beesAt(second) == 4);
-    CHECK(built(e, 6) == 1);
+    {
+        double t = 0, four = -1, done = -1;
+        for (; t < 120 && done < 0; t += 0.05) {
+            for (const ScriptEvent& x : e.advance(0.05))
+                if (x.kind == "built")
+                    done = t;
+            if (four < 0 && e.beesAt(yard) == 4)
+                four = t;
+        }
+        CHECK(four > 4 && four < 5.5 && done > 47 && done < 50);
+    }
+    // On to the second (30000 away: 30 ticks), all four, its 45 s.
+    {
+        double t = 0, four = -1, done = -1;
+        for (; t < 120 && done < 0; t += 0.05) {
+            for (const ScriptEvent& x : e.advance(0.05))
+                if (x.kind == "built")
+                    done = t;
+            if (four < 0 && e.beesAt(second) == 4)
+                four = t;
+        }
+        CHECK(four > 1 && four < 2 && done > 46 && done < 47);
+    }
     built(e, 14); // home, in through the hub's dock one at a time
     CHECK(std::all_of(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.home; }));
     // One bee: four times as long.
@@ -1823,9 +1839,9 @@ void testVehicleProduction() {
     const int yard = e.addBuilt("vehicle-yard", 0, 20000);
     CHECK(e.vehicleAvailable(*apc) && !e.vehicleAvailable(*tank) && !e.vehicleAvailable(*vehicleType(10)));
     // The armed transport: 240 x 300 units at 300 a tick and efficiency
-    // 0.8 (no officer): 300 ticks, 15 s, then 8 s rolling out.
+    // 0.8 (no officer): 300 ticks, 15 s, then 9.5 s rolling out.
     CHECK(e.orderVehicle(*apc) && e.stock()[Duranium] == 4970);
-    CHECK(run(e, 22.5).empty());
+    CHECK(run(e, 24).empty());
     auto out = run(e, 1);
     CHECK(out.size() == 1 && out[0].first == 56 && out[0].second == yard);
     // The panels' figures: the colony's consumption, each consumer's supply.
@@ -1835,7 +1851,7 @@ void testVehicleProduction() {
     // An officer of the yards' speciality at 0.5: efficiency 1.0, 12 s.
     e.setOfficer(yard, 0.5f);
     CHECK(e.orderVehicle(*apc));
-    CHECK(run(e, 19.5).empty() && run(e, 1).size() == 1);
+    CHECK(run(e, 21).empty() && run(e, 1).size() == 1);
     // The phaser tank wants the extended yard and the phaser coil lab (a
     // Federation lab, on the science station).
     e.addBuilt("vehicle-yard-upgrade", 0, 20000);

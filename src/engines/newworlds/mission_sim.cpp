@@ -244,7 +244,7 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
                 std::tie(sx, sy) = parkingSpot(onSpot[{colony_[0].a, colony_[0].b}]++, hx, hy, true);
             else
                 std::tie(sx, sy) = parkingSpot(onSpot[{p.a, p.b}]++, x, y, onHub(p));
-            start.push_back({UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f}, sx, sy, p.type});
+            start.push_back({UnitKind{t->name, t->model, kPaceSpeed * t->pace}, sx, sy, p.type});
         }
     }
     economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"], beesHoused_["worker-bee"]);
@@ -613,7 +613,7 @@ void MissionSim::rollOut() {
             continue;
         const auto [px, py] = world_->openSpot(x, y);
         const int id = spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true);
-        world_->unit(id)->kind = UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f};
+        world_->unit(id)->kind = UnitKind{t->name, t->model, kPaceSpeed * t->pace};
         // An armed one drives on to the rally point.
         if (ct->weapon.kind != WeaponKind::None && !colony_.empty()) {
             const auto [hx, hy] = worldAt(colony_[0].a, colony_[0].b);
@@ -692,8 +692,8 @@ void MissionSim::useModels(const Archives& archives) {
 // passengers; a hub lost loses those inside it.
 void MissionSim::runTransports(double dt) {
     // A stop: in through the building's dock and out again (an unarmed
-    // APC as far as RELEASE), at 500 a tick (exe.md#docking).
-    constexpr float kApcSpeed = 500;
+    // APC as far as RELEASE), at 100 a tick (exe.md#docking).
+    constexpr float kApcSpeed = 100;
     auto stop = [&](int id) {
         const ColonyStructure* c = economy_->structure(id);
         return c ? (economy_->dockIn(*c, kApcSpeed) + economy_->dockOut(*c, kApcSpeed, false)) / 20.0 : 4.0;
@@ -701,7 +701,16 @@ void MissionSim::runTransports(double dt) {
     const ColonyStructure* hub = economy_->hub();
     if (!hub)
         garage_ = 0;
-    auto door = [&](float x, float y) { return world_->openSpot(x, y - 1.2f * kTile); };
+    // Where it pulls up: twice the building's radius out on the side it
+    // comes from (exe.md#transports; 1.2 tiles south without its model).
+    auto door = [&](float x, float y, float fromX, float fromY) {
+        float r = 0.6f * kTile;
+        for (const Unit& u : world_->units())
+            if (u.building && std::abs(u.x - x) < 1 && std::abs(u.y - y) < 1)
+                r = world_->radiusOf(u);
+        const float dx = fromX - x, dy = fromY - y, d = std::hypot(dx, dy);
+        return d < 1 ? world_->openSpot(x, y - 2 * r) : world_->openSpot(x + dx / d * 2 * r, y + dy / d * 2 * r);
+    };
     auto structureAt = [&](int id, float& x, float& y) {
         for (const ColonyStructure& c : economy_->structures())
             if (c.id == id) {
@@ -717,7 +726,8 @@ void MissionSim::runTransports(double dt) {
         return nullptr;
     };
     auto goTo = [&](Shuttle& sh, float x, float y) {
-        std::tie(sh.tx, sh.ty) = door(x, y);
+        const Unit* u = world_->unit(sh.unit);
+        std::tie(sh.tx, sh.ty) = door(x, y, u ? u->x : x, u ? u->y : y - 1);
         sh.tries = 0;
         world_->moveTo(sh.unit, sh.tx, sh.ty);
     };
@@ -732,9 +742,9 @@ void MissionSim::runTransports(double dt) {
         float fx = 0, fy = 0;
         if (!ct || !t || !structureAt(r.from, fx, fy))
             continue;
-        const auto [px, py] = door(hub->x, hub->y);
+        const auto [px, py] = door(hub->x, hub->y, fx, fy);
         Shuttle sh{spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true), r.id};
-        world_->unit(sh.unit)->kind = UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f};
+        world_->unit(sh.unit)->kind = UnitKind{t->name, t->model, kPaceSpeed * t->pace};
         --garage_;
         goTo(sh, fx, fy);
         shuttles_.push_back(sh);
