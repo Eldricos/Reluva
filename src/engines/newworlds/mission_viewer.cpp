@@ -3518,9 +3518,18 @@ void MissionViewer::startFlow() {
     dirty_ = true;
 }
 
+char MissionViewer::side() const {
+    if (missions_.empty())
+        return 0;
+    const std::vector<char> sides = missionSides(missions_[size_t(current_)].shortName);
+    return size_t(side_) < sides.size() ? sides[size_t(side_)] : 0;
+}
+
 void MissionViewer::endFlow() {
     const Flow was = flow_;
     flow_ = Flow::None;
+    if (was == Flow::Report && flowWon_ && isCampaignFinale(missions_[size_t(current_)].shortName))
+        campaignWon_ = side();
     if (was == Flow::Briefing)
         stopBriefing();
     stopPlay();

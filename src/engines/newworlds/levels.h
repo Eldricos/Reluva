@@ -35,6 +35,8 @@ const Level* levelForMap(const std::vector<Level>& levels, std::string_view mapN
 // The sides a mission is played from: all three for a joint mission (J1),
 // else the campaign's ('F' for F1; the Federation for the others).
 std::vector<char> missionSides(std::string_view shortName);
+// Whether winning the mission wins its race's campaign (its movie plays).
+bool isCampaignFinale(std::string_view shortName);
 // Its string table in the side's misc archive: "str/eng/miss/fed01.stb" for
 // F1, "jnt01klg.stb" for J1 as the Klingons, "cvr03.stb" for the C
 // missions, "tst.stb" for Test; empty if none is known (E1-E3).

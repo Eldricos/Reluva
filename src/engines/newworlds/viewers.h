@@ -596,8 +596,18 @@ public:
     void update(uint64_t nowMs);
     // Playing: Tab and Escape are the game's, not the data viewer's.
     bool playing() const { return playing_; }
+    // The side the page shows ('F', 'K', 'R'; 0 with no missions).
+    char side() const;
+    // A race's campaign just won (its last mission's report closed): the
+    // side, once ('F', 'K', 'R'; 0 none), for its movie.
+    char takeCampaignWon() {
+        const char s = campaignWon_;
+        campaignWon_ = 0;
+        return s;
+    }
 
 private:
+    char campaignWon_ = 0;
     struct Page {
         std::string heading; // without the ~s; empty for the title page
         std::string text;

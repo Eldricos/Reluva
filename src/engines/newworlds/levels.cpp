@@ -114,6 +114,13 @@ const char* sidePrefix(char side) {
 
 } // namespace
 
+bool isCampaignFinale(std::string_view shortName) {
+    // The game's campaign table ends every race's run at J9, "The Lost
+    // Tribes" (after F14, K14 and R14): winning it plays the race's movie
+    // (install.md#movies).
+    return shortName == "J9";
+}
+
 std::vector<char> missionSides(std::string_view shortName) {
     if (isJoint(shortName))
         return {'F', 'K', 'R'};

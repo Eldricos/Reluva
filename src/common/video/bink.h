@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <memory>
 #include <vector>
 
 namespace reluva::video {
@@ -22,6 +23,8 @@ constexpr int kFormatBink = 0x10042;
 // libavcodec/bink.c and binkaudio.c).
 class BinkMovie {
 public:
+    BinkMovie();
+    ~BinkMovie();
     Error open(const std::filesystem::path& file);
 
     int width() const { return width_; }
@@ -29,6 +32,8 @@ public:
     uint32_t frames() const { return uint32_t(index_.size()); }
     double fps() const { return fpsDen_ ? double(fpsNum_) / fpsDen_ : 0; }
     bool hasAudio() const { return !tracks_.empty(); }
+    int audioRate() const { return tracks_.empty() ? 0 : tracks_[0].rate; }
+    int audioChannels() const { return tracks_.empty() ? 0 : tracks_[0].stereo ? 2 : 1; }
 
     // Decodes the next frame (false and an error past the end or on bad
     // data). The first call gives frame 0.
@@ -39,8 +44,12 @@ public:
     // `pitch` bytes apart).
     void toRgba(uint8_t* out, int pitch) const;
 
-    // The first audio track decoded whole: interleaved 16-bit samples at
-    // its rate (empty if the movie has none). Reads every frame's audio.
+    // The first audio track's part in a frame, decoded onto `out`
+    // (interleaved 16-bit samples at its rate). Frames must come in order
+    // from 0; the track plays from the movie's start, independent of the
+    // frames' times.
+    Error decodeAudio(uint32_t frame, std::vector<int16_t>& out);
+    // The whole track (empty if the movie has none).
     Error decodeAudio(audio::Sound& out);
 
     // A plane of the last frame (0 Y, 1 U, 2 V): its samples, and the
@@ -53,6 +62,7 @@ private:
         int rate = 0;
         bool stereo = false, dct = false;
     };
+    struct State; // the decoders' working state
     Error readPacket(uint32_t frame, std::vector<uint8_t>& out);
 
     std::ifstream file_;
@@ -67,7 +77,8 @@ private:
     uint32_t next_ = 0;
     int ystride_ = 0, cstride_ = 0, yrows_ = 0, crows_ = 0;
     std::vector<uint8_t> planes_[4], last_[4];
-    std::vector<uint8_t> packet_;
+    std::vector<uint8_t> packet_, audioPacket_;
+    std::unique_ptr<State> state_;
 };
 
 } // namespace reluva::video

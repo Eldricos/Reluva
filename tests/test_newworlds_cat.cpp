@@ -536,6 +536,8 @@ void testLevels() {
 
     CHECK(missionSides("F1") == std::vector<char>{'F'} && missionSides("K12") == std::vector<char>{'K'});
     CHECK(missionSides("J4").size() == 3 && missionSides("C1") == std::vector<char>{'F'});
+    // Winning J9 wins a campaign (its race's movie), not F14, K14 or R14.
+    CHECK(isCampaignFinale("J9") && !isCampaignFinale("F14") && !isCampaignFinale("R12"));
     CHECK(missionTableName("F1", 'F') == "str/eng/miss/fed01.stb");
     CHECK(missionTableName("K12", 'K') == "str/eng/miss/klg12.stb");
     CHECK(missionTableName("R2", 'R') == "str/eng/miss/rom02.stb");

@@ -13,6 +13,7 @@
 // Esc goes back to the launcher.
 
 #include "engines/engine.h"
+#include "engines/newworlds/movie_player.h"
 #include "engines/newworlds/viewers.h"
 #include "common/fs.h"
 
@@ -111,13 +112,27 @@ public:
             else
                 fonts.activate();
         };
-        activate();
+        // The game's movies (install.md#movies): the logos and the intro at
+        // launch; a race's movie when its campaign is won; F5 (the intro)
+        // and F6 (the side's movie) on the missions page.
+        newworlds::MoviePlayer movies(sys_, screen_, output, target_.path);
+        movies.play({"LOGOS.BIK", "STNW.BIK"});
+        if (!movies.playing())
+            activate();
+        auto raceMovie = [](char side) {
+            return side == 'K' ? "KLIWIN.BIK" : side == 'R' ? "ROMWIN.BIK" : "FEDWIN.BIK";
+        };
 
+        bool moviesOn = movies.playing();
         while (true) {
             Event ev;
             while (sys_.pollEvent(ev)) {
                 if (ev.type == EventType::Quit || ev.type == EventType::ReturnToLauncher)
                     return Error::success();
+                if (movies.playing()) {
+                    movies.handleEvent(ev);
+                    continue;
+                }
                 // While the missions page is playing, Escape and Tab are
                 // the game's.
                 const bool game = viewer == 0 && missions.playing();
@@ -132,6 +147,11 @@ public:
                         viewer = (viewer + 1) % kViewers;
                     while (counts[viewer] == 0);
                     activate();
+                    continue;
+                }
+                if (viewer == 0 && !game && ev.type == EventType::KeyDown && !ev.repeat &&
+                    (ev.key == key::F1 + 4 || ev.key == key::F1 + 5)) {
+                    movies.play({ev.key == key::F1 + 4 ? "STNW.BIK" : raceMovie(missions.side())});
                     continue;
                 }
                 if (viewer == 0)
@@ -149,8 +169,19 @@ public:
                 else if (viewer == 6 && ev.type == EventType::KeyDown)
                     fonts.handleKey(ev.key);
             }
+            movies.update(sys_.getMillis());
+            if (moviesOn && !movies.playing())
+                activate(); // the page back on the screen (the movies ended or were skipped)
+            moviesOn = movies.playing();
+            if (moviesOn) {
+                sys_.updateScreen(screen_);
+                sys_.delayMillis(5);
+                continue;
+            }
             if (viewer == 0)
                 missions.update(sys_.getMillis());
+            if (const char won = missions.takeCampaignWon())
+                moviesOn = movies.play({raceMovie(won)}) > 0;
             else if (viewer == 1)
                 models.update(sys_.getMillis());
             else if (viewer == 3)

@@ -39,6 +39,13 @@ public:
     // plays until stopped.
     SoundHandle play(std::shared_ptr<const Sound> sound, SoundType type, int volume = kMaxVolume, int pan = 0,
                      bool loop = false);
+    // A stream: a sound fed as it's made. It plays what it has been given
+    // (silent while it waits for more) and ends once finished and played
+    // out. `samples` are interleaved, `count` of them.
+    SoundHandle playStream(int rate, int channels, SoundType type, int volume = kMaxVolume);
+    void append(SoundHandle stream, const int16_t* samples, size_t count);
+    void finishStream(SoundHandle stream);
+
     void stop(SoundHandle handle);
     void stopType(SoundType type);
     void stopAll();
@@ -68,6 +75,8 @@ private:
         bool loop;
         double position = 0; // in the sound's frames
         bool done = false;
+        std::shared_ptr<Sound> stream; // a stream's own sound (the same as `sound`)
+        bool open = false;             // a stream still being fed
     };
     Channel* find(SoundHandle handle);
     const Channel* find(SoundHandle handle) const;

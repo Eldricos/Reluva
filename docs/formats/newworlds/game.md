@@ -65,6 +65,7 @@ As the first tutorial teaches them:
 | Pause | freezes the mission (as does the window losing the focus); again to go on |
 | MULTISELECTION's entries | right click ticks one; a click selects it alone, a double click as on the object; DELETE drops the ticked from the selection, INVERT flips the ticks, the arrows turn the pages |
 | G (missions page) | plays the mission through as the game runs it: a loading box over the three emblems, the briefing (Backspace skips it), a second loading box, play; once won or lost, the debriefing box, then the won or lost screen with the MISSION REPORT; CONTINUE (or Return) back to the page. Escape leaves at any point. F3 still starts play straight away |
+| F5 / F6 (missions page) | plays the intro movie / the shown side's campaign movie (install.md#movies; the game's launcher has an intro button); Escape, Space, Return or a click skips a movie |
 | K (missions page) | Cadet mode on or off for the missions played next: the colony's objects get twice their hit points instead of the race's bonus (the setup's Cadet box) |
 | Ctrl + X (playing) | the script's walkthrough a step on (a testing aid) |
 | COMMUNICATIONS' buttons | DELETE the message shown; the arrows to the first, previous, next and last; MISSION shows or hides the COMMAND panel (the mission and its objectives); X puts the panel away until the next message |

@@ -209,6 +209,17 @@ static void testMixer() {
     m.stopType(SoundType::Music);
     m.mix(out.data(), 2);
     CHECK(!m.isPlaying(l) && out[0] == 0);
+    // A stream plays what it's given, waits in silence, and ends once
+    // finished and played out.
+    const SoundHandle st = m.playStream(22050, 1, SoundType::Music);
+    const int16_t part[2] = {500, 600};
+    m.append(st, part, 2);
+    m.mix(out.data(), 3);
+    CHECK(out[0] == 500 && out[2] == 600 && out[4] == 0 && m.isPlaying(st));
+    m.append(st, part, 1);
+    m.finishStream(st);
+    m.mix(out.data(), 2);
+    CHECK(out[0] == 500 && out[2] == 0 && !m.isPlaying(st));
     // Nothing to play.
     CHECK(m.play(nullptr, SoundType::Effects) == kNoSound && m.play(make(22050, 1, {}), SoundType::Effects) == kNoSound);
 }

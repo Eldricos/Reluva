@@ -902,6 +902,16 @@ private:
 
 } // namespace
 
+struct BinkMovie::State {
+    std::vector<Bundle> bundles;
+    Tree colourHigh[16];
+    std::unique_ptr<AudioDecoder> audio;
+    uint32_t audioFrame = 0; // the next frame whose audio is due
+};
+
+BinkMovie::BinkMovie() : state_(std::make_unique<State>()) {}
+BinkMovie::~BinkMovie() = default;
+
 Error BinkMovie::open(const std::filesystem::path& file) {
     file_.close();
     file_.clear();
@@ -958,6 +968,13 @@ Error BinkMovie::open(const std::filesystem::path& file) {
         last_[p] = planes_[p];
     }
     next_ = 0;
+    state_->bundles.assign(Sources, Bundle{});
+    for (Bundle& b : state_->bundles)
+        b.data.assign(size_t(bw) * bh * 64, 0);
+    state_->audio.reset();
+    if (!tracks_.empty() && !tracks_[0].dct)
+        state_->audio = std::make_unique<AudioDecoder>(tracks_[0].rate, tracks_[0].stereo ? 2 : 1, false, false);
+    state_->audioFrame = 0;
     return Error::success();
 }
 
@@ -989,12 +1006,8 @@ Error BinkMovie::nextFrame() {
         std::swap(planes_[p], last_[p]);
     Bits bits(packet_.data() + at, packet_.size() - at);
     const size_t total = (packet_.size() - at) * 8;
-    std::vector<Bundle> bundles(Sources);
-    for (Bundle& b : bundles)
-        b.data.assign(size_t(ystride_ / 8) * (yrows_ / 8) * 64, 0);
-    Tree colourHigh[16];
     const int bw = ystride_ / 8, bh = yrows_ / 8, cbw = cstride_ / 8, cbh = crows_ / 8;
-    PlaneDecoder dec(version_, bits, bundles, colourHigh);
+    PlaneDecoder dec(version_, bits, state_->bundles, state_->colourHigh);
     if (flags_ & 0x00100000) { // alpha
         if (version_ >= 'i')
             bits.skip(32);
@@ -1040,38 +1053,43 @@ void BinkMovie::toRgba(uint8_t* out, int pitch) const {
     }
 }
 
+Error BinkMovie::decodeAudio(uint32_t frame, std::vector<int16_t>& out) {
+    if (tracks_.empty())
+        return Error::success();
+    if (!state_->audio)
+        return Error::fail("Bink's DCT audio isn't supported (only the RDFT kind)");
+    if (frame != state_->audioFrame || frame >= index_.size())
+        return Error::fail("Bink audio decoded out of order");
+    ++state_->audioFrame;
+    file_.clear();
+    file_.seekg(index_[frame]);
+    uint8_t size[4];
+    if (!file_.read(reinterpret_cast<char*>(size), 4))
+        return Error::fail("Bink audio cut short");
+    const uint32_t n = le32(size);
+    if (n < 4)
+        return Error::success();
+    audioPacket_.resize(n);
+    if (!file_.read(reinterpret_cast<char*>(audioPacket_.data()), n))
+        return Error::fail("Bink audio cut short");
+    std::vector<float> pcm;
+    if (!state_->audio->packet(audioPacket_.data(), audioPacket_.size(), pcm))
+        return Error::fail("bad Bink audio in frame " + std::to_string(frame));
+    for (const float v : pcm)
+        out.push_back(int16_t(std::clamp(std::lround(v * 32768.0f), -32768L, 32767L)));
+    return Error::success();
+}
+
 Error BinkMovie::decodeAudio(audio::Sound& out) {
     out = {};
     if (tracks_.empty())
         return Error::success();
-    const Track& t = tracks_[0];
-    if (t.dct)
-        return Error::fail("Bink's DCT audio isn't supported (only the RDFT kind)");
-    const int channels = t.stereo ? 2 : 1;
-    AudioDecoder dec(t.rate, channels, t.dct, false);
-    std::vector<float> pcm;
-    std::vector<uint8_t> head(8), data;
-    for (uint32_t f = 0; f < index_.size(); ++f) {
-        file_.clear();
-        file_.seekg(index_[f]);
-        uint8_t size[4];
-        if (!file_.read(reinterpret_cast<char*>(size), 4))
-            return Error::fail("Bink audio cut short");
-        const uint32_t n = le32(size);
-        if (n < 4)
-            continue;
-        data.resize(n);
-        if (!file_.read(reinterpret_cast<char*>(data.data()), n))
-            return Error::fail("Bink audio cut short");
-        if (!dec.packet(data.data(), data.size(), pcm))
-            return Error::fail("bad Bink audio in frame " + std::to_string(f));
-    }
-    out.rate = t.rate;
-    out.channels = channels;
+    out.rate = audioRate();
+    out.channels = audioChannels();
     out.format = kFormatBink;
-    out.samples.resize(pcm.size());
-    for (size_t i = 0; i < pcm.size(); ++i)
-        out.samples[i] = int16_t(std::clamp(std::lround(pcm[i] * 32768.0f), -32768L, 32767L));
+    for (uint32_t f = state_->audioFrame; f < index_.size(); ++f)
+        if (Error e = decodeAudio(f, out.samples))
+            return e;
     return Error::success();
 }
 

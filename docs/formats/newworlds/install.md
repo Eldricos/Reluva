@@ -27,18 +27,32 @@ release, and of the same install with an unofficial fan patch applied
 - `game.ini`, `level.dat`, `olevel.dat`, `kapla.rse`: the screen size and side numbers, and the mission lists; see [level.md](level.md).
 - `Media/`: standard MP3 and WAV files (voice per faction in `FedVO`,
   `KlingVO`, `RomVO`; `Music`; `Misc` sound effects and tutorial voice).
-- `SFC2.BIK` plus the movies on the CD: Bink video (Bink 1, 640 × 480, with
-  Bink audio). A clean install doesn't copy the `MOVIES` folder to the hard
-  disk: the launcher plays them from the CD, through the CD's own
-  `BINKPLAY.EXE` (asking for the CD, and checking it's the original,
-  first).
+- `SFC2.BIK` plus the movies on the CD: Bink video (Bink 1 version `i`,
+  640 × 480 at 15, 25 or 30 frames a second, with stereo 44.1 kHz Bink
+  audio of the RDFT kind). A clean install doesn't copy the `MOVIES`
+  folder to the hard disk. The game plays them from `<CD>\movies\`
+  (the drive letter from the registry's `CDRom` value under
+  `HKLM\SOFTWARE\Interplay\StarTrekNewWorlds\1.0.0`, else the game's own
+  folder), through the CD's own `BINKPLAY.EXE` with the switches `/I102
+  /C /R`, waiting for it to finish. A missing movie brings up a box asking
+  for the CD, again and again; one on a writable disk, a box asking for
+  the original CD.
 
   | Movie | Length | When |
   |---|---|---|
-  | `LOGOS.BIK` | 43 s | the first launch screen, then `STNW.BIK` (not when started for a multiplayer game, nor with a setting off) |
+  | `LOGOS.BIK` | 43 s | every launch, before the launcher, then `STNW.BIK` (not when started for a network or lobby game: `-create`, `-join`, `-ipx`, `-tcpip`, `-modem`, `-serial`, `-mplayer` or `-lobby`; no setting turns them off) |
   | `STNW.BIK` | 2:15 | the intro: after the logos, and the launcher's intro button |
-  | `FEDWIN.BIK`, `KLIWIN.BIK`, `ROMWIN.BIK` | 3:49-3:56 | the race's campaign won (the race the player last chose; the launcher plays it on its return) |
+  | `FEDWIN.BIK`, `KLIWIN.BIK`, `ROMWIN.BIK` | 3:49-3:56 | J9 ("The Lost Tribes") won in single player: the campaign table's last mission, after F14, K14 and R14. The movie is the player's race's; the game closes the mission and the launcher plays it before it reopens |
   | `SFC2.BIK` | 1:06 | never: the executable doesn't name it (a trailer for another game, as `KAPROMO.EXE` is) |
+
+  The launcher's own music, `Media/StarTrek.wav`, plays once each time it
+  opens (after any movie). **In Reluva** the movies play from a `MOVIES`
+  folder in the game folder (copy the CD's), else from the game folder
+  itself; missing ones are left out. LOGOS and STNW play at every start,
+  a race's movie after J9's report closes when won; F5 plays the intro and
+  F6 the shown side's movie from the missions page. Escape, Space, Return
+  or a click skips a movie (what `BINKPLAY.EXE`'s switches allow isn't
+  known). Reluva decodes them itself (`src/common/video/bink.cpp`).
 - The CD's installer archive `DATA1.CAB` (InstallShield, 212 MB) holds
   655 files in three groups (program files, help files, and `SerialEXE`, a
   second `STNW.exe` byte for byte the installed one): all of them are in

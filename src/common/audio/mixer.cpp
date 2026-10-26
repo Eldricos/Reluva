@@ -32,8 +32,33 @@ SoundHandle Mixer::play(std::shared_ptr<const Sound> sound, SoundType type, int 
     if (nextHandle_ == kNoSound)
         nextHandle_ = 1;
     channels_.push_back({handle, std::move(sound), type, std::clamp(volume, 0, kMaxVolume),
-                         std::clamp(pan, -kMaxPan, kMaxPan), loop});
+                         std::clamp(pan, -kMaxPan, kMaxPan), loop, 0, false, nullptr, false});
     return handle;
+}
+
+SoundHandle Mixer::playStream(int rate, int channels, SoundType type, int volume) {
+    if (rate <= 0 || channels < 1 || channels > 2)
+        return kNoSound;
+    auto sound = std::make_shared<Sound>();
+    sound->rate = rate, sound->channels = channels;
+    std::lock_guard<std::mutex> lock(mutex_);
+    const SoundHandle handle = nextHandle_++;
+    if (nextHandle_ == kNoSound)
+        nextHandle_ = 1;
+    channels_.push_back({handle, sound, type, std::clamp(volume, 0, kMaxVolume), 0, false, 0, false, sound, true});
+    return handle;
+}
+
+void Mixer::append(SoundHandle stream, const int16_t* samples, size_t count) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (Channel* c = find(stream); c && c->open)
+        c->stream->samples.insert(c->stream->samples.end(), samples, samples + count);
+}
+
+void Mixer::finishStream(SoundHandle stream) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (Channel* c = find(stream))
+        c->open = false;
 }
 
 void Mixer::stop(SoundHandle handle) {
@@ -112,6 +137,8 @@ void Mixer::mix(int16_t* out, int frames) {
         auto sample = [&](size_t frame, size_t channel) { return double(s.samples[frame * ch + channel]); };
         for (int i = 0; i < frames; ++i) {
             if (c.position >= double(n)) {
+                if (c.open)
+                    break; // a stream waiting for more: silence until it comes
                 if (!c.loop) {
                     c.done = true;
                     break;
