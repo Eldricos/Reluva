@@ -461,13 +461,12 @@ kept apart from the game's behaviour:
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 | Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
-| A phaser pulse's speed | 2500 units a tick | the game's is its beam model's length a tick (not measured) |
-| What a shot can hit | buildings within 6000 of its path, vehicles within 1000; a falling shell what it's no higher than (4000, 1500) | the game's uses each model's radius |
-| Bees and unarmed APCs | hit like anything else | the game's hit test skips some flag bits that, read as classes, would be them; but bees are killed in the game, so it isn't applied |
+| A phaser pulse's speed | 2500 units a tick | the game's is its beam model's length a tick (not read from the models yet) |
+| An object's size to shots | its model's bounds radius (0.9 for vehicles) | the executable; the game grows it over attached parts, Reluva doesn't; without models (tests) 6000 and 1000 |
+| A pulse's or bolt's height | flies level: it hits by its path on the map, and the ground never stops it | the game's flies in three dimensions and the ground (and its line checks) can stop it |
 | A pulse's way | fixed when fired, from the turret as it moves | the game's turns with the turret |
 | A vehicle facing a target outside its turret's arc | turns on the spot, 4.5° a tick, when told to attack it | the game's turret waits at its stop; how the vehicle comes round isn't known |
 | Turrets' pitch limits | not applied | the executable's elevation limits (the map is flat to Reluva's shots) |
-| Reach on a building | 6000 units past its middle | Reluva's |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
 | A build order's spot | clear if no building's middle is within 0.3 blocks | Reluva's: the game uses its placement test |
@@ -492,7 +491,6 @@ kept apart from the game's behaviour:
 | Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |
 | A lab's build time | 28 s | the training missions (21-35 s) |
 | Scans, captures, officers | ranges, flags, strength, 80 %, 16.8 s, 16 seats, 1414 units | the executable (exe.md#scans-and-captures) |
-| A target's size | buildings 6000, vehicles 1000 | Reluva's (the game uses the model's bounding radius) |
 | A scan no raid covers | 1 s to start, 10 s more | Reluva's (the scripts' own targets) |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,

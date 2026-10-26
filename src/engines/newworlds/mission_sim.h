@@ -10,6 +10,7 @@
 #include "engines/newworlds/fog.h"
 #include "engines/newworlds/ground.h"
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/repairs.h"
 #include "engines/newworlds/research.h"
 #include "engines/newworlds/script_effects.h"
@@ -51,6 +52,12 @@ public:
     // The starting colony the mission places for a side, its hub first;
     // empty if it places none.
     static std::vector<ColonyBuilding> placedColony(std::string_view mission, char side);
+
+    // Objects' sizes to shots from their models (exe.md#sides-and-combat):
+    // each model's bounds radius, read from the archives; 0.9 of it for a
+    // vehicle (half for types 117, 261, 264), times its type's scale for a
+    // building. Without this, fixed sizes.
+    void useModels(const Archives& archives);
 
     // Moves time on, in steps of at most a tenth of a second.
     void advance(double seconds);

@@ -557,8 +557,45 @@ its turret follows the nearest in the square, ready. Whoever is shot at
 turns to the nearest attacker it can hit. A turret fires only when it's
 on its target that tick; it turns speeding up and then slowing down
 onto it, at 128 (yaw) or 64 (pitch) 65536ths of a turn a tick each tick,
-with no top speed: half a turn in about 32 ticks. Moving units fire,
-leading a moving target.
+with no top speed: half a turn in about 32 ticks. Moving units fire.
+
+**Aiming.** Every turret, standing or moving, leads its target: it aims
+where the target's last tick of movement takes it in the time a shot
+takes to cover the distance (3D, from the shooter's middle) at the
+turret's speed, in one step. The speeds: a bolt is aimed at 2700 a tick
+but flies 5400 (the game doubles its launch once), so it leads twice
+too far; a beam pulse moves its beam's length a tick (the model's
+`front_lock` to `muzzle_flash`); a shell 350. Artillery keeps the
+shell's speed and solves the angle for the aimed spot, on the low arc,
+or the high one when its line is blocked; it then scales the speed so
+that along that way the shell comes down at the target's distance now.
+Shells fall an exact parabola, 3 a tick² (so a standing target is hit);
+the flat reach is 36 850.
+
+**Hits.** A shot hits the first object it passes that isn't its own
+side's (allies' and neutrals' included), not only its target; bees,
+unarmed APCs and effects (class bits 0x1dea0) are never hit, nor
+targeted. An object's size is its model's bounds radius (a vehicle's
+times 0.9, types 117, 261 and 264 half; a building's times its scale),
+grown to cover attached parts: a phaser tank about 467, an APC 523, a
+construction yard 2512, a vehicle yard 5192, an accommodation block
+5818. The test is a sphere round the object against the shot's path
+that tick, stretched a quarter at each end. One object takes the whole
+damage; nothing splashes, shells included. A shot touching the ground
+is spent. A pulse or bolt is gone at its range's end; a shell flies
+until it lands, at most 1000 ticks. Ranges count to the target's edge
+(its radius).
+
+**Lines of fire.** A pulse or bolt turret picks only targets it has a
+clear line to (from its middle) and fires only while it has one (from
+its muzzle, looked at every 8-11 ticks); blocked, it gives up the target
+and looks again (one the player ordered it at, it drives after). A line
+is blocked by the ground, and by any object other than shooter and
+target whose radius reaches the line: everything not hostile to the
+shooter (its own, allies', neutrals'), and, for the colonies, hostile
+buildings (an enemy's units and turrets never block). Artillery fires
+over anything, lobbing high when blocked. Something that drives into
+the line after the look is hit.
 
 ### Scans and captures
 

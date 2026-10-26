@@ -16,9 +16,6 @@ namespace {
 constexpr float kScoutSpeed = 4000;
 // Spacing of units sent to one point.
 constexpr float kSpread = 2500;
-// How far past a building's middle a shot reaches it (its walls); a
-// placeholder.
-constexpr float kBuildingReach = 6000;
 // Turrets (exe.md#sides-and-combat): they turn speeding up and then
 // slowing down onto their target, at 128 of the game's 65536ths of a turn
 // a tick each tick, and fire only when on it. They look for a target
@@ -42,15 +39,19 @@ bool paysForShots(int type) {
 // Projectiles: a disruptor bolt's speed and a shell's (units a tick), the
 // shells' gravity and longest flight; a phaser pulse runs a beam's length
 // a tick (its model's; Reluva's figure here, the model not measured).
-constexpr float kBoltSpeed = 2700, kShellSpeed = 350, kGravity = 3, kBeamLength = 2500;
+// A bolt is aimed as if it flew 2700 a tick, but flies twice that (the
+// game doubles its launch once); a beam pulse moves a beam's length a
+// tick (Reluva's 2500: the models' beam lengths aren't read yet).
+constexpr float kBoltSpeed = 2700, kBoltFlight = 5400, kShellSpeed = 350, kGravity = 3, kBeamLength = 2500;
+// What a shot passes through and what never blocks a line (exe.md#sides-
+// and-combat): bees, unarmed APCs, effects and a few others by class.
+constexpr int kNotHit = 0x1dea0;
+// The classes that count as units or turrets (an enemy's never blocks).
+constexpr int kUnitClasses = 0x4560110;
 constexpr int kShellLife = 1000;
-// What a projectile can hit: an object's size (Reluva's; the game uses
-// its model's radius) and how high it stands, for a falling shell. (The
-// game's hit test also skips objects with some flag bits, 0x1dea0, which
-// read as class bits would be the bees and unarmed APCs; but bees are
-// killed and replaced in the game, so the field may be another: not
-// applied.)
-constexpr float kBuildingRadius = 6000, kVehicleRadius = 1000, kBuildingTall = 4000, kVehicleTall = 1500;
+// An object's size to shots where its model's isn't known (World::setRadius
+// gives the game's: its model's bounds radius).
+constexpr float kBuildingRadius = 6000, kVehicleRadius = 1000;
 // Cloaking (exe.md#cloaking): ticks seen before it cloaks, and a fade's.
 constexpr int kCloakAfter = 300, kCloakFade = 63;
 // Protecting (exe.md#orders): how often it looks for an attack on the
@@ -60,6 +61,12 @@ constexpr int kProtectEvery = 8, kUnderAttack = 100;
 
 // Whether a unit keeps driving while it fires: one moving on the
 // player's move or attack-en-route order (a cloaking unit not on a move).
+// Its class bits (exe.md#group-counts), from its type.
+int classOf(const Unit& u) {
+    const CombatType* t = combatType(u.type);
+    return t ? t->mask : 0;
+}
+
 bool firesOnTheMove(const Unit& u) {
     return !u.ai && u.moving() &&
            ((u.order == UnitOrder::Move && !u.cloaks) || u.order == UnitOrder::EnRoute ||
@@ -237,7 +244,7 @@ int World::addUnit(char side, const UnitKind& kind, float x, float y, float head
     u.id = nextId_++;
     u.side = side;
     u.kind = kind;
-    u.x = x, u.y = y, u.heading = heading;
+    u.x = u.lastX = x, u.y = u.lastY = y, u.heading = heading;
     units_.push_back(std::move(u));
     return units_.back().id;
 }
@@ -451,6 +458,21 @@ std::vector<WorldEvent> World::takeEvents() {
 // shot and reload. What's out of hit points is destroyed.
 void World::combatTick() {
     ++tick_;
+    for (Unit& u : units_) {
+        u.vx = u.x - u.lastX, u.vy = u.y - u.lastY;
+        u.lastX = u.x, u.lastY = u.y;
+    }
+    // A line of fire, kept 8-11 ticks (artillery lobs over anything).
+    auto clear = [&](Unit& u, const Unit& t) {
+        if (u.weapon.kind == WeaponKind::Artillery)
+            return true;
+        if (u.sightTarget != t.id || tick_ - u.sightTick >= kRescan + (u.id & 3)) {
+            u.sightTarget = t.id, u.sightTick = tick_;
+            u.sightClear = lineClear(u, t);
+        }
+        return u.sightClear;
+    };
+    auto pickable = [&](const Unit& v) { return (classOf(v) & kNotHit) == 0; };
     auto distance = [](const Unit& a, const Unit& b) { return std::hypot(b.x - a.x, b.y - a.y); };
     // Within the turret's arc (exe.md#sides-and-combat: some turn only so
     // far each way from straight ahead).
@@ -462,7 +484,7 @@ void World::combatTick() {
     };
     auto inRange = [&](const Unit& u, const Unit& t) {
         const float range = u.weapon.kind == WeaponKind::Artillery ? std::min(u.weapon.range, kShellReach) : u.weapon.range;
-        return distance(u, t) <= range + (t.building ? kBuildingReach : 0);
+        return distance(u, t) <= range + radiusOf(t); // to its edge
     };
     for (Unit& u : units_) {
         if (u.cloaks && u.hp > 0) {
@@ -505,8 +527,9 @@ void World::combatTick() {
         if (!t && looks && (rescan || u.target)) {
             float best = 1e30f;
             for (Unit& v : units_)
-                if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) &&
-                    inArc(u, v) && distance(u, v) < best)
+                if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && pickable(v) &&
+                    (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) && inArc(u, v) &&
+                    distance(u, v) < best && (u.weapon.kind == WeaponKind::Artillery || lineClear(u, v)))
                     best = distance(u, v), t = &v;
         }
         if (!t && u.lastAttacker && looks)
@@ -531,7 +554,14 @@ void World::combatTick() {
             continue;
         }
         u.target = t->id;
-        if (!inRange(u, *t)) {
+        // A line blocked: one it chose it gives up (it looks again); one
+        // it was told to attack it drives after, as out of range.
+        const bool blocked = !clear(u, *t);
+        if (blocked && !u.ordered) {
+            u.target = 0, u.firing = false, u.burstLeft = 0;
+            continue;
+        }
+        if (!inRange(u, *t) || blocked) {
             // Told to attack it: drive after it (an assault doesn't: it
             // fires from where it stands).
             u.firing = false;
@@ -670,33 +700,43 @@ void World::fire(Unit& u, Unit& t) {
     float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
     if (u.weapon.kind != WeaponKind::Artillery && marksmanship_)
         damage = std::trunc(damage * (marksmanship_(u) + 1));
-    // Aimed ahead of a moving target: where it will be when the shot
-    // gets there at the projectile's speed (a straight line's time).
+    // Aimed ahead of the target, standing or moving: where its last
+    // tick's movement takes it in the time a shot at the turret's speed
+    // takes to get there (one step, as the game's).
     const float speed = u.weapon.kind == WeaponKind::Artillery ? kShellSpeed
                         : u.weapon.kind == WeaponKind::Single  ? kBoltSpeed
                                                                : kBeamLength;
-    float ax = t.x, ay = t.y;
-    if (t.moving() && !t.building && !(t.firing && !firesOnTheMove(t))) {
-        const float ticks = std::hypot(t.x - u.x, t.y - u.y) / speed;
-        const float v = t.kind.speed / 20;
-        ax += std::cos(t.heading) * v * ticks, ay += std::sin(t.heading) * v * ticks;
-    }
+    const float uz = groundAt(u.x, u.y), tz = groundAt(t.x, t.y);
+    const float ticks = std::hypot(std::hypot(t.x - u.x, t.y - u.y), tz - uz) / speed;
+    const float ax = t.x + t.vx * ticks, ay = t.y + t.vy * ticks;
     Projectile p;
     p.from = u.id, p.fromSlot = u.slot, p.kind = u.weapon.kind, p.damage = damage;
     p.x = p.px = p.ox = u.x, p.y = p.py = p.oy = u.y;
     const float d = std::max(1.0f, std::hypot(ax - u.x, ay - u.y));
     p.dx = (ax - u.x) / d, p.dy = (ay - u.y) / d;
     if (u.weapon.kind == WeaponKind::Artillery) {
-        // The low arc to where it's aimed (flat ground; the game lobs the
-        // high one when the line of sight is blocked).
-        const float sin2 = std::min(1.0f, kGravity * d / (kShellSpeed * kShellSpeed));
-        const float angle = 0.5f * std::asin(sin2);
-        p.z = p.pz = groundAt(u.x, u.y);
-        p.vx = p.dx * kShellSpeed * std::cos(angle), p.vy = p.dy * kShellSpeed * std::cos(angle);
-        p.vz = kShellSpeed * std::sin(angle);
+        // The game's solve: the shell's speed fixed, its angle found for the
+        // aimed spot (the low arc, the high one when the line is blocked),
+        // then its speed scaled so that along that way it comes down at the
+        // target's distance now.
+        const float dz = tz - uz, v2 = kShellSpeed * kShellSpeed, g = kGravity;
+        const float disc = (g * dz - v2) * (g * dz - v2) - g * g * (d * d + dz * dz);
+        if (disc < 0)
+            return; // out of its reach
+        const bool high = !lineClear(u, t);
+        const float t2 = 2 * (v2 - g * dz + (high ? 1 : -1) * std::sqrt(disc)) / (g * g);
+        const float flight = std::sqrt(std::max(t2, 1.0f));
+        float vh = d / flight, vz = dz / flight + g * flight / 2;
+        const float t0 = std::hypot(t.x - u.x, t.y - u.y) / vh;
+        if (t0 * vz - dz > 0) {
+            const float k = t0 / std::sqrt(2 * (t0 * vz - dz) / g);
+            vh *= k, vz *= k;
+        }
+        p.z = p.pz = uz;
+        p.vx = p.dx * vh, p.vy = p.dy * vh, p.vz = vz;
     } else {
-        p.speed = speed;
-        p.range = u.weapon.range + (t.building ? kBuildingReach : 0);
+        p.speed = u.weapon.kind == WeaponKind::Single ? kBoltFlight : speed;
+        p.range = u.weapon.range + radiusOf(t);
     }
     projectiles_.push_back(p);
     // The target's turrets learn who fired at them.
@@ -712,6 +752,34 @@ void World::fire(Unit& u, Unit& t) {
 
 float World::groundAt(float x, float y) const { return terrain_.heightAt ? terrain_.heightAt(x, y) : 0; }
 
+float World::radiusOf(const Unit& u) const {
+    if (u.radius <= 0)
+        u.radius = radius_ ? radius_(u) : 0;
+    if (u.radius <= 0)
+        u.radius = u.building ? kBuildingRadius : kVehicleRadius;
+    return u.radius;
+}
+
+bool World::lineClear(const Unit& u, const Unit& t) {
+    const float sx = t.x - u.x, sy = t.y - u.y, len = std::hypot(sx, sy);
+    if (len <= 0)
+        return true;
+    for (Unit& v : units_) {
+        if (v.id == u.id || v.id == t.id || v.hp <= 0)
+            continue;
+        const bool enemy = stance(u.slot, v.slot) == 3;
+        if (enemy && !(u.slot <= 2 && (classOf(v) & kUnitClasses) == 0))
+            continue; // an enemy's unit never blocks; an enemy's building only a colony's line
+        const float r = radiusOf(v);
+        if (v.x < std::min(u.x, t.x) - r || v.x > std::max(u.x, t.x) + r || v.y < std::min(u.y, t.y) - r ||
+            v.y > std::max(u.y, t.y) + r)
+            continue;
+        if (std::abs((v.x - u.x) * sy - (v.y - u.y) * sx) / len <= r)
+            return false;
+    }
+    return true;
+}
+
 // A tick of the projectiles in flight: each moves on (a pulse from its
 // shooter's muzzle as the turret now stands, a bolt straight on, a shell
 // along its arc) and strikes the first object its path crossed this tick
@@ -724,7 +792,7 @@ void World::flyProjectiles() {
         p.px = p.x, p.py = p.y, p.pz = p.z;
         bool done = false;
         if (p.kind == WeaponKind::Artillery) {
-            p.x += p.vx, p.y += p.vy, p.z += p.vz;
+            p.x += p.vx, p.y += p.vy, p.z += p.vz - kGravity / 2; // an exact parabola
             p.vz -= kGravity;
             done = p.age >= kShellLife;
         } else if (p.kind == WeaponKind::Single) {
@@ -742,17 +810,20 @@ void World::flyProjectiles() {
         const float sx = p.x - p.px, sy = p.y - p.py, len2 = sx * sx + sy * sy;
         Unit* hit = nullptr;
         float best = 2;
+        // Anything not its shooter's own side's, but bees, unarmed APCs and
+        // effects: a sphere of the object's radius round where it stands
+        // (a shell in three dimensions; a pulse or bolt flies level), the
+        // path's ends stretched a quarter each way.
         for (Unit& v : units_) {
-            if (v.hp <= 0 || v.id == p.from || v.slot == p.fromSlot)
+            if (v.hp <= 0 || v.id == p.from || v.slot == p.fromSlot || (classOf(v) & kNotHit))
                 continue;
-            const float r = v.building ? kBuildingRadius : kVehicleRadius;
-            // The nearest point of the path to it, as a share of the path.
-            const float f = len2 > 0 ? std::clamp(((v.x - p.px) * sx + (v.y - p.py) * sy) / len2, 0.0f, 1.0f) : 0;
-            if (std::hypot(p.px + sx * f - v.x, p.py + sy * f - v.y) > r || f >= best)
-                continue;
-            // A shell passes over what it's above.
-            if (p.kind == WeaponKind::Artillery &&
-                p.pz + (p.z - p.pz) * f - groundAt(v.x, v.y) > (v.building ? kBuildingTall : kVehicleTall))
+            const float r = radiusOf(v);
+            const bool shell = p.kind == WeaponKind::Artillery;
+            const float sz = shell ? p.z - p.pz : 0, vz = shell ? groundAt(v.x, v.y) - p.pz : 0;
+            const float l2 = len2 + sz * sz;
+            const float f = l2 > 0 ? std::clamp(((v.x - p.px) * sx + (v.y - p.py) * sy + vz * sz) / l2, -0.25f, 1.25f) : 0;
+            const float ex = p.px + sx * f - v.x, ey = p.py + sy * f - v.y, ez = shell ? sz * f - vz : 0;
+            if (ex * ex + ey * ey + ez * ez > r * r || f >= best)
                 continue;
             hit = &v, best = f;
         }
@@ -767,7 +838,7 @@ void World::flyProjectiles() {
             e.kind = WorldEvent::Hit;
             e.from = p.from, e.to = hit->id;
             e.fromSlot = p.fromSlot, e.toSlot = hit->slot;
-            e.x0 = e.x1 = p.px + sx * best, e.y0 = e.y1 = p.py + sy * best;
+            e.x0 = e.x1 = p.px + sx * std::clamp(best, 0.0f, 1.0f), e.y0 = e.y1 = p.py + sy * std::clamp(best, 0.0f, 1.0f);
             e.weapon = p.kind;
             events_.push_back(std::move(e));
             continue;

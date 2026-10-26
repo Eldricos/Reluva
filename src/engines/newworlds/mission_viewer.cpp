@@ -393,6 +393,7 @@ void MissionViewer::startPlay() {
     sim_ = std::make_unique<MissionSim>(level.shortName, side, map_.terrain(), ground, map_.blocksWide(),
                                         map_.blocksHigh(),
                                         colony_ ? colony_->buildings() : std::vector<ColonyBuilding>{});
+    sim_->useModels(archives_);
     world_ = &sim_->world();
     economy_ = &sim_->economy();
     ai_ = &sim_->ai();

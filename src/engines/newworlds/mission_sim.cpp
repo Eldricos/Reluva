@@ -4,6 +4,7 @@
 #include "engines/newworlds/mission_sim.h"
 
 #include "engines/newworlds/colony.h"
+#include "engines/newworlds/geo.h"
 #include "engines/newworlds/start_data.h"
 
 #include <algorithm>
@@ -589,6 +590,30 @@ void MissionSim::rollOut() {
             world_->rally(id, qx, qy);
         }
     }
+}
+
+void MissionSim::useModels(const Archives& archives) {
+    auto radii = std::make_shared<std::map<std::string, float>>();
+    world_->setRadius([&archives, radii](const Unit& u) {
+        const CombatType* t = combatType(u.type);
+        const std::string model = !u.kind.model.empty() ? u.kind.model : t ? t->model : "";
+        if (model.empty())
+            return 0.0f;
+        auto [it, fresh] = radii->try_emplace(model, 0.0f);
+        if (fresh)
+            for (const auto& a : archives)
+                if (const CatEntry* e = a->find(model)) {
+                    std::vector<uint8_t> data;
+                    GeoModel geo;
+                    if (!a->read(*e, data) && !parseGeo(data, geo))
+                        it->second = geo.radius;
+                    break;
+                }
+        const float r = it->second;
+        if (u.building)
+            return r * (t && t->scale > 0 ? t->scale : 1.0f);
+        return r * (u.type == 117 || u.type == 261 || u.type == 264 ? 0.5f : 0.9f);
+    });
 }
 
 // The colony's transports at work (exe.md#transports): each ride waiting

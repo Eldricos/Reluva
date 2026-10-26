@@ -1545,9 +1545,10 @@ void testStoresAndRazing() {
     CHECK(e.dead() == crew);
 }
 
-// Projectiles (exe.md#sides-and-combat): a disruptor bolt flies 2700
-// units a tick and hurts its target only on arrival; a side's shots pass
-// through its own (no friendly fire); a shell flies its arc.
+// Projectiles (exe.md#sides-and-combat): a disruptor bolt flies 5400
+// units a tick and hurts its target only on arrival; a side's own in the
+// line of fire stop it firing, but one that drives in after passes the
+// shot through (no friendly fire); a shell flies its arc.
 void testProjectiles() {
     Terrain t;
     t.width = t.height = 40;
@@ -1561,14 +1562,21 @@ void testProjectiles() {
     w.unit(front)->holdFire = true;
     const float hp = w.unit(fed)->hp;
     bool fired = false;
-    int ticks = 0;
-    for (; ticks < 200 && !fired; ++ticks) {
+    for (int ticks = 0; ticks < 200 && !fired; ++ticks) {
+        w.advance(0.05);
+        for (const WorldEvent& e : w.takeEvents())
+            fired = fired || (e.kind == WorldEvent::Shot && e.from == back);
+    }
+    CHECK(!fired); // its own tank is in the way
+    w.unit(front)->y = w.unit(front)->lastY = y + 8000;
+    for (int ticks = 0; ticks < 200 && !fired; ++ticks) {
         w.advance(0.05);
         for (const WorldEvent& e : w.takeEvents())
             fired = fired || (e.kind == WorldEvent::Shot && e.from == back);
     }
     CHECK(fired && !w.projectiles().empty());
-    // 16000 away: six ticks out (2700 a tick), the front tank no shield.
+    w.unit(front)->y = w.unit(front)->lastY = y; // back into the line, after the shot
+    // 16000 away: three ticks out, the front tank no shield.
     CHECK(w.unit(fed)->hp == hp);
     bool hit = false;
     for (int i = 0; i < 8; ++i) {
@@ -1640,6 +1648,23 @@ void testProjectiles() {
     }
     // (The low arc: about 13 degrees up at that range, topping out near 1000.)
     CHECK(gun && landed && highest > 800 && highest < 1300);
+    // A shot leads a target crossing in front of it: aimed where the
+    // target's last step takes it in the shot's time.
+    {
+        World l(t);
+        l.setStance(1, 0, 3);
+        const int gun = spawnObject(l, 1, 'K', *combatType(10), 100000, 100000, {});
+        const int scout = spawnObject(l, 0, 'F', *combatType(97), 100000, 115000, {});
+        l.moveTo(scout, 250000, 115000);
+        float aimX = 0, atX = 0;
+        for (int i = 0; i < 200 && aimX == 0; ++i) {
+            l.advance(0.05);
+            for (const WorldEvent& e : l.takeEvents())
+                if (e.kind == WorldEvent::Shot && e.from == gun && l.unit(scout))
+                    aimX = e.x1, atX = l.unit(scout)->x;
+        }
+        CHECK(aimX > atX + 100);
+    }
 }
 
 void testRivalsAndGroups() {
@@ -2082,7 +2107,7 @@ void testOrders() {
         World w(t);
         w.setStance(1, 0, 3);
         const int tank = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {}, {}, true);
-        spawnObject(w, 1, 'K', *combatType(46), 100000, 112000, {}); // a bee: unarmed, fired on
+        spawnObject(w, 1, 'K', *combatType(37), 100000, 112000, {}); // a scout: unarmed, fired on
         w.select({tank});
         w.moveSelected(100000, 400000);
         bool moving = false;
@@ -2097,7 +2122,7 @@ void testOrders() {
         World w(t);
         w.setStance(0, 2, 3);
         const int rom = spawnObject(w, 2, 'R', *combatType(35), 100000, 100000, {}, {}, true);
-        spawnObject(w, 0, 'F', *combatType(12), 100000, 112000, {});
+        spawnObject(w, 0, 'F', *combatType(97), 100000, 112000, {});
         w.select({rom});
         w.moveSelected(100000, 400000, order);
         bool moving = false;

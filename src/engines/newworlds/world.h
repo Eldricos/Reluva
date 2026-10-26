@@ -106,6 +106,13 @@ struct Unit {
     int chasing = 0;            // protecting: the attacker it's gone after
     int attackedTick = -100000; // when it was last hit
     int heldBy = -1;            // a building another side's away team holds: that side's slot
+    // How far it moved last tick (for leading it), and where it was.
+    float vx = 0, vy = 0, lastX = 0, lastY = 0;
+    // Its size to shots (exe.md#sides-and-combat): set on first use.
+    mutable float radius = 0;
+    // Its line of fire to its target, as last checked (every 8-11 ticks).
+    int sightTarget = 0, sightTick = -1000;
+    bool sightClear = true;
 };
 
 // What combat did in a step: a shot (from, to, its ends) or something
@@ -212,6 +219,14 @@ public:
     // A shooter's best security skill (its officers'; 0 none): its shots
     // do (skill + 1) times their damage, artillery's excepted.
     void setMarksmanship(std::function<float(const Unit& shooter)> skill) { marksmanship_ = std::move(skill); }
+    // Each object's size to shots and lines of fire: its model's bounds
+    // radius, 0.9 of it for a vehicle (exe.md#sides-and-combat). Without
+    // one, 6000 for buildings and 1000 for vehicles.
+    void setRadius(std::function<float(const Unit&)> radius) { radius_ = std::move(radius); }
+    float radiusOf(const Unit& u) const;
+    // Whether u has a clear line of fire to t: no object it doesn't count
+    // as an enemy in the way (nor, for the colonies, an enemy's building).
+    bool lineClear(const Unit& u, const Unit& t);
     // A defensive turret's power for its shots (exe.md#sides-and-combat):
     // 300 a fire, taken from its buffer; false if it hasn't that much
     // (then it doesn't fire). Vehicles and the natives' guns need none.
@@ -243,6 +258,7 @@ private:
     std::vector<WorldEvent> events_;
     std::function<float(const Unit&, float)> damage_;
     std::function<float(const Unit&)> marksmanship_;
+    std::function<float(const Unit&)> radius_;
     std::vector<Projectile> projectiles_;
     std::function<bool(const Unit&, float)> shotPower_;
     double tickClock_ = 0;

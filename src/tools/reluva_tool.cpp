@@ -2452,6 +2452,7 @@ int cmdPlayCheck(int argc, char** argv) {
             if (!onlySide.empty() && onlySide[0] != side)
                 continue;
             nw::MissionSim sim(m, side, ground);
+            sim.useModels(archives);
             // The keys a tutorial asks for are pressed as it asks (a
             // trainee following it), a second at a time.
             for (double t = 0; t < seconds; t += 1) {
