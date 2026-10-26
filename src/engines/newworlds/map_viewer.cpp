@@ -868,8 +868,10 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
         break;
     }
     case key::Kp0 + 9:
-    case key::Kp0 + 3: {
-        const float step = (k == key::Kp0 + 9 ? 1 : -1) * kKeyTurn / 2;
+    case key::Kp0 + 3:
+    case key::PageUp: // (the game's other pitch keys)
+    case key::PageDown: {
+        const float step = (k == key::Kp0 + 9 || k == key::PageUp ? 1 : -1) * kKeyTurn / 2;
         pitch_ = view_ == View::FirstPerson ? std::clamp(pitch_ + step / 8, -kEyeTilt, kEyeTilt)
                                             : std::clamp(pitch_ + step, 0.02f, kMaxPitch);
         break;
@@ -1423,8 +1425,10 @@ void MapViewer::render() {
                 }
             }
         }
-    // Selected units: a row of small orange marks above each (as in the
-    // recordings).
+    // Selected units: marks above each for its health (exe.md#the-selection-
+    // panel): one while it has any, one more past each fifth (up to five),
+    // in a zigzag, blinking.
+    const bool blink = (shimmerFrame_ / 10) % 2 == 1;
     for (const UnitDraw& u : units_) {
         if (!u.selected)
             continue;
@@ -1432,15 +1436,18 @@ void MapViewer::render() {
         if (v.z < cam.nearZ)
             continue;
         const ScreenVertex p = cam.project(v);
-        for (int k = -1; k <= 1; ++k)
+        const int marks = u.health <= 0 ? 0 : 1 + int(u.health > 0.2f) + int(u.health > 0.4f) + int(u.health > 0.6f) + int(u.health > 0.8f);
+        for (int k = 0; k < marks; ++k) {
+            const int mx = int(p.x) + (k - (marks - 1) / 2) * 6 - ((marks - 1) % 2) * 3, my = int(p.y) - 8 - (k % 2) * 3;
             for (int dy = 0; dy < 3; ++dy)
                 for (int dx = 0; dx < 4; ++dx) {
-                    const int x = int(p.x) + k * 6 + dx - 2, y = int(p.y) + dy - 8;
+                    const int x = mx + dx - 2, y = my + dy;
                     if (x >= 0 && y >= 0 && x < w && y < h) {
                         uint8_t* px = screen_.row(y) + x * 4;
-                        px[0] = 255, px[1] = 150, px[2] = 30;
+                        px[0] = 255, px[1] = uint8_t(blink ? 200 : 150), px[2] = uint8_t(blink ? 80 : 30);
                     }
                 }
+        }
     }
 }
 

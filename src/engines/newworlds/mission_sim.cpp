@@ -377,6 +377,17 @@ bool MissionSim::raze(int unit) {
     return false;
 }
 
+bool MissionSim::cancelBuild(int structure) {
+    if (!economy_->cancel(structure))
+        return false;
+    for (size_t i = 0; i < structureIds_.size() && i < colonyObjects_.size(); ++i)
+        if (structureIds_[i] == structure && colonyObjects_[i] > 0) {
+            world_->remove(colonyObjects_[i]);
+            colonyObjects_[i] = -1;
+        }
+    return true;
+}
+
 bool MissionSim::razing(int unit) const { return std::find(razing_.begin(), razing_.end(), unit) != razing_.end(); }
 
 void MissionSim::setPosture(int slot, int posture) {

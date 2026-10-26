@@ -110,7 +110,10 @@ Work on Reluva's side, listed so the whole picture is in one place.
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
 briefings' scenes (their units flying their paths), the Tricorder's colours
-(the map's own, shifted as the game does), and the guns' pitch limits.
+(the map's own, shifted as the game does), the guns' pitch limits, and from the
+manual's check: Klingon and Romulan cargo bees carrying one pod,
+cancelling constructions (and the cap of 10), F1's edge turning, Page Up
+/ Down, the double right click, and the health marks over selected units.
 
 Settled from the executable and the data since the last list: the camera
 (it isn't held to seen blocks), speeds, docks, bees, roll-out, demolition,

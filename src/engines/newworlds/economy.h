@@ -191,6 +191,12 @@ public:
     bool spend(int structure, float power);
     bool razable(int structure) const;
     bool raze(int structure);
+    // A building or upgrade still going up cancelled from the colony's
+    // details (exe.md#demolishing: a yes / no, then gone; Reluva gives its
+    // cost back, as an aborted build order's). False if it isn't a site.
+    bool cancel(int structure);
+    // Sites and upgrades not finished: the game takes no more orders at 10.
+    int pendingBuilds() const;
     bool evacuated(int structure) const;
 
     // Vehicles: the side's that the menu offers now (their yard and what
@@ -387,6 +393,9 @@ private:
     void unload(const Pod& p);
     Bee* beeById(int id);
     int64_t podSize() const { return side_ == 'F' ? 80000 : 160000; }
+    // A cargo bee's bays: the Federation's two, the Klingons' and Romulans' one
+    // (so every cargo bee carries 160 T a trip).
+    int cargoBays() const { return side_ == 'F' ? 2 : 1; }
     void fly(Bee& b, float x, float y);
 
     // The stores, in the game's units.

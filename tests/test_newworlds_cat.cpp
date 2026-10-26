@@ -1603,6 +1603,22 @@ void testStoresAndRazing() {
     // Gifts now go to the second.
     e.give(Dilithium, 10);
     CHECK(e.storeOf(second)[Dilithium] == 10);
+    // A site cancelled: gone, its cost back; and no more than 10 going up.
+    {
+        e.addBuilt("construction-yard", -60000, 0);
+        e.give(Dilithium, 5000), e.give(Thermoconc, 5000), e.give(Nitrium, 50000), e.give(Polycomp, 500);
+        const Stock had = e.stock();
+        const int site = e.order("power-generator", 60000, 60000, 0, 0);
+        CHECK(site && e.stock()[Dilithium] < had[Dilithium] && e.cancel(site) && !e.structure(site));
+        CHECK(e.stock()[Dilithium] == had[Dilithium] && !e.cancel(1)); // (a finished building isn't a site)
+        std::vector<int> sites;
+        for (int i = 0; i < 11; ++i)
+            sites.push_back(e.order("power-generator", 60000 + 20000.0f * float(i), 80000, 0, 0));
+        CHECK(e.pendingBuilds() == 10 && sites[9] && !sites[10]);
+        for (int id : sites)
+            if (id)
+                e.cancel(id);
+    }
     // A razed building's crew walk back to the hub's pool (20 s).
     const int bay0 = e.addBuilt("sickbay", 0, -40000);
     const int pool0 = e.pool();

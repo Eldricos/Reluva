@@ -117,11 +117,11 @@ facility and utility hospital as marked.
 | Power generator | `fpgs` *name* | `kpgs` | `rps1` |
 | Advanced generator | `fpgs2` *name* | `kpgs2` | `rps2` |
 | Mining station | `fms` *name* | `kms` | `rms` |
-| Accommodation (the Klingons' Arsenal) | `accom` | `kab` | `rab` *name* |
+| Accommodation (the Klingons' Colonial House, the Romulans' Residency) | `accom` | `kab` | `rab` *name* |
 | Sickbay (the Romulans' utility hospital) | `fsb` | `ksb_a` | `ruh_a` (upgrades `ruh_b`: the manual's picture, p. 111, shows the slatted tower on the base) |
 | Science station | `fss_a` *name* | `kss_a` | `rsb_a` |
 | Science station upgrade | `fss_b` *name* | `kss_b` *name* | `rsb_b` |
-| Security center | `fsc` | `ksc` *name* | `risb` *name* |
+| Security center (the Klingons' Arsenal, the Romulans' Security Bureau) | `fsc` | `ksc` (the manual's Arsenal, p. 84) | `risb` *name* |
 | Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
 | Storage facility (the Romulans' material storage) | `prostor` (the manual's picture, p. 47) | `ksf` | `rsf` |
 | Landing pad | `landpad` *name* | | |
@@ -146,7 +146,8 @@ model, in the game's own words for internal use (`reluva-tool mdl-info`):
   `kvy` vehicle yard, `krps` storage processor (the panel's resource
   processor; `krps_i` its interior), `kpgs`/`kpgs2`, `kms`/`kms2`, `ksb_a`
   sickbay (`_b`, `_c`), `kss_a` science block (`_b`-`_d`), `kab`
-  accommodation block (the panel's Arsenal), `ksc` security centre, `klf`
+  accommodation block (the Colonial House), `ksc` security centre (the
+  Arsenal: the manual's picture of it is `ksc`), `klf`
   livestock farm, `kief` import/export, `kdwsp` defence artillery, `kmdb`
   disruptor battery. `ksf`, `ksg` and `kdws` have no metamodel.
 - **Romulan:** `rch` hub (`_b`, `_c`; `rch_i` interior), `rcy_a`

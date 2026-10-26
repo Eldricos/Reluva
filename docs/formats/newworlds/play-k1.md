@@ -105,7 +105,7 @@ The selection panel names what's selected, with a small portrait of it, so
 | Sickbay; "sickbay upgrade" | `ksb_a`; `ksb_b`/`ksb_c` | likely |
 | Construction yard | `kcy` | likely (its model is mostly a few marker faces) |
 | Science station | `kss_a` (the tall block) | sure (shape) |
-| Arsenal (complete 8:46) | `kab` (the flat square with the Klingon emblem, 12:15) | sure (shape) |
+| Arsenal (complete 8:46) | `ksc` (the Arsenal is the Klingon security centre, type 75; the manual's picture is `ksc`'s long hall. The flat square with the Klingon emblem at 12:15 is `kab`, the Colonial House) | corrected |
 | Adv. power generator | `kpgs2`; the plain power generators `kpgs` (striped towers) | likely |
 | Mining station | `kms` | likely |
 | Livestock farm | `klf` (34:10) | sure (shape) |

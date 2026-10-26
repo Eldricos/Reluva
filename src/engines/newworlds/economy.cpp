@@ -555,6 +555,9 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     // game those are types of their own, the AI's 189 an advanced mine.)
     if (!t || (free_ ? !t->sides[size_t(sideIndex())] : !available(*t)))
         return 0;
+    // The colony's queue holds 10 at most (exe.md#the-selection-panel).
+    if (!free_ && pendingBuilds() >= 10)
+        return 0;
     if (!free_ && !affordable(*t)) {
         pendingShort_.push_back({"short-resources", {}});
         // Engineering's report: construction (002) or an upgrade (003) delayed.
@@ -1544,7 +1547,7 @@ void Economy::podTick() {
         }
         const int coming = int(std::count_if(pods_.begin(), pods_.end(),
                                              [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }));
-        if (freeCount(s->id) - coming < 2)
+        if (freeCount(s->id) - coming < cargoBays())
             continue;
         for (Pod& p : pods_)
             if (p.origin == s->id && p.state == Pod::Queued) {
@@ -1577,7 +1580,7 @@ void Economy::podTick() {
         Depot& d = dit->second;
         if (const Bee* c = beeById(d.cargo); !c || c->site != s.id)
             d.cargo = 0;
-        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < 2)
+        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < cargoBays())
             continue;
         for (Bee& b : bees_)
             if (b.cargo && !b.site && b.dock == 0) {
@@ -1586,8 +1589,9 @@ void Economy::podTick() {
             }
     }
     // Each cargo bee (exe.md#bees): it waits (checking every 16 ticks)
-    // until its building's yard has two places free and two pods are ready
-    // (after 64 checks it goes for one); flies to them, takes up to two (a
+    // until its building's yard has room and pods enough for its bays (the
+    // Federation's two, the others' one) are ready (after 64 checks it goes
+    // for one); flies to them, takes up to its bays' worth (a
     // tick each, a 50-tick climb), flies to its building's yard and sets
     // each down (a tick, a 30-tick lift, a 50-tick climb), for the
     // building's worker bee to take in. It never docks there.
@@ -1629,8 +1633,8 @@ void Economy::podTick() {
             continue;
         }
         const int origin = ready[0]->pad;
-        const bool two = std::count_if(ready.begin(), ready.end(), [&](const Pod* p) { return p->pad == origin; }) >= 2;
-        if (freeCount(s->id) < 2 || (!two && b.retries < 64)) {
+        const bool full = std::count_if(ready.begin(), ready.end(), [&](const Pod* p) { return p->pad == origin; }) >= cargoBays();
+        if (freeCount(s->id) < cargoBays() || (!full && b.retries < 64)) {
             ++b.retries;
             b.dock = 16;
             continue;
@@ -1640,7 +1644,7 @@ void Economy::podTick() {
             continue;
         }
         for (Pod* p : ready)
-            if (b.pods.size() < 2 && p->pad == origin) {
+            if (int(b.pods.size()) < cargoBays() && p->pad == origin) {
                 p->state = Pod::Aboard, p->pad = 0, p->slot = -1;
                 b.pods.push_back(p->id);
             }
@@ -1779,6 +1783,24 @@ bool Economy::razable(int structure) const {
             return s.progress >= 1 && !s.evacuating && s.type != "colony-hub" && s.type != "storage-facility" &&
                    buildingType(s.type) && buildingType(s.type)->upgradeOf.empty();
     return false;
+}
+
+int Economy::pendingBuilds() const {
+    return int(std::count_if(structures_.begin(), structures_.end(), [](const ColonyStructure& s) { return s.progress < 1; }));
+}
+
+bool Economy::cancel(int structure) {
+    const ColonyStructure* s = this->structure(structure);
+    if (!s || s->progress >= 1)
+        return false;
+    if (!free_)
+        if (const BuildingType* t = buildingType(s->type))
+            deposit(unitsOf(t->costFor(side_)));
+    for (Bee& b : bees_)
+        if (b.site == structure)
+            b.site = 0, b.working = false;
+    remove(structure);
+    return true;
 }
 
 // The game's raze: half the type's cost back at once (in whole units,

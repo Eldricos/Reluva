@@ -290,6 +290,7 @@ public:
         // A cloaking unit's shimmer (exe.md#cloaking): each corner of its
         // model is thrown up to this far (world units) each frame.
         float shimmer = 0;
+        float health = 1; // hit points left, a share (its selection marks)
         float lift = 0;    // above the ground (a bee in flight)
     };
     void setUnits(std::vector<UnitDraw> units) {
@@ -644,6 +645,7 @@ private:
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
     std::vector<std::string> colonyDetails() const;
+    std::vector<int> pendingBuilds() const;
     std::vector<const VehicleType*> vehicleMenu() const; // the yards' offer, in the game's order
     int menuLines(int lh) const;
     void drawMenu(int x, int ty, int w, const std::vector<const VehicleType*>& vehicles,
@@ -784,6 +786,7 @@ private:
     int housed() const { return sim_ ? sim_->housed() : 0; }
     int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
     int razeAsked_ = 0;             // DEMOLISH pressed: the building asked about (yes / no)
+    int cancelAsked_ = 0;           // a site or upgrade picked on the colony's details (yes / no)
     // The playbook (exe.md#orders): the orders a double click offers for
     // the selection and what was clicked, as a column of icons beside the
     // Tricorder. Each entry: its icon, its name, and the order (f follow
@@ -810,6 +813,7 @@ private:
     int alertedLast_ = 0;               // Space: the alerted object the camera went to last
     double edgeClock_ = 0;
     float edgeSpeed_ = 0;               // edge scrolling's speed, units a tick
+    int edgeTicks_ = 0; // F1's edges raise and lower the camera every fourth tick
     bool mouseSeen_ = false;            // the pointer has moved (it starts at 0, 0)
     int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
     bool allyOpen_ = false;             // the ALLY page

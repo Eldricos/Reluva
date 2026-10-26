@@ -103,6 +103,8 @@ public:
     // DEMOLISH (exe.md#demolishing): half its cost back, its officers to
     // the hub, its people out; then it's destroyed.
     bool raze(int unit);
+    // A site or upgrade still going up cancelled (its structure id).
+    bool cancelBuild(int structure);
     bool razing(int unit) const;
     // ALLY (exe.md#the-tricorder): the player's posture towards a race
     // (every slot of it): 1 friendly, 2 neutral, 3 hostile. Set neutral,

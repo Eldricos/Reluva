@@ -16,7 +16,7 @@ As the first tutorial teaches them:
 
 | Input | What it does |
 |---|---|
-| Left click on a unit | selects it; its panel (name, side, READY or EN ROUTE, shield cover, hit points) in NEW WORLDS |
+| Left click on a unit | selects it; its panel (name, side, READY or EN ROUTE, shield cover, hit points) in NEW WORLDS; above it up to five blinking marks in a zigzag, one for each fifth of its health |
 | Left click on a building (the colony's, or another side's in sight) | selects it; its panel in NEW WORLDS |
 | Double click on one of the colony's objects | a finished building plays its own sound (from where it stands); in F1 the camera follows the object (Up / Down nearer and further, numpad 4/6 orbit, 7/9 raise, 1/3 lower; F1, F2, F3 or Q let go) |
 | Left drag | selects the side's units inside the box |
@@ -35,22 +35,23 @@ As the first tutorial teaches them:
 | V, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
 | A, G, S, T, P | all the colony's APCs, ground scouts, science vehicles, tanks, photon artillery selected |
 | Shift or Ctrl + B / V | the camera to the next of the colony's buildings / fighting vehicles |
-| C | the colony's details (the hub's INFO page) |
+| C | the colony's details (the hub's INFO page); a click on a construction in its queue, then YES, cancels it with the full cost back (at most 10 constructions ordered at once) |
 | R, then 1-9 | the research topics open to the colony; a number starts one (several share the points) |
 | O / Shift + O | the selected vehicles take aboard the officers of the building beside them / put them down |
 | Left click on the TRICORDER | takes the camera there |
 | TRICORDER's buttons | COMMS opens the communications panel; ALLY lists the other races and your posture towards each (a click, then FRIENDLY, NEUTRAL or HOSTILE; set neutral, a race turns hostile at its first shot at you); ZOOM steps the map X2, X1, X4 |
 | Double click on the ground (nothing selected) | locks the camera on the spot; numpad 4/6 orbit it |
 | Right click | drops the selection (or the camera's lock) |
+| Double right click on the ground or the TRICORDER | moves the camera there |
 | Ctrl + left / right click | zooms in on the pointed spot / out |
 | Arrow keys | move the camera forward, back, left, right |
 | Numpad 4 / 6 | turn |
 | Numpad 8 / 2 | zoom in towards the pointer / out ("targeted zoom") |
 | Numpad 7 / 1 | raise / lower the camera |
-| Numpad 9 / 3 | tilt |
+| Numpad 9 / 3, Page Up / Page Down | tilt |
 | F1 / F2 / F3, Q | the game's cameras: low over the ground (2000 up, looking level; numpad 9 / 3 tilt it a little) / isometric (28000 up, 45 degrees) / close-up isometric (15000 up); Q the next |
 | Z / X | keep the camera's place / go back to it |
-| The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up |
+| The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up; in F1 the left and right edges turn the camera, the top and bottom raise and lower it |
 | Space | the camera to the next of the colony's objects with an alert (lately hit, everyone beamed down, a mine exhausted); in F1 it follows it |
 | Home | back to the colony hub |
 | Ctrl + 1-5 | makes the selection a battle group (1-5 select it, Shift + 1-5 goes to it) |

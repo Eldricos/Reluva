@@ -725,7 +725,9 @@ void MissionViewer::showUnits() {
                     const float towards = float(u.cloaking ? 63 - u.fading : u.fading) / 63;
                     shimmer = u.slot == playerSlot_ ? 97 * std::sin(3.14159265f * towards) : 98 * towards;
                 }
-                draw.push_back({u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, shimmer});
+                MapViewer::UnitDraw d{u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, shimmer};
+                d.health = u.maxHp > 0 ? u.hp / u.maxHp : 1;
+                draw.push_back(d);
             }
     // The colony's bees out of the hub: flying (rising off and settling
     // back down), or docked at a mine or the processor; those at work on a
@@ -1153,6 +1155,21 @@ bool MissionViewer::playEvent(const Event& ev) {
             map_.zoomAt(ev.mouseX, ev.mouseY, true);
         } else if (ev.button == MouseButton::Right && ctrl) {
             map_.zoomAt(ev.mouseX, ev.mouseY, false);
+        } else if (ev.button == MouseButton::Right && ev.clicks >= 2) {
+            // A double right click takes the camera to the ground there, on
+            // the map or the Tricorder (exe.md#cameras).
+            float wx = 0, wy = 0;
+            const bool onTricorder = interface_ && tricorder_[2] > 0 && ev.mouseX >= tricorder_[0] &&
+                                     ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
+                                     ev.mouseY < tricorder_[1] + tricorder_[3];
+            if (onTricorder)
+                map_.minimapToWorld(ev.mouseX, ev.mouseY, tricorder_[0], tricorder_[1], tricorder_[2], tricorder_[3],
+                                    kTricorderTiles << tricorderZoom_, wx, wy);
+            if (onTricorder || map_.screenToGround(ev.mouseX, ev.mouseY, wx, wy)) {
+                map_.stopFollowing();
+                followed_ = 0;
+                map_.centreOn(wx, wy);
+            }
         } else if (ev.button == MouseButton::Right) {
             // Right-click drops the selection, or the camera's lock.
             if (map_.locked())
@@ -1491,6 +1508,13 @@ void MissionViewer::update(uint64_t nowMs) {
             if ((ex || ey) && map_.view() != MapViewer::View::FirstPerson && mouseSeen_) {
                 edgeSpeed_ = std::min(kEdgeTop, edgeSpeed_ + kEdgeRamp);
                 map_.pan(float(ex) * edgeSpeed_, float(ey) * edgeSpeed_);
+            } else if ((ex || ey) && mouseSeen_ && followed_ == 0) {
+                // F1's free camera (exe.md#cameras): the side edges turn
+                // it, the top and bottom raise and lower it.
+                if (ex)
+                    map_.gameKey(ex < 0 ? key::Kp0 + 4 : key::Kp0 + 6, mouseX_, mouseY_);
+                if (ey && edgeTicks_++ % 4 == 0)
+                    map_.gameKey(ey > 0 ? key::Kp0 + 7 : key::Kp0 + 1, mouseX_, mouseY_);
             } else {
                 edgeSpeed_ = 0;
             }
@@ -2007,6 +2031,14 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
             jumpTo(std::atoi(b.action.c_str() + 4));
         } else if (b.action == "raze" && u) {
             razeAsked_ = u->id;
+        } else if (b.action == "cancel-yes") {
+            if (sim_)
+                sim_->cancelBuild(cancelAsked_);
+            cancelAsked_ = 0;
+        } else if (b.action == "cancel-no") {
+            cancelAsked_ = 0;
+        } else if (b.action.rfind("cancel", 0) == 0) {
+            cancelAsked_ = std::atoi(b.action.c_str() + 6);
         } else if (b.action == "raze-no") {
             razeAsked_ = 0;
         } else if (b.action == "raze-yes" && u && economy_) {
@@ -2250,6 +2282,20 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
     return out;
 }
 
+// The buildings and upgrades going up, in the colony details' order
+// (buildings, then upgrades).
+std::vector<int> MissionViewer::pendingBuilds() const {
+    std::vector<int> builds, upgrades;
+    if (economy_)
+        for (const ColonyStructure& s : economy_->structures())
+            if (s.progress < 1) {
+                const BuildingType* t = buildingType(s.type);
+                (t && !t->upgradeOf.empty() ? upgrades : builds).push_back(s.id);
+            }
+    builds.insert(builds.end(), upgrades.begin(), upgrades.end());
+    return builds;
+}
+
 // The hub's INFO page (the game's colony details): the colony's people,
 // then each building and upgrade going up.
 std::vector<std::string> MissionViewer::colonyDetails() const {
@@ -2453,9 +2499,11 @@ void MissionViewer::drawInterface() {
             }
             if (const ColonyStructure* c = structureOf(picked->id); c && economy_->razable(c->id))
                 actions.push_back({"DEMOLISH", "raze"});
-            // DEMOLISH asks first.
+            // DEMOLISH asks first; so does cancelling a site.
             if (razeAsked_ == picked->id)
                 actions = {{"DEMOLISH? YES", "raze-yes"}, {"NO", "raze-no"}};
+            if (cancelAsked_ && colonyDetails_)
+                actions = {{"CANCEL IT? YES", "cancel-yes"}, {"NO", "cancel-no"}};
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
         const std::vector<std::string> training = staffView_ && trainingView_ ? trainingLines() : std::vector<std::string>{};
@@ -2546,8 +2594,16 @@ void MissionViewer::drawInterface() {
         } else if (picked) {
             // One object, a unit or a building: the game's panel, with its
             // hit points as a bar under it.
-            for (size_t i = 0; i < info.size(); ++i)
+            // (On the colony's details, an entry going up is a button: a
+            // click asks to cancel it.)
+            const std::vector<int> pending = colonyDetails_ ? pendingBuilds() : std::vector<int>{};
+            size_t entry = 0;
+            for (size_t i = 0; i < info.size(); ++i) {
                 ui_.drawSmall(screen_, x + 10, ty + lh * int(i), info[i], i == 0 ? bright : text);
+                if (entry < pending.size() &&
+                    (info[i].rfind("BUILDING ", 0) == 0 || info[i].rfind("ENGINEERING ", 0) == 0))
+                    buttons_.push_back({x + 6, ty + lh * int(i), w - 12, lh, "cancel" + std::to_string(pending[entry++])});
+            }
             const int by = ty + lh * int(info.size()) + 2, bw = w - 20;
             const float share = std::clamp(picked->hp / std::max(1.0f, picked->maxHp), 0.0f, 1.0f);
             for (int yy = by; yy < by + 4 && yy < screen_.h; ++yy)

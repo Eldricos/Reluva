@@ -18,8 +18,9 @@ use it; *guess* otherwise. Unmarked figures are sure.
 ## The simulation clock
 
 - The game advances in fixed steps of **50 ms** (20 a second); an
-  options checkbox switches to 66 ms (about 15 a second; which option isn't
-  known).
+  multiplayer host's "Cable/DSL Broadband" box switches to 66 ms (about
+  15 a second: checked is the slower tick, for Internet play; unchecked
+  the fast LAN one). Single-player always runs at 50 ms.
 - The mission scripts count time in **script seconds of 16 ticks**: a
   timer of N runs 16N ticks, 0.8 N s at normal speed. F1's recording fits
   it to the second (its scout timer of 10 shows 8 s in, its first attack's
@@ -349,7 +350,8 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   the 7 x 7 blocks round its own, taking from the nearest ore cell (ring by
   ring); each take uses one unit of the cell's amount and gives a tonne of
   raw ore. A cell at 0 turns into plain ground. A mine fills 40 t loads and
-  waits for the bees to carry them (cargo bees carry two, worker bees one);
+  waits for the bees to carry them (the Federation's cargo bees carry two, the Klingons' and Romulans' one
+  of their 160 T pods, worker bees one);
   with 4 loads waiting, or no crew, it waits 24 s before trying again. A
   counter shared by all the colony's mines makes every mine yield all six
   ores: in each 8 takes, 2 of the cell's own kind and 1 of each kind (so 3
@@ -927,11 +929,17 @@ artillery, and **labs** - add-ons to the science station bought with
 materials (10 polycomp, 15 thermoconc and 4-7 trans al each). Federation:
 phaser coil lab 294 (phaser tank), energy lab 295 (mobile shield),
 sensor lab 296 (science vehicle), away team lab 297 (transport), shield
-buffer lab 164. Klingon: special weapons 302, sensor lab 303, trooper
-centre 304, shield buffer 184, tracking systems 185, disruptor matrix
-186. Romulan: infiltration lab 311, energy lab 310, shield buffer 179,
-and 308 (tank) and 309 (cloaked tank), whose names the executable's
-tables don't give in order.
+buffer lab 164. Klingon: shield buffer 184 (shield generator), tracking
+systems 185 (defensive artillery), disruptor matrix 186 (disruptor tank,
+cloaked tank, defensive weapon), special weapons 302 (only the Kang
+battery), sensor lab 303 (science vehicle), trooper centre 304 (unarmed
+APC). Romulan: shield buffer 179 (shield generator), tracking systems
+307 (only the energy lab, as the Federation's 293), disruptor matrix 308
+(tank), energy lab 309 (cloaked tank, defensive artillery), sensor lab
+310 (science vehicle and the cloaking APC), infiltration lab 311
+(unarmed APC). No defence needs a lab named "Defense Net", "Security
+Net" or "Mortar Grid" (the manual's names; the Federation's and
+Romulans' defensive weapons need none).
 
 **Rolling out.** The tick after the bar fills plays the ready sound;
 the vehicle then leaves through the yard's dock: a tick, three times the
@@ -1119,8 +1127,9 @@ pointer elsewhere, the view's name and the zoom (Relief X2).
 ### Cameras
 
 F1, F2 and F3 set the camera mode, Q steps through them: F1 low over the
-ground (2000 up, looking level; it can tilt, and numpad 5 turns it
-round), F2 isometric (28000 up, 45 degrees down), F3 close-up isometric
+ground (2000 up, looking level; it can tilt, Page Up / Page Down pitch
+it, numpad 5 turns it round, and the pointer at the screen's left and
+right edges turns it, at the top and bottom raises and lowers it), F2 isometric (28000 up, 45 degrees down), F3 close-up isometric
 (15000 up, 45 degrees down). The arrows speed up by 80 a step to 6400;
 in F2 and F3 the pointer on the screen's outermost pixels scrolls the
 same way. Z keeps the camera's position (one place; not its direction or
@@ -1137,7 +1146,9 @@ width doesn't change. The distance starts at 1000; Up and Down
 bring it in and out between 800 and 2000. Numpad 4 / 6 orbit the object,
 7 / 9 raise and 1 / 3 lower the camera; the other arrows and edge
 scrolling do nothing. F1, F2, F3 or Q, or the object's loss, end it.
-JUMP TO and Space attach the same way in F1. In F2 and F3 a double click
+JUMP TO and Space attach the same way in F1. A double right click on
+the ground, in the main view or the Tricorder, moves the camera there
+(objects don't). In F2 and F3 a double click
 leaves the camera where it is and only plays the object's own sound.
 Every mission starts in F2.
 
@@ -1278,9 +1289,11 @@ evacuation: the building's crew target goes to 0 and its people walk to a
 hub or accommodation block with room; it waits for its docking bays and
 vehicles to empty and its jobs to finish. Then it takes its own hit
 points in damage and dies the usual way (the destruction effect; no
-under-attack alert), so it counts as destroyed. A site can't be razed or
-cancelled by the player; an aborted computer or script build order tears
-its site down with the full cost back.
+under-attack alert), so it counts as destroyed. A site can't be razed; the
+player cancels one from the colony's details (a click on its queue
+entry, then yes), which, like an aborted computer or script build order,
+tears it down with the full cost back. At most 10 constructions can be
+ordered at once (vehicles aren't capped).
 
 **How long.** Razing sets the building's crew to 0: the crew wait
 inside and it asks for an unarmed APC, which takes them aboard; the
