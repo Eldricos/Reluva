@@ -2147,9 +2147,7 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
         return std::to_string(it == beesHoused().end() ? 0 : it->second);
     };
     if (c->type == "colony-hub" || c->type == "construction-yard") {
-        int transports = 0;
-        for (const Unit& v : world_->units())
-            transports += v.slot == playerSlot_ && v.name == "unarmed-apc";
+        const int transports = sim_ ? sim_->transports() : 0;
         out.push_back("WORKBEE " + bees("worker-bee"));
         out.push_back("CARGOBEE " + bees("cargo-bee"));
         out.push_back("CNSTRCTNBEE " + bees("construction-bee"));

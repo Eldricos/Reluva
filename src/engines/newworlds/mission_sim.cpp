@@ -155,6 +155,7 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     startStock(mission_, side_, stock);
     economy_ = std::make_unique<Economy>(side_, stock, 50, map);
     economy_->setOfficers(int(officers(mission_, player_).size()));
+    economy_->setTransports(true);
     for (const ColonyBuilding& c : colony_) {
         const auto [x, y] = worldAt(c.a, c.b);
         structureIds_.push_back(economy_->addBuilt(c.name, x, y));
@@ -176,8 +177,9 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     // The mission's own vehicles (exe.md#starting-colonies): bees inside
     // the hub (the construction and cargo bees flying out to work); the
     // first 16 that fight, scout or scan on the rally group's places in
-    // the hub's block, whatever spot the mission gives; the rest (unarmed
-    // APCs, the game's in the hub too) round their spot, spread a little.
+    // the hub's block, whatever spot the mission gives; unarmed APCs in
+    // the hub (the colony's transports); the rest round their spot, spread
+    // a little.
     // Without any, four ground scouts in a row south of the hub. Each on
     // the nearest open tile.
     float hx = float(blocksWide_) * kBlock / 2, hy = float(blocksHigh_) * kBlock / 2;
@@ -203,6 +205,8 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         if ((onHub(p) || !colony_.empty()) && bee(p.type)) {
             ++housed_;
             ++beesHoused_[ct->name];
+        } else if (!colony_.empty() && ct && std::string_view(ct->name) == "unarmed-apc") {
+            ++garage_; // the colony's transports start in the hub
         } else if (*t->model) {
             auto [x, y] = worldAt(p.a, p.b);
             float sx = 0, sy = 0;
@@ -417,6 +421,7 @@ void MissionSim::step(double dt) {
     auto said = ai_->observe(events);
     happened.insert(happened.end(), said.begin(), said.end());
     rollOut();
+    runTransports(dt);
     // Buildings being razed: once empty, gone (the game's own blow,
     // through the usual destruction).
     for (auto it = razing_.begin(); it != razing_.end();) {
@@ -538,6 +543,10 @@ void MissionSim::rollOut() {
             economy_->setBees(beesHoused_["construction-bee"], beesHoused_["cargo-bee"], beesHoused_["worker-bee"]);
             continue;
         }
+        if (const CombatType* ct = combatType(type); ct && std::string_view(ct->name) == "unarmed-apc" && economy_->hub()) {
+            ++garage_; // it drives into the hub, a transport
+            continue;
+        }
         float x = float(blocksWide_) * kBlock / 2, y = float(blocksHigh_) * kBlock / 2;
         for (const ColonyStructure& c : economy_->structures())
             if (c.id == yard)
@@ -556,6 +565,100 @@ void MissionSim::rollOut() {
             const auto [qx, qy] = world_->openSpot(rx, ry);
             world_->rally(id, qx, qy);
         }
+    }
+}
+
+// The colony's transports at work (exe.md#transports): each ride waiting
+// takes one from the hub, which drives to where its people are, stops to
+// take them on, drives them to where they're going, stops to set them
+// down and drives home into the hub. One lost on the way loses its
+// passengers; a hub lost loses those inside it.
+void MissionSim::runTransports(double dt) {
+    constexpr double kStop = 4; // 80 ticks at a building (the game's, without a dock)
+    const ColonyStructure* hub = economy_->hub();
+    if (!hub)
+        garage_ = 0;
+    auto door = [&](float x, float y) { return world_->openSpot(x, y - 1.2f * kTile); };
+    auto structureAt = [&](int id, float& x, float& y) {
+        for (const ColonyStructure& c : economy_->structures())
+            if (c.id == id) {
+                x = c.x, y = c.y;
+                return true;
+            }
+        return false;
+    };
+    auto rideOf = [&](int id) -> const Economy::Ride* {
+        for (const Economy::Ride& r : economy_->rides())
+            if (r.id == id)
+                return &r;
+        return nullptr;
+    };
+    auto goTo = [&](Shuttle& sh, float x, float y) {
+        std::tie(sh.tx, sh.ty) = door(x, y);
+        sh.tries = 0;
+        world_->moveTo(sh.unit, sh.tx, sh.ty);
+    };
+    // Rides ready for one, while the hub has any.
+    for (const Economy::Ride& r : economy_->rides()) {
+        if (!hub || garage_ <= 0 || r.wait > 0 ||
+            std::any_of(shuttles_.begin(), shuttles_.end(), [&](const Shuttle& s) { return s.ride == r.id; }))
+            continue;
+        const int type = side_ == 'K' ? 88 : side_ == 'R' ? 89 : 55;
+        const CombatType* ct = combatType(type);
+        const ObjectType* t = objectType(type);
+        float fx = 0, fy = 0;
+        if (!ct || !t || !structureAt(r.from, fx, fy))
+            continue;
+        const auto [px, py] = door(hub->x, hub->y);
+        Shuttle sh{spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true), r.id};
+        world_->unit(sh.unit)->kind = UnitKind{t->name, t->model, groundScout(side_).speed * t->pace / 0.125f};
+        --garage_;
+        goTo(sh, fx, fy);
+        shuttles_.push_back(sh);
+    }
+    for (auto it = shuttles_.begin(); it != shuttles_.end();) {
+        Shuttle& sh = *it;
+        Unit* u = world_->unit(sh.unit);
+        const Economy::Ride* r = rideOf(sh.ride);
+        if (!u || u->hp <= 0) {
+            if (r && r->loaded)
+                economy_->rideLost(sh.ride);
+            it = shuttles_.erase(it);
+            continue;
+        }
+        if (!r && sh.leg < 4) { // its ride called off: home
+            sh.leg = 4;
+            if (hub)
+                goTo(sh, hub->x, hub->y);
+        }
+        const bool there = !u->moving() && std::hypot(u->x - sh.tx, u->y - sh.ty) < 1.5f * kTile;
+        if (!u->moving() && !there && sh.leg % 2 == 0 && ++sh.tries < 3)
+            world_->moveTo(sh.unit, sh.tx, sh.ty); // sent off its way: back to it
+        const bool arrived = !u->moving() && (there || sh.tries >= 3);
+        float x = 0, y = 0;
+        if (sh.leg == 0 && arrived) {
+            sh.leg = 1, sh.wait = kStop;
+        } else if ((sh.leg == 1 || sh.leg == 3) && (sh.wait -= dt) <= 0) {
+            if (sh.leg == 1 && r) {
+                economy_->rideLoaded(sh.ride);
+                sh.leg = 2;
+                if (structureAt(r->to, x, y) || (hub && (x = hub->x, y = hub->y, true)))
+                    goTo(sh, x, y);
+            } else if (sh.leg == 3) {
+                economy_->rideDelivered(sh.ride);
+                sh.leg = 4;
+                if (hub)
+                    goTo(sh, hub->x, hub->y);
+            }
+        } else if (sh.leg == 2 && arrived) {
+            sh.leg = 3, sh.wait = kStop;
+        } else if (sh.leg == 4 && arrived && hub) {
+            world_->remove(sh.unit);
+            ++garage_;
+            it = shuttles_.erase(it);
+            continue;
+        }
+        ++it;
     }
 }
 

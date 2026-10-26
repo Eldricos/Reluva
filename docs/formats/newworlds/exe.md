@@ -414,9 +414,37 @@ record in the file's order, then hands the vehicles on:
 
 So spots several sides share in the data (C1's 322:338 for the Klingon
 and Romulan tanks, the Klingon bees at another map's hub, 424:71 in
-D1-E3, R9's 352:320) are never where those units start. Reluva keeps the
-player's unarmed APCs out, round the hub, as it has no way yet to bring
-them out of it.
+D1-E3, R9's 352:320) are never where those units start.
+
+### Transports
+
+The unarmed APC (Federation 55, Klingon 88, Romulan 89) is the colony's
+crew shuttle, not a vehicle the player drives. It lives in the hub (off
+the map: nothing can see, click or target it there; the A key selects
+only armed APCs) and comes out only when the colony's vehicle pool is
+asked for one, by:
+
+- a building whose crew target is lowered below its crew: those over it
+  wait inside for a ride to a barracks (a hub or accommodation block)
+  with room for ten;
+- a barracks sending crew to a building: an accommodation block always
+  sends them by APC; the hub lets them walk when its own pool covers the
+  job;
+- a transporter pad, after each beam-down, to carry the people on.
+
+It drives to where the people are, takes them on (ten a ride) or sets
+them down at the door, and always drives home into the hub afterwards.
+A human side's requests wait for an APC that's free; the pool never
+orders one built. One made at a vehicle yard drives straight to a waiting
+request, else into the hub. An AI side gets one built free for each
+request no APC is free for. A hub destroyed takes the vehicles inside it
+with it. The player has no control that brings one out.
+
+In Reluva the player's transports work this way (`MissionSim`, with the
+economy's rides); a ride's stops last 4 s each (the game's 80 ticks at a
+building without a dock; its dock steps weren't timed), and an APC
+lost on the way loses its passengers. The AI sides' APCs stay in their
+hubs and their people walk.
 
 ### The script engine
 

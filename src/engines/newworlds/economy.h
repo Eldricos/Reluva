@@ -119,7 +119,8 @@ struct ColonyStructure {
     bool evacuating = false; // being razed: its people leaving
     int evacTicks = 0;       // ticks since
     bool beaming = false;    // its crew on their way down from orbit
-    // People on their way to it: how many, and seconds still to walk.
+    // People on their way to it: how many, and seconds still to walk
+    // (kRiding: in, or waiting for, one of the colony's transports).
     std::vector<std::pair<int, double>> coming;
 };
 
@@ -258,6 +259,32 @@ public:
     // at each; a mine with none serving it sends nothing. Bees fly
     // straight, 150 units a tick, a flight at least 10 ticks.
     void setBees(int construction, int cargo, int worker = 0);
+
+    // The colony's transports (exe.md#transports), once switched on (the
+    // player's colony; an AI's people all walk): the unarmed APCs that live
+    // in the hub ferry people in tens. A building's crew from an
+    // accommodation block, or beamed down to the transporter pad, rides
+    // from there; those over a lowered crew target ride back to a hub or
+    // block with room. The hub's own pool walks, as before. Each ride waits
+    // for a transport; the caller drives them and says when one has taken
+    // its people on, set them down, or was lost with them.
+    static constexpr double kRiding = 1e18;
+    struct Ride {
+        int id = 0;
+        int from = 0, to = 0; // structures
+        int people = 0;
+        bool toPool = false;  // into its pool, else its crew
+        bool listed = false;  // counted in to's coming (else on its own, as walking)
+        bool loaded = false;
+        double wait = 0;      // seconds before they're there to take (beaming down)
+    };
+    void setTransports(bool on) { transports_ = on; }
+    // The colony's finished hub, if it has one.
+    const ColonyStructure* hub() const;
+    const std::vector<Ride>& rides() const { return rides_; }
+    void rideLoaded(int ride);
+    void rideDelivered(int ride);
+    void rideLost(int ride);
     struct Bee {
         int id = 0;
         bool cargo = false;
@@ -326,7 +353,6 @@ private:
     Bee* beeById(int id);
     int64_t podSize() const { return side_ == 'F' ? 80000 : 160000; }
     void fly(Bee& b, float x, float y);
-    const ColonyStructure* hub() const;
 
     // The stores, in the game's units.
     using Units = std::array<int64_t, kMaterials>;
@@ -368,6 +394,12 @@ private:
     float lifeMet_ = 1;
     int dead_ = 0;
     std::vector<std::pair<int, double>> walking_; // people on their way to the hub's pool, seconds left
+    bool transports_ = false;
+    std::vector<Ride> rides_;
+    int nextRide_ = 1;
+    void addRides(int from, int to, int people, bool toPool, bool listed, double wait = 0);
+    const ColonyStructure* pad() const;
+    ColonyStructure* structureById(int id);
     double lastCrewWarning_ = -1e9;
     int nextId_ = 1;
     bool free_ = false;

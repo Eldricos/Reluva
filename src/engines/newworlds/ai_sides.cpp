@@ -158,6 +158,9 @@ void AiSides::start() {
             // Without a model only what the scripts name, and shield
             // generators (their fields count), are placed (unseen). Bees
             // stay in the hub.
+            // Unarmed APCs too, once the hub's placed (its transports).
+            if (t && std::string_view(t->name) == "unarmed-apc" && !(hubX == midX && hubY == midY))
+                continue;
             if (!t || p->forWhom == 1 || isBee(*t) ||
                 (!*t->model && !*p->model && !*p->label && std::string_view(t->name) != "shield-generator"))
                 continue;

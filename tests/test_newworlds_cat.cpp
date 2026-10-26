@@ -992,6 +992,35 @@ void testEconomy() {
     home.addBuilt("accommodation", 0, 0);
     home.addBuilt("farm", 0, 0);
     CHECK(home.capacity() == 90);
+    // The transports (exe.md#transports): with the hub's pool all in the
+    // block, a yard's crew sent off rides back to the hub, and the crew
+    // asked for again rides from the block; nobody is lost on the way.
+    Economy ferry('F', {}, 50, map);
+    ferry.addBuilt("colony-hub", 0, 0);
+    ferry.addBuilt("accommodation", 0, 0);
+    const int cyard = ferry.addBuilt("construction-yard", 0, 0);
+    ferry.setTransports(true);
+    const int everyone = ferry.people();
+    int crew0 = 0;
+    for (const ColonyStructure& c : ferry.structures())
+        if (c.id == cyard)
+            crew0 = c.crew;
+    CHECK(crew0 > 0);
+    ferry.setCrewTarget(cyard, 0);
+    CHECK(ferry.rides().size() == 1 && ferry.rides()[0].from == cyard && ferry.rides()[0].toPool &&
+          ferry.rides()[0].people == crew0 && ferry.people() == everyone);
+    ferry.setCrewTarget(cyard, crew0);
+    CHECK(ferry.rides().size() == 2 && ferry.rides()[1].to == cyard && !ferry.rides()[1].toPool &&
+          ferry.people() == everyone);
+    std::vector<int> ids;
+    for (const Economy::Ride& r : ferry.rides())
+        ids.push_back(r.id);
+    for (int id : ids)
+        ferry.rideLoaded(id), ferry.rideDelivered(id);
+    for (const ColonyStructure& c : ferry.structures())
+        if (c.id == cyard)
+            CHECK(c.crew == crew0 && c.coming.empty());
+    CHECK(ferry.rides().empty() && ferry.people() == everyone);
 }
 
 void testWorld() {
@@ -2257,6 +2286,52 @@ void testModelTextures() {
     CHECK(slots[1] == &doors[2]);
 }
 
+// The colony's transports in play (exe.md#transports): F1's two unarmed
+// APCs start in the hub; with an accommodation block holding everyone, a
+// building's crew sent off rides back to the hub and its crew asked for
+// again rides out from the block, an APC driving each way and home.
+void testTransports() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    std::vector<ColonyBuilding> colony = MissionSim::placedColony("F1", 'F');
+    colony.push_back({"accommodation", "", 446, 210}); // takes in the hub's whole pool
+    MissionSim sim("F1", 'F', t, map, 64, 64, colony);
+    CHECK(sim.transports() == 2 && sim.transportsHoused() == 2);
+    for (const Unit& u : sim.world().units())
+        CHECK(!(u.slot == sim.playerSlot() && u.name == "unarmed-apc"));
+    const ColonyStructure* hub = sim.economy().hub();
+    CHECK(hub != nullptr);
+    if (!hub)
+        return;
+    CHECK(hub->pool == 0);
+    int store = 0, crew = 0;
+    for (const ColonyStructure& c : sim.economy().structures())
+        if (c.type == "sickbay")
+            store = c.id, crew = c.crew;
+    CHECK(store > 0 && crew > 0);
+    const int everyone = sim.economy().people();
+    sim.economy().setCrewTarget(store, 0);
+    sim.economy().setCrewTarget(store, crew);
+    CHECK(sim.economy().rides().size() == 2);
+    sim.advance(1);
+    CHECK(sim.transportsHoused() == 0 && sim.transports() == 2);
+    int out = 0;
+    for (const Unit& u : sim.world().units())
+        out += u.slot == sim.playerSlot() && u.name == "unarmed-apc";
+    CHECK(out == 2);
+    for (int i = 0; i < 300 && (!sim.economy().rides().empty() || sim.transportsHoused() < 2); ++i)
+        sim.advance(1);
+    CHECK(sim.economy().rides().empty() && sim.transportsHoused() == 2 && sim.economy().people() == everyone);
+    for (const ColonyStructure& c : sim.economy().structures())
+        if (c.id == store)
+            CHECK(c.crew == crew);
+}
+
 void testRasterizer() {
     Surface surf;
     surf.create(16, 16, PixelFormat::RGBA32);
@@ -2345,6 +2420,7 @@ int main() {
     testTraining();
     testBees();
     testStoresAndRazing();
+    testTransports();
     testProjectiles();
     testModelTextures();
     testRasterizer();

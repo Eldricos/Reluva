@@ -78,6 +78,10 @@ public:
     // The bees in the hub, by kind ("construction-bee"), and all of them.
     const std::map<std::string, int>& beesHoused() const { return beesHoused_; }
     int housed() const { return housed_; }
+    // The colony's transports (exe.md#transports): in the hub, and all
+    // (those out ferrying people too).
+    int transportsHoused() const { return garage_; }
+    int transports() const { return garage_ + int(shuttles_.size()); }
 
     // The player's orders that touch the rules. A building ordered at a
     // map position (its middle): the cost taken, its site put up; its
@@ -132,6 +136,7 @@ private:
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void spawnColonyObject(size_t index);
     void rollOut();
+    void runTransports(double dt);
     void sightings(std::vector<ScriptEvent>& happened);
     void watchUnits();
     void note(const std::string& line);
@@ -154,6 +159,18 @@ private:
     std::vector<int> colonyObjects_, structureIds_;
     std::map<std::string, int> beesHoused_;
     int housed_ = 0, rallied_ = 0;
+    // The transports: those in the hub, and each one out on a ride: its
+    // unit, the ride, the leg (0 to the pick-up, 1 loading, 2 to the
+    // drop, 3 unloading, 4 home), seconds left at a stop, tries to get
+    // where it's going.
+    int garage_ = 0;
+    struct Shuttle {
+        int unit, ride, leg = 0;
+        double wait = 0;
+        int tries = 0;
+        float tx = 0, ty = 0;
+    };
+    std::vector<Shuttle> shuttles_;
     std::vector<int> razing_;
     std::set<int> touchyNeutral_;
     std::vector<Said> said_;

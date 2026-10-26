@@ -507,8 +507,11 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
         }
     }
     structures_.push_back(s);
-    // A building standing at the start has its crew at once.
+    // A building standing at the start has its crew at once (no rides).
+    const bool transports = transports_;
+    transports_ = false;
     requestCrew(structures_.back());
+    transports_ = transports;
     for (auto& c : structures_.back().coming)
         c.second = 0;
     structures_.back().crew += std::accumulate(structures_.back().coming.begin(), structures_.back().coming.end(), 0,
@@ -641,7 +644,81 @@ int Economy::walking() const {
     int n = 0;
     for (const auto& w : walking_)
         n += w.first;
+    for (const Ride& r : rides_)
+        n += r.listed ? 0 : r.people;
     return n;
+}
+
+ColonyStructure* Economy::structureById(int id) {
+    for (ColonyStructure& s : structures_)
+        if (s.id == id)
+            return &s;
+    return nullptr;
+}
+
+const ColonyStructure* Economy::pad() const {
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "transporter-pad" && s.progress >= 1 && !s.evacuating)
+            return &s;
+    return nullptr;
+}
+
+// People to carry, ten to a transport.
+void Economy::addRides(int from, int to, int people, bool toPool, bool listed, double wait) {
+    for (int left = people; left > 0; left -= kBatch) {
+        const int n = std::min(left, kBatch);
+        rides_.push_back({nextRide_++, from, to, n, toPool, listed, false, wait});
+        if (ColonyStructure* t = listed ? structureById(to) : nullptr)
+            t->coming.push_back({toPool ? -n : n, kRiding});
+    }
+}
+
+void Economy::rideLoaded(int ride) {
+    for (Ride& r : rides_)
+        if (r.id == ride)
+            r.loaded = true;
+}
+
+void Economy::rideDelivered(int ride) {
+    const auto it = std::find_if(rides_.begin(), rides_.end(), [&](const Ride& r) { return r.id == ride; });
+    if (it == rides_.end())
+        return;
+    const Ride r = *it;
+    rides_.erase(it);
+    ColonyStructure* to = structureById(r.to);
+    if (to && r.listed) {
+        const int signedPeople = r.toPool ? -r.people : r.people;
+        for (auto c = to->coming.begin(); c != to->coming.end(); ++c)
+            if (c->second >= kRiding / 2 && c->first == signedPeople) {
+                to->coming.erase(c);
+                break;
+            }
+    }
+    if (to && !to->evacuating)
+        (r.toPool ? to->pool : to->crew) += r.people;
+    else if (ColonyStructure* h = structureById(hub() ? hub()->id : -1))
+        h->pool += r.people;
+    else
+        orbit_ += r.people;
+    retryCrew();
+}
+
+void Economy::rideLost(int ride) {
+    const auto it = std::find_if(rides_.begin(), rides_.end(), [&](const Ride& r) { return r.id == ride; });
+    if (it == rides_.end())
+        return;
+    const Ride r = *it;
+    rides_.erase(it);
+    dead_ += r.people;
+    if (ColonyStructure* to = r.listed ? structureById(r.to) : nullptr) {
+        const int signedPeople = r.toPool ? -r.people : r.people;
+        for (auto c = to->coming.begin(); c != to->coming.end(); ++c)
+            if (c->second >= kRiding / 2 && c->first == signedPeople) {
+                to->coming.erase(c);
+                break;
+            }
+        requestCrew(*to);
+    }
 }
 
 void Economy::loseOne() {
@@ -675,14 +752,22 @@ void Economy::requestCrew(ColonyStructure& s) {
     for (ColonyStructure& from : structures_)
         if (from.progress >= 1 && from.pool >= need && from.id != s.id) {
             from.pool -= need;
-            s.coming.push_back({need, kCrewWalk});
+            // From the hub's own pool they walk; from a block they ride.
+            if (transports_ && from.type != "colony-hub")
+                addRides(from.id, s.id, need, false, true);
+            else
+                s.coming.push_back({need, kCrewWalk});
             s.wanted = 0;
             return;
         }
     if (has("transporter-pad") && orbit_ >= need) {
         orbit_ -= need;
         s.beaming = true;
-        s.coming.push_back({need, kCrewWalk});
+        // Beamed down to the pad, then (with transports) carried on.
+        if (const ColonyStructure* p = transports_ ? pad() : nullptr; p && p->id != s.id)
+            addRides(p->id, s.id, need, false, true, kCrewWalk);
+        else
+            s.coming.push_back({need, kCrewWalk});
         s.wanted = 0;
     }
 }
@@ -695,7 +780,19 @@ void Economy::setCrewTarget(int structure, int n) {
         if (!t || t->crewSlots == 0)
             return;
         s.target = std::clamp(n, 0, t->crewSlots);
-        // Those over it go back to the hub's pool.
+        // Those over it go back to the hub's pool (with transports, riding
+        // to a hub or block with room for ten).
+        if (s.crew > s.target && transports_) {
+            for (ColonyStructure& h : structures_) {
+                const BuildingType* ht = buildingType(h.type);
+                if (h.progress >= 1 && !h.evacuating && ht && ht->poolSlots - h.pool >= kBatch &&
+                    (h.type == "colony-hub" || h.type == "accommodation")) {
+                    addRides(s.id, h.id, s.crew - s.target, true, false);
+                    s.crew = s.target;
+                    break;
+                }
+            }
+        }
         if (s.crew > s.target)
             for (ColonyStructure& h : structures_)
                 if (h.type == "colony-hub" && h.progress >= 1) {
@@ -748,11 +845,16 @@ void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
         const int room = t->poolSlots - s.pool;
         const int m = std::min({kBatch, room, hubPool > 0 ? hubPool : (has("transporter-pad") ? orbit_ : 0)});
         if (m > 0) {
-            if (hubPool > 0)
+            if (hubPool > 0) {
                 hub->pool -= m;
-            else
+                s.coming.push_back({-m, kCrewWalk}); // negative: for its pool
+            } else {
                 orbit_ -= m;
-            s.coming.push_back({-m, kCrewWalk}); // negative: for its pool
+                if (const ColonyStructure* p = transports_ ? pad() : nullptr)
+                    addRides(p->id, s.id, m, true, true, kCrewWalk);
+                else
+                    s.coming.push_back({-m, kCrewWalk});
+            }
         }
     }
     if (arrived)
@@ -888,6 +990,8 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         staff(s, out);
         s.evacTicks += s.evacuating;
     }
+    for (Ride& r : rides_)
+        r.wait = std::max(0.0, r.wait - 1 / kTicksPerSecond);
     // People walking back from a razed building reach the hub's pool (with
     // no hub, the roster in orbit).
     for (auto& w : walking_)
@@ -1492,8 +1596,22 @@ bool Economy::raze(int structure) {
             // way turn back.
             int leaving = s.crew;
             for (const auto& c : s.coming)
-                leaving += std::abs(c.first);
+                leaving += c.second >= kRiding / 2 ? 0 : std::abs(c.first);
             s.coming.clear();
+            // Those riding to it go to the hub instead; those it was to
+            // send off walk out with the rest.
+            for (auto r = rides_.begin(); r != rides_.end();) {
+                if (r->from == s.id && !r->loaded) {
+                    leaving += r->people;
+                    r = rides_.erase(r);
+                    continue;
+                }
+                if (r->to == s.id) {
+                    r->listed = false, r->toPool = true;
+                    r->to = hub() ? hub()->id : -1;
+                }
+                ++r;
+            }
             s.crew = 0, s.target = 0;
             if (leaving > 0)
                 walking_.push_back({leaving, kCrewWalk});

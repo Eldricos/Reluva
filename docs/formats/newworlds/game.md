@@ -444,6 +444,7 @@ kept apart from the game's behaviour:
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
 | F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking 9 degrees down | the game's offsets; its look angle isn't known |
 | Escape's box | "LEAVE THIS MISSION?" | Reluva's wording |
+| A transport's stops | 4 s to take people on or set them down, at a spot 1.2 tiles south of the building | the game's 80 ticks at a building without a dock; its docks' steps aren't timed, nor where its doors are |
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
 | Spacing of a group's spots | 2500 units | Reluva's |
 | Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
