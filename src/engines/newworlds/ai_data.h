@@ -40,6 +40,9 @@ struct Weapon {
     int magazine = 0;  // shots a burst
     int guns = 0;      // weapons the type carries
     float arc = 3.14159f; // radians its turret turns each way from straight ahead (pi: all round)
+    // Radians its gun lifts and dips (a target's pitch outside them is
+    // never fired on; artillery lobs its shells, so isn't held by them).
+    float up = 1.5708f, down = 1.5708f;
 };
 
 struct CombatType {

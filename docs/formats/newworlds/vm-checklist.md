@@ -113,21 +113,14 @@ Work on Reluva's side, listed so the whole picture is in one place.
 
 - **Saving and loading** [code]: the game has none; a Reluva feature for
   later.
-- **Demolition by APC** [code]: the game's razed building waits for an
-  unarmed APC to take its crew out (exe.md#demolishing); Reluva's bees
-  leave and the crew walk.
-- **The Cadet box** [code]: a setup option doubling the player's hit points
-  instead of the race's bonus.
-- **Message faces by number** [code]: each message's face is the large
-  portrait its own number gives; Reluva's paraphrased messages carry the
-  section's.
-- **Held briefing scenes** [code]: some briefing steps wait for the
-  mission's briefing script to play a scene (F1's shuttle); Reluva plays
-  them without it.
-- **The Tricorder's ground colours** [code]: the map's own palette shifted
-  per race (exe.md#the-tricorder).
-- **Turret elevation and attached parts** [code]: the pitch limits and an
-  object's size over its attached parts aren't applied.
+- **The Tricorder's palette** [code]: the game shifts a 256-entry palette
+  of its map's for the Tricorder's bands; Reluva hasn't found it and shifts
+  the ground's own colours by the same rules.
+
+Done on Reluva's side since: Cadet mode (K on the missions page),
+demolition by unarmed APC, messages' faces by their officer numbers, the
+briefings' scenes (their units flying their paths), the Tricorder's colour
+rules, and the guns' pitch limits.
 
 Settled from the executable and the data since the last list: the camera
 (it isn't held to seen blocks), speeds, docks, bees, roll-out, demolition,

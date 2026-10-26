@@ -468,11 +468,11 @@ kept apart from the game's behaviour:
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 | Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
 | A phaser pulse's speed | 2500 units a tick | the game's is its beam model's length a tick (not read from the models yet) |
-| An object's size to shots | its model's bounds radius (0.9 for vehicles) | the executable; the game grows it over attached parts, Reluva doesn't; without models (tests) 6000 and 1000 |
+| An object's size to shots | its model's bounds radius (0.9 for vehicles) | the executable; the game grows it over attached parts (the bees' pods, which shots don't hit anyway) and a captured building's over the APC inside; without models (tests) 6000 and 1000 |
 | A pulse's or bolt's height | flies level: it hits by its path on the map, and the ground never stops it | the game's flies in three dimensions and the ground (and its line checks) can stop it |
 | A pulse's way | fixed when fired, from the turret as it moves | the game's turns with the turret |
 | A vehicle facing a target outside its turret's arc | drives at it (for a point a target's radius short of it) and fires once it's in the arc | the executable (exe.md#orders) |
-| Turrets' pitch limits | not applied | the executable's elevation limits (the map is flat to Reluva's shots) |
+| Turrets' pitch limits | each gun's lift and dip (the phaser tank's 20 degrees up, 45 down) against the ground's heights; artillery not held | the executable (exe.md#vehicles-and-turrets) |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
 | A unit in a building's way | its position inside the spot's box (half the footprint and 512 more) | the game keeps a box per unit as it moves; their size isn't known |

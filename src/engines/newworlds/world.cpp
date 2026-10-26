@@ -479,6 +479,15 @@ void World::combatTick() {
         const float rel = std::remainder(std::atan2(t.y - u.y, t.x - u.x) - (u.building ? 0 : u.heading), 2 * 3.14159265f);
         return std::abs(rel) <= u.weapon.arc + 0.01f;
     };
+    // Within its gun's pitch, the ground's heights between them (a lobbed
+    // shell isn't held by it).
+    auto inPitch = [&](const Unit& u, const Unit& t) {
+        if (u.weapon.kind == WeaponKind::Artillery || !terrain_.heightAt)
+            return true;
+        const float pitch = std::atan2(terrain_.heightAt(t.x, t.y) - terrain_.heightAt(u.x, u.y),
+                                       std::max(1.0f, distance(u, t)));
+        return pitch <= u.weapon.up + 0.01f && pitch >= -u.weapon.down - 0.01f;
+    };
     // To its edge; a shell no further than it can fly (to the middle).
     auto inRange = [&](const Unit& u, const Unit& t) {
         if (u.weapon.kind == WeaponKind::Artillery)
@@ -527,12 +536,12 @@ void World::combatTick() {
             float best = 1e30f;
             for (Unit& v : units_)
                 if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && pickable(v) &&
-                    (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) && inArc(u, v) &&
+                    (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) && inArc(u, v) && inPitch(u, v) &&
                     distance(u, v) < best && (u.weapon.kind == WeaponKind::Artillery || lineClear(u, v)))
                     best = distance(u, v), t = &v;
         }
         if (!t && u.lastAttacker && looks)
-            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a) && inArc(u, *a))
+            if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a) && inArc(u, *a) && inPitch(u, *a))
                 t = a;
         if (!t) {
             u.target = 0, u.ordered = false, u.firing = false, u.burstLeft = 0;
@@ -575,6 +584,11 @@ void World::combatTick() {
                 u.planTick = tick_;
                 setPath(u.id, u.flies ? std::vector<std::pair<float, float>>{{t->x, t->y}} : findPath(u.x, u.y, t->x, t->y));
             }
+            continue;
+        }
+        // Above or below what its gun reaches: it can't fire at it.
+        if (!inPitch(u, *t)) {
+            u.firing = false;
             continue;
         }
         // (Out of its arc it isn't firing yet: it drives round.)

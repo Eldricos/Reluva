@@ -1642,6 +1642,24 @@ void testProjectiles() {
     Terrain t;
     t.width = t.height = 40;
     t.moveClass.assign(1600, 1);
+    // A gun's pitch: a target on a cliff 20000 above, 15000 off, is past
+    // the phaser tank's 20 degrees up, so never fired on.
+    for (const float rise : {0.0f, 20000.0f}) {
+        Terrain cliff = t;
+        cliff.heightAt = [rise](float x, float) { return x > 150000 ? rise : 0.0f; };
+        World c(cliff);
+        c.setStance(0, 1, 3);
+        const int tank = spawnObject(c, 0, 'F', *combatType(8), 140000, 20 * 8192.0f, {});
+        const int above = spawnObject(c, 1, 'K', *combatType(10), 155000, 20 * 8192.0f, {});
+        c.unit(above)->holdFire = true;
+        bool shot = false;
+        for (int i = 0; i < 100; ++i) {
+            c.advance(0.05);
+            for (const WorldEvent& e : c.takeEvents())
+                shot = shot || (e.kind == WorldEvent::Shot && e.from == tank);
+        }
+        CHECK(shot == (rise == 0)); // (on level ground it fires)
+    }
     World w(t);
     w.setStance(1, 0, 3);
     const float y = 20 * 8192.0f;
