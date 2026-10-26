@@ -41,6 +41,7 @@
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
+#include "common/video/bink.h"
 #include "common/audio/decode.h"
 #include "common/audio/wav.h"
 #include "engines/newworlds/cat_archive.h"
@@ -2554,7 +2555,58 @@ int cmdScriptCheck(int argc, char** argv) {
     return bad ? 1 : 0;
 }
 
+// bink-decode <movie.bik> <out.yuv> [frames] [out.pcm]: decodes a Bink
+// movie's frames to raw YUV 4:2:0 (each plane cropped to the picture) and
+// its audio to raw 16-bit samples, to compare with another decoder.
+int cmdBinkDecode(int argc, char** argv) {
+    if (argc < 4) {
+        std::fprintf(stderr, "usage: reluva-tool bink-decode <movie.bik> <out.yuv> [frames] [out.pcm]\n");
+        return 2;
+    }
+    reluva::video::BinkMovie movie;
+    if (reluva::Error err = movie.open(argv[2])) {
+        std::fprintf(stderr, "%s\n", err.message.c_str());
+        return 1;
+    }
+    std::printf("%dx%d, %u frames at %.3f fps, %s\n", movie.width(), movie.height(), movie.frames(), movie.fps(),
+                movie.hasAudio() ? "audio" : "no audio");
+    std::fflush(stdout); // before the frames, should they go to stdout too
+    const uint32_t frames = argc > 4 ? std::min(movie.frames(), uint32_t(parseNumber(argv[4]))) : movie.frames();
+    std::FILE* out = std::fopen(argv[3], "wb");
+    if (!out)
+        return 1;
+    for (uint32_t f = 0; f < frames; ++f) {
+        if (reluva::Error err = movie.nextFrame()) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            std::fclose(out);
+            return 1;
+        }
+        for (int p = 0; p < 3; ++p) {
+            const int w = p ? movie.width() / 2 : movie.width(), h = p ? movie.height() / 2 : movie.height();
+            for (int y = 0; y < h; ++y)
+                std::fwrite(movie.plane(p).data() + size_t(y) * movie.stride(p), 1, size_t(w), out);
+        }
+    }
+    std::fclose(out);
+    if (argc > 5) {
+        reluva::audio::Sound sound;
+        if (reluva::Error err = movie.decodeAudio(sound)) {
+            std::fprintf(stderr, "%s\n", err.message.c_str());
+            return 1;
+        }
+        std::FILE* pcm = std::fopen(argv[5], "wb");
+        if (!pcm)
+            return 1;
+        std::fwrite(sound.samples.data(), 2, sound.samples.size(), pcm);
+        std::fclose(pcm);
+        std::printf("audio: %d Hz, %d channels, %zu frames\n", sound.rate, sound.channels, sound.frames());
+    }
+    return 0;
+}
+
 int main(int argc, char** argv) {
+    if (argc >= 2 && std::strcmp(argv[1], "bink-decode") == 0)
+        return cmdBinkDecode(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "hexdump") == 0)
         return cmdHexdump(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "cat-probe") == 0)

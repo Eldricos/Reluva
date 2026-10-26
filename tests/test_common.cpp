@@ -14,8 +14,10 @@
 #include "common/fs.h"
 #include "common/md5.h"
 #include "common/text.h"
+#include "common/video/bink.h"
 
 #include <cstdio>
+#include <cstring>
 #include <memory>
 #include <fstream>
 #include <string>
@@ -211,6 +213,60 @@ static void testMixer() {
     CHECK(m.play(nullptr, SoundType::Effects) == kNoSound && m.play(make(22050, 1, {}), SoundType::Effects) == kNoSound);
 }
 
+// A one-frame 8x8 Bink movie (version i) built bit by bit: each plane a
+// single fill block.
+static void testBink(const std::filesystem::path& tmp) {
+    std::vector<uint8_t> bytes;
+    uint64_t acc = 0;
+    int nbits = 0;
+    auto put = [&](uint32_t v, int n) { // low bit first
+        acc |= uint64_t(v) << nbits;
+        nbits += n;
+        while (nbits >= 8) {
+            bytes.push_back(uint8_t(acc));
+            acc >>= 8, nbits -= 8;
+        }
+    };
+    auto align32 = [&] {
+        while (nbits || bytes.size() % 4)
+            put(0, 1);
+    };
+    put(0, 32); // the frame's leading word (version i)
+    for (const int colour : {0x5A, 0xC0, 0x40}) { // Y, then V and U from version h
+        put(0, 4 * 23);                           // every tree the plain one
+        put(1, 10), put(1, 1), put(6, 4);         // block types: one, all fill
+        put(0, 9);                                // no 16x16 block types
+        put(1, 10), put(1, 1), put(colour >> 4, 4), put(colour & 15, 4); // one colour
+        for (int i = 0; i < 6; ++i)
+            put(0, 10); // no patterns, motion, DCs or runs
+        align32();
+    }
+    std::vector<uint8_t> file(48);
+    auto le = [&](size_t at, uint32_t v) {
+        for (int i = 0; i < 4; ++i)
+            file[at + i] = uint8_t(v >> (8 * i));
+    };
+    std::memcpy(file.data(), "BIKi", 4);
+    le(4, uint32_t(48 + bytes.size() - 8)), le(8, 1), le(12, uint32_t(bytes.size()));
+    le(20, 8), le(24, 8), le(28, 15), le(32, 1), le(36, 0), le(40, 0), le(44, 48);
+    file.insert(file.end(), bytes.begin(), bytes.end());
+    std::filesystem::create_directories(tmp);
+    const auto path = tmp / "fill.bik";
+    std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(file.data()), std::streamsize(file.size()));
+
+    video::BinkMovie movie;
+    CHECK(movie.open(path).ok);
+    CHECK(movie.width() == 8 && movie.height() == 8 && movie.frames() == 1 && movie.fps() == 15 && !movie.hasAudio());
+    CHECK(movie.nextFrame().ok && movie.frame() == 1);
+    CHECK(movie.plane(0)[0] == 0x5A && movie.plane(0)[63] == 0x5A);
+    CHECK(movie.plane(1)[0] == 0x40 && movie.plane(2)[0] == 0xC0 && movie.plane(1)[movie.stride(1) * 3 + 3] == 0x40);
+    std::vector<uint8_t> rgba(8 * 8 * 4);
+    movie.toRgba(rgba.data(), 8 * 4);
+    CHECK(rgba[0] > rgba[1] && rgba[0] > rgba[2] && rgba[3] == 255); // red-ish (V high, U low)
+    CHECK(!movie.nextFrame().ok); // past the end
+    CHECK(!movie.open(tmp / "missing.bik").ok);
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_tests";
     testMd5();
@@ -219,6 +275,7 @@ int main() {
     testWav();
     testMp3();
     testMixer();
+    testBink(tmp / "bink");
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)
