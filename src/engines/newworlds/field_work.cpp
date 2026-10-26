@@ -22,17 +22,19 @@ constexpr float kOfficerReach = 1414;
 constexpr size_t kOfficerSeats = 16;
 constexpr float kStrongSkill = 0.5f;
 constexpr int kTeamTicks = 336;
-// The game's script watches count 16 ticks a second; the simulation 20.
-constexpr double kScriptTicks = 16;
+// The raids' and watches' delays are the game's raw 50 ms ticks
+// (exe.md#the-simulation-clock), as the simulation's.
+constexpr double kScriptTicks = 20;
 constexpr double kTick = 0.05;
 // Placeholders: a target's size (its model's bounding radius), how near
 // its entry an APC stops, how near a site counts as the target's, and a
 // watch for a scan no raid covers (the game has none; the scripts' own
-// targets need one): 1 s to start, 10 s to finish.
+// targets need one): its reply 2 ticks after the scanner comes in range,
+// as the game's routine reply (exe.md#scans-and-captures), 8 s to finish.
 constexpr float kBuildingSize = 6000, kVehicleSize = 1000;
 constexpr float kEntry = 7000;
 constexpr float kSiteNear = 2 * kBlock;
-constexpr int kOwnStart = 16, kOwnHold = 160;
+constexpr int kOwnStart = 2, kOwnHold = 160;
 
 int conditionOf(FieldWork::Kind kind, bool strong) { return 4 + int(kind) + (strong ? 3 : 0); }
 

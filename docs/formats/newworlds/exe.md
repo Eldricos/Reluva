@@ -54,8 +54,8 @@ Klingon, 43 Romulan *likely* (not in the build menus).
 ## Costs and prerequisites
 
 Panel units (T, G, KG all one stock unit each). The build value is the
-vehicle yard's work, in what are probably sixteenths of a second at full
-efficiency. Some tutorial readings were misread digits in the small font:
+vehicle yard's work: its value x 300 power units, taken 300 a tick at
+its efficiency. Some tutorial readings were misread digits in the small font:
 the generator's dilithium is 35, the improved yard's thermoconc 30, the
 advanced hub's 30.
 
@@ -260,6 +260,20 @@ disruptor tank 229) have no cloak figure: they are given a different
 behaviour when ordered, and the same combat figures as the uncloaked ones.
 Vehicles repair themselves, 1 hit point every 6400 / max hp ticks (see
 [Repairs](#repairs)).
+
+**Speed.** Paths run over 1024-unit cells, eight ways; a unit takes 1/pace
+ticks a cell, so its speed is 1024 x pace a tick (diagonals 1448 x pace).
+The start-up rewrite replaces the stored paces: scouts 0.3 (6140 units a
+second), tanks and armed APCs 0.1667 (3410), artillery and science
+vehicles 0.1 (2050), unarmed APCs 0.0833 (1710). Terrain decides only
+where a unit can go, not how fast. Crew figures walk straight, 19 a tick.
+Turrets pitch relative to the hull within their limits (a target outside
+them is never fired on), at 64 units a tick squared (yaw 128). An
+object's size to shots grows over its first attached part (its distance
+plus that part's radius); a captured building's grows over the capturing
+APC, plus 1000. Everything the simulation animates plays a frame a tick
+(20 a second): the bees' arms, the crew, building doors (8 frames), the
+16-frame destruction effects.
 
 ## Buildings
 
@@ -484,6 +498,12 @@ Reluva follows this (`placement.h`): the occupancy is read from what
 stands, sites included (a building's cells free once it's gone; the
 game's freeing wasn't traced), and units' boxes are their positions.
 
+**No turning.** Every object has a heading, but the player's builds
+always take 0 and no key turns them; of the missions' 3868 placements all
+face 0 but the wrecked USS Explorer's two halves (134, 135), at half a
+turn. Each moving unit keeps a box 512 each way round it, whatever its
+type: in a building's way if inside the footprint's half plus 512.
+
 ### Transports
 
 The unarmed APC (Federation 55, Klingon 88, Romulan 89) is the colony's
@@ -513,6 +533,14 @@ economy's rides); a ride's stops last 4 s each (the game's 80 ticks at a
 building without a dock; its dock steps weren't timed), and an APC
 lost on the way loses its passengers. The AI sides' APCs stay in their
 hubs and their people walk.
+
+**The stop.** An unarmed APC first drives to a point twice the
+building's model radius out on its own side. At a level dock (hubs,
+yards, processors, pads) it waits for the door, flies to ARRIVAL, checks
+RELEASE is clear and leaves by DEPARTURE, each leg distance / 100 (its
+played dock speed), at least 10 ticks; at a vertical dock (mines,
+sickbays) it docks if the dock is free, else tries again after 80
+ticks.
 
 ### The script engine
 
@@ -717,6 +745,14 @@ skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
 
+**Range and replies.** A scanner drives for the same kind of point as an
+attack, about a target's radius off, and scans as soon as it is within
+its sensor range plus the target's radius (18000 + r for a science
+vehicle). A scan nobody watches gets the routine reply 2 ticks after the
+scanner comes in range, once each spell of scanning; only F1, F2, J6, K1,
+K2, MarkL1, R1 and R2 have one (elsewhere nothing is said). The raids'
+and watches' delays are raw ticks.
+
 ### Fog of war
 
 The map is a grid of one cell a block, each with six channels holding a
@@ -828,6 +864,11 @@ buys the rest back with power before any other building, (what's
 missing) / 16.384 / its efficiency. An empty pool was not seen to do
 anything.
 
+**Moving officers.** A click on an officer's card picks them; a click on
+one of the colony's buildings or vehicles with a free officer seat moves
+them there. There is no drag; the range is 2000000 units, so none. A
+double click on a card takes F1's camera to whatever holds them.
+
 ### Vehicle production
 
 A vehicle yard makes one vehicle at a time. An order takes the cost at
@@ -858,6 +899,12 @@ centre 304, shield buffer 184, tracking systems 185, disruptor matrix
 186. Romulan: infiltration lab 311, energy lab 310, shield buffer 179,
 and 308 (tank) and 309 (cloaked tank), whose names the executable's
 tables don't give in order.
+
+**Rolling out.** The tick after the bar fills plays the ready sound;
+the vehicle then leaves through the yard's dock: a tick, three times the
+LOCK-RELEASE leg and the RELEASE-DEPARTURE leg at its speed: about 9.5 s
+for a tank from the Federation's yard (6.5 s a scout), 4 s from the
+Klingons', 7.3 s from the Romulans'.
 
 ### Research
 
@@ -1041,6 +1088,16 @@ JUMP TO and Space attach the same way in F1. In F2 and F3 a double click
 leaves the camera where it is and only plays the object's own sound.
 Every mission starts in F2.
 
+**Limits.** The camera's point is held within 440000 of the map's
+middle each way (about five blocks in from a 64-block map's edges) and
+nowhere else: a check that would keep it over blocks the side has seen
+exists but is switched off. F1, F2 and F3 reset it to 2000, 28000 and
+15000 up (four other presets are never reached); only F1's height moves
+(numpad 7 / 1, up to 128 a step), and every mode keeps it at least 800
+above the ground under it and 800 ahead. Numpad 8 / 2 zoom between 0.75
+and 8 times (reset to 1 by the F keys), turning towards the point under
+the pointer as they zoom in.
+
 ### Keys
 
 The game's own: X (camera back; Ctrl+X quits), Escape (quit, with a
@@ -1172,6 +1229,13 @@ under-attack alert), so it counts as destroyed. A site can't be razed or
 cancelled by the player; an aborted computer or script build order tears
 its site down with the full cost back.
 
+**How long.** Razing sets the building's crew to 0: the crew wait
+inside and it asks for an unarmed APC, which takes them aboard; the
+building goes once the APC has left its dock (on a human side the APC
+must exist: without one it presumably waits). Two blocks from the
+Federation hub it's gone about 30-35 s after DEMOLISH, its crew in the
+hub's pool after 55-65 s, about 19 s more a block each way.
+
 ### Bees
 
 - **Where they are.** A side's bees belong to its hub (the vehicle pool's
@@ -1226,6 +1290,34 @@ its site down with the full cost back.
   for again. While the starting colony is set up, pods arrive at once.
 - Not found: the number of tiles each building's model gives (so the
   build times; the training missions' timings stand in, with four bees).
+
+**Speeds as played.** The start-up rewrite sets the bees' flight speeds
+to 1000 units a tick (construction), 600 (cargo) and 400 (worker), and
+the unarmed APCs' dock speed to 100 (the stored figures, 150, 150, 200
+and 500, are never used). Most bee dock legs so take the 10-tick
+shortest; four bees leave the Federation hub about 2.2 s apart.
+
+**How they build.** The bees build a building's deconstructed `_d` model:
+its file ends in a table of four sections, each a list of faces, between
+them every face. Each face is cut into tiles of up to 800 by 1200 (empty
+ones skipped); a bee builds one tile a cycle (an arm swing of 17 frames
+and a reposition flight, about 18 ticks by the code), in its own section
+only, then takes the first unfinished section without a bee. So four
+bees take as long as the biggest section, one the sum of all four. The
+Federation's timed builds fit T = max over sections k of (5.5 s + 2.2 s
+x k + 0.67 s x its tiles) within about 4.5 s, which gives the untimed
+ones: shield generator 27 s, photon turret 22, artillery 31; the
+Klingons' generator 21, yard 40, shield generator 22, turret 24; the
+Romulans' generator 25, yard 62, shield generator 48, turrets 29-33.
+(The per-tile time the fit needs is less than the code's cycle reads; the
+relative sizes are firm.) An AI builds defences and shield generators
+the same way; one without an idle construction bee gets one made free.
+
+**Cargo.** A cargo bee never docks at the mine or the processor: it
+takes and sets down pods on their pads, about 8-9.5 s for its two at the
+mine and 11 s at the processor; inside, a worker bee spends about 8.5 s a
+pod at a Federation mine and 6 s at the processor. A trip carries two
+pods: 80 T for the Federation, 160 T for the others.
 
 ### Docking
 
@@ -1363,6 +1455,19 @@ that corner (4 x 4). There is one for the side, not one per yard, and
 nothing found moves it. A unit within 4096 of its place stands and
 fires; one that can't get there tries again after 320-816 ticks.
 
+**Out of the arc, and groups.** A unit told to attack a target its
+turret can't bear on doesn't pivot: it plans an attack point (a sweep of
+37 points 10 degrees apart, growing 1.25 times a round), about a target's
+radius off on its own side, drives at it and fires once the target is in
+the arc. Only the Klingon armed APC (40, 90 degrees each way) and the
+Romulan APCs (64, 230, 60 degrees) have limited arcs. Hulls turn with the
+turrets' speed-up-and-brake rule (192 units a tick squared for tanks,
+APCs, artillery and science vehicles, 16 for scouts and bees, 32 for large
+craft; a half turn about 26 ticks). Units sent together all get the same
+point, starting 0-11 ticks apart; they pack round it by their boxes,
+about 1024 apart, and one whose next step is taken waits 5 updates, then
+plans again.
+
 ### Group counts
 
 Each object type has a class mask: 0x2 small buildings (generators,
@@ -1456,8 +1561,6 @@ the NEW WORLDS panel, its class picked by type id:
 
 ## Still open
 
-- How long a path step is (so units' real speeds), and how many pieces
-  each building's model gives its bees to build.
-- How long bees stay docked (so how fast they carry ore).
+- The seconds a bee takes a tile (the code's cycle against the timed
+  builds).
 - Placement flags and a third placement phase.
-- How the player moves officers (the gesture).

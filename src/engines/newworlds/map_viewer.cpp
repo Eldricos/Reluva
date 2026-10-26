@@ -612,8 +612,12 @@ void MapViewer::setView(View v) {
 }
 
 void MapViewer::centreOn(float x, float y) {
-    targetX_ = std::clamp(x, 0.0f, worldWidth());
-    targetY_ = std::clamp(y, 0.0f, worldHeight());
+    // The game holds its camera within 440000 of the map's middle each way
+    // (exe.md#cameras), whatever the player has seen.
+    constexpr float kReach = 440000;
+    const float cx = worldWidth() / 2, cy = worldHeight() / 2;
+    targetX_ = std::clamp(std::clamp(x, cx - kReach, cx + kReach), 0.0f, worldWidth());
+    targetY_ = std::clamp(std::clamp(y, cy - kReach, cy + kReach), 0.0f, worldHeight());
     targetZ_ = groundHeight(targetX_, targetY_) + (view_ == View::FirstPerson ? kEyeHeight : 0);
     dirty_ = true;
 }
@@ -699,7 +703,10 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
         float x = 0, y = 0;
         if (in && !locked_ && screenToGround(mouseX, mouseY, x, y))
             centreOn(targetX_ + (x - targetX_) * 0.2f, targetY_ + (y - targetY_) * 0.2f);
-        distance_ = std::clamp(distance_ * (in ? 0.85f : 1.18f), kTileSize * 0.3f, 40.0f * kBlockSize);
+        // The game's zoom goes from 0.75 to 8 times the view's own (reset
+        // by F1, F2, F3).
+        const ViewShape& shape = view_ == View::Close ? kClose : view_ == View::FirstPerson ? kFirstPerson : kBirdsEye;
+        distance_ = std::clamp(distance_ * (in ? 0.85f : 1.18f), shape.distance / 8, shape.distance / 0.75f);
         break;
     }
     case key::Kp0 + 7:
@@ -707,7 +714,7 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
         // Raise or lower the eye, keeping where it stands over the ground.
         const float ground = distance_ * std::cos(pitch_);
         float height = distance_ * std::sin(pitch_) * (k == key::Kp0 + 7 ? 1.2f : 1 / 1.2f);
-        height = std::clamp(height, kTileSize * 0.05f, 40.0f * kBlockSize);
+        height = std::clamp(height, 800.0f, 40.0f * kBlockSize); // at least 800 up, as the game keeps it
         pitch_ = std::clamp(std::atan2(height, ground), 0.02f, kMaxPitch);
         distance_ = std::hypot(height, ground);
         break;

@@ -1665,7 +1665,8 @@ void testProjectiles() {
         CHECK(!turretFired && tankFired && asked >= 300);
     }
     // A turret that turns only 60 degrees each way (the Romulan armed APC)
-    // won't pick an enemy behind it; told to attack, it turns to face it.
+    // won't pick an enemy behind it; told to attack, it drives at it and
+    // fires once it's in the arc.
     {
         World r(t);
         r.setStance(2, 0, 3);
@@ -1791,7 +1792,7 @@ void testRivalsAndGroups() {
         CHECK(hands("J4", "kli-sci-blk-raid").empty() && hands("J4", "hostage-sci-blk-raid").empty());
     }
     // A rival's watch: J3's Klingon raid on a workshop is won when it's
-    // destroyed, by anyone (5 s, then 30 s).
+    // destroyed, by anyone (80 ticks, then 480: 4 s and 24 s).
     {
         World w(t);
         AiSides ai("J3", 0, w);
@@ -1811,9 +1812,9 @@ void testRivalsAndGroups() {
         };
         run(1);
         w.remove(target);
-        run(34);
+        run(26);
         CHECK(!said(heard, "captured-by klingon raid-building-one"));
-        run(2);
+        run(3);
         CHECK(said(heard, "captured-by klingon raid-building-one"));
     }
 }

@@ -11,11 +11,11 @@ namespace reluva::newworlds {
 
 namespace {
 
-// Placeholder: a ground scout crosses a block in about four seconds, by
-// eye from the recordings; to be timed in the game.
-constexpr float kScoutSpeed = 0.3f * kPaceSpeed; // the scouts' pace
-// Spacing of units sent to one point.
-constexpr float kSpread = 2500;
+// A ground scout: its pace of 0.3 path steps a tick, a block in 2.7 s.
+constexpr float kScoutSpeed = 0.3f * kPaceSpeed;
+// Units sent to one point: the game sends them all to it, and they pack
+// round it by the 1024-unit box each keeps (exe.md#orders).
+constexpr float kSpread = 1024;
 // Turrets (exe.md#sides-and-combat): they turn speeding up and then
 // slowing down onto their target, at 128 of the game's 65536ths of a turn
 // a tick each tick, and fire only when on it. They look for a target
@@ -27,9 +27,6 @@ constexpr float kShellReach = 36850;
 // types pay it: the empires' defensive weapons and artillery (and their
 // copies for slots 3-5).
 constexpr float kShotPower = 300;
-// How fast a standing vehicle turns its hull to bring a target into its
-// turret's arc (Reluva's: how the game's units face one isn't known).
-constexpr float kHullTurn = 3.14159265f / 40;
 bool paysForShots(int type) {
     for (int t : {54, 80, 81, 82, 83, 84, 276, 277, 281, 282, 287, 288})
         if (t == type)
@@ -580,8 +577,9 @@ void World::combatTick() {
             }
             continue;
         }
-        u.firing = true;
-        if (!onTheMove)
+        // (Out of its arc it isn't firing yet: it drives round.)
+        u.firing = inArc(u, *t);
+        if (!onTheMove && u.firing)
             u.path.clear();
         // Cloaked, it decloaks to fire; it can't while fading either way.
         if (u.cloaks && (u.cloaked || u.fading > 0)) {
@@ -591,12 +589,16 @@ void World::combatTick() {
             continue;
         }
         // Outside its turret's arc (one it was told to attack): the turret
-        // waits at its stop, and a standing vehicle turns to face it.
+        // waits at its stop, and a standing vehicle drives at it, for a
+        // point a target's radius short of it on its own side, firing once
+        // it comes into the arc (exe.md#orders: the game doesn't turn on
+        // the spot).
         if (!inArc(u, *t)) {
             turnTurret(u, std::atan2(t->y - u.y, t->x - u.x) - (u.building ? 0 : u.heading));
             if (!u.building && !u.moving()) {
-                const float d = std::remainder(std::atan2(t->y - u.y, t->x - u.x) - u.heading, 2 * 3.14159265f);
-                u.heading += std::clamp(d, -kHullTurn, kHullTurn);
+                const float dx = u.x - t->x, dy = u.y - t->y, d = std::max(1.0f, std::hypot(dx, dy));
+                const float r = radiusOf(*t);
+                setPath(u.id, findPath(u.x, u.y, t->x + dx / d * r, t->y + dy / d * r));
             }
             continue;
         }

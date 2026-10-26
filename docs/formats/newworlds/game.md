@@ -446,18 +446,17 @@ kept apart from the game's behaviour:
 
 | What | Value | From |
 |---|---|---|
-| Ground scout speed | 4000 units a second (a block in 4 s) | by eye; to be timed |
-| Animation speed | 10 frames a second | Reluva's (arf.md) |
+| Unit speeds | 1024 × the pace a tick: scouts 6140 units a second, tanks and armed APCs 3410, artillery and science vehicles 2050, unarmed APCs 1710 | the executable's played paces (exe.md#vehicles-and-turrets) |
+| Animation speed | 10 frames a second | Reluva's (arf.md); the game plays its simulation's animations a frame a tick (20 a second) |
 | Units' drawn size | 4 × their models | the tutorial: a scout is a quarter of the vehicle yard's width beside it, against a sixteenth for the models |
 | F1's follow camera | 5 model radii behind (times distance / 800), 0.8 up, looking at the object (9 degrees down) | the executable (exe.md#cameras) |
 | Escape's box | "LEAVE THIS MISSION?" | Reluva's wording |
-| A transport's stop | in through the building's dock and out to RELEASE, at a spot 1.2 tiles south of the building | the dock times are the game's; it drives to the dock's ARRIVAL point, which Reluva doesn't place |
-| Docks and yards | the model's points as they are in the model, the building not turned | the game turns them with the building; Reluva's colony buildings aren't turned |
+| A transport's stop | twice the building's radius out on the side it comes from, then in through the dock and out to RELEASE at 100 a tick | the executable (exe.md#transports) |
 | A pod aboard | hangs under its bee, 400 lower | the game hangs it at the bee's BAY_n_LOCK point |
 | Space's alerts | objects hit in the last 41 ticks | the game's last 41 Tricorder redraws, and its reports too (beamed down, a mine exhausted) |
-| Spacing of a group's spots | 2500 units | Reluva's |
-| Build time | per type with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83; others 40 | the VM recordings of C1, C4-C8 (play-vm-tutorials.md), whose colonies had four construction bees; the game's is its model's pieces |
-| Evacuating a razed building | 5 ticks at least, then as long as its bees take to leave; its people walk back to the hub's pool in 20 s | the game asks its parts each tick whether they can let go; the walk's time is Reluva's crew walk |
+| Spacing of a group's spots | 1024 units | the game sends them all to the one point and they pack by their 1024 boxes |
+| Build time | with four bees: processor 25 s, generator 30, construction yard 45, mine 60, vehicle yard 65, science station 75, security center 83 (timed); shield generator 27, photon turret 22, artillery 31; the Klingons' generator 23, yard 37, shield generator 22, turret 24; the Romulans' generator 28, yard 58, shield generator 48, turret 33, artillery 29; others 40 | the training missions, and the rest from each model's tiles against them (exe.md#bees) |
+| Evacuating a razed building | 5 ticks at least, then as long as its bees take to leave; its people walk back to the hub's pool in 20 s | the game's waits for an unarmed APC to take the crew out (about 30-35 s two blocks from the hub, the crew home 55-65 s; exe.md#demolishing): not done yet |
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
@@ -471,7 +470,7 @@ kept apart from the game's behaviour:
 | An object's size to shots | its model's bounds radius (0.9 for vehicles) | the executable; the game grows it over attached parts, Reluva doesn't; without models (tests) 6000 and 1000 |
 | A pulse's or bolt's height | flies level: it hits by its path on the map, and the ground never stops it | the game's flies in three dimensions and the ground (and its line checks) can stop it |
 | A pulse's way | fixed when fired, from the turret as it moves | the game's turns with the turret |
-| A vehicle facing a target outside its turret's arc | turns on the spot, 4.5° a tick, when told to attack it | the game's turret waits at its stop; how the vehicle comes round isn't known |
+| A vehicle facing a target outside its turret's arc | drives at it (for a point a target's radius short of it) and fires once it's in the arc | the executable (exe.md#orders) |
 | Turrets' pitch limits | not applied | the executable's elevation limits (the map is flat to Reluva's shots) |
 | Target finding | AI colonies go only for colonies | Reluva's (F1's recordings); the rest the executable's |
 | An order's units | the side's idle ones, then its vehicle yards; none beamed in but by attack groups | the executable (exe.md#ai-colonies) |
@@ -485,10 +484,10 @@ kept apart from the game's behaviour:
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
-| Rolling a vehicle out | 8 s after the yard's work | the recordings' scout (build value 0) |
+| Rolling a vehicle out | a tank 9.5 s after the yard's work from the Federation's yard, 4 s the Klingons', 7.3 s the Romulans'; a scout two thirds of that | the yards' dock legs (exe.md#docking) |
 | A lab's build time | 28 s | the training missions (21-35 s) |
 | Scans, captures, officers | ranges, flags, strength, 80 %, 16.8 s, 16 seats, 1414 units | the executable (exe.md#scans-and-captures) |
-| A scan no raid covers | 1 s to start, 10 s more | Reluva's (the scripts' own targets) |
+| A scan no raid covers | its reply 2 ticks after coming in range, 8 s to finish | the game's routine reply (2 ticks; only F1, F2, J6, K1, K2, R1 and R2 have one); the finish is Reluva's |
 
 The code: `src/engines/newworlds/world.h` (units, passability, paths,
 groups, combat), `ai_sides.h` (the other sides and their orders),

@@ -793,6 +793,7 @@ private:
     std::array<int, 5> jumpedTo_{};
     int cycledBuilding_ = 0, cycledVehicle_ = 0; // Shift+B / Shift+V: where the camera went last     // JUMP TO: each class's object the camera went to last
     int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
+    uint64_t officerClickMs_ = 0; // when a card was last clicked (a double click: the camera to them)
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the

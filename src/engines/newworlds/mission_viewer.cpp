@@ -2029,7 +2029,15 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
                             economy_->setCrewTarget(c.id, now + (b.action == "crew+" ? 1 : -1));
                         }
         } else if (b.action.rfind("officer", 0) == 0) {
-            pickedOfficer_ = std::atoi(b.action.c_str() + 7);
+            // A click picks the officer; a second on the same card brings
+            // the camera to whatever they're in (exe.md#crew-and-efficiency).
+            const int i = std::atoi(b.action.c_str() + 7);
+            if (i == pickedOfficer_ && nowMs_ - officerClickMs_ < 400 && fieldWork_ &&
+                size_t(i) < fieldWork_->officers().size())
+                if (const Unit* in = world_ ? world_->unit(fieldWork_->officers()[size_t(i)].in) : nullptr)
+                    cameraTo(*in);
+            pickedOfficer_ = i;
+            officerClickMs_ = nowMs_;
         }
         redraw();
         return true;
