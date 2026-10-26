@@ -1059,7 +1059,8 @@ bool MissionViewer::playEvent(const Event& ev) {
                 map_.centreOn(x, y);
             break;
         }
-        if (ev.key >= '1' && ev.key <= '9') {
+        // Battle groups 1-5, as the game's (exe.md#keys).
+        if (ev.key >= '1' && ev.key <= '5') {
             const int n = int(ev.key - '0');
             float x = 0, y = 0;
             if (ctrl)
@@ -1814,11 +1815,11 @@ void MissionViewer::openPlaybook(int target, float gx, float gy) {
         if (!scanners && apcs && t->building && posture == 3)
             playbook_.push_back({"pbcaptre", "CAPTURE BUILDING", 'c'});
     } else if (t && t->building && t->slot == playerSlot_ && shields) {
-        playbook_ = {{"pbprotct", "PROTECT AREA", 'a'}};
+        playbook_ = {{"pbprohre", "PROTECT AREA", 'a'}};
     } else {
         t = nullptr;
         playbook_ = {{"pbdefend", "ATTACK EN ROUTE", 'r'},
-                     {"pbprohre", "PROTECT FROM LOCATION", 'l'},
+                     {"pbprotct", "PROTECT FROM LOCATION", 'l'},
                      {"pbmove", "MOVE WITHOUT ATTACKING", 'v'},
                      {"pbreturn", "RETURN TO VEHICLE RALLY POINT", 'y'}};
     }

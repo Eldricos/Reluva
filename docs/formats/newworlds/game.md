@@ -53,8 +53,7 @@ As the first tutorial teaches them:
 | The pointer at the screen's edge (F2, F3) | scrolls that way, speeding up |
 | Space | the camera to the next of the colony's objects with an alert (lately hit, everyone beamed down, a mine exhausted); in F1 it follows it |
 | Home | back to the colony hub |
-| Ctrl + 1-9 | makes the selection a battle group |
-| 1-9 / Shift + 1-9 | selects the group / centres on it |
+| Ctrl + 1-5 | makes the selection a battle group (1-5 select it, Shift + 1-5 goes to it) |
 | B | the build menu in the NEW WORLDS panel (B again closes it) |
 | 1-9, 0 (menu open), or a click on its portrait | picks a building (its hologram follows the pointer) or orders a vehicle; < and > turn the menu's pages, X closes it |
 | Left click (placing) | builds where the hologram is green |
@@ -482,7 +481,7 @@ kept apart from the game's behaviour:
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
 | The Tricorder's ground and ore colours | each point's terrain colour shifted for its block's class and the race; ores hatched in rings and blended at their edges by the blocks round each corner, unsurveyed blocks solid, the border dark | the executable (exe.md#the-tricorder) |
-| Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprohre` protect from location, `pbprotct` protect area) | the executable loads them by number |
+| Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprotct` protect from location, `pbprohre` protect area) | the executable loads them by number; the manual's pictures settle the two protects |
 | Approach | within 1.5 blocks of a site | Reluva's |
 | Crew walking to their building | 20 s | C8's yard crewed about 20 s after "not enough crew" |
 | Rolling a vehicle out | a tank 9.5 s after the yard's work from the Federation's yard, 4 s the Klingons', 7.3 s the Romulans'; a scout two thirds of that | the yards' dock legs (exe.md#docking) |

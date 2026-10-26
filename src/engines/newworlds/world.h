@@ -211,7 +211,8 @@ public:
     // spot round it, so they don't all pile onto one.
     void moveSelected(float x, float y, UnitOrder order = UnitOrder::Move);
 
-    // Battle groups 1-9: Ctrl+N makes the selection group N, N selects it.
+    // Battle groups 1-5 (the game's; room for 9): Ctrl+N makes the
+    // selection group N, N selects it.
     void setGroup(int n);
     bool selectGroup(int n);
     const std::vector<int>& group(int n) const { return groups_[size_t(std::clamp(n, 0, 9))]; }
