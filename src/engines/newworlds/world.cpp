@@ -894,4 +894,8 @@ void World::flyProjectiles() {
     projectiles_ = std::move(flying);
 }
 
+void World::syncState(save::Serializer& s) {
+    s(stances_)(events_)(projectiles_)(tickClock_)(tick_)(units_)(groups_)(nextId_);
+}
+
 } // namespace reluva::newworlds

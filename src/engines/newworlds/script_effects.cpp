@@ -353,4 +353,9 @@ int64_t ScriptEffects::healthSum() const {
     return n;
 }
 
+void ScriptEffects::syncState(save::Serializer& s) {
+    s(topUp_)(toppingUp_)(storms_)(routes_)(sparks_)(beaming_)(inside_)(zonesSeen_)(standing_)(infection_);
+    s(infected_)(crewAtStart_)(people_)(visit_)(infecting_)(clock_)(second_)(topUpClock_)(random_);
+}
+
 } // namespace reluva::newworlds

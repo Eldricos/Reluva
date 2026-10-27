@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/fog.h"
 #include "engines/newworlds/world.h"
 
@@ -25,6 +26,9 @@ namespace reluva::newworlds {
 // holds nothing mends at the vehicles' rate.
 class Repairs {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     explicit Repairs(World& world);
 
     // The best engineering skill in an object (its officers'; 0 none).
@@ -41,6 +45,7 @@ private:
     struct State {
         int countdown = 0;
         double stored = 0; // repair energy held
+        friend void syncState(save::Serializer& s, State& v) { s(v.countdown)(v.stored); }
     };
     World& world_;
     std::function<float(int)> skill_;

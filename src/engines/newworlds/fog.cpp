@@ -128,4 +128,10 @@ void Fog::refresh(const World& world) {
     stamp(world, -1, -1);
 }
 
+void Fog::syncState(save::Serializer& s) {
+    s(cells_)(step_);
+    if (s.loading() && cells_.size() != size_t(w_) * size_t(h_))
+        s.fail("a fog of another map's size");
+}
+
 } // namespace reluva::newworlds

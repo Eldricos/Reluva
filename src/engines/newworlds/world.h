@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_data.h"
 
 #include <algorithm>
@@ -49,6 +50,7 @@ struct UnitKind {
     std::string name;  // as the selection panel names it ("GROUND SCOUT")
     std::string model; // "geo/fed/ffs.geo"
     float speed = 0;
+    friend void syncState(save::Serializer& s, UnitKind& v) { s(v.name)(v.model)(v.speed); }
 };
 
 // A unit's speed, world units a second, for each path step a tick of its
@@ -123,6 +125,14 @@ struct Unit {
     int sightTarget = 0, sightTick = -1000;
     int planTick = -1000; // when it last planned a way after its target
     bool sightClear = true;
+    friend void syncState(save::Serializer& s, Unit& v) {
+        s(v.id)(v.side)(v.slot)(v.kind)(v.type)(v.name)(v.label)(v.building)(v.built)(v.efficiency)(v.x)(v.y)
+         (v.heading)(v.path)(v.selected)(v.hp)(v.maxHp)(v.weapon)(v.target)(v.ordered)(v.ai)(v.holdFire)
+         (v.flies)(v.cooldown)(v.burstLeft)(v.burstGap)(v.firing)(v.turretYaw)(v.turretSpin)(v.tracking)
+         (v.lastAttacker)(v.cloaks)(v.cloaked)(v.cloakClock)(v.fading)(v.cloaking)(v.order)(v.holdX)(v.holdY)
+         (v.protects)(v.chasing)(v.attackedTick)(v.heldBy)(v.vx)(v.vy)(v.lastX)(v.lastY)(v.radius)
+         (v.sightTarget)(v.sightTick)(v.planTick)(v.sightClear);
+    }
 };
 
 // What combat did in a step: a shot (from, to, its ends) or something
@@ -141,6 +151,10 @@ struct Projectile {
     float speed = 0, range = 0;   // beams and bolts: units a tick, how far it goes
     float ox = 0, oy = 0;         // a pulse's muzzle, as the turret was last
     int age = 0;                  // ticks
+    friend void syncState(save::Serializer& s, Projectile& v) {
+        s(v.from)(v.fromSlot)(v.kind)(v.damage)(v.x)(v.y)(v.z)(v.px)(v.py)(v.pz)(v.dx)(v.dy)(v.vx)(v.vy)(v.vz)
+         (v.speed)(v.range)(v.ox)(v.oy)(v.age);
+    }
 };
 
 struct WorldEvent {
@@ -154,10 +168,16 @@ struct WorldEvent {
     float x0 = 0, y0 = 0, x1 = 0, y1 = 0;
     WeaponKind weapon = WeaponKind::None;
     Unit what;
+    friend void syncState(save::Serializer& s, WorldEvent& v) {
+        s(v.kind)(v.from)(v.to)(v.fromSlot)(v.toSlot)(v.x0)(v.y0)(v.x1)(v.y1)(v.weapon)(v.what);
+    }
 };
 
 class World {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     explicit World(Terrain terrain);
 
     const Terrain& terrain() const { return terrain_; }

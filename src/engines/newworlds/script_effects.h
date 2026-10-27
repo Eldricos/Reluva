@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/mission_script.h"
@@ -25,6 +26,9 @@ namespace reluva::newworlds {
 // <seconds>, infection <percent>, cured.
 class ScriptEffects {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     ScriptEffects(int playerSlot, World& world, AiSides* ai, Economy* economy, const MissionScript* script);
 
     // A script output: an effect (verb and its arguments), or stock
@@ -40,6 +44,7 @@ public:
         float x, y;
         int kind;
         double age = 0;
+        friend void syncState(save::Serializer& s, Spark& v) { s(v.x)(v.y)(v.kind)(v.age); }
     };
     const std::vector<Spark>& sparks() const { return sparks_; }
     int infection() const { return int(infection_); } // percent
@@ -53,11 +58,13 @@ private:
         std::string zone;
         double every = 0, clock = 0; // meteors: seconds between; 0 a storm's flashes
         bool meteors = false;
+        friend void syncState(save::Serializer& s, Storm& v) { s(v.zone)(v.every)(v.clock)(v.meteors); }
     };
     struct Route {
         std::vector<std::pair<float, float>> points;
         size_t next = 0;
         bool loop = false;
+        friend void syncState(save::Serializer& s, Route& v) { s(v.points)(v.next)(v.loop); }
     };
     std::array<float, 4> zoneRect(const std::string& zone) const; // world x0, y0, x1, y1
     int slotNamed(const std::string& side) const;
@@ -86,6 +93,7 @@ private:
     struct Person {
         int health = 256, saved = 0;
         bool ill = false;
+        friend void syncState(save::Serializer& s, Person& v) { s(v.health)(v.saved)(v.ill); }
     };
     std::vector<Person> people_;
     size_t visit_ = 0;

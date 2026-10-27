@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include <functional>
 #include <string>
 #include <string_view>
@@ -44,6 +45,7 @@ struct ColonyGround {
 struct ColonyBuilding {
     std::string name, model;
     int a = 0, b = 0; // its middle
+    friend void syncState(save::Serializer& s, ColonyBuilding& v) { s(v.name)(v.model)(v.a)(v.b); }
 };
 
 // Buildings on the map's tile grid (half a block, 4 map positions), each

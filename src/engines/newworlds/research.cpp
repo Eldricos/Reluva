@@ -98,4 +98,8 @@ std::vector<ScriptEvent> Research::advance(double seconds) {
     return out;
 }
 
+void Research::syncState(save::Serializer& s) {
+    s(topics_)(queue_)(clock_);
+}
+
 } // namespace reluva::newworlds

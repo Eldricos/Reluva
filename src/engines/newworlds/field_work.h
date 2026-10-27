@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_data.h"
 #include "engines/newworlds/fog.h"
 #include "engines/newworlds/mission_script.h"
@@ -51,6 +52,9 @@ namespace reluva::newworlds {
 // buildings 1, large 3, of the colony's size at the start).
 class FieldWork {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     enum Kind { Science, Medical, Engineering };
 
     FieldWork(std::string_view mission, int playerSlot, World& world,
@@ -105,6 +109,7 @@ public:
         size_t officer; // in officers()
         int done = 0;
         bool running = false, finished = false;
+        friend void syncState(save::Serializer& s, Course& v) { s(v.officer)(v.done)(v.running)(v.finished); }
     };
     static constexpr int kCoursePoints = 150000, kTrainingPerTick = 1000;
     const std::vector<Course>& courses() const { return courses_; }
@@ -132,17 +137,20 @@ private:
         int target;
         Kind kind;
         int ticks = 0; // in range, scanning, in a row
+        friend void syncState(save::Serializer& s, ScanOrder& v) { s(v.target)(v.kind)(v.ticks); }
     };
     struct CaptureOrder {
         int target;
         int state = 0; // 0 weaken it, 1 drive up, 2 the team going in, 3 held
         int timer = 0;
         float savedHp = 0;
+        friend void syncState(save::Serializer& s, CaptureOrder& v) { s(v.target)(v.state)(v.timer)(v.savedHp); }
     };
     struct Hold {
         int slot;
         int apc;
         double seconds = 0;
+        friend void syncState(save::Serializer& s, Hold& v) { s(v.slot)(v.apc)(v.seconds); }
     };
     // A raid's progress: how long its condition has held, and whether it
     // has started (its start sent) or succeeded.

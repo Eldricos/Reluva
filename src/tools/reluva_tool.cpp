@@ -41,6 +41,7 @@
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
+#include "common/savestate.h"
 #include "common/video/bink.h"
 #include "common/audio/decode.h"
 #include "common/audio/wav.h"
@@ -2383,18 +2384,20 @@ int cmdGeoSurvey(int argc, char** argv) {
 // hold, from each side it's played from.
 int cmdPlayCheck(int argc, char** argv) {
     namespace nw = reluva::newworlds;
-    bool verbose = false;
+    bool verbose = false, roundTrip = false;
     std::string onlySide;
     int first = 2;
     while (first < argc && argv[first][0] == '-') {
         if (std::strcmp(argv[first], "-v") == 0)
             verbose = true;
+        else if (std::strcmp(argv[first], "-r") == 0)
+            roundTrip = true;
         else if (std::strcmp(argv[first], "-s") == 0 && first + 1 < argc)
             onlySide = argv[++first];
         ++first;
     }
     if (argc - first < 3) {
-        std::fprintf(stderr, "usage: reluva-tool play-check [-v] [-s F|K|R] <mission|all> <seconds> <file.cat>...\n");
+        std::fprintf(stderr, "usage: reluva-tool play-check [-v] [-r] [-s F|K|R] <mission|all> <seconds> <file.cat>...\n");
         return 2;
     }
     const std::string which = argv[first];
@@ -2454,21 +2457,54 @@ int cmdPlayCheck(int argc, char** argv) {
                 continue;
             nw::MissionSim sim(m, side, ground);
             sim.useModels(archives);
+            // -r: halfway, a savestate loaded into a second run, which
+            // must carry on exactly as the first (docs/savestates.md).
+            std::unique_ptr<nw::MissionSim> copy;
+            auto state = [](nw::MissionSim& s) {
+                reluva::save::Serializer out = reluva::save::Serializer::saver();
+                s.syncState(out);
+                return out.take();
+            };
+            std::string roundTripResult;
             // The keys a tutorial asks for are pressed as it asks (a
             // trainee following it), a second at a time.
-            for (double t = 0; t < seconds; t += 1) {
-                sim.advance(std::min(1.0, seconds - t));
-                if (nw::MissionRun* run = sim.run())
+            auto second = [&](nw::MissionSim& s, double dt) {
+                s.advance(dt);
+                if (nw::MissionRun* run = s.run())
                     for (const nw::ScriptEvent& e : run->awaited())
                         if (e.kind == "key" && !run->finished())
-                            sim.fireScript(e);
+                            s.fireScript(e);
+            };
+            for (double t = 0; t < seconds; t += 1) {
+                if (roundTrip && !copy && t >= seconds / 2) {
+                    copy = std::make_unique<nw::MissionSim>(m, side, ground);
+                    copy->useModels(archives);
+                    reluva::save::Serializer in = reluva::save::Serializer::loader(state(sim));
+                    copy->syncState(in);
+                    if (!in.ok() || !in.atEnd())
+                        roundTripResult = "savestate: didn't load (" + (in.ok() ? std::string("bytes left") : in.error()) + ")";
+                }
+                second(sim, std::min(1.0, seconds - t));
+                if (copy && roundTripResult.empty())
+                    second(*copy, std::min(1.0, seconds - t));
             }
+            if (copy && roundTripResult.empty()) {
+                const std::vector<uint8_t> a = state(sim), b = state(*copy);
+                size_t at = 0;
+                while (at < a.size() && at < b.size() && a[at] == b[at])
+                    ++at;
+                roundTripResult = a == b ? "savestate: loaded halfway, the same at the end"
+                                         : "savestate: loaded halfway, DIFFERS at the end (byte " + std::to_string(at) + ")";
+            }
+            troubled += roundTripResult.find("same") == std::string::npos && !roundTripResult.empty();
             const auto problems = sim.problems();
             const auto stuck = size_t(std::count_if(problems.begin(), problems.end(),
                                                     [](const std::string& p) { return p.rfind("stuck", 0) == 0; }));
             troubled += stuck > 0;
             std::printf("== %s (%c): %s; %zu stuck, %zu waiting\n", m.c_str(), side,
                         sim.won() ? "won" : sim.lost() ? "lost" : "running", stuck, problems.size() - stuck);
+            if (!roundTripResult.empty())
+                std::printf("   %s\n", roundTripResult.c_str());
             if (verbose)
                 for (const std::string& l : sim.log())
                     std::printf("   %s\n", l.c_str());

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_data.h"
 #include "engines/newworlds/mission_script.h"
 
@@ -21,6 +22,9 @@ namespace reluva::newworlds {
 // it. A finished topic sends researched <topic> to the scripts.
 class Research {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     static constexpr int kPointsPerTick = 1000;
 
     Research(std::string_view mission, int slot);
@@ -34,6 +38,9 @@ public:
         int done = 0;        // points so far
         bool running = false, finished = false;
         bool open() const { return locks < 1; }
+        friend void syncState(save::Serializer& s, Topic& v) {
+            s(v.name)(v.aliases)(v.field)(v.points)(v.locks)(v.done)(v.running)(v.finished);
+        }
     };
     const std::vector<Topic>& topics() const { return topics_; }
 

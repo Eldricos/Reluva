@@ -2584,6 +2584,44 @@ void testRasterizer() {
 
 } // namespace
 
+// Savestates (docs/savestates.md): a mission saved after two minutes and
+// loaded into a fresh one carries on exactly as the first, for each race's
+// first mission on a flat map (its AI, economies, script and all).
+void testSaveState() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int bx, int by) { return (bx + by) % 9 == 0 ? 1 : 0; };
+    map.depositAmount = [](int, int) { return 500; };
+    auto state = [](MissionSim& sim) {
+        save::Serializer s = save::Serializer::saver();
+        sim.syncState(s);
+        return s.take();
+    };
+    for (const auto& [mission, side] : {std::pair{"F1", 'F'}, std::pair{"K1", 'K'}, std::pair{"R1", 'R'}}) {
+        const std::vector<ColonyBuilding> colony = MissionSim::placedColony(mission, side);
+        MissionSim a(mission, side, t, map, 64, 64, colony);
+        a.advance(120);
+        const std::vector<uint8_t> saved = state(a);
+        MissionSim b(mission, side, t, map, 64, 64, colony);
+        save::Serializer in = save::Serializer::loader(saved);
+        b.syncState(in);
+        CHECK(in.ok() && in.atEnd());
+        CHECK(state(b) == saved); // loaded whole
+        a.advance(180);
+        b.advance(180);
+        CHECK(state(a) == state(b)); // and on the same way
+        CHECK(a.world().units().size() == b.world().units().size() && a.clock() == b.clock());
+        // Another mission's state isn't taken.
+        MissionSim other("F2", 'F', t, map, 64, 64, MissionSim::placedColony("F2", 'F'));
+        save::Serializer wrong = save::Serializer::loader(saved);
+        other.syncState(wrong);
+        CHECK(!wrong.ok());
+    }
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -2619,6 +2657,7 @@ int main() {
     testBees();
     testStoresAndRazing();
     testTransports();
+    testSaveState();
     testPlacement();
     testProjectiles();
     testModelTextures();

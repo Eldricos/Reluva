@@ -104,8 +104,7 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **Saving and loading** [code]: the game has none; a Reluva feature for
-  later.
+- **Nothing left here.**
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
@@ -115,7 +114,8 @@ manual's check: Klingon and Romulan cargo bees carrying one pod,
 cancelling constructions (and the cap of 10), F1's edge turning, Page Up
 / Down, the double right click, and the health marks over selected units. The
 game's Bink movies now play too (the logos and intro at launch, a race's
-movie when J9 is won), decoded by Reluva itself.
+movie when J9 is won), decoded by Reluva itself; and saving and loading (Reluva's savestates,
+Ctrl+F5, for every engine).
 
 Settled from the executable and the data since the last list: the camera
 (it isn't held to seen blocks), speeds, docks, bees, roll-out, demolition,

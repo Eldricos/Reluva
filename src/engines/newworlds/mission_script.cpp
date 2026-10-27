@@ -708,4 +708,16 @@ std::string announcementFor(const ScriptEvent& event, const std::vector<MissionR
     return {};
 }
 
+void MissionRun::syncState(save::Serializer& s) {
+    // The rules, one for each of the script's handlers (and the generic
+    // ones), in the order made on starting: only whether each has fired
+    // and is armed changes.
+    if (s.count(rules_.size()) != rules_.size() && s.loading())
+        s.fail("a mission script of another shape");
+    for (Rule& r : rules_)
+        s(r.fired)(r.armed);
+    s(built_)(completed_)(revealed_)(timers_)(signals_)(state_)(random_)(won_)(lost_)(allDone_)(failing_);
+    s(failId_)(depth_);
+}
+
 } // namespace reluva::newworlds

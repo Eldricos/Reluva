@@ -3525,6 +3525,88 @@ char MissionViewer::side() const {
     return size_t(side_) < sides.size() ? sides[size_t(side_)] : 0;
 }
 
+bool MissionViewer::canSave(std::string& why) const {
+    if (!playing_ || !sim_) {
+        why = "Only a mission being played can be saved (G or F3 on the missions page).";
+        return false;
+    }
+    if (flow_ != Flow::None && flow_ != Flow::Playing) {
+        why = "The mission is over.";
+        return false;
+    }
+    return true;
+}
+
+std::string MissionViewer::stateDescription() const {
+    if (missions_.empty() || !sim_)
+        return {};
+    const Level& level = missions_[size_t(current_)];
+    const int seconds = int(sim_->clock());
+    char time[16];
+    std::snprintf(time, sizeof time, "%d:%02d", seconds / 60, seconds % 60);
+    const char s = side();
+    const char* race = s == 'K' ? "Klingon" : s == 'R' ? "Romulan" : "Federation";
+    return level.shortName + ": " + level.title + " (" + race + ", " + time + ")";
+}
+
+Error MissionViewer::syncState(save::Serializer& s) {
+    // Which mission, as whom.
+    std::string mission = missions_.empty() ? "" : missions_[size_t(current_)].shortName;
+    int sideIndex = side_;
+    bool cadet = cadetMode(), flowed = flow_ == Flow::Playing;
+    s(mission)(sideIndex)(cadet)(flowed);
+    if (!s.ok())
+        return Error::fail("The save is damaged: " + s.error());
+    if (s.loading()) {
+        const auto it = std::find_if(missions_.begin(), missions_.end(),
+                                     [&](const Level& l) { return l.shortName == mission; });
+        if (it == missions_.end())
+            return Error::fail("This game's mission list has no " + mission + ".");
+        const int index = int(it - missions_.begin());
+        if (sideIndex < 0 || size_t(sideIndex) >= missionSides(mission).size())
+            return Error::fail("The save is damaged: no such side.");
+        // The mission started afresh, as play starts it, then put back.
+        if (flow_ != Flow::None) {
+            if (flow_ == Flow::Briefing)
+                stopBriefing();
+            flow_ = Flow::None;
+        }
+        stopBriefing();
+        shown_ = true; // the page is up (activate() leaves it as it is)
+        show(index);
+        if (sideIndex != side_) {
+            side_ = sideIndex;
+            loadSide();
+        }
+        if (!hasMap_)
+            return Error::fail("The archives have no map for " + mission + ".");
+        setCadetMode(cadet);
+        startPlay();
+        stopClip(); // the opening's voice, already heard
+        if (!sim_)
+            return Error::fail("Couldn't start " + mission + ".");
+    }
+    sim_->syncState(s);
+    s(log_)(commsShown_)(commsClosed_)(commandShown_)(shownOthers_)(otherBuildings_)(unitVoices_);
+    map_.syncCamera(s);
+    if (s.loading()) {
+        if (!s.ok())
+            return Error::fail("The save is damaged: " + s.error() + ". The mission starts over.");
+        flow_ = flowed ? Flow::Playing : Flow::None;
+        flowWon_ = false;
+        lastTickMs_ = nowMs_;
+        quitAsked_ = paused_ = false;
+        selectedBuilding_ = 0;
+        placing_.clear();
+        showColony();
+        showUnits();
+        dirty_ = true;
+        redraw();
+        updateTitle();
+    }
+    return Error::success();
+}
+
 void MissionViewer::endFlow() {
     const Flow was = flow_;
     flow_ = Flow::None;

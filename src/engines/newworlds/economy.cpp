@@ -1872,4 +1872,12 @@ bool Economy::evacuated(int structure) const {
     return false;
 }
 
+void Economy::syncState(save::Serializer& s) {
+    s(stores_)(refined_)(capacity_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
+    s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_);
+    s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
+    s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastCrewWarning_)(nextId_)(dockFree_);
+    s(beeClock_)(free_)(beesModelled_)(bees_)(nextBee_)(nextPod_)(pods_)(depots_)(shipClock_);
+}
+
 } // namespace reluva::newworlds

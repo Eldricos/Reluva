@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/mission_script.h"
 
 #include <array>
@@ -128,10 +129,17 @@ struct ColonyStructure {
     // People on their way to it: how many, and seconds still to walk
     // (kRiding: in, or waiting for, one of the colony's transports).
     std::vector<std::pair<int, double>> coming;
+    friend void syncState(save::Serializer& s, ColonyStructure& v) {
+        s(v.id)(v.type)(v.x)(v.y)(v.progress)(v.blockX)(v.blockY)(v.exhausted)(v.stored)(v.fill)(v.supply)
+         (v.health)(v.crew)(v.pool)(v.wanted)(v.target)(v.evacuating)(v.evacTicks)(v.beaming)(v.coming);
+    }
 };
 
 class Economy {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     Economy(char side, Stock start, int capacity, ColonyMap map);
 
     // The stock as the panel shows it: what the colony's storage
@@ -212,6 +220,7 @@ public:
         double work;       // power units still to put in
         double total;
         double rollout = 0; // seconds left rolling out, once done
+        friend void syncState(save::Serializer& s, VehicleJob& v) { s(v.type)(v.yard)(v.work)(v.total)(v.rollout); }
     };
     const std::vector<VehicleJob>& vehicleJobs() const { return jobs_; }
     // Vehicles finished since last asked: type id and the yard's id.
@@ -289,6 +298,9 @@ public:
         bool listed = false;  // counted in to's coming (else on its own, as walking)
         bool loaded = false;
         double wait = 0;      // seconds before they're there to take (beaming down)
+        friend void syncState(save::Serializer& s, Ride& v) {
+            s(v.id)(v.from)(v.to)(v.people)(v.toPool)(v.listed)(v.loaded)(v.wait);
+        }
     };
     void setTransports(bool on) { transports_ = on; }
     // The colony's finished hub, if it has one.
@@ -316,6 +328,11 @@ public:
         float fromX = 0, fromY = 0, toX = 0, toY = 0;
         int flown = 0, flight = 0; // ticks: 0 flight when not flying
         std::vector<int> pods;     // the pods aboard (a worker's one, a cargo bee's two)
+        friend void syncState(save::Serializer& s, Bee& v) {
+            s(v.id)(v.cargo)(v.worker)(v.home)(v.x)(v.y)(v.heading)(v.site)(v.spot)(v.working)(v.loaded)(v.dock)
+             (v.inside)(v.docking)(v.fetching)(v.retries)(v.fromX)(v.fromY)(v.toX)(v.toY)(v.flown)(v.flight)
+             (v.pods);
+        }
     };
     const std::vector<Bee>& bees() const { return bees_; }
     int beesAt(int site) const; // construction bees at work on a site
@@ -341,6 +358,9 @@ public:
         int pad = 0;              // the building whose yard it stands on (or is being set down on)
         int slot = -1;            // its place there (-1 none)
         bool inbound = false;     // aboard a worker bee taking it in to its building
+        friend void syncState(save::Serializer& s, Pod& v) {
+            s(v.id)(v.load)(v.refined)(v.origin)(v.dest)(v.state)(v.x)(v.y)(v.pad)(v.slot)(v.inbound);
+        }
     };
     const std::vector<Pod>& pods() const { return pods_; }
 
@@ -404,6 +424,7 @@ private:
         int structure; // its storage facility (0: the mission's stock, before one stands)
         bool gone = false; // its facility destroyed (kept only as the yards' store)
         Units units{};
+        friend void syncState(save::Serializer& s, Store& v) { s(v.structure)(v.gone)(v.units); }
     };
     int64_t total(int m) const;
     bool pays(const Units& cost) const;
@@ -467,6 +488,7 @@ private:
         int worker = 0, cargo = 0;
         std::array<int64_t, kMaterials> dug{};
         bool asked = false;
+        friend void syncState(save::Serializer& s, Depot& v) { s(v.worker)(v.cargo)(v.dug)(v.asked); }
     };
     std::map<int, Depot> depots_;
     int shipClock_ = 0;

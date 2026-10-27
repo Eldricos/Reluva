@@ -43,12 +43,14 @@ Linux (with each distro's packages) and Windows with Visual Studio 2022.
 ## Usage
 
 - `reluva` opens the launcher. *Add Game...* scans a folder for supported games.
-- `reluva <target>` starts a configured game directly. `reluva testbed`
-  runs the test pattern.
+- `reluva <target>` starts a configured game directly (`--load <slot>` from
+  a savestate). `reluva testbed` runs the test pattern.
 - `reluva --hash <files...>` prints detection signatures for an engine's table.
 - `reluva-tool` has developer tools for studying game data: `hexdump`,
   `cat-probe`, `cat-list` and `cat-extract` (New Worlds archives).
-- In game: **Ctrl+F5** returns to the launcher, **Alt+Enter** toggles fullscreen.
+- In game: **Ctrl+F5** opens the Reluva menu (resume, savestates, back to the
+  launcher, quit; see [docs/savestates.md](docs/savestates.md)), **Alt+Enter**
+  toggles fullscreen. The launcher's **Load...** starts a game from a save.
 - New Worlds currently opens as a data viewer. **Tab** switches between missions, models,
   textures, maps, sounds, strings and fonts, **Left/Right** step through them and **F** cycles filters.
   Missions (level.dat's list) show their map with the briefing over it: **Up/Down** turn its

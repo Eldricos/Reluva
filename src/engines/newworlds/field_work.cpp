@@ -580,4 +580,28 @@ const char* skillWord(float skill) {
     return kWords[std::clamp(int(skill * 4), 0, 4)];
 }
 
+void FieldWork::syncState(save::Serializer& s) {
+    s(sites_)(scans_)(captures_)(holds_);
+    // The officers, each by its slot and place in the mission's list.
+    const uint32_t n = s.count(officers_.size());
+    if (s.loading())
+        officers_.assign(n, OfficerAt{nullptr, 0, 0});
+    for (OfficerAt& o : officers_) {
+        int slot = o.officer ? o.officer->slot : -1;
+        s(slot);
+        save::syncIndex(s, o.officer, newworlds::officers(mission_, slot));
+        s(o.in)(o.skill);
+    }
+    s(courses_)(scanned_)(session_);
+    const std::vector<const Raid*> raidList = raids(mission_);
+    const uint32_t w = s.count(watches_.size());
+    if (s.loading())
+        watches_.assign(w, Watch{});
+    for (Watch& v : watches_) {
+        save::syncIndex(s, v.raid, raidList);
+        s(v.target)(v.condition)(v.start)(v.hold)(v.ticks)(v.started)(v.done)(v.side)(v.futile)(v.seen)(v.names);
+    }
+    s(pending_)(heldNames_)(races_)(colonyBase_)(shared_)(clock_)(tick_);
+}
+
 } // namespace reluva::newworlds

@@ -965,4 +965,30 @@ std::vector<std::string> MissionSim::problems() const {
     return out;
 }
 
+void MissionSim::syncState(save::Serializer& s) {
+    // The mission it's of (the loader makes the same one first).
+    std::string mission = mission_;
+    char side = side_;
+    s(mission)(side);
+    if (s.loading() && (mission != mission_ || side != side_))
+        s.fail("another mission's state");
+    world_->syncState(s);
+    economy_->syncState(s);
+    ai_->syncState(s);
+    fog_->syncState(s);
+    repairs_->syncState(s);
+    fieldWork_->syncState(s);
+    research_->syncState(s);
+    effects_->syncState(s);
+    bool scripted = run_ != nullptr;
+    s(scripted);
+    if (s.loading() && scripted != (run_ != nullptr))
+        s.fail("a mission script of another shape");
+    if (run_ && scripted)
+        run_->syncState(s);
+    s(colony_)(colonyObjects_)(structureIds_)(beesHoused_)(housed_)(rallied_)(garage_)(shuttles_)(razing_);
+    s(touchyNeutral_)(said_)(events_)(voices_)(lastAttackVoice_)(alerts_)(lastCounts_)(seenSites_)(scannedSites_);
+    s(approached_)(tracks_)(shooting_)(stuck_)(placedBadly_)(harmless_)(log_)(clock_)(fogClock_)(lost_);
+}
+
 } // namespace reluva::newworlds

@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "common/types.h"
 
 #include <array>
@@ -88,6 +89,7 @@ struct ScriptEvent {
     std::string kind;
     std::vector<std::string> args;
     int a = -1, b = -1; // a map position, when the event has one
+    friend void syncState(save::Serializer& s, ScriptEvent& v) { s(v.kind)(v.args)(v.a)(v.b); }
 };
 
 struct MissionScript {
@@ -126,6 +128,9 @@ const MissionScript* findMissionScript(std::string_view shortName, char side);
 // A mission being played: feed it events, get back what happens.
 class MissionRun {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     struct Output {
         // Stance, Ai, Stock: for the game to carry out (sender = the side,
         // text = the stance, the order, or the material and amount).
@@ -139,6 +144,7 @@ public:
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
         std::string clip;          // a message's voice clip (a media stem), if any
+        friend void syncState(save::Serializer& s, Output& v) { s(v.kind)(v.sender)(v.text)(v.objective)(v.clip); }
     };
     enum class State { Incomplete, Complete, Hidden };
 

@@ -87,4 +87,8 @@ float shieldedDamage(const Unit& target, float damage, const Fog* fog, float sec
     return std::trunc(damage / (4 * security + 1));
 }
 
+void Repairs::syncState(save::Serializer& s) {
+    s(states_)(pool_)(clock_);
+}
+
 } // namespace reluva::newworlds

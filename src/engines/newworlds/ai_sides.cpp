@@ -752,4 +752,29 @@ std::vector<std::string> AiSides::running() const {
     return out;
 }
 
+void AiSides::syncState(save::Serializer& s) {
+    // The running orders, each by its place in the mission's list.
+    const std::vector<const NpcOrder*> orders = npcOrders(mission_);
+    const uint32_t n = s.count(running_.size());
+    if (s.loading())
+        running_.assign(n, Running{});
+    for (Running& r : running_) {
+        save::syncIndex(s, r.order, orders);
+        s(r.units)(r.leg)(r.clock)(r.legClock)(r.started)(r.gathered)(r.hunting)(r.done)(r.awaited)(r.site);
+        s(r.groups)(r.guarding);
+    }
+    // The other colonies' economies, made as the mission starts.
+    if (s.count(colonies_.size()) != colonies_.size() && s.loading())
+        s.fail("other colonies than the mission's");
+    for (auto& [slot, colony] : colonies_) {
+        int k = slot;
+        s(k);
+        if (s.loading() && k != slot)
+            s.fail("other colonies than the mission's");
+        s(colony.structureOf);
+        colony.economy->syncState(s);
+    }
+    s(races_)(nativeSites_)(rallied_)(colonyBase_)(colonyShare_)(colonyTotal_)(counts_)(clock_);
+}
+
 } // namespace reluva::newworlds

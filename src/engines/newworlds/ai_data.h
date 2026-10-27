@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include <array>
 #include <cstdint>
 #include <string_view>
@@ -43,6 +44,9 @@ struct Weapon {
     // Radians its gun lifts and dips (a target's pitch outside them is
     // never fired on; artillery lobs its shells, so isn't held by them).
     float up = 1.5708f, down = 1.5708f;
+    friend void syncState(save::Serializer& s, Weapon& v) {
+        s(v.kind)(v.damage)(v.range)(v.reload)(v.magazine)(v.guns)(v.arc)(v.up)(v.down);
+    }
 };
 
 struct CombatType {

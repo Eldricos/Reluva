@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "common/events.h"
 #include "common/system.h"
 #include "common/audio/mixer.h"
@@ -321,6 +322,13 @@ public:
     bool gameKey(uint32_t key, int mouseX, int mouseY);
     void setView(View v);
     View view() const { return view_; }
+    // The camera, for a savestate: its mode, where it looks from and Z's
+    // mark (a lock or a followed object let go).
+    void syncCamera(save::Serializer& s) {
+        s(view_)(markX_)(markY_)(marked_)(targetX_)(targetY_)(targetZ_)(yaw_)(pitch_)(distance_);
+        if (s.loading())
+            locked_ = following_ = false, dirty_ = true;
+    }
     // Ctrl+click: zoom in on the pointed spot, or out.
     void zoomAt(int sx, int sy, bool in);
     // Centres the view on a world point, keeping the view's height.
@@ -598,6 +606,12 @@ public:
     bool playing() const { return playing_; }
     // The side the page shows ('F', 'K', 'R'; 0 with no missions).
     char side() const;
+    // Savestates (docs/savestates.md): a mission being played can be
+    // saved (`why` says why not); loading one starts its mission and puts
+    // the play and the page back as they were.
+    bool canSave(std::string& why) const;
+    std::string stateDescription() const;
+    Error syncState(save::Serializer& s);
     // A race's campaign just won (its last mission's report closed): the
     // side, once ('F', 'K', 'R'; 0 none), for its movie.
     char takeCampaignWon() {

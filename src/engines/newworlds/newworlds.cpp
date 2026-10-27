@@ -81,6 +81,7 @@ public:
         StringViewer strings(sys_, screen_, archives_);
         FontViewer fonts(sys_, screen_, archives_);
         MissionViewer missions(sys_, screen_, archives_, levels, output, target_.path);
+        missions_ = &missions;
         constexpr int kViewers = 7;
         const size_t counts[kViewers] = {missions.count(), models.count(),  textures.count(), maps.count(),
                                          sounds.count(),   strings.count(), fonts.count()};
@@ -116,6 +117,11 @@ public:
         // launch; a race's movie when its campaign is won; F5 (the intro)
         // and F6 (the side's movie) on the missions page.
         newworlds::MoviePlayer movies(sys_, screen_, output, target_.path);
+        movies_ = &movies;
+        struct Forget { // the pages are gone once run() returns
+            NewWorldsEngine& e;
+            ~Forget() { e.missions_ = nullptr, e.movies_ = nullptr; }
+        } forget{*this};
         movies.play({"LOGOS.BIK", "STNW.BIK"});
         if (!movies.playing())
             activate();
@@ -129,6 +135,7 @@ public:
             while (sys_.pollEvent(ev)) {
                 if (ev.type == EventType::Quit || ev.type == EventType::ReturnToLauncher)
                     return Error::success();
+
                 if (movies.playing()) {
                     movies.handleEvent(ev);
                     continue;
@@ -169,6 +176,17 @@ public:
                 else if (viewer == 6 && ev.type == EventType::KeyDown)
                     fonts.handleKey(ev.key);
             }
+            // A savestate loaded (by the Reluva menu, inside pollEvent): its
+            // mission is on the missions page.
+            if (loaded_) {
+                loaded_ = false;
+                if (viewer != 0) {
+                    if (viewer == 4)
+                        sounds.deactivate();
+                    viewer = 0;
+                    activate();
+                }
+            }
             movies.update(sys_.getMillis());
             if (moviesOn && !movies.playing())
                 activate(); // the page back on the screen (the movies ended or were skipped)
@@ -193,7 +211,44 @@ public:
         }
     }
 
+    // Savestates (docs/savestates.md): a mission being played on the
+    // missions page.
+    bool canSaveState(std::string& why) const override {
+        if (!missions_) {
+            why = "The game isn't up yet.";
+            return false;
+        }
+        if (movies_ && movies_->playing()) {
+            why = "A movie is playing.";
+            return false;
+        }
+        return missions_->canSave(why);
+    }
+    bool canLoadState(std::string& why) const override {
+        if (!missions_) {
+            why = "The game isn't up yet.";
+            return false;
+        }
+        return true;
+    }
+    uint32_t stateVersion() const override { return kStateVersion; }
+    std::string stateDescription() const override { return missions_ ? missions_->stateDescription() : ""; }
+    Error syncState(save::Serializer& s) override {
+        if (!missions_)
+            return Error::fail("The game isn't up yet.");
+        if (s.loading() && movies_)
+            movies_->stop();
+        Error e = missions_->syncState(s);
+        if (s.loading())
+            loaded_ = true;
+        return e;
+    }
+
 private:
+    // Goes up whenever a savestate's layout changes (any syncState in the
+    // engine): older saves are then refused.
+    static constexpr uint32_t kStateVersion = 1;
+
     // The main menu's mission list, if the game folder has one; a missing
     // or unreadable level.dat only loses the missions' names.
     std::vector<newworlds::Level> readLevels() const {
@@ -229,6 +284,9 @@ private:
 
     System& sys_;
     GameTarget target_;
+    MissionViewer* missions_ = nullptr;
+    newworlds::MoviePlayer* movies_ = nullptr;
+    bool loaded_ = false;
     Surface screen_;
     newworlds::Archives archives_;
 };

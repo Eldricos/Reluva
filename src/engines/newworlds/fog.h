@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/world.h"
 
 #include <array>
@@ -25,6 +26,9 @@ namespace reluva::newworlds {
 // science channels, 5 inside a shield generator's field.
 class Fog {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     static constexpr int kChannels = 6;
     enum Channel { Seen, Scanned, Surveyed, Deep, Deeper, Shielded };
 

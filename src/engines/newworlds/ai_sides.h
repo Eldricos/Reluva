@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_data.h"
 #include "engines/newworlds/economy.h"
 #include "engines/newworlds/mission_script.h"
@@ -70,6 +71,9 @@ std::vector<std::string> scriptNames(const Unit& u, int playerSlot);
 // also for a human side run for the player too, with the player's units.
 class AiSides {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     AiSides(std::string_view mission, int playerSlot, World& world);
 
     // Places every AI side's objects and starts the orders that run from

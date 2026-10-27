@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include "common/savestate.h"
 #include "engines/newworlds/ai_sides.h"
 #include "engines/newworlds/colony.h"
 #include "engines/newworlds/economy.h"
@@ -40,6 +41,9 @@ namespace reluva::newworlds {
 // never clears and shots that never tell.
 class MissionSim {
 public:
+    // A savestate's part (docs/savestates.md): what play changes, saved or
+    // loaded; the rest is made again as the mission starts.
+    void syncState(save::Serializer& s);
     // A mission on its map: the terrain, the ground's deposits, the map's
     // size in blocks, and the player's starting colony (its hub first; map
     // positions in eighths of a block, as the scripts and placements
@@ -122,6 +126,7 @@ public:
     struct Said {
         ScriptEvent fired;
         std::vector<MissionRun::Output> out;
+        friend void syncState(save::Serializer& s, Said& v) { s(v.fired)(v.out); }
     };
     std::vector<Said> takeSaid();
     std::vector<WorldEvent> takeEvents();
@@ -183,6 +188,9 @@ private:
         double wait = 0;
         int tries = 0;
         float tx = 0, ty = 0;
+        friend void syncState(save::Serializer& s, Shuttle& v) {
+            s(v.unit)(v.ride)(v.leg)(v.wait)(v.tries)(v.tx)(v.ty);
+        }
     };
     std::vector<Shuttle> shuttles_;
     std::vector<int> razing_;
@@ -200,6 +208,7 @@ private:
     struct Track {
         float x, y, left;
         double since;
+        friend void syncState(save::Serializer& s, Track& v) { s(v.x)(v.y)(v.left)(v.since); }
     };
     std::map<int, Track> tracks_;
     // Each firing unit's target, its hit points then, and since when.
@@ -207,6 +216,7 @@ private:
         int target;
         float hp;
         double since;
+        friend void syncState(save::Serializer& s, Shooting& v) { s(v.target)(v.hp)(v.since); }
     };
     std::map<int, Shooting> shooting_;
     std::set<int> stuck_, placedBadly_, harmless_;

@@ -197,6 +197,37 @@ template <class T> void sync(Serializer& s, T& v) {
     }
 }
 
+// A pointer into a table the state is rebuilt from (an entry of the game's
+// data, a list made on starting): saved as its place in `table` (a vector
+// of the entries or of pointers to them), -1 for none.
+template <class T, class Table> void syncIndex(Serializer& s, const T*& p, const Table& table) {
+    int32_t index = -1;
+    if (s.saving() && p)
+        for (size_t i = 0; i < table.size(); ++i) {
+            const T* entry;
+            if constexpr (std::is_pointer_v<typename Table::value_type>)
+                entry = table[i];
+            else
+                entry = &table[i];
+            if (entry == p) {
+                index = int32_t(i);
+                break;
+            }
+        }
+    s(index);
+    if (s.loading()) {
+        p = nullptr;
+        if (index >= int32_t(table.size()))
+            s.fail("an entry the game's data doesn't have");
+        else if (index >= 0) {
+            if constexpr (std::is_pointer_v<typename Table::value_type>)
+                p = table[size_t(index)];
+            else
+                p = &table[size_t(index)];
+        }
+    }
+}
+
 // The file around an engine's state.
 constexpr uint32_t kFormatVersion = 1;
 constexpr int kThumbWidth = 160, kThumbHeight = 120;
