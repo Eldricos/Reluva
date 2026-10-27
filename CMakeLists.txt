@@ -62,6 +62,7 @@ add_library(reluva_common STATIC
     src/common/audio/wav.cpp
     src/common/font.cpp
     src/common/text.cpp
+    src/common/savestate.cpp
     src/common/video/bink.cpp
     src/common/video/bink_tables.cpp)
 target_include_directories(reluva_common PUBLIC src)
@@ -122,8 +123,10 @@ target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warning
 add_executable(reluva
     src/main.cpp
     src/backends/sdl3/sdl_system.cpp
-    src/launcher/launcher.cpp)
+    src/launcher/launcher.cpp
+    src/launcher/game_menu.cpp)
 target_link_libraries(reluva PRIVATE reluva_engines imgui SDL3::SDL3 reluva_warnings)
+target_compile_definitions(reluva PRIVATE RELUVA_VERSION="${PROJECT_VERSION}")
 
 # --- developer tools -----------------------------------------------------------
 add_executable(reluva-tool src/tools/reluva_tool.cpp)

@@ -3,7 +3,9 @@
 
 // Testbed: a built-in "game" that exercises the System interface (palette
 // graphics, input, timing, audio) so the backend can be checked without any
-// game data. Esc returns to the launcher, Space toggles a test tone.
+// game data. Esc returns to the launcher, Space toggles a test tone. It
+// has savestates (the animation's time, the tone, the crosshair), to try
+// the Reluva menu (Ctrl+F5) without a game.
 
 #include "engines/engine.h"
 
@@ -45,7 +47,7 @@ public:
             }
         });
 
-        const uint64_t start = sys_.getMillis();
+        start_ = sys_.getMillis();
         bool running = true;
         while (running) {
             Event ev;
@@ -70,13 +72,29 @@ public:
                 }
             }
 
-            const uint64_t t = sys_.getMillis() - start;
+            const uint64_t t = sys_.getMillis() - start_;
             drawFrame(t);
             sys_.updateScreen(screen_);
             sys_.delayMillis(1); // vsync paces the loop; this just yields
         }
 
         sys_.stopAudio();
+        return Error::success();
+    }
+
+    bool canSaveState(std::string&) const override { return true; }
+    uint32_t stateVersion() const override { return 1; }
+    std::string stateDescription() const override {
+        return "Testbed at " + std::to_string((sys_.getMillis() - start_) / 1000) + " s";
+    }
+    Error syncState(save::Serializer& s) override {
+        uint64_t elapsed = sys_.getMillis() - start_;
+        bool tone = toneOn_;
+        s(elapsed)(tone)(mouseX_)(mouseY_);
+        if (s.loading() && s.ok()) {
+            start_ = sys_.getMillis() - elapsed;
+            toneOn_ = tone;
+        }
         return Error::success();
     }
 
@@ -124,6 +142,7 @@ private:
     Surface screen_;
     Surface plasma_;
     int mouseX_ = kWidth / 2, mouseY_ = kHeight / 2;
+    uint64_t start_ = 0;
     std::atomic<bool> toneOn_{false};
     double phase_ = 0; // audio thread only
 };

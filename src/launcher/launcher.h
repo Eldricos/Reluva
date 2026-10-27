@@ -8,6 +8,8 @@
 #include "engines/engine.h"
 
 #include <atomic>
+#include <filesystem>
+#include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
@@ -16,11 +18,12 @@
 namespace reluva {
 
 class SdlSystem;
+class SlotBrowser;
 
 // The game list UI, drawn with Dear ImGui on the SDL renderer.
 class Launcher {
 public:
-    Launcher(SdlSystem& system, Config& config);
+    Launcher(SdlSystem& system, Config& config, std::filesystem::path saveRoot);
     ~Launcher();
     Launcher(const Launcher&) = delete;
     Launcher& operator=(const Launcher&) = delete;
@@ -39,8 +42,13 @@ private:
 
     static void pickFolderCallback(void* userdata, const char* const* files, int filter);
 
+    void drawLoad(std::optional<GameTarget>& launch);
+
     SdlSystem& sys_;
     Config& config_;
+    std::filesystem::path saveRoot_;
+    std::unique_ptr<SlotBrowser> loadBrowser_; // the Load window's list, while it's open
+    int loadSelected_ = 0;
     std::string selected_;
     std::string status_;
 

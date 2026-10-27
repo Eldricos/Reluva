@@ -114,6 +114,8 @@ void SdlSystem::resetForLauncher() {
         gameTexture_ = nullptr;
     }
     gameW_ = gameH_ = 0;
+    lastFrame_.clear();
+    menuHandler_ = queuedAction_ = nullptr;
     SDL_SetRenderLogicalPresentation(renderer_, 0, 0, SDL_LOGICAL_PRESENTATION_DISABLED);
     SDL_SetWindowTitle(window_, "Reluva");
 }
@@ -140,6 +142,24 @@ Error SdlSystem::initGraphics(int width, int height, PixelFormat format) {
     return Error::success();
 }
 
+void SdlSystem::restoreGamePresentation() {
+    SDL_SetRenderScale(renderer_, 1.0f, 1.0f);
+    if (gameW_)
+        SDL_SetRenderLogicalPresentation(renderer_, gameW_, gameH_, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+}
+
+EventType SdlSystem::runPaused(const MenuHandler& handler) {
+    const uint64_t start = SDL_GetTicks();
+    if (audioStream_)
+        SDL_PauseAudioStreamDevice(audioStream_);
+    const EventType result = handler();
+    if (audioStream_)
+        SDL_ResumeAudioStreamDevice(audioStream_);
+    restoreGamePresentation();
+    pausedMs_ += SDL_GetTicks() - start;
+    return result;
+}
+
 void SdlSystem::setPalette(const Color* colors, int start, int count) {
     for (int i = 0; i < count && start + i < 256; ++i)
         palette_[start + i] = packRgba(colors[i].r, colors[i].g, colors[i].b, 255);
@@ -157,8 +177,13 @@ void SdlSystem::updateScreen(const Surface& surface) {
                 dst[x] = palette_[src[x]];
         }
         SDL_UpdateTexture(gameTexture_, nullptr, convertBuffer_.data(), gameW_ * 4);
+        lastFrame_.resize(convertBuffer_.size() * 4);
+        std::memcpy(lastFrame_.data(), convertBuffer_.data(), lastFrame_.size());
     } else {
         SDL_UpdateTexture(gameTexture_, nullptr, surface.pixels.data(), surface.pitch);
+        lastFrame_.resize(size_t(gameW_) * gameH_ * 4);
+        for (int y = 0; y < gameH_; ++y)
+            std::memcpy(lastFrame_.data() + size_t(y) * gameW_ * 4, surface.row(y), size_t(gameW_) * 4);
     }
 
     SDL_SetRenderDrawColor(renderer_, 0, 0, 0, 255);
@@ -170,6 +195,15 @@ void SdlSystem::updateScreen(const Surface& surface) {
 void SdlSystem::setWindowTitle(const std::string& title) { SDL_SetWindowTitle(window_, title.c_str()); }
 
 bool SdlSystem::pollEvent(Event& out) {
+    if (queuedAction_) {
+        const MenuHandler action = std::move(queuedAction_);
+        queuedAction_ = nullptr;
+        if (const EventType t = runPaused(action); t != EventType::None) {
+            out = Event{};
+            out.type = t;
+            return true;
+        }
+    }
     SDL_Event ev;
     while (SDL_PollEvent(&ev)) {
         SDL_ConvertEventToRenderCoordinates(renderer_, &ev);
@@ -181,9 +215,16 @@ bool SdlSystem::pollEvent(Event& out) {
             return true;
         case SDL_EVENT_KEY_DOWN:
         case SDL_EVENT_KEY_UP:
-            // Ctrl+F5 is the global "return to launcher" hotkey.
+            // Ctrl+F5 opens the Reluva menu (else returns to the launcher).
             if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_F5 && (ev.key.mod & SDL_KMOD_CTRL)) {
-                out.type = EventType::ReturnToLauncher;
+                if (ev.key.repeat)
+                    continue;
+                const EventType t = menuHandler_ ? runPaused(menuHandler_) : EventType::ReturnToLauncher;
+                if (t == EventType::None)
+                    continue;
+                if (t == EventType::Quit)
+                    quitRequested_ = true;
+                out.type = t;
                 return true;
             }
             // Alt+Enter toggles fullscreen.
@@ -227,7 +268,7 @@ bool SdlSystem::pollEvent(Event& out) {
     return false;
 }
 
-uint64_t SdlSystem::getMillis() const { return SDL_GetTicks(); }
+uint64_t SdlSystem::getMillis() const { return SDL_GetTicks() - pausedMs_; }
 
 void SdlSystem::delayMillis(uint32_t ms) { SDL_Delay(ms); }
 

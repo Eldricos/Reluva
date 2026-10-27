@@ -15,8 +15,12 @@
 #include "common/md5.h"
 #include "common/text.h"
 #include "common/video/bink.h"
+#include "common/savestate.h"
 
 #include <cstdio>
+#include <vector>
+#include <optional>
+#include <map>
 #include <cstring>
 #include <memory>
 #include <fstream>
@@ -224,6 +228,81 @@ static void testMixer() {
     CHECK(m.play(nullptr, SoundType::Effects) == kNoSound && m.play(make(22050, 1, {}), SoundType::Effects) == kNoSound);
 }
 
+namespace savetest {
+enum class Kind : uint8_t { A, B };
+struct Thing {
+    int id = 0;
+    float x = 0;
+    Kind kind = Kind::A;
+    std::vector<std::string> names;
+    std::optional<double> maybe;
+};
+void syncState(save::Serializer& s, Thing& t) { s(t.id)(t.x)(t.kind)(t.names)(t.maybe); }
+} // namespace savetest
+
+static void testSavestate(const std::filesystem::path& tmp) {
+    using savetest::Thing;
+    // A round trip through the serializer: the same values back, every byte used.
+    std::vector<Thing> things(2);
+    things[0] = {7, 1.5f, savetest::Kind::B, {"a", "bc"}, 2.25};
+    things[1].id = -3;
+    std::map<int, std::vector<bool>> flags{{1, {true, false, true}}, {5, {}}};
+    std::unique_ptr<Thing> owned = std::make_unique<Thing>(things[0]);
+    int64_t big = -1234567890123;
+    uint8_t grid[2][3] = {{1, 2, 3}, {4, 5, 6}};
+    save::Serializer out = save::Serializer::saver();
+    out(things)(flags)(owned)(big)(grid);
+    std::vector<Thing> things2;
+    std::map<int, std::vector<bool>> flags2;
+    std::unique_ptr<Thing> owned2;
+    int64_t big2 = 0;
+    uint8_t grid2[2][3] = {};
+    save::Serializer in = save::Serializer::loader(out.bytes());
+    in(things2)(flags2)(owned2)(big2)(grid2);
+    CHECK(in.ok() && in.atEnd());
+    CHECK(things2.size() == 2 && things2[0].id == 7 && things2[0].x == 1.5f && things2[0].kind == savetest::Kind::B);
+    CHECK(things2[0].names == std::vector<std::string>({"a", "bc"}) && things2[0].maybe == 2.25 && !things2[1].maybe);
+    CHECK(flags2 == flags && owned2 && owned2->names.size() == 2 && big2 == big && grid2[1][2] == 6);
+    // Cut short, or with a silly length: it fails instead of reading past the end.
+    std::vector<uint8_t> cut(out.bytes().begin(), out.bytes().begin() + 10);
+    save::Serializer short_ = save::Serializer::loader(cut);
+    things2.clear();
+    short_(things2)(flags2);
+    CHECK(!short_.ok());
+    save::Serializer huge = save::Serializer::loader({0xFF, 0xFF, 0xFF, 0x7F});
+    std::vector<int> v;
+    huge(v);
+    CHECK(!huge.ok() && v.empty());
+
+    // Files: the header alone, or with the state; a damaged one refused.
+    const auto dir = tmp / "saves";
+    std::filesystem::remove_all(dir);
+    save::Header h;
+    h.engineId = "testbed", h.gameId = "testbed", h.target = "testbed", h.stateVersion = 3;
+    h.description = "Testing", h.created = 1793000000;
+    std::vector<uint8_t> screen(64 * 48 * 4, 200);
+    save::makeThumbnail(screen.data(), 64, 48, 64 * 4, h);
+    CHECK(h.thumbWidth == 160 && h.thumbHeight == 120 && h.thumbnail.size() == 160 * 120 * 4 && h.thumbnail[5] == 200);
+    CHECK(save::freeSlot(dir) == 1);
+    CHECK(save::writeFile(save::slotPath(dir, 1), h, out.bytes()).ok);
+    CHECK(save::writeFile(save::slotPath(dir, 4), h, {}).ok);
+    CHECK(save::freeSlot(dir) == 2);
+    const std::vector<save::Slot> slots = save::listSlots(dir);
+    CHECK(slots.size() == 2 && slots[0].number == 1 && slots[1].number == 4 && slots[0].header.description == "Testing");
+    save::Header back;
+    std::vector<uint8_t> state;
+    CHECK(save::readFile(save::slotPath(dir, 1), back, state).ok && state == out.bytes() && back.stateVersion == 3);
+    {
+        std::fstream f(save::slotPath(dir, 1), std::ios::in | std::ios::out | std::ios::binary);
+        f.seekp(-6, std::ios::end);
+        f.put('\x55');
+    }
+    CHECK(!save::readFile(save::slotPath(dir, 1), back, state).ok);
+    CHECK(save::readHeader(save::slotPath(dir, 1), back).ok); // the header is still fine
+    std::ofstream(dir / "slot05.rlvs") << "nonsense";
+    CHECK(save::listSlots(dir).size() == 3 && !save::listSlots(dir)[2].error.empty());
+}
+
 // A one-frame 8x8 Bink movie (version i) built bit by bit: each plane a
 // single fill block.
 static void testBink(const std::filesystem::path& tmp) {
@@ -287,6 +366,7 @@ int main() {
     testMp3();
     testMixer();
     testBink(tmp / "bink");
+    testSavestate(tmp / "save");
     testFsAndDetection(tmp / "fs");
     testConfig(tmp / "cfg");
     if (failures)

@@ -7,6 +7,7 @@
 
 #include <SDL3/SDL.h>
 
+#include <functional>
 #include <vector>
 
 namespace reluva {
@@ -27,6 +28,25 @@ public:
     void resetForLauncher();
     // True once the user closed the window during a game.
     bool quitRequested() const { return quitRequested_; }
+
+    // The Reluva menu: Ctrl+F5 during a game runs `handler` from inside
+    // pollEvent(), with the game's clock and sound paused; its answer
+    // (Quit, ReturnToLauncher, or None to go on) becomes the next event.
+    // Without one, Ctrl+F5 returns to the launcher.
+    using MenuHandler = std::function<EventType()>;
+    void setMenuHandler(MenuHandler handler) { menuHandler_ = std::move(handler); }
+    // Runs `action` the same way at the game's next pollEvent() (a
+    // savestate to load once the game is up).
+    void queueMenuAction(MenuHandler action) { queuedAction_ = std::move(action); }
+
+    // What the menu draws over: the game's last frame (null before the
+    // first), and the presentation to put back afterwards.
+    SDL_Texture* gameTexture() const { return gameW_ ? gameTexture_ : nullptr; }
+    int gameWidth() const { return gameW_; }
+    int gameHeight() const { return gameH_; }
+    // The game's last frame as RGBA (for thumbnails).
+    const std::vector<uint8_t>& lastFrame() const { return lastFrame_; }
+    void restoreGamePresentation();
 
     // System
     Error initGraphics(int width, int height, PixelFormat format) override;
@@ -52,6 +72,10 @@ private:
     uint32_t palette_[256] = {};          // RGBA32, byte order R,G,B,A
     std::vector<uint32_t> convertBuffer_; // CLUT8 -> RGBA32 staging
     bool quitRequested_ = false;
+    EventType runPaused(const MenuHandler& handler);
+    MenuHandler menuHandler_, queuedAction_;
+    uint64_t pausedMs_ = 0; // time spent in the menu, left out of getMillis()
+    std::vector<uint8_t> lastFrame_;
 
     SDL_AudioStream* audioStream_ = nullptr;
     AudioCallback audioCallback_;

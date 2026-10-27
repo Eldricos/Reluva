@@ -5,6 +5,7 @@
 
 #include "backends/sdl3/sdl_system.h"
 #include "engines/registry.h"
+#include "launcher/game_menu.h"
 
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -12,7 +13,8 @@
 
 namespace reluva {
 
-Launcher::Launcher(SdlSystem& system, Config& config) : sys_(system), config_(config) {
+Launcher::Launcher(SdlSystem& system, Config& config, std::filesystem::path saveRoot)
+    : sys_(system), config_(config), saveRoot_(std::move(saveRoot)) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -33,6 +35,7 @@ Launcher::Launcher(SdlSystem& system, Config& config) : sys_(system), config_(co
 }
 
 Launcher::~Launcher() {
+    loadBrowser_.reset();
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -124,6 +127,20 @@ void Launcher::drawUi(std::optional<GameTarget>& launch, bool& quit) {
         launch = targetFromConfig(selected_);
     ImGui::EndDisabled();
 
+    ImGui::BeginDisabled(!haveSelection);
+    if (ImGui::Button("Load...", bsize)) {
+        loadBrowser_ = std::make_unique<SlotBrowser>(sys_.renderer());
+        loadBrowser_->refresh(saveFolder(saveRoot_, selected_));
+        loadSelected_ = loadBrowser_->slots().empty() ? 0 : loadBrowser_->slots().back().number;
+        int64_t newest = -1;
+        for (const save::Slot& s : loadBrowser_->slots())
+            if (s.error.empty() && s.header.created > newest)
+                newest = s.header.created, loadSelected_ = s.number;
+        ImGui::OpenPopup("Load");
+    }
+    ImGui::EndDisabled();
+    drawLoad(launch);
+
     ImGui::BeginDisabled(pickInProgress_);
     if (ImGui::Button("Add Game...", bsize)) {
         pickInProgress_ = true;
@@ -142,7 +159,7 @@ void Launcher::drawUi(std::optional<GameTarget>& launch, bool& quit) {
 
     ImGui::Spacing();
     if (ImGui::Button("Run Testbed", bsize))
-        launch = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}};
+        launch = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}, 0};
 
     ImGui::Spacing();
     if (ImGui::Button("Quit", bsize))
@@ -176,6 +193,46 @@ void Launcher::drawUi(std::optional<GameTarget>& launch, bool& quit) {
     }
 
     ImGui::End();
+}
+
+// The selected game's saves: one to start the game with.
+void Launcher::drawLoad(std::optional<GameTarget>& launch) {
+    const float scale = ImGui::GetStyle().FontScaleDpi;
+    ImGui::SetNextWindowSize(ImVec2(560 * scale, 360 * scale));
+    if (!ImGui::BeginPopupModal("Load", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings)) {
+        if (loadBrowser_ && !ImGui::IsPopupOpen("Load"))
+            loadBrowser_.reset();
+        return;
+    }
+    if (!loadBrowser_) {
+        ImGui::CloseCurrentPopup();
+        ImGui::EndPopup();
+        return;
+    }
+    ImGui::TextUnformatted(config_.get(selected_, "description", selected_).c_str());
+    ImGui::BeginGroup();
+    const int picked = loadBrowser_->draw(loadSelected_, 0, ImGui::GetContentRegionAvail().y - ImGui::GetFrameHeightWithSpacing() * 1.5f);
+    ImGui::EndGroup();
+    ImGui::SameLine();
+    ImGui::BeginGroup();
+    loadBrowser_->drawDetails(loadSelected_);
+    ImGui::EndGroup();
+    bool readable = false;
+    for (const save::Slot& s : loadBrowser_->slots())
+        if (s.number == loadSelected_)
+            readable = s.error.empty();
+    ImGui::BeginDisabled(!readable);
+    if (ImGui::Button("Load") || (picked && readable)) {
+        GameTarget t = targetFromConfig(selected_);
+        t.loadSlot = loadSelected_;
+        launch = t;
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndDisabled();
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape))
+        ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
 }
 
 void SDLCALL Launcher::pickFolderCallback(void* userdata, const char* const* files, int) {
@@ -233,7 +290,7 @@ void Launcher::addGame(const DetectedGame& game, const std::string& path) {
 
 GameTarget Launcher::targetFromConfig(const std::string& name) const {
     return GameTarget{name, config_.get(name, "engine"), config_.get(name, "gameid"),
-                      config_.get(name, "description", name), config_.get(name, "path")};
+                      config_.get(name, "description", name), config_.get(name, "path"), 0};
 }
 
 } // namespace reluva

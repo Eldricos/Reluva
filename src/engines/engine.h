@@ -4,6 +4,7 @@
 #pragma once
 
 #include "common/detection.h"
+#include "common/savestate.h"
 #include "common/system.h"
 #include "common/types.h"
 
@@ -21,6 +22,7 @@ struct GameTarget {
     std::string gameId;
     std::string description;
     std::filesystem::path path; // game data directory
+    int loadSlot = 0;            // a savestate to load once the game is up (0 none)
 };
 
 // A running game. Created by its MetaEngine, run once, then destroyed.
@@ -30,6 +32,27 @@ public:
 
     // Runs the game until the player quits or asks to return to the launcher.
     virtual Error run() = 0;
+
+    // Savestates (docs/savestates.md). An engine that has them says when
+    // it can save and load (`why` explains a no), and lists its whole
+    // state in syncState(), for saving or loading as the Serializer says.
+    // Both are called by the Reluva menu from inside System::pollEvent(),
+    // between the engine's frames; a failed load may leave the state
+    // half-read, so the engine should be able to start over from it (its
+    // menu, a new mission). stateVersion() goes up whenever the state's
+    // layout changes: older saves are then refused, not misread.
+    virtual bool canSaveState(std::string& why) const {
+        why = "This game has no savestates yet.";
+        return false;
+    }
+    virtual bool canLoadState(std::string& why) const { return canSaveState(why); }
+    virtual uint32_t stateVersion() const { return 0; }
+    // A description for a new save ("F1: Power Corrupts").
+    virtual std::string stateDescription() const { return {}; }
+    virtual Error syncState(save::Serializer& s) {
+        (void)s;
+        return Error::fail("This game has no savestates.");
+    }
 };
 
 // Static description of an engine: its name, how to recognise its games,
