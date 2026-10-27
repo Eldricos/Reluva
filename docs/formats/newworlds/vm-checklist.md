@@ -20,10 +20,6 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 
 ## 1. Game-wide mechanics
 
-- **Compass and row 0** [shot]: the data says rows grow northward and the
-  default camera looks north; one screenshot of the compass strip with the
-  camera looking up-screen, to see which letter it shows.
-  ([gmf.md](gmf.md#map-positions-in-the-game))
 - **Tricorder mineral rule** [shot]: over one kind-1 (dilithium) block,
   hover the main view at high and at ground-level camera, then the relief
   inset; note when the ore name appears instead of plain terrain.
@@ -72,14 +68,14 @@ message's text and trigger but not the order the counter shows.
 
 **Klingon**
 
-- **K1** [rec]: the counter numbers of messages 3-6, 8-9, 12, 15-17, 19, 24
-  and 27 (the data gives which lines they can be).
-  ([play-k1.md](play-k1.md#still-to-look-at))
 - **J7K** [shot]: the starting colony size (COLONY SIZE). ([play-j7r.md](play-j7r.md))
 
 **Romulan**
 
-- **R1** [rec]: the counter numbers of messages 5, 6 and 18. ([play-r1.md](play-r1.md))
+- **R1** [rec]: the counter numbers of messages 5, 6 and 18 (another
+  play shows the power warning repeating every minute, so they may be
+  repeats; [play-14east.md](play-14east.md#r1)).
+  ([play-r1.md](play-r1.md))
 - **R2** [rec]: messages 3, 7, 8 and 23. ([play-r2.md](play-r2.md))
 - **J1R** [rec]: the numbers of the two messages near 29:07 and 33:00 (the
   Federation's fail line and the temple scan's). ([play-j1r.md](play-j1r.md))
@@ -122,4 +118,7 @@ Settled from the executable and the data since the last list: the camera
 placement, turning to fire, groups, transports, scans, officers, repairs,
 animation speed, the script clock, power, shield cover, difficulty and
 Cadet mode, the mission report, COMMAND, message faces, Tricorder colours,
-bonus labels, every briefing (R8's too) and most missions' questions.
+bonus labels, every briefing (R8's too) and most missions' questions. A
+second channel's recording ([play-14east.md](play-14east.md)) settled the
+compass (the starting camera looks north) and K1's unseen messages (each
+arrived with the one after it, as the script has them).

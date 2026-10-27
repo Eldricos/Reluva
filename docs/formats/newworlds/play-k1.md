@@ -134,5 +134,7 @@ per block, didn't fit.)
 
 ## Still to look at
 
-The COMMAND panel and mission report, and the messages missed (3-6, 8-9,
-12, 15-17, 19, 24, 27).
+The COMMAND panel and mission report. (The messages missed here, 3-6,
+8-9, 12, 15-17, 19, 24 and 27, are accounted for by another play of K1:
+the generic "finished" lines, and the messages that arrive with the one
+after them; [play-14east.md](play-14east.md#k1).)

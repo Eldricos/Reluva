@@ -2450,24 +2450,40 @@ void MissionViewer::drawInterface() {
     sideW_ = sideW;
     buttons_.clear();
 
-    // The compass strip along the top: a tick every 5 degrees, a label
-    // every 10, N E S W at the quarters, centred on the camera's heading.
+    // The compass strip along the top, as the game's: a character a
+    // degree round the camera's heading (about 13 each way), "+" every 5,
+    // a three-digit label every 10 ("350", "010"), the quarters bracketed
+    // ("[ N ]"), dashes between.
     if (hasMap_) {
-        const float heading = map_.heading();
-        const int cx = screen_.w / 2, span = 120, pxPerDeg = 2;
-        for (int d = -span / 2; d <= span / 2; ++d) {
-            int deg = int(std::lround(heading)) + d;
-            deg = ((deg % 360) + 360) % 360;
-            const int x = cx + d * pxPerDeg;
-            if (deg % 10 == 0) {
-                static const char* kPoints[] = {"N", "E", "S", "W"};
-                const std::string label = deg % 90 == 0 ? kPoints[deg / 90]
-                                                        : (deg < 100 ? "0" : "") + std::to_string(deg);
-                ui_.drawSmall(screen_, x - ui_.smallWidth(label) / 2, 2, label, deg % 90 == 0 ? bright : text);
-            } else if (deg % 5 == 0) {
-                ui_.drawSmall(screen_, x - 1, 2, "+", text);
+        constexpr int kHalf = 14;
+        const int heading = int(std::lround(map_.heading()));
+        std::string strip(2 * kHalf + 1, '-');
+        auto put = [&](int at, const std::string& label) {
+            for (size_t i = 0; i < label.size(); ++i)
+                if (const int k = at - int(label.size() / 2) + int(i); k >= 0 && k < int(strip.size()))
+                    strip[size_t(k)] = label[i];
+        };
+        for (int d = -kHalf - 2; d <= kHalf + 2; ++d) {
+            const int deg = ((heading + d) % 360 + 360) % 360;
+            if (deg % 10 == 5)
+                put(d + kHalf, "+");
+        }
+        for (int d = -kHalf - 2; d <= kHalf + 2; ++d) {
+            const int deg = ((heading + d) % 360 + 360) % 360;
+            static const char* kPoints[] = {"N", "E", "S", "W"};
+            if (deg % 90 == 0)
+                put(d + kHalf, std::string("[ ") + kPoints[deg / 90] + " ]");
+            else if (deg % 10 == 0) {
+                char label[4];
+                std::snprintf(label, sizeof label, "%03d", deg);
+                put(d + kHalf, label);
             }
         }
+        const Color pale{220, 220, 225}; // the game's strip is a pale grey throughout
+        const int adv = ui_.smallWidth("-");
+        int x = screen_.w / 2 - adv * kHalf - adv / 2;
+        for (size_t i = 0; i < strip.size(); ++i, x += adv)
+            ui_.drawSmall(screen_, x, 2, std::string(1, strip[i]), pale);
     }
 
     // NEW WORLDS: the colony panel: the colony's size and stock (in play

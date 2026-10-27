@@ -62,8 +62,10 @@ recorded missions (F1, K1, K2, J1, J2, J3, J4, K7; see the play-*.md
 pages): read this way all 15 lie on or beside a deposit block (all but one on one,
 mean distance 0.1 blocks, against about 10 for random points), and every
 mine position is 8n + 4, a block's centre. Read as 16 per block, or column
-first, they fall nowhere near deposits. Which compass direction row 0 faces
-isn't known.
+first, they fall nowhere near deposits. Rows grow northward: every mission
+starts with the camera looking north (the compass strip reads `[ N ]`,
+[play-14east.md](play-14east.md#the-compass)), so row 0 is the map's south
+edge, at the bottom of the starting view.
 
 ### Resource deposits
 
