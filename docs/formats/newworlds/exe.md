@@ -1049,9 +1049,15 @@ How a side the computer plays builds and makes units:
   assault, past its waypoints, goes for the nearest object of its target
   side, each unit first chasing a live attacker of its own (no fog test),
   until the side has nothing left.
-- **Messages.** Patrols and sweeps read theirs (`Abort` ends the group);
-  guards and assaults don't read the text, so any message, `Abort`
-  included, triggers them.
+- **Messages.** Every order starts armed, named or not: a patrol or sweep
+  runs once its delay is past (or at once in modes 3, 5 and 6), a named
+  guard or assault in mode 3 at once, one in another mode once a message
+  comes. A message to an order already armed sets it "seen" (a patrol or
+  sweep then goes without waiting out its delay) and adds no second
+  group. Patrols and sweeps read theirs (`Abort` ends the group); guards
+  and assaults don't read the text, so any message, `Abort` included,
+  triggers them. (So R8's Metar sentinels take their posts at the start,
+  and R12's Hubrin observer sets out on its patrol at once.)
 - **Done and lost.** A wiped-out group is followed by another, up to
   three in all, except in modes 3, 5 and 6; an assault instead waits for
   a new message.
