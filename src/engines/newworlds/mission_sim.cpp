@@ -137,8 +137,18 @@ std::string mapPosition(float x, float y) {
 
 std::vector<ColonyBuilding> MissionSim::placedColony(std::string_view mission, char side) {
     std::vector<ColonyBuilding> out;
+    // What the game places only when the side isn't a player's (J3's
+    // vehicle yard: ai_data.cpp's forWhom 2) stays out of a player's colony.
+    const int slot = side == 'K' ? 1 : side == 'R' ? 2 : 0;
+    const std::vector<const SidePlacement*> placed = sidePlacements(mission, slot);
+    auto computerOnly = [&](const StartPlacement& p) {
+        for (const SidePlacement* q : placed)
+            if (q->type == p.type && std::abs(q->a - p.a) <= 2 && std::abs(q->b - p.b) <= 2)
+                return q->forWhom == 2;
+        return false;
+    };
     for (const StartPlacement& p : startPlacements(mission, side))
-        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model) {
+        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model && !computerOnly(p)) {
             // On its footprint's middle, as the game puts it (exe.md#building-placement).
             const auto [x, y] = snapped(footprintOf(p.type), worldAt(p.a, p.b).first, worldAt(p.a, p.b).second);
             const ColonyBuilding c{t->name, t->model, int(std::lround(y / kBlock * 8)), int(std::lround(x / kBlock * 8))};

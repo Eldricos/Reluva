@@ -2603,6 +2603,14 @@ void testStartingYardStock() {
     CHECK(j8.economy().stock() == (Stock{660, 1160, 2300, 660, 5600, 6600}));
     MissionSim f1("F1", 'F', t, map, 64, 64, MissionSim::placedColony("F1", 'F'));
     CHECK(f1.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
+    // J3's yard is placed only for a computer's side, so J3F starts at the
+    // data's stock (as played); K7's is the player's too, J4K has none.
+    MissionSim j3("J3", 'F', t, map, 64, 64, MissionSim::placedColony("J3", 'F'));
+    CHECK(j3.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
+    MissionSim k7("K7", 'K', t, map, 64, 64, MissionSim::placedColony("K7", 'K'));
+    CHECK(k7.economy().stock() == (Stock{660, 1160, 2300, 660, 5600, 6600}));
+    MissionSim j4("J4", 'K', t, map, 64, 64, MissionSim::placedColony("J4", 'K'));
+    CHECK(j4.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
 }
 
 void testSaveState() {

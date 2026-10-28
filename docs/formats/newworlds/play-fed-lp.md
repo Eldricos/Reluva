@@ -126,7 +126,8 @@ thermoconc. J8R's 656 / 1140 / 2211 / 653 / 5100 / 6600 at 2:46
 yard placed with those missions' starting colonies: made during the
 set-up, it tops the empty store up to 160 000 units of each of those
 materials before the mission's stock goes in ([exe.md](exe.md#stores));
-Reluva does the same now.
+Reluva does the same now. (K7 starts the same way, J4K at the data's
+stock: J4's Klingon colony has no yard.)
 
 ## Messages worth noting
 

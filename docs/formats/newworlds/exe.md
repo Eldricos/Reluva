@@ -1286,7 +1286,8 @@ shortfall from its store (the side's first storage facility's) and what's
 on its way: while the mission is being set up the shortfall goes straight
 into the store, free; later it asks for pods instead. The set-up places
 each side's starting objects before it puts in the mission's stock, so a
-starting colony with a vehicle yard (J8, F12, C1, as placed) starts with
+starting colony with a vehicle yard (J8, F12, K7, C1, J4 but for the
+Klingons; J3's only for a computer's side) starts with
 160 T of dilithium, polycomp and transalumin and 1600 of nitrium and
 duranium on top of the mission's stock, once a side. (FUN_005f00f0,
 FUN_005ed810, FUN_00586268.)
