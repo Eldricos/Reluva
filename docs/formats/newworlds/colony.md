@@ -110,7 +110,8 @@ facility and utility hospital as marked.
 | Building | Federation | Klingon | Romulan |
 |---|---|---|---|
 | Colony hub | `fch` | `kch` | `rch` |
-| Colony hub upgrade | `fch_b` | `kch_b` | `rch_b` (the tower; `rch_c` the next stage) |
+| Colony hub upgrade | `fch_b` | `kch_b` | `rch_b` (the tower) |
+| Advanced hub | `fch_c` *name* | `kch_c` *name* | `rch_c` (the bladed base: J1R, J2R, R1) |
 | Vehicle yard | `fvpy_a` | `kvy` | `rvy` (upgrade `rvy_b`) |
 | Construction yard | `fcy` | `kcy` | `rcy_a` (upgrade `rcy_b`) |
 | Resource processor | `frps_a` | `krps` | `rrpp_a` (upgrades `rrpp_b`) |
@@ -183,8 +184,8 @@ only):
 | Panel name | Model | Evidence | How sure |
 |---|---|---|---|
 | Colony hub | `rch` | the four-legged arch in every Romulan start; portrait | sure |
-| Colony hub upgrade | `rch_b` | a tall column standing inside the arch (J9R 13:08); the metamodel calls it the first upgrade; the panel then offers "improved hub" | fairly |
-| (improved hub) | `rch_c` | the spiked grey plate at the arch's foot, seen only after the first upgrade (J9R 13:08, not at 4:06); the second upgrade by its metamodel | fairly |
+| Colony hub upgrade | `rch_b` | a tall ribbed column standing inside the arch, past its crown: the first upgrade (J9R 13:08, J2R, J1R 10:49) | sure |
+| (advanced hub) | `rch_c` | the dark bladed plate at the arch's foot, green-lit tips: the second upgrade, after the column (J2R 24:29-25:03, J1R 12:42, R1 16:53; [play-rom-lp.md](play-rom-lp.md)) | sure |
 | Construction yard / upgrade | `rcy_a` / `rcy_b` | the flat cross with raised green-lit corners; the ramp-shaped block joined to its side (R1 12:45, R2) | sure / likely |
 | Vehicle yard / upgrade | `rvy` / `rvy_b` | octagonal ring; the upgrade is the pointed grey-faced wedge joined to it, selected on its own (R1 12:45) | sure / fairly |
 | Science station / upgrade | `rsb_a` / `rsb_b` | the low six-bayed dome (J9R 7:08); upgrades are ribbed slanted slabs standing in its bays (R2 14:51, J9R 13:05, J7R 23:15) | sure / fairly |

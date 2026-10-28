@@ -68,6 +68,7 @@ struct ModelEntry {
 constexpr ModelEntry kModels[] = {
     {"colony-hub", "FCH", "KCH", "RCH"},
     {"colony-hub-upgrade", "FCH_B", "KCH_B", "RCH_B"},
+    {"colony-hub-advanced", "fch_c", "kch_c", "RCH_C"}, // the second stage: the Romulans' bladed base
     {"vehicle-yard", "FVPY_A", "KVY", "RVY"},
     {"construction-yard", "FCY", "KCY", "RCY_A"},
     {"resource-processor", "FRPS_A", "KRPS", "RRPP_A"},
@@ -99,6 +100,7 @@ constexpr ModelEntry kModels[] = {
 
 constexpr std::pair<const char*, const char*> kUpgrades[] = {
     {"colony-hub-upgrade", "colony-hub"},
+    {"colony-hub-advanced", "colony-hub"},
     {"science-station-upgrade", "science-station"},
 };
 

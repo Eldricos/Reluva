@@ -795,13 +795,24 @@ void MissionViewer::choose(const BuildingType& t) {
     if (!economy_ || !economy_->available(t))
         return;
     if (!t.upgradeOf.empty()) {
-        // An upgrade goes on its building at once.
+        // An upgrade goes on its building at once, its model (where it has
+        // one) on the building. One the stock can't pay is refused, with
+        // Engineering's report.
+        const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
         for (const ColonyStructure& s : economy_->structures())
             if (s.type == t.upgradeOf && s.progress >= 1) {
-                if (economy_->affordable(t) && colony_ && colony_->add(t.id)) {
+                if (!economy_->affordable(t)) {
+                    economy_->order(t.id, s.x, s.y, 0, 0);
+                } else if (colony_ && colony_->add(t.id)) {
                     const ColonyBuilding& c = colony_->buildings().back();
                     sim_->placeUpgrade(t.id, c.model, c.a, c.b, s.x, s.y);
                     showColony();
+                } else if (colony_ && buildingModel(t.id, side).empty()) {
+                    for (const ColonyBuilding& c : colony_->buildings())
+                        if (c.name == t.upgradeOf) {
+                            sim_->placeUpgrade(t.id, "", c.a, c.b, s.x, s.y);
+                            break;
+                        }
                 }
                 break;
             }
