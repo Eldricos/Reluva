@@ -1029,8 +1029,17 @@ How a side the computer plays builds and makes units:
   does (build value x 300 at the yard's efficiency), **free to an AI
   side**. The natives' factories are the Taubat hangar (115), K2's rebel
   hangar (143), side 4's 151 and the Metar portal (201): one unit at a
-  time each, free, in its build value in ticks (Taubat units 64, 3.2 s;
-  Metar ones 16, 0.8 s; tanks 640, 32 s), rolled out at the building.
+  time each, free, at full speed (no power or efficiency part: 1.0, the
+  0.35 rule never applies), in its build value in ticks (Taubat and rebel
+  units 64, Metar ones 16) and a tick to finish, then rolled out through
+  the building's dock: two clear checks, three times the lock-to-release
+  leg and the release-to-departure leg, each at least 10 ticks at the
+  unit's dock speed (Metar 99, 203: 200; 48, 105, 129, 205: 150; the
+  others 100). The factory takes its next request only once the unit is
+  out: a Metar portal (legs 7838, about 5373) gives one every 8.2, 10.6 or
+  15.4 s by the unit's speed, a Taubat hangar (2530, about 3200) one every
+  8.7 s, 151 (3224, 4634) one every 10.5 s. No cap on live units, no
+  minimum gap; requests are served by priority, oldest first.
   Without a yard or factory the request just waits; only the attack-group
   script objects beam units in. Requests have no limit and never time
   out, but an order has one group at a time, so a side's outstanding

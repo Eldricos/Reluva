@@ -65,11 +65,7 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **The natives' production speed**: with the Metar portals making a unit
-  every 0.8 s (their build value of 16 ticks), J8's Metar guards destroy
-  the Federation's AI colony about two minutes into an unplayed J8R.
-  Check a portal's roll-out time in the executable, or a recording of J8
-  where the Federation is the computer's.
+- **Nothing left here.**
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the

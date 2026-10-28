@@ -19,6 +19,27 @@ namespace {
 // (115), K2's rebels' hangar (143), side 4's 151 and the Metar portal (201).
 bool isFactory(int type) { return type == 115 || type == 143 || type == 151 || type == 201; }
 
+// How long a native factory is busy with one unit (exe.md#ai-colonies):
+// its build value in ticks at full speed, a tick to finish, then the roll
+// out through its dock (two clear checks, three times the lock-to-release
+// leg, the release-to-departure leg, each at least 10 ticks at the unit's
+// dock speed), before it takes the next request. A Metar portal gives one
+// every 8-15 s, a Taubat hangar one every 8.7 s.
+double factorySeconds(int factory, int unit) {
+    const CombatType* t = combatType(unit);
+    const bool metar = t && t->race == 'M';
+    const bool native = metar || (t && t->race == 'T') || (unit >= 139 && unit <= 141);
+    const int build = metar ? 16 : native ? 64 : 640;
+    const int speed = unit == 99 || unit == 203                                      ? 200
+                      : unit == 48 || unit == 105 || unit == 129 || unit == 205 ? 150
+                                                                                     : 100;
+    const auto [lock, depart] = factory == 201   ? std::pair{7838, 5373}
+                                : factory == 151 ? std::pair{3224, 4634}
+                                                 : std::pair{2530, 3200};
+    const int ticks = build + 1 + 2 + 3 * std::max(10, lock / speed) + std::max(10, depart / speed);
+    return ticks / 20.0;
+}
+
 } // namespace
 
 namespace {
@@ -495,9 +516,8 @@ int AiSides::outstanding(int slot, int type) const {
 }
 
 // The natives' factories: each idle one takes its side's oldest request,
-// builds it (Taubat units 3.2 s, Metar ones 0.8 s, others 32 s: their
-// build values in ticks) and rolls it out beside itself. A factory lost
-// gives its unit back to the queue.
+// builds it and rolls it out (factorySeconds), the unit out at the end. A
+// factory lost gives its unit back to the queue.
 void AiSides::factories(double seconds) {
     for (auto it = factoryJobs_.begin(); it != factoryJobs_.end();) {
         const Unit* f = world_.unit(it->factory);
@@ -524,9 +544,7 @@ void AiSides::factories(double seconds) {
             !isFactory(f.type) ||
             std::any_of(factoryJobs_.begin(), factoryJobs_.end(), [&](const FactoryJob& j) { return j.factory == f.id; }))
             continue;
-        const CombatType* t = combatType(q->second.front());
-        const double build = !t ? 32 : t->race == 'T' ? 3.2 : t->race == 'M' ? 0.8 : 32;
-        factoryJobs_.push_back({f.id, f.slot, q->second.front(), build});
+        factoryJobs_.push_back({f.id, f.slot, q->second.front(), factorySeconds(f.type, q->second.front())});
         q->second.pop_front();
     }
 }
