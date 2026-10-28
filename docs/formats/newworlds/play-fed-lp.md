@@ -122,8 +122,11 @@ nitrium and duranium than the data's** (J8: the default 500 / 1000 / 2300
 / 500 / 4000 / 5000; F12: 800 / 1750 / 2300 / 1000 / 24000 / 25000), and
 thermoconc unchanged: the same 160 000 game units of every material but
 thermoconc. J8R's 656 / 1140 / 2211 / 653 / 5100 / 6600 at 2:46
-([play-j8r.md](play-j8r.md)) is the same, partly spent. What adds it isn't
-known (no script gift, no difficulty).
+([play-j8r.md](play-j8r.md)) is the same, partly spent. It is the vehicle
+yard placed with those missions' starting colonies: made during the
+set-up, it tops the empty store up to 160 000 units of each of those
+materials before the mission's stock goes in ([exe.md](exe.md#stores));
+Reluva does the same now.
 
 ## Messages worth noting
 
@@ -155,8 +158,10 @@ known (no script gift, no difficulty).
 - **Repeats**: Operations' power warning about once a minute (J4F 13:59,
   14:55, about 15:52, 16:51; F14), as Reluva has it. The resource-shortage
   line re-arrives about every 5 s while resources stay short (J4F
-  27:16-38:21, J6F 18:49-25:21); Reluva says it only when an order is
-  refused, so what retries is to be traced.
+  27:16-38:21, J6F 18:49-25:21): the vehicle yard's report, repeated as
+  the colony's buildings keep asking for worker bees it can't pay for
+  ([exe.md](exe.md#stores)). Reluva says it only when an order is
+  refused.
 - **J4F**: the Romulan hub is reported destroyed at 26:33 while the camera
   is on the player's colony (not the player's doing); buildings captured
   change hands back (the Taubat hangar Federation at 39:09, Taubat again at

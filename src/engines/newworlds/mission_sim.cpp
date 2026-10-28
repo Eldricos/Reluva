@@ -188,6 +188,8 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         const auto [x, y] = worldAt(c.a, c.b);
         structureIds_.push_back(economy_->addBuilt(c.name, x, y));
     }
+    if (std::any_of(colony_.begin(), colony_.end(), [](const ColonyBuilding& c) { return c.name == "vehicle-yard"; }))
+        economy_->startingYardStock();
     // The other sides as the mission places them, and the colony's own
     // buildings as things they can shoot at.
     ai_ = std::make_unique<AiSides>(mission_, player_, *world_);

@@ -85,11 +85,6 @@ message's text and trigger but not the order the counter shows.
 - **J7R** [rec]: who destroys the Federation hub. ([play-j7r.md](play-j7r.md))
 - **R12** [rec]: message 9 (64:45-66:20); who kills the Hubrin observer.
   ([play-r12.md](play-r12.md))
-- **J8R** [rec]: the starting stock: J8 and F12 start with 160 more of
-  dilithium, polycomp and transalumin and 1600 more of nitrium and
-  duranium than the data's, on every side (J7 and the others exactly the
-  data's): what adds it? Watch the stock from the first frame of play, and
-  whether it changes at once. ([play-fed-lp.md](play-fed-lp.md#starting-colonies))
 - **C11** [rec]: message 13 (16:46-18:30). ([play-c11.md](play-c11.md))
 
 ## 5. Missing data files

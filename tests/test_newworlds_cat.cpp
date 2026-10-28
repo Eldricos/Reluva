@@ -2587,6 +2587,24 @@ void testRasterizer() {
 // Savestates (docs/savestates.md): a mission saved after two minutes and
 // loaded into a fresh one carries on exactly as the first, for each race's
 // first mission on a flat map (its AI, economies, script and all).
+// A vehicle yard placed with the starting colony fills the store to 160
+// of each material but thermoconc first (exe.md#stores): J8F starts 160 /
+// 160 / 0 / 160 / 1600 / 1600 above its data stock, as played; F1, with
+// no yard, at the data's.
+void testStartingYardStock() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    MissionSim j8("J8", 'F', t, map, 64, 64, MissionSim::placedColony("J8", 'F'));
+    CHECK(j8.economy().stock() == (Stock{660, 1160, 2300, 660, 5600, 6600}));
+    MissionSim f1("F1", 'F', t, map, 64, 64, MissionSim::placedColony("F1", 'F'));
+    CHECK(f1.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
+}
+
 void testSaveState() {
     Terrain t;
     t.width = t.height = 128;
@@ -2658,6 +2676,7 @@ int main() {
     testStoresAndRazing();
     testTransports();
     testSaveState();
+    testStartingYardStock();
     testPlacement();
     testProjectiles();
     testModelTextures();

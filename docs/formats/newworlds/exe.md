@@ -1279,6 +1279,28 @@ the yards keep using its store, which no longer counts in the stock. A
 storage facility destroyed takes what it held. The computer's sides pay
 nothing (a per-side flag set only for human players).
 
+**A vehicle yard's top-up.** Every vehicle yard is made with a supply agent
+whose target stock is 160 000 units of each material but thermoconc (the
+colonies' races; the other sides 10 000 dilithium). Made, it works out the
+shortfall from its store (the side's first storage facility's) and what's
+on its way: while the mission is being set up the shortfall goes straight
+into the store, free; later it asks for pods instead. The set-up places
+each side's starting objects before it puts in the mission's stock, so a
+starting colony with a vehicle yard (J8, F12, C1, as placed) starts with
+160 T of dilithium, polycomp and transalumin and 1600 of nitrium and
+duranium on top of the mission's stock, once a side. (FUN_005f00f0,
+FUN_005ed810, FUN_00586268.)
+
+**The vehicle yard's shortage report** (001, "manufacture delayed"): a
+player's order the yard refuses is kept and retried silently, but the
+colony's mines, processors, storage facilities and yards ask for a worker
+bee each time they think while they have none, and each refused request
+reports again, at most once every 600 ms (the same throttle for every
+shortage line); so it repeats while worker bees are lacking and the store
+can't pay for one. The 5 s period seen in play wasn't found. The power
+warning's once a minute is its own (60 000 ms). (FUN_005f05b0,
+FUN_005f0d10, FUN_005ba310.)
+
 ### Demolishing
 
 The panel's raze button asks yes or no, and works only on the side's own

@@ -427,6 +427,14 @@ void Economy::take(Units cost) {
         }
 }
 
+void Economy::startingYardStock() {
+    Units u{};
+    for (int m = 0; m < kMaterials; ++m)
+        if (m != Thermoconc)
+            u[size_t(m)] = 160000;
+    deposit(u);
+}
+
 void Economy::deposit(const Units& u) {
     for (Store& st : stores_)
         if (!st.gone) {

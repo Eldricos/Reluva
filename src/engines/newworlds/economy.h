@@ -303,6 +303,11 @@ public:
         }
     };
     void setTransports(bool on) { transports_ = on; }
+    // A vehicle yard placed with the starting colony fills its (the first
+    // storage facility's) store up to 160 T of each material but
+    // thermoconc (1600 of nitrium and duranium) before the mission's stock
+    // goes in, so that stock arrives on top (exe.md#stores).
+    void startingYardStock();
     // The colony's finished hub, if it has one.
     const ColonyStructure* hub() const;
     const std::vector<Ride>& rides() const { return rides_; }
