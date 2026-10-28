@@ -26,6 +26,7 @@ the grid (5); `F8009` the relief map (6); `F8010`-`F8014` over the emblem
 | 53:08 | 4 | Command | the tractor told to avoid the Hubrin base |
 | 54:09 | 5 | Command | hostile units may be approaching the colony |
 | 55:39 | 6 | Command | the tractor is in the colony, to be beamed up |
+| (not seen) | 7 | Command | the transporter locking on (another play: on screen for 1.5 s before 8; [play-fed-lp.md](play-fed-lp.md#messages-worth-noting)) |
 | 56:36 | 8 | Command | the dormant Metar recovered |
 | 56:52 | 9 | Science | its research shows a biological flux |
 | 56:57 | 10 | Science | it exists as flesh here and as energy in subspace |

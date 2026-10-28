@@ -207,6 +207,9 @@ briefing pages with green title bars. The compass strip at the top
   the science station model.
 - Who destroyed the Klingon hub at 20:26 (no Romulan attack on it seen).
 - The transporter position: <112X280> here and in J2F, <112:260> in J2K.
-- J2F's mine 196, 436 lies on no deposit: re-read that frame.
+- (Answered: J2F's mine 196, 436 reads so in another play too, three
+  minutes in: one of the three mines J2F's starting colony is placed with,
+  in a block of its own with no deposit, digging a patch within reach
+  until it runs out; [play-fed-lp.md](play-fed-lp.md#j2-the-mine-at-196-436).)
 - Which body in the PLANETARY DATA view is the star.
 - 5:43 counter: 3/3 or 2/2.

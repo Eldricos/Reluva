@@ -645,7 +645,10 @@ private:
     void stopPlay();
     bool playEvent(const Event& ev); // true if play used it
     void showUnits();
-    void drawPlay(); // the selection box, the full-screen Tricorder
+    void drawPlay();
+    std::string compassStrip() const;
+    void fullTricorderRect(int& x0, int& y0, int& size, int& tiles) const;
+    std::string tricorderReadoutAt(float wx, float wy, float reach) const; // the selection box, the full-screen Tricorder
     bool hubPosition(float& x, float& y) const;
     // Building in play (B): the menu's types for the side, the hologram
     // under the pointer, placing it, and its construction drawn.

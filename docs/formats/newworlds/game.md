@@ -59,7 +59,7 @@ As the first tutorial teaches them:
 | 1-9, 0 (menu open), or a click on its portrait | picks a building (its hologram follows the pointer) or orders a vehicle; < and > turn the menu's pages, X closes it |
 | Left click (placing) | builds where the hologram is green |
 | Right click or Escape (placing) | puts the hologram away |
-| Tab | the full-screen Tricorder, units marked |
+| Tab | the full-screen Tricorder, units marked, a cross on the camera's target; the readout at the top names what's under the cross (an ore once its deposit is surveyed), the compass moving to the small Tricorder's line |
 | I | the interface on/off |
 | Escape | asks whether to leave the mission (Y / Return or YES leaves, N / Escape or NO stays; the mission runs on meanwhile); first it closes the menu or hologram |
 | Pause | freezes the mission (as does the window losing the focus); again to go on |

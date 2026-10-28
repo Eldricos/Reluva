@@ -71,10 +71,13 @@ edge, at the bottom of the starting view.
 
 Bits 12-15 of a grid cell's second value mark a resource deposit, kinds 1
 to 6, and the third value's bits 12-15 always repeat it (every `icewrld`
-map). They're the six raw ores the colony mines: the Tricorder names the
-ore under the cursor ("<ore> AT <a:b>") when the cursor is over its relief
-inset (over the main view it reads TERRAIN), and every such reading in the
-Romulan recordings lies on a block of one kind:
+map). They're the six raw ores the colony mines: the full-screen Tricorder (Tab)
+names the ore under its centre cross ("<ore> AT <a:b>", "MAGNESITE ORE AT"
+for kind 5) once the deposit is revealed (drawn hatched), else TERRAIN;
+the main view and the small Tricorder never name one
+([play-fed-lp.md](play-fed-lp.md#the-tricorder-and-ore-names)). Every such
+reading lies on a block of one kind (several hundred in the Federation
+Let's Play, all but one):
 
 | Kind | Ore | Readings |
 |---|---|---|

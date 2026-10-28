@@ -11,10 +11,13 @@ paraphrased. October 2026.
   C9's part of that table (57 the title, 58 the stardate and a forest
   world, 60 the objective: stand against the Orion pirate attacks). The
   same shape as the Klingon bonus mission C10 ([play-c10.md](play-c10.md)).
-- **The map**: a forest world (`alpwrld`); its mine reported exhausted at
-  260, 300 lies on deposits of `f3` and `j3` (read as in
-  [gmf.md](gmf.md#map-positions-in-the-game)), both forest maps, so one of
-  those.
+- **The map**: `demo1` (as level.md has it): in the Federation Let's Play
+  every dolamide reading lies on its kind 6 and every magnesite one in its
+  kind-5 rows, and the mine reported exhausted at 260, 300 is kind 5 there
+  ([play-fed-lp.md](play-fed-lp.md#maps)); `f3` and `j3`, guessed before,
+  don't fit. The first message, missing here, is a Romulan transmission
+  offering an alliance against the Orions; the opening messages then arrive
+  a second time about 2¼ minutes later.
 - **Messages**: none at first (1:40); lost contact with a transmission
   (2:21); Security reading an Orion force big enough to mean invasion, to
   the north (2:28); an Orion demanding the colony's surrender, with a

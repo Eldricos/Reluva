@@ -20,10 +20,6 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 
 ## 1. Game-wide mechanics
 
-- **Tricorder mineral rule** [shot]: over one kind-1 (dilithium) block,
-  hover the main view at high and at ground-level camera, then the relief
-  inset; note when the ore name appears instead of plain terrain.
-  ([gmf.md](gmf.md#resource-deposits))
 - **Build times** [rec]: the executable gives how the bees build (tiles,
   four sections at once) but its time a tile doesn't match the Federation's
   timed builds. Time one Klingon or Romulan building (a power generator or
@@ -49,10 +45,11 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
 ## 3. Interface
 
-- **The star in star-system views** [shot]: in each briefing's star-system
-  view, which body is the star and which is the mission's planet (J1R, J2R,
-  J3R, J7R, J8R, R2, R9, R12): the models don't say which texture goes on
-  which body. ([play-j1r.md](play-j1r.md), [play-r12.md](play-r12.md))
+- **The star in star-system views** [shot]: the mission's planet is the
+  body the camera centres on (the Federation Let's Play, every briefing);
+  which body is the star isn't shown by shading (none glows). If a star
+  can be told at all (a menu, a closer view), note it for J1, J2, J3, J7,
+  J8, R2, R9, R12. ([play-fed-lp.md](play-fed-lp.md#star-system-views))
 
 ## 4. Per mission
 
@@ -63,8 +60,11 @@ message's text and trigger but not the order the counter shows.
 
 - **F1** [rec]: which messages are 5-6, 14, 16 and 23-24 (the data narrows
   them to the processor line, the temple warning, the weak scans' lines and
-  the Taubat-building line). ([play-f1.md](play-f1.md#still-to-look-at))
-- **J2F** [shot]: re-read the mine at 196, 436. ([play-j2r.md](play-j2r.md))
+  the Taubat-building line). ([play-f1.md](play-f1.md#still-to-look-at);
+  another play's first ten, the Taubat's warning and the medical scan's
+  lines among them, are in
+  [play-fed-lp.md](play-fed-lp.md#messages-worth-noting): the numbers
+  differ from play to play.)
 
 **Klingon**
 
@@ -82,13 +82,14 @@ message's text and trigger but not the order the counter shows.
 - **J2R** [rec]: who destroys the Klingon hub (the Federation's random
   raids or the Hubrin's?). ([play-j2r.md](play-j2r.md))
 - **J6R** [rec]: messages 4 and 5. ([play-j6r.md](play-j6r.md))
-- **J7R** [rec]: who destroys the Federation hub; the grey-blue crystal
-  units and the red-white fliers. ([play-j7r.md](play-j7r.md))
+- **J7R** [rec]: who destroys the Federation hub. ([play-j7r.md](play-j7r.md))
 - **R12** [rec]: message 9 (64:45-66:20); who kills the Hubrin observer.
   ([play-r12.md](play-r12.md))
-- **J8R** [rec]: the white-and-red fliers; the starting stock (2:46 reads
-  about 30 % above the data's, the same on every side: what adds it?).
-  ([play-j8r.md](play-j8r.md))
+- **J8R** [rec]: the starting stock: J8 and F12 start with 160 more of
+  dilithium, polycomp and transalumin and 1600 more of nitrium and
+  duranium than the data's, on every side (J7 and the others exactly the
+  data's): what adds it? Watch the stock from the first frame of play, and
+  whether it changes at once. ([play-fed-lp.md](play-fed-lp.md#starting-colonies))
 - **C11** [rec]: message 13 (16:46-18:30). ([play-c11.md](play-c11.md))
 
 ## 5. Missing data files
@@ -121,4 +122,8 @@ Cadet mode, the mission report, COMMAND, message faces, Tricorder colours,
 bonus labels, every briefing (R8's too) and most missions' questions. A
 second channel's recording ([play-14east.md](play-14east.md)) settled the
 compass (the starting camera looks north) and K1's unseen messages (each
-arrived with the one after it, as the script has them).
+arrived with the one after it, as the script has them); a Federation Let's
+Play ([play-fed-lp.md](play-fed-lp.md)) settled the Tricorder's ore rule
+(the Tab Tricorder alone names ores, under its centre cross, once
+revealed), J2F's mine (one the starting colony is placed with), J7's crystal units and the
+fliers (Romulan disruptor tanks, Metar craft) and C9's map (`demo1`).

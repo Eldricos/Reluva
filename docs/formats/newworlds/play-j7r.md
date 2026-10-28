@@ -233,8 +233,10 @@ artillery). Portraits:
   something else?
 - The first mine's position: 188, 324 (more likely: two closed loops, and
   block 23,40 has the lower value 150) or 180, 324.
-- Who destroyed the Federation hub at 23:54; whose are the grey-blue crystal
-  units and the red-and-white fliers.
+- Who destroyed the Federation hub at 23:54. (Answered since: the grey-blue
+  crystal units are Romulan disruptor tanks and the red-and-white fliers
+  the Metar's, by the selection panel in J7F;
+  [play-fed-lp.md](play-fed-lp.md#units-and-buildings-named-on-the-selection-panel).)
 - (Answered since: science station `rsb_a`, vehicle yard upgrade `rvy_b`,
   static disruptor `rdds`; [colony.md](colony.md#romulan-matches).) The tall
   finned tower by the hub: select it (security centre `risb`?).

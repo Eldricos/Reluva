@@ -2362,20 +2362,78 @@ void MissionViewer::jumpTo(int slot) {
     cameraTo(*all[next]);
 }
 
+// The compass strip, as the game's: a character a degree round the
+// camera's heading (about 13 each way), "+" every 5, a three-digit label
+// every 10 ("350", "010"), the quarters bracketed ("[ N ]"), dashes
+// between.
+std::string MissionViewer::compassStrip() const {
+    constexpr int kHalf = 14;
+    const int heading = int(std::lround(map_.heading()));
+    std::string strip(2 * kHalf + 1, '-');
+    auto put = [&](int at, const std::string& label) {
+        for (size_t i = 0; i < label.size(); ++i)
+            if (const int k = at - int(label.size() / 2) + int(i); k >= 0 && k < int(strip.size()))
+                strip[size_t(k)] = label[i];
+    };
+    for (int d = -kHalf - 2; d <= kHalf + 2; ++d)
+        if (((heading + d) % 360 + 360) % 360 % 10 == 5)
+            put(d + kHalf, "+");
+    for (int d = -kHalf - 2; d <= kHalf + 2; ++d) {
+        const int deg = ((heading + d) % 360 + 360) % 360;
+        static const char* kPoints[] = {"N", "E", "S", "W"};
+        if (deg % 90 == 0)
+            put(d + kHalf, std::string("[ ") + kPoints[deg / 90] + " ]");
+        else if (deg % 10 == 0) {
+            char label[4];
+            std::snprintf(label, sizeof label, "%03d", deg);
+            put(d + kHalf, label);
+        }
+    }
+    return strip;
+}
+
+// Where the full-screen Tricorder (Tab) draws its map, and its zoom.
+void MissionViewer::fullTricorderRect(int& x0, int& y0, int& size, int& tiles) const {
+    size = std::min(screen_.w, screen_.h) - 40;
+    x0 = (screen_.w - size) / 2, y0 = (screen_.h - size) / 2;
+    // (Twice as many tiles across as the small one.)
+    tiles = kTricorderTiles << (tricorderZoom_ + 1);
+}
+
 // What play adds over the map: the full-screen Tricorder (Tab), with the
 // units on it, and the box a left drag draws.
 void MissionViewer::drawPlay() {
     if (tricorderFull_ && hasMap_) {
-        const int size = std::min(screen_.w, screen_.h) - 40;
-        const int x0 = (screen_.w - size) / 2, y0 = (screen_.h - size) / 2;
+        int x0 = 0, y0 = 0, size = 0, tiles = 0;
+        fullTricorderRect(x0, y0, size, tiles);
         for (int y = 0; y < screen_.h; ++y) {
             uint8_t* row = screen_.row(y);
             for (int x = 0; x < screen_.w; ++x, row += 4)
                 row[0] = uint8_t(row[0] / 4), row[1] = uint8_t(row[1] / 4), row[2] = uint8_t(row[2] / 4);
         }
-        // (Twice as many tiles across as the small one.)
-        const int tiles = kTricorderTiles << (tricorderZoom_ + 1);
         drawTricorderMap(x0, y0, size, size, tiles);
+        // The cross the readout at the top reads under: the camera's target
+        // (the game keeps it at its map's centre).
+        {
+            float cx = 0, cy = 0;
+            int px = 0, py = 0;
+            map_.cameraTarget(cx, cy);
+            if (map_.minimapPoint(cx, cy, x0, y0, size, size, px, py, tiles))
+                for (int d = -5; d <= 5; ++d)
+                    for (const auto& [qx, qy] : {std::pair{px + d, py}, std::pair{px, py + d}})
+                        if (qx >= 0 && qy >= 0 && qx < screen_.w && qy < screen_.h) {
+                            uint8_t* q = screen_.row(qy) + qx * 4;
+                            q[0] = q[1] = q[2] = 255;
+                        }
+        }
+        // Its readout along the top, in the compass's place: the map under
+        // the cross, the camera's target, not the pointer (play-fed-lp.md).
+        {
+            float cx = 0, cy = 0;
+            map_.cameraTarget(cx, cy);
+            const std::string line = tricorderReadoutAt(cx, cy, 1500.0f);
+            ui_.drawSmall(screen_, (screen_.w - ui_.smallWidth(line)) / 2, 2, line, Color{220, 220, 225});
+        }
         // What the side sees: its own green (selected orange), those
         // hostile to it red, the rest yellow.
         if (world_)
@@ -2450,40 +2508,18 @@ void MissionViewer::drawInterface() {
     sideW_ = sideW;
     buttons_.clear();
 
-    // The compass strip along the top, as the game's: a character a
-    // degree round the camera's heading (about 13 each way), "+" every 5,
-    // a three-digit label every 10 ("350", "010"), the quarters bracketed
-    // ("[ N ]"), dashes between.
+    // The strip along the top: the compass, or with the full-screen
+    // Tricorder up, its readout (the compass moves to the
+    // small Tricorder's line; play-14east.md, play-fed-lp.md).
     if (hasMap_) {
-        constexpr int kHalf = 14;
-        const int heading = int(std::lround(map_.heading()));
-        std::string strip(2 * kHalf + 1, '-');
-        auto put = [&](int at, const std::string& label) {
-            for (size_t i = 0; i < label.size(); ++i)
-                if (const int k = at - int(label.size() / 2) + int(i); k >= 0 && k < int(strip.size()))
-                    strip[size_t(k)] = label[i];
-        };
-        for (int d = -kHalf - 2; d <= kHalf + 2; ++d) {
-            const int deg = ((heading + d) % 360 + 360) % 360;
-            if (deg % 10 == 5)
-                put(d + kHalf, "+");
-        }
-        for (int d = -kHalf - 2; d <= kHalf + 2; ++d) {
-            const int deg = ((heading + d) % 360 + 360) % 360;
-            static const char* kPoints[] = {"N", "E", "S", "W"};
-            if (deg % 90 == 0)
-                put(d + kHalf, std::string("[ ") + kPoints[deg / 90] + " ]");
-            else if (deg % 10 == 0) {
-                char label[4];
-                std::snprintf(label, sizeof label, "%03d", deg);
-                put(d + kHalf, label);
-            }
-        }
         const Color pale{220, 220, 225}; // the game's strip is a pale grey throughout
-        const int adv = ui_.smallWidth("-");
-        int x = screen_.w / 2 - adv * kHalf - adv / 2;
-        for (size_t i = 0; i < strip.size(); ++i, x += adv)
-            ui_.drawSmall(screen_, x, 2, std::string(1, strip[i]), pale);
+        if (!tricorderFull_) { // (with it up, drawPlay() puts its readout here)
+            const std::string strip = compassStrip();
+            const int adv = ui_.smallWidth("-");
+            int x = screen_.w / 2 - adv * int(strip.size() / 2) - adv / 2;
+            for (size_t i = 0; i < strip.size(); ++i, x += adv)
+                ui_.drawSmall(screen_, x, 2, std::string(1, strip[i]), pale);
+        }
     }
 
     // NEW WORLDS: the colony panel: the colony's size and stock (in play
@@ -2798,7 +2834,9 @@ void MissionViewer::drawInterface() {
                                 p[0] = c.r, p[1] = c.g, p[2] = c.b;
                             }
                 }
-            ui_.drawSmall(screen_, x + 10, y + h - 14 - 2 * lh, tricorderReadout(mx, my, mw, mh, tiles), text);
+            // With the full-screen Tricorder up its line carries the compass.
+            ui_.drawSmall(screen_, x + 10, y + h - 14 - 2 * lh,
+                          tricorderFull_ ? compassStrip() : tricorderReadout(mx, my, mw, mh, tiles), text);
         }
         int bx = x + 10;
         for (const auto& [label, action] : {std::pair{"COMMS", "tri-comms"}, std::pair{"ALLY", "tri-ally"},
@@ -3055,7 +3093,11 @@ std::string MissionViewer::tricorderReadout(int mx, int my, int mw, int mh, int 
     // An object within two pixels' worth of the pointer.
     float x1 = 0, y1 = 0;
     map_.minimapToWorld(mouseX_ + 2, mouseY_, mx, my, mw, mh, tiles, x1, y1);
-    const float reach = std::max(std::fabs(x1 - wx), 1500.0f);
+    return tricorderReadoutAt(wx, wy, std::max(std::fabs(x1 - wx), 1500.0f));
+}
+
+// What the Tricorder's line says of a world point (objects within reach).
+std::string MissionViewer::tricorderReadoutAt(float wx, float wy, float reach) const {
     if (world_)
         for (const Unit& u : world_->units())
             if (visible(u) && std::hypot(u.x - wx, u.y - wy) < reach) {
