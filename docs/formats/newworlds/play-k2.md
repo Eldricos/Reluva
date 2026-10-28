@@ -41,7 +41,7 @@ screen.
 | Time | # | From | What it says (paraphrased) |
 |---|---|---|---|
 | 3:14 | 1 | Incoming message (the allied Taubat) | the rebels are moving; asks the Klingons to keep their promise and help |
-| 4:28 | 2 | Intelligence | the allied Taubat base is at <279:26> |
+| 4:28 | 2 | Intelligence | the allied Taubat base is at <279:126> (another play read it three times; [play-kli-lp.md](play-kli-lp.md)) |
 | 4:41 | 3 | Intelligence | enemy units approaching the allied base |
 | 8:14 | 4 | Operations | not enough power; build generators (repeated at 9:14 as 5) |
 | 10:26 | 6 | Intelligence | enemy units approaching the colony |
@@ -86,4 +86,6 @@ per block, didn't fit.)
 ## Colony
 
 Colony size 35/90 at 6:20, 53/90 at 12:13, 64/90 at 17:47, 81/90 at
-26:31: K2 starts with a larger capacity (90) than K1 and F1 (50).
+26:31. Those are later readings: another play starts at 22/50, the
+capacity rising with the buildings (60 by 16:39, 70 by 22:55, 85 by 27:46;
+[play-kli-lp.md](play-kli-lp.md#starting-colonies)).

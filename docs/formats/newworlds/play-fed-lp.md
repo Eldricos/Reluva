@@ -102,8 +102,8 @@ J3). J4's view shows only the yellow-brown haze; J6's is almost black.
   F3, F8: a large dark structure with two boxy arms on a mesa).
 - Orion disruptor tanks (C9). A Romulan photon defence (F3).
 - J7's magenta square on the briefing map (at the colony's north-west
-  edge) is drawn like a unit's marker, not a deposit's hatching; what it
-  marks isn't seen.
+  edge) is drawn like a unit's marker, not a deposit's hatching: it is the
+  Hubrin guide ([play-kli-lp.md](play-kli-lp.md#j7-the-magenta-marker)).
 
 ## Starting colonies
 
@@ -126,8 +126,9 @@ thermoconc. J8R's 656 / 1140 / 2211 / 653 / 5100 / 6600 at 2:46
 yard placed with those missions' starting colonies: made during the
 set-up, it tops the empty store up to 160 000 units of each of those
 materials before the mission's stock goes in ([exe.md](exe.md#stores));
-Reluva does the same now. (K7 starts the same way, J4K at the data's
-stock: J4's Klingon colony has no yard.)
+Reluva does the same now. (Every Klingon start fits too: K7, K8, J6K,
+J8K, K14 and C10 topped up, the rest at the data's stock;
+[play-kli-lp.md](play-kli-lp.md#starting-colonies).)
 
 ## Messages worth noting
 
@@ -179,5 +180,6 @@ every magnesite one in its kind-5 rows, and its mine at 260, 300 on kind 5
 ## Not seen
 
 A Klingon AI colony's mining station, an upgraded Romulan hub close up,
-build timings, who destroys J2's Klingon hub (no message for it in this
-play), who kills F12's Hubrin observer.
+build timings (the Klingon play has some; [play-kli-lp.md](play-kli-lp.md#build-times)),
+who destroys J2's Klingon hub (no message for it in this play; the Hubrin,
+in the Klingon play), who kills F12's Hubrin observer.

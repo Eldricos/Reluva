@@ -226,8 +226,10 @@ artillery). Portraits:
 - Why the briefing backdrops lag the pages (emblem under pages 3-4, the star
   system only after the last page) - the Romulan script, or slow scene
   loading? Compare a second Romulan J7 recording or the briefing script.
-- What the magenta marker on the relief map is (the guide's position?), and
-  which model is the Hubrin guide (`h`, by its metamodel name only). The
+- (Answered since: the magenta marker is the Hubrin guide, a NEUTRAL UNIT
+  owned by the Hubrin, by the Tricorder and selection panel in J7K;
+  [play-kli-lp.md](play-kli-lp.md#j7-the-magenta-marker).) Which model is
+  the Hubrin guide (`h`, by its metamodel name only). The
   ground step's spire and craft look Metar (`mch`, `mport`; table above).
 - Message 5 (24:14-24:32) was never shown: the transalumin quota, or
   something else?

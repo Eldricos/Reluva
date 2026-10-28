@@ -150,6 +150,8 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 12, 89, 5, 50, 0}, Stock{0, 12, 89, 50, 30, 0}, Stock{0, 12, 89, 3, 500, 0}},
                      {{{}, {}, {"colony-hub"}}}, 45),
                  34000, 550, 85);
+        // The Klingons' times as their Let's Play timed them (play-kli-lp.md).
+        t.back().kliSeconds = 32;
         consumer(add("vehicle-yard", "VEHICLE YARD",
                      {Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 2, 0, 0}},
                      {yard, yard, yard}, 65),
@@ -190,6 +192,7 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 8, 48, 20, 0, 0}, Stock{0, 8, 48, 26, 0, 0}, Stock{0, 8, 48, 36, 0, 0}}, {yard, yard, yard},
                      40),
                  44000, 550, 440);
+        t.back().kliSeconds = 61;
         const std::vector<std::string> housing{"construction-yard-upgrade", "transporter-pad"};
         BuildingType& accommodation = add("accommodation", "ACCOMMODATION",
                                           {Stock{0, 20, 50, 36, 0, 0}, Stock{0, 16, 60, 40, 0, 0}, Stock{0, 16, 60, 42, 0, 0}},
@@ -211,6 +214,7 @@ const std::vector<BuildingType>& buildingTypes() {
                        {"construction-yard-upgrade", "colony-hub-upgrade"}}},
                      83),
                  34000, 425, 340);
+        t.back().kliSeconds = 70;
         // Defences: the shield generator (its field halves the colony's
         // damage; exe.md#shields) and the two turrets, by their models.
         consumer(add("shield-generator", "SHIELD GENERATOR",
@@ -251,8 +255,10 @@ const std::vector<BuildingType>& buildingTypes() {
         };
         upgrade("colony-hub-upgrade", "IMPROVED HUB", "colony-hub", Stock{0, 4, 40, 0, 0, 1000},
                 Stock{0, 4, 40, 0, 0, 1000}, Stock{0, 4, 40, 0, 0, 1000}, nullptr);
+        t.back().kliSeconds = 46;
         upgrade("colony-hub-advanced", "ADVANCED HUB", "colony-hub", Stock{0, 50, 30, 20, 0, 0},
                 Stock{0, 50, 30, 20, 0, 0}, Stock{0, 50, 30, 20, 0, 0}, "colony-hub-upgrade");
+        t.back().kliSeconds = 45;
         upgrade("construction-yard-upgrade", "IMPROVED YARD", "construction-yard", Stock{0, 2, 30, 4, 0, 0},
                 Stock{0, 2, 30, 2, 0, 0}, Stock{0, 2, 30, 2, 0, 0}, nullptr);
         upgrade("construction-yard-advanced", "ADVANCED YARD", "construction-yard", Stock{0, 20, 10, 6, 0, 0},

@@ -19,8 +19,12 @@ paraphrased. October 2026.
   page and no speech.
 - **The map**: the two mines reported exhausted (292, 364 and 276, 444) lie
   on deposits in five maps read as in [gmf.md](gmf.md#map-positions-in-the-game);
-  the only desert one is **`f2`** (`deswrld`), and the terrain is tan sand
-  with concrete. So C10 is played on F2's map, most likely.
+  the only desert one is `f2` (`deswrld`), and the terrain is tan sand
+  with concrete, so this page first took it for F2's map. **It is
+  `coverd1`**, as the executable registers it: a second play's three
+  exhausted mines (276, 444 kelbonite; 412, 404 silicon; 340, 380
+  kelbonite) all lie on `coverd1`'s deposits, two of them on none in `f2`,
+  and this play's two fit `coverd1` too ([play-kli-lp.md](play-kli-lp.md#maps)).
 - The colony starts already built (2:02, 52/50).
 
 ## Messages

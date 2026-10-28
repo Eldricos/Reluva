@@ -206,6 +206,9 @@ briefing pages with green title bars. The compass strip at the top
 - The grid model in `J2R009` (`rsb_a`?), the box beside the hub (`rsf`?),
   the science station model.
 - Who destroyed the Klingon hub at 20:26 (no Romulan attack on it seen).
+  Most likely the Hubrin: in a Klingon play of J2 a lone HUBRIN unit over
+  the Klingon colony shot its hub down with no other side near
+  ([play-kli-lp.md](play-kli-lp.md#j2k-the-hubrin-destroy-the-klingon-hub)).
 - The transporter position: <112X280> here and in J2F, <112:260> in J2K.
 - (Answered: J2F's mine 196, 436 reads so in another play too, three
   minutes in: one of the three mines J2F's starting colony is placed with,

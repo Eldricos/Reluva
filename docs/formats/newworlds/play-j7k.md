@@ -35,4 +35,5 @@ objective is to process them.
 
 ## Colony
 
-Colony size 45/90 at 6:20, 48/90 at 14:14, 71/90 at 23:38.
+Colony size 45/90 at 6:20, 48/90 at 14:14, 71/90 at 23:38. At the start
+it is 26/50 (another play, the first frame; [play-kli-lp.md](play-kli-lp.md#starting-colonies)).

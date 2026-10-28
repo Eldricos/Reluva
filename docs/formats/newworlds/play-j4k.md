@@ -44,6 +44,9 @@ K7 and J2, scripted per mission.
 | 77:31 | 15 | Intelligence | secondary objective met: all Metar and Taubat units destroyed |
 | 77:35 | 16 | Intelligence | the Klingons have completed their mission |
 
+Another play adds the **construction yard** to the recaptures (its own
+message and objective; [play-kli-lp.md](play-kli-lp.md#messages-worth-noting)).
+
 Recapturing a building is done by sending a team in (a "we're in" message,
 then "recaptured"); the four primary objectives are met by 7:20, but the
 mission only ends when the secondary objective is met too, 70 minutes

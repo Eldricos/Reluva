@@ -21,10 +21,11 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 ## 1. Game-wide mechanics
 
 - **Build times** [rec]: the executable gives how the bees build (tiles,
-  four sections at once) but its time a tile doesn't match the Federation's
-  timed builds. Time one Klingon or Romulan building (a power generator or
-  vehicle yard) and one defence from the order to finished, with four
-  construction bees; and the same building with one bee.
+  four sections at once) but its time a tile doesn't match the timed
+  builds. The Klingon Let's Play timed five Klingon buildings
+  ([play-kli-lp.md](play-kli-lp.md#build-times)); still wanted: a Romulan
+  building, a Klingon vehicle yard, and one defence from the order to
+  finished with four construction bees, and any building with one bee.
   ([exe.md](exe.md#bees))
 
 ## 2. Buildings and units (model matching)
@@ -38,10 +39,10 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
   pictures settled the other model guesses (the storage facility, turrets,
   shield generators, transporter pad and utility hospital; colony.md).
 - **Natives** [shot]: R2's black many-legged unit at 36:30 (an Orion tank
-  `odv` or a Taubat tank `tgp`?), and J7R's magenta map marker.
-  ([play-r2.md](play-r2.md), [play-j7r.md](play-j7r.md))
+  `odv` or a Taubat tank `tgp`?). ([play-r2.md](play-r2.md))
 - **Klingon buildings** [shot]: an AI colony's mining station in a joint
-  mission: does it stand on a deposit? ([play-k1.md](play-k1.md))
+  mission played from another side: does it stand on a deposit? (Every
+  mine the Klingon player built did; [play-kli-lp.md](play-kli-lp.md#mining-stations).)
 
 ## 3. Interface
 
@@ -66,10 +67,6 @@ message's text and trigger but not the order the counter shows.
   [play-fed-lp.md](play-fed-lp.md#messages-worth-noting): the numbers
   differ from play to play.)
 
-**Klingon**
-
-- **J7K** [shot]: the starting colony size (COLONY SIZE). ([play-j7r.md](play-j7r.md))
-
 **Romulan**
 
 - **R1** [rec]: the counter numbers of messages 5, 6 and 18 (another
@@ -79,8 +76,6 @@ message's text and trigger but not the order the counter shows.
 - **R2** [rec]: messages 3, 7, 8 and 23. ([play-r2.md](play-r2.md))
 - **J1R** [rec]: the numbers of the two messages near 29:07 and 33:00 (the
   Federation's fail line and the temple scan's). ([play-j1r.md](play-j1r.md))
-- **J2R** [rec]: who destroys the Klingon hub (the Federation's random
-  raids or the Hubrin's?). ([play-j2r.md](play-j2r.md))
 - **J6R** [rec]: messages 4 and 5. ([play-j6r.md](play-j6r.md))
 - **J7R** [rec]: who destroys the Federation hub. ([play-j7r.md](play-j7r.md))
 - **R12** [rec]: message 9 (64:45-66:20); who kills the Hubrin observer.
@@ -96,7 +91,9 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **Nothing left here.**
+- **Colony size**: the starting colonies' COLONY SIZE (people and
+  capacity) doesn't match the game's in most Klingon missions
+  ([play-kli-lp.md](play-kli-lp.md#starting-colonies)).
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
@@ -122,4 +119,8 @@ Play ([play-fed-lp.md](play-fed-lp.md)) settled the Tricorder's ore rule
 (the Tab Tricorder alone names ores, under its centre cross, once
 revealed), J2F's mine (one the starting colony is placed with), J7's crystal units and the
 fliers (Romulan disruptor tanks, Metar craft) and C9's map (`demo1`); the executable then explained J8's and F12's extra
-stock (a starting vehicle yard's top-up).
+stock (a starting vehicle yard's top-up). A Klingon Let's Play
+([play-kli-lp.md](play-kli-lp.md)) then gave five Klingon build times, the
+Hubrin as J2's attacker of the Klingon hub, J7's magenta marker (the
+Hubrin guide), J7K's starting colony, C10's map (`coverd1`) and every
+Klingon start's stock (the top-up wherever a yard is placed).
