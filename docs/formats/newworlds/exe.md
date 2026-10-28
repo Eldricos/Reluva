@@ -400,11 +400,35 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   shield generators, landing pads, accommodation and turrets always count
   as fully staffed. A whole, powered, staffed generator runs at 1.2 (the
   panel's 120 %); a hub without an officer at 0.8.
-- **Colony size and capacity.** COLONY SIZE a / b: a counts the side's
-  buildings and vehicles (not crew); b starts at 50 (a mission may set
-  another: C1's 60) and never passes 90. Accommodation adds 5, a farm
-  (hydroponics, livestock, clone) 10, each sickbay ward 5; nothing else
-  (the landing pad, upgrades). That gives F1's 50, 55, 65, 80, 90.
+- **Colony size and capacity.** COLONY SIZE a / b, held in two globals
+  (0x853414, 0x8566dc; printed at 0x550711 / 0x550770); the build buttons
+  work only while a < b.
+  - **a** is set to 0 when a world is set up, goes up by one as each of the
+    local side's objects is made (the one creation routine, 0x5a65f3) and
+    down by one as one dies (demolition included). It counts every
+    building (storage facilities, turrets, escape pods and the containment
+    device too; a site as soon as it's placed), every vehicle (armed APCs,
+    science vehicles and scouts too) and every bee (construction, worker,
+    cargo). Not the unarmed APCs (transports), crew, cargo pods, upgrades
+    or add-ons (sickbay wards). Each vehicle yard, construction yard,
+    storage facility, processor and mine standing at the start makes a
+    worker bee of its own, free, which counts (the yards are the same kind
+    of agent as the mines): so a start is its placements (the human-only
+    and AI-only filter applied: J3, J6) plus one per such building. That
+    gives 17 of 22 recorded starts exactly (F1 20, J8F 41, J4K 47, C10 47
+    ...); K2 reads one lower, and J1K, K7 and J7K 9-10 lower, which nothing
+    in the executable explains.
+  - **b** is set to 50 once, when the program starts, and never reset: no
+    mission or script sets it. Housing raises it as it's made (a site as
+    it's placed, or a starting placement): accommodation 5, a farm
+    (hydroponics, livestock, clone) 10, each sickbay ward fitted 5;
+    nothing else (the landing pad, upgrades). Past 90 the excess is banked;
+    a loss takes the same off and the bank refills it to 90. A briefing's
+    scene makes the colony's housing a first time and never takes it off,
+    so starting housing counts twice (J8F's 60, J6K's 90, K14's 70, C1's
+    60); and b carries over everything from earlier missions in the same
+    run (F12's 90, J2K's 55 once and 50 another time). That gives F1's 50,
+    55, 65, 80, 90.
 - **Crew.** Each building has places for its staff and occupants; it works
   only with its staff in. The hub holds the colony's pool (150).
 

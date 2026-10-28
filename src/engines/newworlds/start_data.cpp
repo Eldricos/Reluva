@@ -46,7 +46,7 @@ constexpr ObjectType kTypes[] = {
     {70, true, "power-generator", "geo/rom/rps1.geo", 0},
     {71, true, "vehicle-yard", "geo/rom/rvy.geo", 0},
     {72, true, "transporter-pad", "geo/rom/rbcs.geo", 0},
-    {73, true, "transporter-pad", "", 0},
+    {73, true, "transporter-pad", "geo/kln/kief.geo", 0}, // (guess: its sounds are kief's, the import/export block)
     {74, true, "security-center", "geo/rom/risb.geo", 0},
     {75, true, "security-center", "geo/kln/ksc.geo", 0},
     {77, true, "construction-yard", "geo/fed/fcy.geo", 0},

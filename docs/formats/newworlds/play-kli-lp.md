@@ -92,13 +92,19 @@ other one has none: the yard's top-up to 160 000 units of each material
 but thermoconc ([exe.md](exe.md#stores)), which Reluva has. Reluva's
 starting stocks match all fourteen.
 
-**The colony sizes don't match yet.** Reluva's after five seconds, against
-the game's: K7 24/50 (20/50), J3K 25/50 (24/50), J4K 43/50 (47/50), K8
-24/50 (28/50), J6K 42/75 (47/90), J7K 33/50 (26/50), J8K 38/50 (41/50),
-K14 50/60 (55/70). Both numbers (the people, the capacity) are off, in
-both directions; a Reluva bug still to look into. K2's 90 in
-[play-k2.md](play-k2.md) is a later reading: the capacity grows with the
-buildings (here 50 at the start, 60 by 16:39, 70 by 22:55, 85 by 27:46).
+The colony sizes these starts show led to the executable's rule
+([exe.md](exe.md#the-economy)): every building, vehicle and bee but the
+transports, a free worker bee for each yard, storage facility, processor
+and mine, and starting housing counted twice in the capacity (the
+briefing's scene makes it once more). Reluva now counts so, and starts
+J2K, J3K, J4K, K1, K8, J6K, J8K, K14, J9K and C10 as recorded. **K2 reads
+one lower than the rule gives, and J1K, K7 and J7K 9-10 lower** (J1K
+25/50 for 35, K7 20/50 for 30, J7K 26/50 for 35); nothing in the
+executable takes anything off at the start, so another version's data, a
+loaded save or a reading after the start are the likely causes. K2's 90
+in [play-k2.md](play-k2.md) is a later reading: the capacity grows with
+the buildings (here 50 at the start, 60 by 16:39, 70 by 22:55, 85 by
+27:46).
 
 ## Mining stations
 

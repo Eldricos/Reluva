@@ -91,9 +91,7 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **Colony size**: the starting colonies' COLONY SIZE (people and
-  capacity) doesn't match the game's in most Klingon missions
-  ([play-kli-lp.md](play-kli-lp.md#starting-colonies)).
+- **Nothing left here.**
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
@@ -123,4 +121,6 @@ stock (a starting vehicle yard's top-up). A Klingon Let's Play
 ([play-kli-lp.md](play-kli-lp.md)) then gave five Klingon build times, the
 Hubrin as J2's attacker of the Klingon hub, J7's magenta marker (the
 Hubrin guide), J7K's starting colony, C10's map (`coverd1`) and every
-Klingon start's stock (the top-up wherever a yard is placed).
+Klingon start's stock (the top-up wherever a yard is placed); and the
+starts' colony sizes, the executable's count of objects and housing
+([exe.md](exe.md#the-economy)).

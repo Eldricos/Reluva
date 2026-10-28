@@ -247,7 +247,7 @@ public:
 private:
     // Goes up whenever a savestate's layout changes (any syncState in the
     // engine): older saves are then refused.
-    static constexpr uint32_t kStateVersion = 1;
+    static constexpr uint32_t kStateVersion = 2;
 
     // The main menu's mission list, if the game folder has one; a missing
     // or unreadable level.dat only loses the missions' names.

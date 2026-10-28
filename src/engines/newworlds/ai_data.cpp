@@ -63,7 +63,7 @@ constexpr CombatType kTypes[] = {
     {70, "power-generator", "geo/rom/rps1.geo", 'R', true, 200, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 2500.0f, 4, 1, true, false, 0x2},
     {71, "vehicle-yard", "geo/rom/rvy.geo", 'R', true, 450, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 1, true, false, 0x4},
     {72, "transporter-pad", "geo/rom/rbcs.geo", 'R', true, 250, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 2, true, false, 0x2},
-    {73, "transporter-pad", "", 'K', true, 250, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 2, true, false, 0x2},
+    {73, "transporter-pad", "geo/kln/kief.geo", 'K', true, 250, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 2, true, false, 0x2},
     {74, "security-center", "geo/rom/risb.geo", 'R', true, 500, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 20000.0f, 4, 2, true, false, 0x4},
     {75, "security-center", "geo/kln/ksc.geo", 'K', true, 500, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 20000.0f, 4, 1, true, false, 0x4},
     {77, "construction-yard", "geo/fed/fcy.geo", 'F', true, 450, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 4, true, false, 0x4},

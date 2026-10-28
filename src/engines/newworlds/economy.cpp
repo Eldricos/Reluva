@@ -493,8 +493,8 @@ std::array<float, kOres> Economy::oreStock() const {
 int Economy::colonySize() const {
     int n = vehicles_;
     for (const ColonyStructure& s : structures_)
-        if (const BuildingType* t = buildingType(s.type); t && t->upgradeOf.empty())
-            ++n;
+        if (const BuildingType* t = buildingType(s.type); !t || t->upgradeOf.empty())
+            ++n; // (the storage facility, not in the build menu, too)
     return n;
 }
 
@@ -535,7 +535,10 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
         addStore(s.id);
     if (const BuildingType* t = buildingType(type)) {
         s.stored = t->bufferCap;
-        capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
+        // Housing standing at the start counts twice: the briefing's scene
+        // makes the colony's own a first time and never takes it off
+        // (exe.md#the-economy).
+        raiseCapacity(2 * t->capacity);
         // The hub takes in everyone still in orbit; accommodation standing
         // at the start takes people straight from the hub.
         if (type == "colony-hub") {
@@ -592,6 +595,8 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     }
     if (!free_)
         take(unitsOf(t->costFor(side_)));
+    // Housing raises the capacity as soon as its site is placed.
+    raiseCapacity(t->capacity);
     structures_.push_back(s);
     return s.id;
 }
@@ -1027,7 +1032,6 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
                 if (!b.cargo && !b.worker && b.site == s.id)
                     b.site = 0, b.working = false;
             s.stored = t->bufferCap;
-            capacity_ = std::min(kCapacityCap, capacity_ + t->capacity);
             out.push_back({"built", {s.type}});
             if (s.type == "colony-hub")
                 out.push_back({"officer", {"004"}}); // a hub finished: Engineering's line
@@ -1214,6 +1218,20 @@ std::vector<ScriptEvent> Economy::advance(double seconds) {
     return out;
 }
 
+// The capacity: what housing adds past 90 is banked, and refills it when
+// housing is lost.
+void Economy::raiseCapacity(int n) {
+    capacity_ += n;
+    if (capacity_ > kCapacityCap)
+        capBank_ += capacity_ - kCapacityCap, capacity_ = kCapacityCap;
+}
+
+void Economy::lowerCapacity(int n) {
+    capacity_ -= n;
+    const int refill = std::min(capBank_, std::max(0, kCapacityCap - capacity_));
+    capacity_ += refill, capBank_ -= refill;
+}
+
 void Economy::remove(int id) {
     // What it held goes with it: a storage facility's store (the first
     // stays the yards'), a processor's ore and goods.
@@ -1235,6 +1253,8 @@ void Economy::remove(int id) {
                 ore_ = {}, refined_ = {};
             // Its people die with it (not those razing let go).
             dead_ += c.crew + c.pool;
+            if (const BuildingType* t = buildingType(c.type))
+                lowerCapacity(t->capacity);
         }
     structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
                                      [&](const ColonyStructure& c) { return c.id == id; }),
@@ -1267,16 +1287,21 @@ void Economy::setBees(int construction, int cargo, int worker) {
                 else
                     ++it;
     }
-    // The buildings standing at the start get a worker bee each, free.
+    // The buildings standing at the start get a worker bee each, free: the
+    // mines, processors and storage facilities, and the yards too (the
+    // game makes them the same kind of agent; exe.md#the-economy).
     if (first)
         for (const ColonyStructure& s : structures_)
-            if (s.progress >= 1 && (s.type == "mining-station" || s.type == "resource-processor" || s.type == "storage-facility")) {
+            if (s.progress >= 1 && (s.type == "mining-station" || s.type == "resource-processor" ||
+                                    s.type == "storage-facility" || s.type == "vehicle-yard" ||
+                                    s.type == "construction-yard")) {
                 Bee b;
                 b.id = nextBee_++;
                 b.worker = true, b.home = false;
                 b.x = s.x, b.y = s.y, b.site = s.id;
                 bees_.push_back(b);
-                depots_[s.id].worker = b.id;
+                if (s.type != "vehicle-yard" && s.type != "construction-yard")
+                    depots_[s.id].worker = b.id;
             }
 }
 
@@ -1887,7 +1912,7 @@ bool Economy::evacuated(int structure) const {
 }
 
 void Economy::syncState(save::Serializer& s) {
-    s(stores_)(refined_)(capacity_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
+    s(stores_)(refined_)(capacity_)(capBank_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
     s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_);
     s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
     s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastCrewWarning_)(nextId_)(dockFree_);

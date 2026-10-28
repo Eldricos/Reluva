@@ -154,7 +154,8 @@ public:
     Stock stock() const;
     Stock storeOf(int structure) const; // a storage facility's own
     // COLONY SIZE: the colony's buildings and vehicles, and the most it
-    // may have (50 at the start, raised by housing, never past 90).
+    // may have (50 at the start, raised by housing as it's placed, never
+    // past 90).
     int colonySize() const;
     int capacity() const { return capacity_; }
     void setVehicles(int n) { vehicles_ = n; }
@@ -437,13 +438,15 @@ private:
     void deposit(const Units& u); // into the first standing store (none: lost)
     void addStore(int structure);
     Store* yardStore();       // the first storage facility's, where vehicles are paid from
+    void raiseCapacity(int n);
+    void lowerCapacity(int n);
     static Units unitsOf(const Stock& s);
 
     char side_;
     int powerClass(std::string_view type) const;
     std::vector<Store> stores_;
     Units refined_{}; // at the processor, waiting to go to storage
-    int capacity_, vehicles_ = 0;
+    int capacity_, capBank_ = 0, vehicles_ = 0;
     ColonyMap map_;
     std::vector<ColonyStructure> structures_;
     std::array<int64_t, kOres> ore_{}; // raw ore at the processor, game units

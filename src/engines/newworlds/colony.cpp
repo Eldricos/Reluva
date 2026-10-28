@@ -85,7 +85,7 @@ constexpr ModelEntry kModels[] = {
     {"clone-farm", "", "", "rcbf"},
     {"storage-facility", "PROSTOR", "KSF", "RSF"},
     {"landing-pad", "landpad", "", ""},
-    {"transporter-pad", "landpad", "", "RBCS"},
+    {"transporter-pad", "landpad", "KIEF", "RBCS"},
     {"farm", "FHF", "KLF", "rcbf"},
     {"photon-turret", "fpdt", "", ""},
     {"disruptor-turret", "", "KDWS", ""},

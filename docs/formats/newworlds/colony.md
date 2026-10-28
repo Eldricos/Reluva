@@ -125,7 +125,7 @@ facility and utility hospital as marked.
 | Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
 | Storage facility (the Romulans' material storage) | `prostor` (the manual's picture, p. 47) | `ksf` | `rsf` |
 | Landing pad | `landpad` *name* | | |
-| Transporter pad | | | `rbcs` (the manual, p. 113) |
+| Transporter pad | | `kief` *guess* (its sounds are the import/export block's) | `rbcs` (the manual, p. 113) |
 | Photon turret (the Klingons' photon launcher, the Romulans' photon defense) | `fpdt` *guess* | `kdwsp` (the manual, p. 86) | `rpds` (the manual, p. 117) |
 | Disruptor turret (the Romulans' static disruptor) | | `kdws` (the manual, p. 85) | `rdds` (the manual, p. 116) |
 | Shield generator | `fsg` | `ksg` (the manual, p. 87: not the disruptor turret) | `rcss` (the manual, p. 118) |

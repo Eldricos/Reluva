@@ -135,20 +135,39 @@ std::string mapPosition(float x, float y) {
     return std::to_string(int(y / kBlock * 8)) + ":" + std::to_string(int(x / kBlock * 8));
 }
 
+namespace {
+
+// What the game places only when the side isn't a player's (J3's vehicle
+// yard, J3's and J6's tanks: ai_data.cpp's forWhom 2) stays out of a
+// player's start. Each such record takes out one start placement of its
+// type at its spot.
+class ComputerOnly {
+public:
+    ComputerOnly(std::string_view mission, char side) {
+        for (const SidePlacement* q : sidePlacements(mission, side == 'K' ? 1 : side == 'R' ? 2 : 0))
+            if (q->forWhom == 2)
+                left_.push_back(q);
+    }
+    bool take(const StartPlacement& p) {
+        for (auto it = left_.begin(); it != left_.end(); ++it)
+            if ((*it)->type == p.type && std::abs((*it)->a - p.a) <= 2 && std::abs((*it)->b - p.b) <= 2) {
+                left_.erase(it);
+                return true;
+            }
+        return false;
+    }
+
+private:
+    std::vector<const SidePlacement*> left_;
+};
+
+} // namespace
+
 std::vector<ColonyBuilding> MissionSim::placedColony(std::string_view mission, char side) {
     std::vector<ColonyBuilding> out;
-    // What the game places only when the side isn't a player's (J3's
-    // vehicle yard: ai_data.cpp's forWhom 2) stays out of a player's colony.
-    const int slot = side == 'K' ? 1 : side == 'R' ? 2 : 0;
-    const std::vector<const SidePlacement*> placed = sidePlacements(mission, slot);
-    auto computerOnly = [&](const StartPlacement& p) {
-        for (const SidePlacement* q : placed)
-            if (q->type == p.type && std::abs(q->a - p.a) <= 2 && std::abs(q->b - p.b) <= 2)
-                return q->forWhom == 2;
-        return false;
-    };
+    ComputerOnly computerOnly(mission, side);
     for (const StartPlacement& p : startPlacements(mission, side))
-        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model && !computerOnly(p)) {
+        if (const ObjectType* t = objectType(p.type); t && t->building && *t->model && !computerOnly.take(p)) {
             // On its footprint's middle, as the game puts it (exe.md#building-placement).
             const auto [x, y] = snapped(footprintOf(p.type), worldAt(p.a, p.b).first, worldAt(p.a, p.b).second);
             const ColonyBuilding c{t->name, t->model, int(std::lround(y / kBlock * 8)), int(std::lround(x / kBlock * 8))};
@@ -237,9 +256,10 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     };
     std::vector<Start> start;
     std::map<std::pair<int, int>, int> onSpot;
+    ComputerOnly computerOnly(mission_, side_);
     for (const StartPlacement& p : startPlacements(mission_, side_)) {
         const ObjectType* t = objectType(p.type);
-        if (!t || t->building)
+        if (!t || t->building || computerOnly.take(p))
             continue;
         const CombatType* ct = combatType(p.type);
         if ((onHub(p) || !colony_.empty()) && bee(p.type)) {
@@ -526,12 +546,18 @@ void MissionSim::step(double dt) {
     happened.insert(happened.end(), worked.begin(), worked.end());
     if (second)
         sightings(happened);
-    // The economy: its vehicles (those out and the bees in the hub), then
-    // construction, power, mining; the buildings' progress and efficiency
-    // back on their objects.
+    // The economy: what COLONY SIZE counts beside its buildings
+    // (exe.md#the-economy): the side's vehicles but its
+    // transports, its bees, and objects the economy doesn't hold (escape
+    // pods, the containment device); then construction, power, mining;
+    // the buildings' progress and efficiency back on their objects.
     economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
-                                            [&](const Unit& u) { return u.slot == player_ && !u.building; })) +
-                          housed_);
+                                            [&](const Unit& u) {
+                                                return u.slot == player_ && u.name != "unarmed-apc" &&
+                                                       (!u.building || u.name == "escape-pod" ||
+                                                        u.name == "containment-device");
+                                            })) +
+                          int(economy_->bees().size()));
     // What the economy reports: its officers' lines (for the screen), the
     // reports that raise an alert (a mine exhausted, a crew beamed down),
     // the rest for the script.

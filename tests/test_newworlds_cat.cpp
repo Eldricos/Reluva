@@ -1516,8 +1516,8 @@ void testBees() {
         m.addBuilt("construction-yard", 20000, 0);
         m.addBuilt("resource-processor", 20000, 20000);
         m.addBuilt("storage-facility", -20000, 0);
-        m.setBees(4, cargo, 1); // the processor and storage get a worker bee free; one spare
-        CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.worker; }) == 3);
+        m.setBees(4, cargo, 1); // the yard, processor and storage get a worker bee free; one spare
+        CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.worker; }) == 4);
         CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
         CHECK(built(m, 100) == 1); // 22 s out, 60 s building
         built(m, 45);
@@ -2613,6 +2613,39 @@ void testStartingYardStock() {
     CHECK(j4.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
 }
 
+// COLONY SIZE at the start, as the games recorded show it (exe.md#the-economy):
+// every building, vehicle and bee but the transports, a worker bee free for
+// each yard, storage facility, processor and mine, starting housing counted
+// twice. (F12's 90, and J2K's 55 in one play, carry over from earlier
+// missions in the same run, which Reluva doesn't.)
+void testStartingColonySize() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    struct Start {
+        const char* mission;
+        char side;
+        int size, capacity;
+    };
+    for (const Start& w : {Start{"F1", 'F', 20, 50}, Start{"J1", 'F', 26, 50}, Start{"J3", 'F', 26, 50},
+                           Start{"J2", 'F', 35, 50}, Start{"J7", 'F', 39, 50}, Start{"J8", 'F', 41, 60},
+                           Start{"F12", 'F', 47, 50}, Start{"K1", 'K', 22, 50}, Start{"J2", 'K', 25, 50},
+                           Start{"J3", 'K', 24, 50}, Start{"J4", 'K', 47, 50}, Start{"K8", 'K', 28, 50},
+                           Start{"J6", 'K', 47, 90}, Start{"J8", 'K', 41, 50}, Start{"K14", 'K', 55, 70},
+                           Start{"J9", 'K', 35, 50}, Start{"C10", 'K', 47, 50}}) {
+        MissionSim sim(w.mission, w.side, t, map, 64, 64, MissionSim::placedColony(w.mission, w.side));
+        sim.advance(0.1);
+        CHECK(sim.economy().colonySize() == w.size);
+        CHECK(sim.economy().capacity() == w.capacity);
+        if (sim.economy().colonySize() != w.size || sim.economy().capacity() != w.capacity)
+            std::printf("  %s%c: %d/%d\n", w.mission, w.side, sim.economy().colonySize(), sim.economy().capacity());
+    }
+}
+
 void testSaveState() {
     Terrain t;
     t.width = t.height = 128;
@@ -2685,6 +2718,7 @@ int main() {
     testTransports();
     testSaveState();
     testStartingYardStock();
+    testStartingColonySize();
     testPlacement();
     testProjectiles();
     testModelTextures();
