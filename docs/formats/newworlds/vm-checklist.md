@@ -20,14 +20,11 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 
 ## 1. Game-wide mechanics
 
-- **Build times** [rec]: the executable gives how the bees build (tiles,
-  four sections at once) but its time a tile doesn't match the timed
-  builds. The Let's Plays timed five Klingon and three Romulan buildings
-  ([play-kli-lp.md](play-kli-lp.md#build-times),
-  [play-rom-lp.md](play-rom-lp.md#build-times)); still wanted: a vehicle
-  yard timed cleanly (the readings disagree), one defence from the order to
-  finished with four construction bees, and any building with one bee.
-  ([exe.md](exe.md#bees))
+- **Build times** [rec]: a site takes as long as its model's largest
+  section (four bees at most; one bee does all four in turn), about 0.7 s
+  a tile by the timed builds, the executable not giving the figure. Still
+  wanted to check it: a vehicle yard timed cleanly, a defence, and any
+  building with one bee. ([exe.md](exe.md#bees))
 
 ## 2. Buildings and units (model matching)
 
@@ -37,17 +34,6 @@ selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 - **Natives** [shot]: R2's black many-legged unit at 36:30 (an Orion tank
   `odv` or a Taubat tank `tgp`? In another R2 play every enemy unit was
   the Orions'). ([play-r2.md](play-r2.md))
-- **Klingon buildings** [shot]: an AI colony's mining station in a joint
-  mission played from another side: does it stand on a deposit? (Every
-  mine the Klingon player built did; [play-kli-lp.md](play-kli-lp.md#mining-stations).)
-
-## 3. Interface
-
-- **The star in star-system views** [shot]: the mission's planet is the
-  body the camera centres on (the Federation Let's Play, every briefing);
-  which body is the star isn't shown by shading (none glows). If a star
-  can be told at all (a menu, a closer view), note it for J1, J2, J3, J7,
-  J8, R2, R9, R12. ([play-fed-lp.md](play-fed-lp.md#star-system-views))
 
 ## 4. Per mission
 
@@ -69,10 +55,6 @@ message's text and trigger but not the order the counter shows.
 - **R1** [rec]: message 18 (another play's first twelve are in
   [play-rom-lp.md](play-rom-lp.md#messages-worth-noting); 18 there is most
   likely a building's "complete" line). ([play-r1.md](play-r1.md))
-- **J7R** [rec]: who destroys the Federation hub (in two plays it fell off
-  camera). ([play-j7r.md](play-j7r.md))
-- **R12** [rec]: who kills the Hubrin observer (likely the Metar, whose
-  fliers were attacking then). ([play-r12.md](play-r12.md))
 
 ## 5. Missing data files
 
@@ -123,4 +105,9 @@ starts' colony sizes, the executable's count of objects and housing
 ([play-rom-lp.md](play-rom-lp.md)) recorded R8 for the first time,
 settled the Romulan hub's two stages (the column, then the bladed base),
 gave three Romulan build times and C11's time limit, and numbered R2's,
-J1R's, J6R's and C11's open messages.
+J1R's, J6R's and C11's open messages. The executable then explained the
+rest: C11's deadline (48 minutes; the recording was cut), J7's
+Federation hub (the other computer sides' random raids), R12's observer
+(its patrol takes it into the natives' raids), the Klingon AI's mines
+(J4, J6 and J7 only, none on a deposit), and that nothing marks a
+star-system view's star (a plain model, no light).
