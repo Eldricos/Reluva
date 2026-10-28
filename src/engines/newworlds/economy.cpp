@@ -150,8 +150,9 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 12, 89, 5, 50, 0}, Stock{0, 12, 89, 50, 30, 0}, Stock{0, 12, 89, 3, 500, 0}},
                      {{{}, {}, {"colony-hub"}}}, 45),
                  34000, 550, 85);
-        // The Klingons' times as their Let's Play timed them (play-kli-lp.md).
-        t.back().kliSeconds = 32;
+        // The Klingons' and Romulans' times as their Let's Plays timed them
+        // (play-kli-lp.md, play-rom-lp.md).
+        t.back().kliSeconds = 32, t.back().romSeconds = 70;
         consumer(add("vehicle-yard", "VEHICLE YARD",
                      {Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 2, 0, 0}},
                      {yard, yard, yard}, 65),
@@ -161,7 +162,7 @@ const std::vector<BuildingType>& buildingTypes() {
             {Stock{35, 1, 35, 0, 800, 0}, Stock{35, 1, 30, 0, 850, 0}, Stock{35, 1, 30, 0, 850, 0}}, {yard, yard, yard},
             30)
             .output = {500, 500, 1000};
-        t.back().kliSeconds = 23, t.back().romSeconds = 28;
+        t.back().kliSeconds = 23, t.back().romSeconds = 36;
         add("advanced-generator", "ADVANCED GENERATOR",
             {Stock{50, 2, 40, 0, 850, 0}, Stock{50, 2, 37, 0, 870, 0}, Stock{50, 2, 37, 0, 870, 0}},
             {{{"construction-yard-advanced", "colony-hub-upgrade"},
@@ -192,7 +193,7 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 8, 48, 20, 0, 0}, Stock{0, 8, 48, 26, 0, 0}, Stock{0, 8, 48, 36, 0, 0}}, {yard, yard, yard},
                      40),
                  44000, 550, 440);
-        t.back().kliSeconds = 61;
+        t.back().kliSeconds = 61, t.back().romSeconds = 90;
         const std::vector<std::string> housing{"construction-yard-upgrade", "transporter-pad"};
         BuildingType& accommodation = add("accommodation", "ACCOMMODATION",
                                           {Stock{0, 20, 50, 36, 0, 0}, Stock{0, 16, 60, 40, 0, 0}, Stock{0, 16, 60, 42, 0, 0}},

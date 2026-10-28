@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J8 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md)): the white-and-red fliers are the Metar's (Advanced Sniper, Nak, Yat, Dea; Bur, Ras, Starship).
+
 Joint mission J8 ("Checkmate", `jnt08rom.stb` string 1; the dust planet
 Cadimus II, `alnwrld`'s `j8` map) played as the Romulans, in a 7.8-minute
 recording (465.7 s) with commentary (the Drive file "Romulan Mission 12").

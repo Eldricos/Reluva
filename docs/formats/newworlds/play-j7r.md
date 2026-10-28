@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J7 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): the start is 38/50, not /90; the Federation hub fell off camera there too.
+
 Joint mission J7 ("The Jaws of Death", `jnt07rom.stb` string 1; the desert
 planet Lupercal, `deswrld`'s `j7` map) played as the Romulans, in a
 24.9-minute recording (1493.0 s) with commentary (the Drive file "Romulan

@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J9 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#starting-colonies)): the start is 39/50 with the data's stock; 988 / 2211 / 497 / 3500 is the stock after a construction yard ordered 3 s in.
+
 Joint mission J9 ("The Lost Tribes", `jnt09rom.stb` string 1; the dust
 planet Cadimus II, `alnwrld`'s `j9` map) played as the Romulans, in a
 13.5-minute recording (811.9 s) with commentary (the Drive file "Romulan

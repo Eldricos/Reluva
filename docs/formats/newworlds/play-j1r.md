@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J1 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): the temple scan, seizure and power source in turn, a Taubat temple destroyed line, no Federation hub line; the start 28/50, not /90.
+
 Joint mission J1 ("Into the Arena", `icewrld`'s `j1` map, the snow world
 Mazikaan) played as the Romulans, in a 36-minute recording (2160.8 s) with
 commentary (the Drive file "Romulan Mission 3"). Times are

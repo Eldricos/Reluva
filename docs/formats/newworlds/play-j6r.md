@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J6 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): 4 is Medical's biodata study complete, 5 the Federation hub destroyed, half a second apart; the colony starts with the improved hub and the vehicle yard's top-up.
+
 Joint mission J6 ("Keep Your Friends Close", `vlcwrld`'s `j6` map, the
 volcanic world Pellion Blue) played as the Romulans. The recording (the Drive
 file "Romulan Mission 9") runs 38.2 minutes (2293.8 s) and has commentary.

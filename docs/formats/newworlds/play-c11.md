@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, bonus mission C11 (Romulan)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): **C11 has a time limit**, failed 37 min 28 s into play; message 13 was most likely generic; the first ambassador beamed up is the Klingons'.
+
 The bonus Romulan mission C11 ("False Sanctuary", `cvr03.stb` strings 78-87, commented out in
 `level.dat`), most likely on **F1's map** (`icewrld`'s `f1`, the ice world
 named Junil IV here), in a 30:52 recording (1852.1 s) with commentary (the

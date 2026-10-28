@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J4 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md)): the start is 32/50 with the vehicle yard's top-up; the arsenal to take is a CAPTURED SECURITY CENT owned by the Metar.
+
 Joint mission J4 ("Cry Havoc", `alnwrld`'s `j4` map, the bleak world
 Al-Fadir in the Al-Deta system) played as the Romulans, in a 26.7-minute
 recording (1602.4 s) with commentary (the Drive file "Romulan Mission 6").

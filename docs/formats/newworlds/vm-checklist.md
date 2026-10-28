@@ -22,9 +22,10 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 
 - **Build times** [rec]: the executable gives how the bees build (tiles,
   four sections at once) but its time a tile doesn't match the timed
-  builds. The Klingon Let's Play timed five Klingon buildings
-  ([play-kli-lp.md](play-kli-lp.md#build-times)); still wanted: a Romulan
-  building, a Klingon vehicle yard, and one defence from the order to
+  builds. The Let's Plays timed five Klingon and three Romulan buildings
+  ([play-kli-lp.md](play-kli-lp.md#build-times),
+  [play-rom-lp.md](play-rom-lp.md#build-times)); still wanted: a vehicle
+  yard timed cleanly (the readings disagree), one defence from the order to
   finished with four construction bees, and any building with one bee.
   ([exe.md](exe.md#bees))
 
@@ -33,13 +34,9 @@ never delete a message unread. **[shot]** = a screenshot is enough;
 Select each item and screenshot it close up, from two sides, with the
 selection panel naming it ([colony.md](colony.md#buildings-and-models)).
 
-- **Romulan hub upgrades** [shot]: the manual supports `rch_b` (a tower)
-  as the first upgrade and `rch_c` (a base under it) the second; one
-  close-up of an upgraded Romulan hub would confirm it. The manual's
-  pictures settled the other model guesses (the storage facility, turrets,
-  shield generators, transporter pad and utility hospital; colony.md).
 - **Natives** [shot]: R2's black many-legged unit at 36:30 (an Orion tank
-  `odv` or a Taubat tank `tgp`?). ([play-r2.md](play-r2.md))
+  `odv` or a Taubat tank `tgp`? In another R2 play every enemy unit was
+  the Orions'). ([play-r2.md](play-r2.md))
 - **Klingon buildings** [shot]: an AI colony's mining station in a joint
   mission played from another side: does it stand on a deposit? (Every
   mine the Klingon player built did; [play-kli-lp.md](play-kli-lp.md#mining-stations).)
@@ -69,18 +66,13 @@ message's text and trigger but not the order the counter shows.
 
 **Romulan**
 
-- **R1** [rec]: the counter numbers of messages 5, 6 and 18 (another
-  play shows the power warning repeating every minute, so they may be
-  repeats; [play-14east.md](play-14east.md#r1)).
-  ([play-r1.md](play-r1.md))
-- **R2** [rec]: messages 3, 7, 8 and 23. ([play-r2.md](play-r2.md))
-- **J1R** [rec]: the numbers of the two messages near 29:07 and 33:00 (the
-  Federation's fail line and the temple scan's). ([play-j1r.md](play-j1r.md))
-- **J6R** [rec]: messages 4 and 5. ([play-j6r.md](play-j6r.md))
-- **J7R** [rec]: who destroys the Federation hub. ([play-j7r.md](play-j7r.md))
-- **R12** [rec]: message 9 (64:45-66:20); who kills the Hubrin observer.
-  ([play-r12.md](play-r12.md))
-- **C11** [rec]: message 13 (16:46-18:30). ([play-c11.md](play-c11.md))
+- **R1** [rec]: message 18 (another play's first twelve are in
+  [play-rom-lp.md](play-rom-lp.md#messages-worth-noting); 18 there is most
+  likely a building's "complete" line). ([play-r1.md](play-r1.md))
+- **J7R** [rec]: who destroys the Federation hub (in two plays it fell off
+  camera). ([play-j7r.md](play-j7r.md))
+- **R12** [rec]: who kills the Hubrin observer (likely the Metar, whose
+  fliers were attacking then). ([play-r12.md](play-r12.md))
 
 ## 5. Missing data files
 
@@ -91,7 +83,10 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **Nothing left here.**
+- **C11's deadline**: Reluva's script gives 3600 script seconds, 48
+  minutes at its 0.8 s a script second, but the game failed it 37½
+  minutes in ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)):
+  check the timer's start and units in the executable.
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the
@@ -123,4 +118,8 @@ Hubrin as J2's attacker of the Klingon hub, J7's magenta marker (the
 Hubrin guide), J7K's starting colony, C10's map (`coverd1`) and every
 Klingon start's stock (the top-up wherever a yard is placed); and the
 starts' colony sizes, the executable's count of objects and housing
-([exe.md](exe.md#the-economy)).
+([exe.md](exe.md#the-economy)). A Romulan Let's Play
+([play-rom-lp.md](play-rom-lp.md)) recorded R8 for the first time,
+settled the Romulan hub's two stages (the column, then the bladed base),
+gave three Romulan build times and C11's time limit, and numbered R2's,
+J1R's, J6R's and C11's open messages.

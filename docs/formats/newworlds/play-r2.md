@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission R2
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): 3 a mine exhausted, 7 and 8 the Taubat temple and vehicle facility, a second facility at <268:172>, 23 the Orion's threat; the start 22/50 (the 90 later); the mine read here as 300, 332 is 292, 332.
+
 Romulan mission R2 ("The Kingdom of the Blind", `rom02.stb`; the map `r2`,
 found under `alnwrld` in the concrete CSVs; the dust world Taphet in the
 Vistima system) as seen in a 43:40 recording (2620.5 s) with commentary

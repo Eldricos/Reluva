@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J3 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md)): the start is 26/50 with the data's stock; 27/90 and 988 / 2211 / 497 / 3500 were read after the first order.
+
 Joint mission J3 ("The Mask Slips", `alpwrld`'s `j3` map, the windswept
 planet AP173.B in the AP173 system) played as the Romulans, in a 67.1-minute
 recording (4025.6 s) with commentary (the Drive file "Romulan Mission 5").

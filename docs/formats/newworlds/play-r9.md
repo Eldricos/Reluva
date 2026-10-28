@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission R9
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#starting-colonies)): the start is 19/50 with the data's stock; 988 / 2211 / 497 / 3500 is the stock after the first construction yard's order.
+
 Romulan mission R9 ("I Have Become Death", `rom09.stb` string 1; the desert
 world Tarikon 8 in the Tarikon system, `deswrld`'s `r9` map) in a 56.9-minute
 recording (3413.2 s) with commentary (the Drive file "Romulan Mission 8").

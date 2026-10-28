@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission J2 (Romulan side)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md)): Security's message is 3; the start 25/50 with the data's stock (the capacity reaches 90 only later).
+
 Joint mission J2 ("Absent Friends", `redwrld`'s `j2` map, the barren world
 Orgolio in the Jotunheim system) played as the Romulans, in a 33.6-minute
 recording (2018.5 s) with commentary (the Drive file "Romulan Mission 4").

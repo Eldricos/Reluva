@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission R12 (Romulan)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)): "device in place" comes 0.75 s before "construction complete"; message 9 was most likely a generic line; won, objectives 12 and 14 complete.
+
 Romulan mission R12 ("Death Rattle", `rom12.stb` string 1; the planet
 Bezouk 2, `icewrld`'s `r12` map) in a 66.7-minute recording (3999.1 s) with
 commentary (the Drive file "Romulan Mission 11"). Times are

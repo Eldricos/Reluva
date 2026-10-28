@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission R14 (Romulan)
 
+> Another play ([play-rom-lp.md](play-rom-lp.md)) won it at 73:41 (objectives 12 and 14 complete); the start is 58/80 with the vehicle yard's top-up.
+
 Romulan mission R14 ("The Finest Hour", `rom14.stb` string 1; Bezouk 2
 again, played on `icewrld`'s `r12` map) in a 47.9-minute recording
 (2873.9 s) with commentary (the Drive file "Romulan Mission 13"). Times are the recording's; messages and pages are paraphrased.

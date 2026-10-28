@@ -1,5 +1,7 @@
 # Star Trek: New Worlds: watched in play, mission R1
 
+> Another play ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)) numbers its first twelve messages and starts at 17/50 with the data's stock.
+
 Romulan mission R1 ("Et Tu?", `rom01.stb` string 1; the planet Sakuntula in
 the Manuka system, `redwrld`'s `r1` map) as seen in a 23½-minute recording
 with commentary (the Drive file "Romulan Mission 1", 1415.96 s = 23:36;
