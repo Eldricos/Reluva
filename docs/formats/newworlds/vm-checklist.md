@@ -121,4 +121,5 @@ arrived with the one after it, as the script has them); a Federation Let's
 Play ([play-fed-lp.md](play-fed-lp.md)) settled the Tricorder's ore rule
 (the Tab Tricorder alone names ores, under its centre cross, once
 revealed), J2F's mine (one the starting colony is placed with), J7's crystal units and the
-fliers (Romulan disruptor tanks, Metar craft) and C9's map (`demo1`).
+fliers (Romulan disruptor tanks, Metar craft) and C9's map (`demo1`); the executable then explained J8's and F12's extra
+stock (a starting vehicle yard's top-up).
