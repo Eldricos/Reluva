@@ -169,9 +169,10 @@ gives, as K2 did.
   line held 22 s, not the other J9R play's quarter-second and 2-to-4 jump.
 - **C11** (043): **C11 has a time limit.** The first play failed on it,
   Narok's verdict 37 min 28 s after play began (39:32) and Command's
-  failure 8 s later; the report shows only the time-out line. Reluva's
-  script has the deadline (3600 script seconds) but at its 0.8 s a script
-  second it comes at 48 min, not 37½: a discrepancy still to look into.
+  failure 8 s later; the report shows only the time-out line. The
+  executable's deadline is a plain 3600-unit timer from the start, 48 min
+  at the script clock's 0.8 s (which can't run fast), as Reluva has it; the
+  recording must be missing about 10½ minutes (cuts, or a resumed save).
   Message 13 of the other play was most likely a generic line. COMMAND
   shows the objectives one at a time; the ambassador beamed up first is
   the Klingons'. ORION TANKs owned by the TAUBAT, a PHASER DEFENSE TURRET

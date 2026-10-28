@@ -83,10 +83,11 @@ message's text and trigger but not the order the counter shows.
 
 Work on Reluva's side, listed so the whole picture is in one place.
 
-- **C11's deadline**: Reluva's script gives 3600 script seconds, 48
-  minutes at its 0.8 s a script second, but the game failed it 37½
-  minutes in ([play-rom-lp.md](play-rom-lp.md#messages-worth-noting)):
-  check the timer's start and units in the executable.
+- **The natives' production speed**: with the Metar portals making a unit
+  every 0.8 s (their build value of 16 ticks), J8's Metar guards destroy
+  the Federation's AI colony about two minutes into an unplayed J8R.
+  Check a portal's roll-out time in the executable, or a recording of J8
+  where the Federation is the computer's.
 
 Done on Reluva's side since: Cadet mode (K on the missions page),
 demolition by unarmed APC, messages' faces by their officer numbers, the

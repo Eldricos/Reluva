@@ -1027,8 +1027,16 @@ How a side the computer plays builds and makes units:
   an idle unit; failing that, its production ministry passes the request
   to a factory, one per vehicle yard, which makes it as the player's yard
   does (build value x 300 at the yard's efficiency), **free to an AI
-  side**. Without a yard the request just waits; only the attack-group
-  script objects beam units in. The group sets off once it has them all.
+  side**. The natives' factories are the Taubat hangar (115), K2's rebel
+  hangar (143), side 4's 151 and the Metar portal (201): one unit at a
+  time each, free, in its build value in ticks (Taubat units 64, 3.2 s;
+  Metar ones 16, 0.8 s; tanks 640, 32 s), rolled out at the building.
+  Without a yard or factory the request just waits; only the attack-group
+  script objects beam units in. Requests have no limit and never time
+  out, but an order has one group at a time, so a side's outstanding
+  requests never pass its orders' counts; units a gone group asked for go
+  to the next group wanting the type. The group sets off once it has
+  them all.
   A human side's pool passes on only requests for worker bees.
 - **The tasks.** An order's task code says what it does: 1 a patrol
   that loops (back to its first waypoint after its last, for good; with

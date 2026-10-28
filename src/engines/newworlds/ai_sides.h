@@ -9,6 +9,7 @@
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/world.h"
 
+#include <deque>
 #include <map>
 #include <memory>
 #include <string>
@@ -155,6 +156,17 @@ private:
     std::pair<float, float> wayPoint(const NpcOrder& o, int leg) const;
     std::pair<float, float> openSpot(float x, float y) const;
     bool home(int slot, float& x, float& y) const;
+    bool deliver(int slot, int type, int id);
+    int outstanding(int slot, int type) const;
+    void factories(double seconds);
+    // A native side's factory (a Taubat hangar, a Metar portal) at work:
+    // one unit at a time, free (exe.md#ai-colonies).
+    struct FactoryJob {
+        int factory = 0; // the building's unit id
+        int slot = 0, type = 0;
+        double left = 0; // seconds still to build
+        friend void syncState(save::Serializer& s, FactoryJob& j) { s(j.factory)(j.slot)(j.type)(j.left); }
+    };
 
     std::string mission_;
     int player_;
@@ -163,6 +175,8 @@ private:
     std::vector<Running> running_;
     std::map<int, Colony> colonies_;
     std::map<int, double> nativeSites_; // a building going up without an economy: seconds put in
+    std::map<int, std::deque<int>> factoryQueue_; // per native slot: unit types asked for, oldest first
+    std::vector<FactoryJob> factoryJobs_;
     std::map<int, int> rallied_;         // per slot: vehicles sent to its rally point so far
     std::map<int, int> colonyBase_, colonyShare_, colonyTotal_; // per slot: colony size at the start, its shares last told
     ColonyMap ground_;

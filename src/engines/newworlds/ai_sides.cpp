@@ -15,6 +15,14 @@ namespace reluva::newworlds {
 
 namespace {
 
+// The natives' buildings that make units as a yard does: the Taubat hangar
+// (115), K2's rebels' hangar (143), side 4's 151 and the Metar portal (201).
+bool isFactory(int type) { return type == 115 || type == 143 || type == 151 || type == 201; }
+
+} // namespace
+
+namespace {
+
 constexpr float kBlock = 16384;
 // Placeholders (not found in the executable): how far guards go after
 // what comes near their spot, and how near a waypoint counts as reached.
@@ -341,11 +349,21 @@ void AiSides::gather(Running& r) {
             world_.moveTo(idle[i].second, wx + std::cos(angle) * off, wy + std::sin(angle) * off);
         }
     }
+    // Units already being made that no group is waiting for (a group gone
+    // meanwhile) are this one's first; then new ones are asked for: of an
+    // AI colony's yards, or of a native side's factories.
+    for (int spare = outstanding(o.slot, o.type); spare > 0 && int(r.units.size()) + r.awaited < o.count; --spare)
+        ++r.awaited;
     auto colony = colonies_.find(o.slot);
     const VehicleType* v = vehicleType(o.type);
     while (colony != colonies_.end() && v && int(r.units.size()) + r.awaited < o.count &&
            colony->second.economy->orderVehicle(*v))
         ++r.awaited;
+    const bool factory = colony == colonies_.end() && std::any_of(world_.units().begin(), world_.units().end(), [&](const Unit& u) {
+        return u.slot == o.slot && u.building && isFactory(u.type);
+    });
+    for (; factory && int(r.units.size()) + r.awaited < o.count; ++r.awaited)
+        factoryQueue_[o.slot].push_back(o.type);
     if (int(r.units.size()) >= o.count) {
         r.gathered = true;
         steer(r);
@@ -403,6 +421,7 @@ void AiSides::build(Running& r) {
 // health, the vehicles their yards finish (each to the order that asked
 // for one of its type, oldest first).
 void AiSides::colonies(double seconds) {
+    factories(seconds);
     for (auto& [id, put] : nativeSites_) {
         put += seconds;
         if (Unit* u = world_.unit(id))
@@ -431,17 +450,9 @@ void AiSides::colonies(double seconds) {
                     x = s.x, y = s.y - 1.2f * kTile;
             const auto [px, py] = openSpot(x, y);
             const int id = spawnObject(world_, slot, raceOf(slot), *t, px, py, {});
-            bool asked = false;
-            for (Running& r : running_)
-                if (!r.done && r.awaited > 0 && r.order->slot == slot && r.order->type == type) {
-                    --r.awaited;
-                    r.units.push_back(id);
-                    asked = true;
-                    break;
-                }
             // One no order asked for (a group gone meanwhile) parks at the
             // side's rally point, armed.
-            if (!asked && t->weapon.kind != WeaponKind::None)
+            if (!deliver(slot, type, id) && t->weapon.kind != WeaponKind::None)
                 for (const ColonyStructure& s : c.economy->structures())
                     if (s.type == "colony-hub") {
                         const auto [rx, ry] = rallySpot(s.x, s.y, rallied_[slot]++);
@@ -449,6 +460,74 @@ void AiSides::colonies(double seconds) {
                         break;
                     }
         }
+    }
+}
+
+// A unit a side's yard or factory finished: to the oldest group waiting
+// for one of its type.
+bool AiSides::deliver(int slot, int type, int id) {
+    for (Running& r : running_)
+        if (!r.done && r.awaited > 0 && r.order->slot == slot && r.order->type == type) {
+            --r.awaited;
+            r.units.push_back(id);
+            return true;
+        }
+    return false;
+}
+
+// Units of a type a side has being made (or asked of its factories) that
+// no group is waiting for any more.
+int AiSides::outstanding(int slot, int type) const {
+    int made = 0;
+    if (auto c = colonies_.find(slot); c != colonies_.end()) {
+        for (const Economy::VehicleJob& j : c->second.economy->vehicleJobs())
+            made += j.type == type;
+    } else {
+        if (auto q = factoryQueue_.find(slot); q != factoryQueue_.end())
+            made += int(std::count(q->second.begin(), q->second.end(), type));
+        for (const FactoryJob& j : factoryJobs_)
+            made += j.slot == slot && j.type == type;
+    }
+    for (const Running& r : running_)
+        if (!r.done && r.order->slot == slot && r.order->type == type)
+            made -= r.awaited;
+    return std::max(0, made);
+}
+
+// The natives' factories: each idle one takes its side's oldest request,
+// builds it (Taubat units 3.2 s, Metar ones 0.8 s, others 32 s: their
+// build values in ticks) and rolls it out beside itself. A factory lost
+// gives its unit back to the queue.
+void AiSides::factories(double seconds) {
+    for (auto it = factoryJobs_.begin(); it != factoryJobs_.end();) {
+        const Unit* f = world_.unit(it->factory);
+        if (!f || f->hp <= 0) {
+            factoryQueue_[it->slot].push_front(it->type);
+            it = factoryJobs_.erase(it);
+            continue;
+        }
+        it->left -= seconds;
+        if (it->left > 0) {
+            ++it;
+            continue;
+        }
+        if (const CombatType* t = combatType(it->type)) {
+            const auto [px, py] = openSpot(f->x, f->y - 1.2f * kTile);
+            const int id = spawnObject(world_, it->slot, raceOf(it->slot), *t, px, py, {});
+            deliver(it->slot, it->type, id);
+        }
+        it = factoryJobs_.erase(it);
+    }
+    for (const Unit& f : world_.units()) {
+        auto q = factoryQueue_.find(f.slot);
+        if (q == factoryQueue_.end() || q->second.empty() || !f.building || f.built < 1 || f.hp <= 0 ||
+            !isFactory(f.type) ||
+            std::any_of(factoryJobs_.begin(), factoryJobs_.end(), [&](const FactoryJob& j) { return j.factory == f.id; }))
+            continue;
+        const CombatType* t = combatType(q->second.front());
+        const double build = !t ? 32 : t->race == 'T' ? 3.2 : t->race == 'M' ? 0.8 : 32;
+        factoryJobs_.push_back({f.id, f.slot, q->second.front(), build});
+        q->second.pop_front();
     }
 }
 
@@ -784,6 +863,7 @@ void AiSides::syncState(save::Serializer& s) {
         s(colony.structureOf);
         colony.economy->syncState(s);
     }
+    s(factoryQueue_)(factoryJobs_);
     s(races_)(nativeSites_)(rallied_)(colonyBase_)(colonyShare_)(colonyTotal_)(counts_)(clock_);
 }
 
