@@ -1964,7 +1964,8 @@ void testCrew() {
     for (const ColonyStructure& s : e.structures())
         if (s.id == yard)
             CHECK(s.crew == 3 && e.efficiency(s) > 0.79f && e.efficiency(s) < 0.81f);
-    // A sickbay ordered: its crew walk over once it's built (20 s).
+    // A sickbay ordered: its crew walk over once it's built, at 380 units
+    // a second (30 000 units: 79 s).
     CHECK(e.order("sickbay", 30000, 0, 0, 0) != 0);
     run(e, 41);
     CHECK(e.has("sickbay") && e.pool() == 140);
@@ -1973,7 +1974,12 @@ void testCrew() {
         if (s.type == "sickbay")
             sickbayCrew = s.crew;
     CHECK(sickbayCrew == 0);
-    run(e, 21);
+    run(e, 75);
+    for (const ColonyStructure& s : e.structures())
+        if (s.type == "sickbay")
+            sickbayCrew = s.crew;
+    CHECK(sickbayCrew == 0);
+    run(e, 6);
     for (const ColonyStructure& s : e.structures())
         if (s.type == "sickbay")
             sickbayCrew = s.crew;
@@ -1991,7 +1997,9 @@ void testCrew() {
     CHECK(yardCrew() == 1 && e.pool() == poolBefore + 2);
     e.setCrewTarget(yard, 9); // (held to its 3 slots)
     CHECK(e.pool() == poolBefore);
-    run(e, 21);
+    run(e, 50);
+    CHECK(yardCrew() == 1); // 20 000 units: 53 s
+    run(e, 5);
     CHECK(yardCrew() == 3);
     // Life support: 150 people at 16 a tick, bought back by the hub at
     // 16.384 a unit of power, divided by its efficiency (0.8): 183 a tick.

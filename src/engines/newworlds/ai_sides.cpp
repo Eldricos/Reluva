@@ -206,9 +206,12 @@ void AiSides::start() {
                 colony->second.economy->setOfficer(structure, skill);
         }
     }
-    // Unnamed orders, and named builds (which start armed).
+    // Every order starts armed (exe.md#ai-colonies): the unnamed ones, the
+    // named builds, patrols and sweeps (on their delay), and named orders
+    // in mode 3, which go at once; a named guard or assault in another
+    // mode waits for its message.
     for (const NpcOrder* o : npcOrders(mission_))
-        if ((!*o->name || o->task == 9) && (o->slot != player_ || o->human))
+        if ((!*o->name || o->task == 9 || o->task <= 3 || o->mode == 3) && (o->slot != player_ || o->human))
             queue(*o);
 }
 
@@ -248,7 +251,8 @@ bool AiSides::ready(const Running& r) const {
     if (o.task == 10)
         return false;
     const bool quick = o.mode == 3 || o.mode == 5 || o.mode == 6;
-    if ((o.task <= 3 || o.task == 9) && clock_ < o.delay * kScriptSecond && !(quick && o.task <= 2))
+    if ((o.task <= 3 || o.task == 9) && clock_ < o.delay * kScriptSecond && !(quick && o.task <= 2) &&
+        !(r.seen && o.task <= 2))
         return false;
     if (o.task == 2 && !quick && o.ways > 0) {
         const auto [lx, ly] = wayPoint(o, o.ways - 1);
@@ -480,10 +484,16 @@ bool AiSides::order(const std::string& side, const std::string& text) {
                 r.done = true;
         return true;
     }
-    // A named build already armed stays as it is.
-    if (found->task == 9 && std::any_of(running_.begin(), running_.end(),
-                                        [&](const Running& r) { return r.order == found && !r.done; }))
-        return true;
+    // An order already armed takes no second group from its message: a
+    // patrol or sweep not yet gone goes now, without waiting out its delay;
+    // a group out carries on; a build stays as it is.
+    for (Running& r : running_)
+        if (r.order == found && !r.done) {
+            r.seen = true;
+            if (!r.started && ready(r))
+                fire(r);
+            return true;
+        }
     queue(*found);
     return true;
 }
@@ -761,7 +771,7 @@ void AiSides::syncState(save::Serializer& s) {
     for (Running& r : running_) {
         save::syncIndex(s, r.order, orders);
         s(r.units)(r.leg)(r.clock)(r.legClock)(r.started)(r.gathered)(r.hunting)(r.done)(r.awaited)(r.site);
-        s(r.groups)(r.guarding);
+        s(r.groups)(r.guarding)(r.seen);
     }
     // The other colonies' economies, made as the mission starts.
     if (s.count(colonies_.size()) != colonies_.size() && s.loading())

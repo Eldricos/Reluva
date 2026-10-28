@@ -70,12 +70,16 @@ double rolloutSeconds(char side, int type) {
 }
 // People (exe.md#crew-and-efficiency): a race's roster, an accommodation
 // block's batches, life support's use a person a tick and its rate of
-// exchange with power, a farm's output. How long crew take to walk to
-// their building is a placeholder: C8's yard was crewed about 20 s after
-// the "not enough crew" message.
+// exchange with power, a farm's output. Crew walk from the hub at 19 units
+// a tick, 380 a second (about 43 s a block; exe.md#bees); how long a
+// beamed-down crew takes from the pad is a placeholder (C8's yard was
+// crewed about 20 s after the "not enough crew" message).
 constexpr int kRoster = 150, kBatch = 10;
 constexpr double kLifePerPerson = 16, kLifePerPower = 16.384, kFarmLife = 2048;
-constexpr double kCrewWalk = 20;
+constexpr double kCrewWalk = 20, kCrewSpeed = 380;
+double walkSeconds(const ColonyStructure& from, const ColonyStructure& to) {
+    return std::hypot(double(to.x - from.x), double(to.y - from.y)) / kCrewSpeed;
+}
 // The least a razed building stands evacuating (Reluva's: the game's is
 // a few ticks, its parts let go in turn).
 constexpr int kEvacTicks = 5;
@@ -130,7 +134,8 @@ const std::vector<BuildingType>& buildingTypes() {
     // tiles, one each a cycle, in four sections at once (exe.md#bees), so
     // the rest follow from their models' tiles, against those timed: the
     // defences and shield generators, and the other races' generators and
-    // yards.
+    // yards (its largest section's tiles x 0.70 s, + 5.5 s + 1.4 s for each
+    // section before it).
     static const std::vector<BuildingType> kTypes = [] {
         std::vector<BuildingType> t;
         auto add = [&](const char* id, const char* panel, std::array<Stock, 3> cost,
@@ -157,7 +162,7 @@ const std::vector<BuildingType>& buildingTypes() {
                      {Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 5, 0, 0}, Stock{0, 10, 90, 2, 0, 0}},
                      {yard, yard, yard}, 65),
                  34000, 550, 60);
-        t.back().kliSeconds = 37, t.back().romSeconds = 58;
+        t.back().kliSeconds = 42, t.back().romSeconds = 62;
         add("power-generator", "POWER GENERATOR",
             {Stock{35, 1, 35, 0, 800, 0}, Stock{35, 1, 30, 0, 850, 0}, Stock{35, 1, 30, 0, 850, 0}}, {yard, yard, yard},
             30)
@@ -233,7 +238,7 @@ const std::vector<BuildingType>& buildingTypes() {
                        {"construction-yard-upgrade", "security-center", "shield-generator"}}},
                      22),
                  64000, 550, 160);
-        t.back().kliSeconds = 24, t.back().romSeconds = 33;
+        t.back().kliSeconds = 24, t.back().romSeconds = 34;
         consumer(add("defensive-artillery", "DEFENSIVE ARTILLERY",
                      {Stock{0, 0, 93, 13, 250, 500}, Stock{0, 0, 93, 11, 250, 500}, Stock{0, 0, 93, 11, 250, 500}},
                      {{{"construction-yard-advanced", "colony-hub-advanced", "security-center"},
@@ -241,7 +246,7 @@ const std::vector<BuildingType>& buildingTypes() {
                        {"construction-yard-upgrade", "colony-hub-advanced", "security-center", "energy-lab"}}},
                      31),
                  64000, 550, 160);
-        t.back().romSeconds = 29;
+        t.back().romSeconds = 27;
         // Upgrades: fitted to their building, no placing. An advanced one
         // follows the improved one.
         auto upgrade = [&](const char* id, const char* panel, const char* of, Stock f, Stock k, Stock r,
@@ -810,7 +815,7 @@ void Economy::requestCrew(ColonyStructure& s) {
             if (transports_ && from.type != "colony-hub")
                 addRides(from.id, s.id, need, false, true);
             else
-                s.coming.push_back({need, kCrewWalk});
+                s.coming.push_back({need, walkSeconds(from, s)});
             s.wanted = 0;
             return;
         }
@@ -901,7 +906,7 @@ void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
         if (m > 0) {
             if (hubPool > 0) {
                 hub->pool -= m;
-                s.coming.push_back({-m, kCrewWalk}); // negative: for its pool
+                s.coming.push_back({-m, walkSeconds(*hub, s)}); // negative: for its pool
             } else {
                 orbit_ -= m;
                 if (const ColonyStructure* p = transports_ ? pad() : nullptr)

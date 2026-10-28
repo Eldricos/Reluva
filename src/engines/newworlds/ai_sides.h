@@ -138,6 +138,7 @@ private:
         int site = 0;    // a build order's building, once put up
         int groups = 0;  // groups sent and lost (it tries three in all)
         bool guarding = false; // its units hold their spot now (a guard, a patrol ending as one)
+        bool seen = false;     // a message came for it (a patrol or sweep then goes without its delay)
     };
     struct Colony {
         std::unique_ptr<Economy> economy;
