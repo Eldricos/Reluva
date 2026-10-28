@@ -2636,7 +2636,8 @@ void testStartingColonySize() {
                            Start{"F12", 'F', 47, 50}, Start{"K1", 'K', 22, 50}, Start{"J2", 'K', 25, 50},
                            Start{"J3", 'K', 24, 50}, Start{"J4", 'K', 47, 50}, Start{"K8", 'K', 28, 50},
                            Start{"J6", 'K', 47, 90}, Start{"J8", 'K', 41, 50}, Start{"K14", 'K', 55, 70},
-                           Start{"J9", 'K', 35, 50}, Start{"C10", 'K', 47, 50}}) {
+                           Start{"J9", 'K', 35, 50}, Start{"C10", 'K', 47, 50}, Start{"R1", 'R', 17, 50},
+                           Start{"R2", 'R', 22, 50}, Start{"R8", 'R', 53, 50}, Start{"R9", 'R', 19, 50}}) {
         MissionSim sim(w.mission, w.side, t, map, 64, 64, MissionSim::placedColony(w.mission, w.side));
         sim.advance(0.1);
         CHECK(sim.economy().colonySize() == w.size);

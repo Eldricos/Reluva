@@ -549,13 +549,14 @@ void MissionSim::step(double dt) {
     // The economy: what COLONY SIZE counts beside its buildings
     // (exe.md#the-economy): the side's vehicles but its
     // transports, its bees, and objects the economy doesn't hold (escape
-    // pods, the containment device); then construction, power, mining;
+    // pods, the containment device, R8's inert buildings); then construction, power, mining;
     // the buildings' progress and efficiency back on their objects.
     economy_->setVehicles(int(std::count_if(world_->units().begin(), world_->units().end(),
                                             [&](const Unit& u) {
                                                 return u.slot == player_ && u.name != "unarmed-apc" &&
                                                        (!u.building || u.name == "escape-pod" ||
-                                                        u.name == "containment-device");
+                                                        u.name == "containment-device" ||
+                                                        u.name.rfind("inert-", 0) == 0);
                                             })) +
                           int(economy_->bees().size()));
     // What the economy reports: its officers' lines (for the screen), the
