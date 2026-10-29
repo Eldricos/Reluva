@@ -85,12 +85,26 @@ int main(int argc, char** argv) {
     while (auto target = direct ? direct : launcher.run()) {
         const MetaEngine* meta = findEngine(target->engineId);
         if (!meta) {
-            launcher.setStatus("Unknown engine '" + target->engineId + "' for " + target->target);
+            const std::string why = "Unknown engine '" + target->engineId + "' for " + target->target;
+            if (direct) {
+                std::fprintf(stderr, "%s\n", why.c_str());
+                return 1;
+            }
+            launcher.setStatus(why);
             continue;
         }
 
         SDL_Log("Starting %s (%s)", target->description.c_str(), meta->name());
         auto engine = meta->create(system, *target);
+        if (!engine) {
+            const std::string why = target->description + ": " + meta->name() + " can't run this game";
+            if (direct) {
+                std::fprintf(stderr, "%s\n", why.c_str());
+                return 1;
+            }
+            launcher.setStatus(why);
+            continue;
+        }
         // Ctrl+F5 opens the Reluva menu over the game.
         menu.attach(engine.get(), *target);
         system.setMenuHandler([&] { return menu.run(); });

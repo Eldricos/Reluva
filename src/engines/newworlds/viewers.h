@@ -604,6 +604,8 @@ public:
     void update(uint64_t nowMs);
     // Playing: Tab and Escape are the game's, not the data viewer's.
     bool playing() const { return playing_; }
+    // A run (G) under way, at any stage: the keys are the run's too.
+    bool inRun() const { return flow_ != Flow::None; }
     // The side the page shows ('F', 'K', 'R'; 0 with no missions).
     char side() const;
     // Savestates (docs/savestates.md): a mission being played can be
@@ -612,6 +614,9 @@ public:
     bool canSave(std::string& why) const;
     std::string stateDescription() const;
     Error syncState(save::Serializer& s);
+    // The mission being played from its start again (a load that failed
+    // after it began putting the play back); nothing if none is.
+    void restartPlay();
     // A race's campaign just won (its last mission's report closed): the
     // side, once ('F', 'K', 'R'; 0 none), for its movie.
     char takeCampaignWon() {
@@ -643,6 +648,7 @@ private:
     // Play: the game's controls over the map.
     void startPlay();
     void stopPlay();
+    void resetPlayUi(); // play's panels closed and its picks dropped (both of the above)
     bool playEvent(const Event& ev); // true if play used it
     void showUnits();
     void drawPlay();

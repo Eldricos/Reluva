@@ -416,21 +416,8 @@ void MissionViewer::startPlay() {
     pageRun_.reset();
     run_ = sim_->run();
     playerSlot_ = sim_->playerSlot();
-    flashes_.clear();
-    blasts_.clear();
-    pendingOrder_ = 0;
-    researchMenu_ = vehicleMenu_ = buildMenu_ = false;
-    placing_.clear();
+    resetPlayUi();
     walk_.clear();
-    log_.clear();
-    walkNote_.clear();
-    selectedBuilding_ = 0;
-    razeAsked_ = 0;
-    colonyDetails_ = false;
-    jumpedTo_ = {};
-    commsShown_ = -1, commsClosed_ = false, commandShown_ = true;
-    allyOpen_ = false, allyPick_ = -1;
-    shownOthers_.clear();
     // What the script said as the mission began.
     for (const MissionSim::Said& said : sim_->takeSaid())
         deliver(said.fired, said.out);
@@ -439,7 +426,6 @@ void MissionViewer::startPlay() {
     playing_ = true;
     interface_ = true;
     briefing_ = false;
-    boxing_ = tricorderFull_ = false;
     lastTickMs_ = nowMs_;
     map_.centreOn(hx, hy);
     map_.setView(MapViewer::View::BirdsEye);
@@ -464,21 +450,52 @@ const std::map<std::string, int>& MissionViewer::beesHoused() const {
     return sim_ ? sim_->beesHoused() : kNone;
 }
 
+// What play's panels show and what they're waiting on, as a mission
+// starts: nothing open, picked or asked, so none of it outlives its play.
+void MissionViewer::resetPlayUi() {
+    quitAsked_ = paused_ = false;
+    boxing_ = tricorderFull_ = false;
+    flashes_.clear();
+    blasts_.clear();
+    pendingOrder_ = 0;
+    researchMenu_ = vehicleMenu_ = buildMenu_ = false;
+    placing_.clear();
+    ghostOk_ = false, ghostA_ = ghostB_ = -1;
+    log_.clear();
+    walkNote_.clear();
+    selectedBuilding_ = 0;
+    razeAsked_ = cancelAsked_ = 0;
+    colonyDetails_ = false;
+    staffView_ = trainingView_ = false;
+    pickedOfficer_ = -1, officerClickMs_ = 0;
+    playbook_.clear();
+    playbookTarget_ = 0, playbookX_ = playbookY_ = 0, playbookAt_ = {};
+    multiPage_ = 0;
+    multiTicked_.clear();
+    jumpedTo_ = {};
+    cycledBuilding_ = cycledVehicle_ = 0;
+    followed_ = alertedLast_ = rallied_ = 0;
+    menuPage_ = 0, menuFlash_ = {-1, 0};
+    commsShown_ = -1, commsClosed_ = false, commandShown_ = true;
+    allyOpen_ = false, allyPick_ = -1;
+    shownOthers_.clear();
+    otherBuildings_.clear();
+    unitVoices_.clear();
+    spokenSelection_.clear();
+    buttons_.clear();
+}
+
 void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
-    quitAsked_ = paused_ = false;
     map_.stopFollowing();
     if (mixer_)
         mixer_->stop(stingHandle_);
     world_ = nullptr, economy_ = nullptr, ai_ = nullptr, fieldWork_ = nullptr;
     research_ = nullptr, effects_ = nullptr, fog_ = nullptr, run_ = nullptr;
     sim_.reset();
-    log_.clear();
-    walkNote_.clear();
-    buildMenu_ = false;
-    placing_.clear();
+    resetPlayUi();
     map_.setGhost({}, 0, 0, false);
     map_.setUnits({});
     map_.unlock();
@@ -1373,6 +1390,13 @@ void MissionViewer::handleEvent(const Event& ev) {
             return;
     }
     if (playing_ && playEvent(ev))
+        return;
+    // A run's briefing (or play) is its mission's, as whom it started:
+    // the keys that pick another mission or side, or start another play,
+    // wait until it's over.
+    if (flow_ != Flow::None && ev.type == EventType::KeyDown &&
+        (ev.key == key::Left || ev.key == key::Right || ev.key == 'j' || ev.key == 'x' || ev.key == 'z' ||
+         ev.key == 'c' || ev.key == 'g' || ev.key == key::F1 + 2))
         return;
     if (ev.type == EventType::KeyDown && ev.key == 'g') {
         startFlow();
@@ -2631,7 +2655,7 @@ void MissionViewer::drawInterface() {
                 if (!c.finished && !c.running)
                     buttons_.push_back({x + 6, cy, w - 12, lh, "course" + std::to_string(i)});
             }
-        } else if (staffView_) {
+        } else if (staffView_ && fieldWork_) {
             // The officers' cards: each one's own face, then rank
             // and name, section and skill, and where they are. A click picks
             // one: the next of the colony's buildings or vehicles clicked
@@ -3659,8 +3683,12 @@ Error MissionViewer::syncState(save::Serializer& s) {
     s(log_)(commsShown_)(commsClosed_)(commandShown_)(shownOthers_)(otherBuildings_)(unitVoices_);
     map_.syncCamera(s);
     if (s.loading()) {
-        if (!s.ok())
+        if (!s.ok()) {
+            // Whatever was read is dropped: the mission from its start.
+            flow_ = flowed ? Flow::Playing : Flow::None;
+            restartPlay();
             return Error::fail("The save is damaged: " + s.error() + ". The mission starts over.");
+        }
         flow_ = flowed ? Flow::Playing : Flow::None;
         flowWon_ = false;
         lastTickMs_ = nowMs_;
@@ -3674,6 +3702,15 @@ Error MissionViewer::syncState(save::Serializer& s) {
         updateTitle();
     }
     return Error::success();
+}
+
+void MissionViewer::restartPlay() {
+    if (!playing_)
+        return;
+    stopPlay();
+    startPlay();
+    flowWon_ = false;
+    dirty_ = true;
 }
 
 void MissionViewer::endFlow() {

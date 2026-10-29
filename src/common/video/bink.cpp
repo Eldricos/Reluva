@@ -622,6 +622,9 @@ bool PlaneDecoder::decode(uint8_t* frame, const uint8_t* last, int stride, int w
                     std::memcpy(dst + i * stride, prev + i * stride, 8);
                 break;
             case Scaled: {
+                // On a plane's last block row or column (an odd count) only
+                // the quarters inside the plane are kept.
+                const int sw = bx + 1 < bw ? 16 : 8, sh = by + 1 < bh ? 16 : 8;
                 blk = value(SubBlockTypes);
                 switch (blk) {
                 case RunBlock:
@@ -634,8 +637,8 @@ bool PlaneDecoder::decode(uint8_t* frame, const uint8_t* last, int stride, int w
                     break;
                 case Fill: {
                     const uint8_t v = uint8_t(value(Colours));
-                    for (int i = 0; i < 16; ++i)
-                        std::memset(dst + i * stride, v, 16);
+                    for (int i = 0; i < sh; ++i)
+                        std::memset(dst + i * stride, v, size_t(sw));
                     break;
                 }
                 case PatternBlock: {
@@ -655,8 +658,8 @@ bool PlaneDecoder::decode(uint8_t* frame, const uint8_t* last, int stride, int w
                     return false;
                 }
                 if (blk != Fill)
-                    for (int j = 0; j < 16; ++j)
-                        for (int i = 0; i < 16; ++i)
+                    for (int j = 0; j < sh; ++j)
+                        for (int i = 0; i < sw; ++i)
                             dst[j * stride + i] = small[(j >> 1) * 8 + (i >> 1)];
                 ++bx;
                 dst += 8;
@@ -924,7 +927,10 @@ Error BinkMovie::open(const std::filesystem::path& file) {
     if (h[0] != 'B' || h[1] != 'I' || h[2] != 'K' || h[3] < 'c' || h[3] > 'k')
         return Error::fail("not a Bink 1 movie (versions c-k)");
     version_ = char(h[3]);
-    fileSize_ = le32(h + 4) + 8;
+    // The header's size, but never past the file's real end.
+    std::error_code ec;
+    const uintmax_t real = std::filesystem::file_size(file, ec);
+    fileSize_ = uint32_t(std::min<uint64_t>(uint64_t(le32(h + 4)) + 8, ec ? 0 : real));
     const uint32_t frames = le32(h + 8);
     width_ = int(le32(h + 20));
     height_ = int(le32(h + 24));
@@ -932,8 +938,10 @@ Error BinkMovie::open(const std::filesystem::path& file) {
     fpsDen_ = le32(h + 32);
     flags_ = le32(h + 36);
     const uint32_t tracks = le32(h + 40);
-    if (!frames || frames > 1000000 || width_ <= 0 || width_ > 7680 || height_ <= 0 || height_ > 4800 || !fpsNum_ ||
-        !fpsDen_ || tracks > 256)
+    // At most 4096x4096 (Bink 1 movies are far smaller), which keeps the
+    // planes and bundles below about 160 MB.
+    if (!frames || frames > 1000000 || uint64_t(frames) * 4 > fileSize_ || width_ <= 0 || width_ > 4096 ||
+        height_ <= 0 || height_ > 4096 || !fpsNum_ || !fpsDen_ || tracks > 256)
         return Error::fail("bad Bink header");
     if (version_ == 'k')
         file_.seekg(4, std::ios::cur);
@@ -969,8 +977,11 @@ Error BinkMovie::open(const std::filesystem::path& file) {
     }
     next_ = 0;
     state_->bundles.assign(Sources, Bundle{});
-    for (Bundle& b : state_->bundles)
-        b.data.assign(size_t(bw) * bh * 64, 0);
+    // Each source's most values per block (a run block may take 63 runs and
+    // 64 colours, a pattern block 8 pattern rows).
+    constexpr int kPerBlock[Sources] = {1, 1, 64, 8, 1, 1, 1, 1, 64};
+    for (int s = 0; s < Sources; ++s)
+        state_->bundles[s].data.assign(size_t(bw) * bh * kPerBlock[s], 0);
     state_->audio.reset();
     if (!tracks_.empty() && !tracks_[0].dct)
         state_->audio = std::make_unique<AudioDecoder>(tracks_[0].rate, tracks_[0].stereo ? 2 : 1, false, false);
@@ -1069,6 +1080,9 @@ Error BinkMovie::decodeAudio(uint32_t frame, std::vector<int16_t>& out) {
     const uint32_t n = le32(size);
     if (n < 4)
         return Error::success();
+    const uint32_t end = frame + 1 < index_.size() ? index_[frame + 1] : fileSize_;
+    if (uint64_t(n) + 4 > end - index_[frame])
+        return Error::fail("bad Bink audio in frame " + std::to_string(frame));
     audioPacket_.resize(n);
     if (!file_.read(reinterpret_cast<char*>(audioPacket_.data()), n))
         return Error::fail("Bink audio cut short");

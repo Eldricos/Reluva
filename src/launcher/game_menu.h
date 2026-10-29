@@ -61,7 +61,8 @@ public:
     // shown in the menu.
     EventType loadAtStart(int slot);
 
-    // Saves to / loads from a slot; the error says why not.
+    // Saves to / loads from a slot; the error says why not. A load that
+    // fails once the engine has begun reading calls its loadFailed().
     Error save(int slot, const std::string& description);
     Error load(int slot);
 
@@ -73,6 +74,9 @@ private:
     std::filesystem::path root_;
     Engine* engine_ = nullptr;
     GameTarget target_;
+    // A load failed part way and the engine couldn't put itself right: no
+    // resuming or saving until a load works.
+    bool broken_ = false;
 };
 
 } // namespace reluva

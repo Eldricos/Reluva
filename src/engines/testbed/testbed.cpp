@@ -90,12 +90,21 @@ public:
     Error syncState(save::Serializer& s) override {
         uint64_t elapsed = sys_.getMillis() - start_;
         bool tone = toneOn_;
-        s(elapsed)(tone)(mouseX_)(mouseY_);
+        int mx = mouseX_, my = mouseY_;
+        s(elapsed)(tone)(mx)(my);
         if (s.loading() && s.ok()) {
             start_ = sys_.getMillis() - elapsed;
             toneOn_ = tone;
+            mouseX_ = mx, mouseY_ = my;
         }
         return Error::success();
+    }
+    // A load gone wrong: the testbed as it starts.
+    bool loadFailed() override {
+        start_ = sys_.getMillis();
+        toneOn_ = false;
+        mouseX_ = kWidth / 2, mouseY_ = kHeight / 2;
+        return true;
     }
 
 private:

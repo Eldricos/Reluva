@@ -37,10 +37,8 @@ public:
     // it can save and load (`why` explains a no), and lists its whole
     // state in syncState(), for saving or loading as the Serializer says.
     // Both are called by the Reluva menu from inside System::pollEvent(),
-    // between the engine's frames; a failed load may leave the state
-    // half-read, so the engine should be able to start over from it (its
-    // menu, a new mission). stateVersion() goes up whenever the state's
-    // layout changes: older saves are then refused, not misread.
+    // between the engine's frames. stateVersion() goes up whenever the
+    // state's layout changes: older saves are then refused, not misread.
     virtual bool canSaveState(std::string& why) const {
         why = "This game has no savestates yet.";
         return false;
@@ -53,6 +51,12 @@ public:
         (void)s;
         return Error::fail("This game has no savestates.");
     }
+    // A load that failed once syncState() had begun reading (its error,
+    // a damaged save, bytes left over): the state may be half-read, so the
+    // engine puts itself somewhere sound (its menu, the mission from its
+    // start) and returns true, or returns false if it can't, and the menu
+    // then offers only another load, the launcher or quitting.
+    virtual bool loadFailed() { return false; }
 };
 
 // Static description of an engine: its name, how to recognise its games,

@@ -31,6 +31,9 @@ std::string formatTime(int64_t t) {
     return buf;
 }
 
+// Why the game can't go on after a load it couldn't recover from.
+constexpr const char* kBroken = "A load failed part way: load another save, or return to the launcher.";
+
 std::string slotLabel(const save::Slot& s) {
     char num[8];
     std::snprintf(num, sizeof num, "%02d", s.number);
@@ -127,6 +130,7 @@ GameMenu::GameMenu(SdlSystem& system, std::filesystem::path saveRoot) : sys_(sys
 void GameMenu::attach(Engine* engine, const GameTarget& target) {
     engine_ = engine;
     target_ = target;
+    broken_ = false;
 }
 
 Error GameMenu::save(int slot, const std::string& description) {
@@ -166,13 +170,15 @@ Error GameMenu::load(int slot) {
         return Error::fail("This save is from another version of Reluva (" + h.reluvaVersion +
                            ") whose saves for this game this one can't read.");
     save::Serializer s = save::Serializer::loader(std::move(bytes));
-    if (Error e = engine_->syncState(s))
-        return e;
-    if (!s.ok())
-        return Error::fail("The save is damaged: " + s.error());
-    if (!s.atEnd())
-        return Error::fail("The save has more in it than this version reads.");
-    return Error::success();
+    Error e = engine_->syncState(s);
+    if (e.ok && !s.ok())
+        e = Error::fail("The save is damaged: " + s.error());
+    if (e.ok && !s.atEnd())
+        e = Error::fail("The save has more in it than this version reads.");
+    // Past this point the game holds what was read: on a failure it must
+    // put itself right, or it can't be played or saved until a load works.
+    broken_ = !e.ok && !engine_->loadFailed();
+    return e;
 }
 
 EventType GameMenu::run() { return loop(Page::Main, {}); }
@@ -215,15 +221,16 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
         enter(page);
     bool showProblem = !problem.empty();
     message = problem;
-    std::string why;
-    const bool canSave = engine_ && engine_->canSaveState(why);
-    const std::string saveWhy = why;
-    const bool canLoad = engine_ && engine_->canLoadState(why);
-    const std::string loadWhy = why;
-
     EventType result = EventType::None;
     bool open = true;
     while (open) {
+        // (Again each frame: a load changes them.)
+        std::string why;
+        const bool canSave = engine_ && !broken_ && engine_->canSaveState(why);
+        const std::string saveWhy = broken_ ? kBroken : why;
+        const bool canLoad = engine_ && engine_->canLoadState(why);
+        const std::string loadWhy = why;
+
         SDL_Event ev;
         while (SDL_PollEvent(&ev)) {
             ImGui_ImplSDL3_ProcessEvent(&ev);
@@ -233,13 +240,13 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
             }
             if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_ESCAPE && !ev.key.repeat &&
                 !ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId)) {
-                if (page == Page::Main)
-                    open = false;
-                else
+                if (page != Page::Main)
                     page = Page::Main;
+                else if (!broken_)
+                    open = false;
             }
             if (ev.type == SDL_EVENT_KEY_DOWN && ev.key.key == SDLK_F5 && (ev.key.mod & SDL_KMOD_CTRL) &&
-                !ev.key.repeat)
+                !ev.key.repeat && !broken_)
                 open = false;
         }
         if (!open)
@@ -261,8 +268,12 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
                          ImGuiWindowFlags_NoResize);
         const ImVec2 wide(-1, 0);
         if (page == Page::Main) {
+            ImGui::BeginDisabled(broken_);
             if (ImGui::Button("Resume", wide))
                 open = false;
+            ImGui::EndDisabled();
+            if (broken_ && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+                ImGui::SetTooltip("%s", kBroken);
             ImGui::BeginDisabled(!canSave);
             if (ImGui::Button("Save...", wide))
                 enter(Page::Save);

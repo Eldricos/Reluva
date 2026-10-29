@@ -140,9 +140,9 @@ public:
                     movies.handleEvent(ev);
                     continue;
                 }
-                // While the missions page is playing, Escape and Tab are
-                // the game's.
-                const bool game = viewer == 0 && missions.playing();
+                // While the missions page is playing, or a run (G) is under
+                // way at any stage, Escape and Tab are the game's.
+                const bool game = viewer == 0 && (missions.playing() || missions.inRun());
                 if (ev.type == EventType::KeyDown && ev.key == key::Escape && !game)
                     return Error::success();
                 if (ev.type == EventType::KeyDown && ev.key == key::Tab && !game) {
@@ -239,15 +239,26 @@ public:
         if (s.loading() && movies_)
             movies_->stop();
         Error e = missions_->syncState(s);
-        if (s.loading())
+        if (s.loading()) {
             loaded_ = true;
+            syncFailed_ = !e.ok;
+        }
         return e;
+    }
+    // A load the menu found wrong after the mission took it (bytes left
+    // over): the mission starts over. One that failed in syncState() has
+    // already put the page right (the mission restarted, or none played).
+    bool loadFailed() override {
+        if (missions_ && !syncFailed_)
+            missions_->restartPlay();
+        syncFailed_ = false;
+        return true;
     }
 
 private:
     // Goes up whenever a savestate's layout changes (any syncState in the
     // engine): older saves are then refused.
-    static constexpr uint32_t kStateVersion = 4;
+    static constexpr uint32_t kStateVersion = 5;
 
     // The main menu's mission list, if the game folder has one; a missing
     // or unreadable level.dat only loses the missions' names.
@@ -286,7 +297,7 @@ private:
     GameTarget target_;
     MissionViewer* missions_ = nullptr;
     newworlds::MoviePlayer* movies_ = nullptr;
-    bool loaded_ = false;
+    bool loaded_ = false, syncFailed_ = false;
     Surface screen_;
     newworlds::Archives archives_;
 };

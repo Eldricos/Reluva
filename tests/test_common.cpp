@@ -304,8 +304,9 @@ static void testSavestate(const std::filesystem::path& tmp) {
 }
 
 // A one-frame 8x8 Bink movie (version i) built bit by bit: each plane a
-// single fill block.
-static void testBink(const std::filesystem::path& tmp) {
+// single fill block, or (scaled) a 16x16 fill block, which on an 8x8 plane
+// must keep to its one 8x8 quarter.
+static std::vector<uint8_t> binkMovie(bool scaled, uint32_t headerSize = 0) {
     std::vector<uint8_t> bytes;
     uint64_t acc = 0;
     int nbits = 0;
@@ -322,14 +323,21 @@ static void testBink(const std::filesystem::path& tmp) {
             put(0, 1);
     };
     put(0, 32); // the frame's leading word (version i)
+    bool first = true;
     for (const int colour : {0x5A, 0xC0, 0x40}) { // Y, then V and U from version h
         put(0, 4 * 23);                           // every tree the plain one
-        put(1, 10), put(1, 1), put(6, 4);         // block types: one, all fill
-        put(0, 9);                                // no 16x16 block types
+        if (scaled && first) {
+            put(1, 10), put(1, 1), put(1, 4); // block types: one, scaled
+            put(1, 9), put(1, 1), put(6, 4);  // 16x16 block types: one, fill
+        } else {
+            put(1, 10), put(1, 1), put(6, 4); // block types: one, all fill
+            put(0, 9);                        // no 16x16 block types
+        }
         put(1, 10), put(1, 1), put(colour >> 4, 4), put(colour & 15, 4); // one colour
         for (int i = 0; i < 6; ++i)
             put(0, 10); // no patterns, motion, DCs or runs
         align32();
+        first = false;
     }
     std::vector<uint8_t> file(48);
     auto le = [&](size_t at, uint32_t v) {
@@ -337,12 +345,21 @@ static void testBink(const std::filesystem::path& tmp) {
             file[at + i] = uint8_t(v >> (8 * i));
     };
     std::memcpy(file.data(), "BIKi", 4);
-    le(4, uint32_t(48 + bytes.size() - 8)), le(8, 1), le(12, uint32_t(bytes.size()));
+    le(4, headerSize ? headerSize : uint32_t(48 + bytes.size() - 8)), le(8, 1), le(12, uint32_t(bytes.size()));
     le(20, 8), le(24, 8), le(28, 15), le(32, 1), le(36, 0), le(40, 0), le(44, 48);
     file.insert(file.end(), bytes.begin(), bytes.end());
+    return file;
+}
+
+static void testBink(const std::filesystem::path& tmp) {
     std::filesystem::create_directories(tmp);
-    const auto path = tmp / "fill.bik";
-    std::ofstream(path, std::ios::binary).write(reinterpret_cast<const char*>(file.data()), std::streamsize(file.size()));
+    auto write = [&](const char* name, const std::vector<uint8_t>& file) {
+        const auto path = tmp / name;
+        std::ofstream(path, std::ios::binary)
+            .write(reinterpret_cast<const char*>(file.data()), std::streamsize(file.size()));
+        return path;
+    };
+    const auto path = write("fill.bik", binkMovie(false));
 
     video::BinkMovie movie;
     CHECK(movie.open(path).ok);
@@ -355,6 +372,39 @@ static void testBink(const std::filesystem::path& tmp) {
     CHECK(rgba[0] > rgba[1] && rgba[0] > rgba[2] && rgba[3] == 255); // red-ish (V high, U low)
     CHECK(!movie.nextFrame().ok); // past the end
     CHECK(!movie.open(tmp / "missing.bik").ok);
+
+    // A 16x16 block on an 8x8 plane: filled, and nothing written past it.
+    CHECK(movie.open(write("scaled.bik", binkMovie(true))).ok);
+    CHECK(movie.nextFrame().ok && movie.plane(0).size() == 64 && movie.plane(0)[0] == 0x5A &&
+          movie.plane(0)[63] == 0x5A);
+
+    // A header claiming a far bigger file: its size is the real one.
+    CHECK(movie.open(write("big.bik", binkMovie(false, 0x7FFFFFF0))).ok);
+    CHECK(movie.nextFrame().ok && movie.plane(0)[0] == 0x5A);
+
+    // An audio track whose packet claims 4 GB: an error, not an allocation.
+    {
+        const std::vector<uint8_t> plain = binkMovie(false);
+        std::vector<uint8_t> file(plain.begin(), plain.begin() + 44);
+        file[40] = 1;                                                          // one track
+        const uint8_t track[12] = {0, 0, 0, 0, 0x22, 0x56, 0, 0, 0, 0, 0, 0}; // 22050 Hz, mono, RDFT
+        file.insert(file.end(), track, track + 12);
+        const uint8_t index[4] = {60, 0, 0, 0}, size[4] = {0xF0, 0xFF, 0xFF, 0xFF};
+        file.insert(file.end(), index, index + 4);
+        file.insert(file.end(), size, size + 4);
+        file.insert(file.end(), plain.begin() + 48, plain.end());
+        const uint32_t total = uint32_t(file.size() - 8);
+        for (int i = 0; i < 4; ++i)
+            file[4 + i] = uint8_t(total >> (8 * i));
+        CHECK(movie.open(write("audio.bik", file)).ok && movie.hasAudio());
+        audio::Sound sound;
+        CHECK(!movie.decodeAudio(sound).ok);
+    }
+
+    // Implausible sizes are refused, not allocated.
+    std::vector<uint8_t> huge = binkMovie(false);
+    huge[21] = 0x40; // 16392 wide
+    CHECK(!movie.open(write("huge.bik", huge)).ok);
 }
 
 int main() {

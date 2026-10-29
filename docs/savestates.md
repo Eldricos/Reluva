@@ -16,7 +16,10 @@ game's behaviour.
   slot asks first. **Delete** removes one.
 - **Load...** lists the saves, newest picked, with each one's thumbnail,
   description and date. **Load** (or a double click) puts the game back as
-  it was and closes the menu.
+  it was and closes the menu. A save that turns out damaged part way
+  through leaves the game somewhere sound (New Worlds starts the mission
+  over); if the game can't manage that, Resume and Save stay greyed out
+  until another save loads.
 - The launcher's **Load...** button lists the selected game's saves and
   starts the game from one. `reluva <target> --load <slot>` does the same
   from the command line.
@@ -51,7 +54,7 @@ the old one. The header can be read alone (for the lists).
 
 ## For an engine
 
-An engine opts in through four virtual functions in `Engine`
+An engine opts in through five virtual functions in `Engine`
 (`src/engines/engine.h`):
 
 - `canSaveState(why)` / `canLoadState(why)`: whether it can now, and why
@@ -62,6 +65,13 @@ An engine opts in through four virtual functions in `Engine`
 - `syncState(Serializer&)`: lists its state once. The same code saves and
   loads (`s.saving()` / `s.loading()` say which), so the two can't drift
   apart.
+- `loadFailed()`: called when a load fails once `syncState` has begun
+  reading: its own error, the serializer not `ok()` after it, or bytes
+  left over (`!atEnd()`). The state may be half-read; the engine puts
+  itself somewhere sound (its menu, the mission from its start) and
+  returns true. False (the default) says it can't: the menu then won't
+  resume or save until a load succeeds, offering only Load, Return to
+  Launcher and Quit.
 
 `save::Serializer` (`src/common/savestate.h`) handles numbers, enums,
 strings and the standard containers (vector, deque, array, map,
@@ -89,7 +99,11 @@ power and life support), the AI's running orders, the fog, repairs, field
 work (scans, captures, officers, courses, raids), research, the script's
 effects, the mission script's state, and the missions page's messages,
 camera and Cadet mode. Its random numbers are seeded counters, saved with
-the rest, so a mission loaded carries on exactly as it would have.
+the rest, so a mission loaded carries on exactly as it would have. A load
+that fails once the mission has started (a damaged save, bytes left over)
+starts that mission over from its beginning, as whom it was saved; one
+that fails before (a mission or map the game doesn't have) leaves the
+game as it was, or the missions page with nothing playing.
 
 Two checks keep that true as the code changes:
 
