@@ -1708,9 +1708,8 @@ every scan-lost science metar-colony-hub
   say science "The scan dropped, Sir. Trying again."
 on scanned science metar-colony-hub
   say science "Finished, Sir, but I can't draw any firm conclusion. This needs a specialist."
-# The research's second unlock: in the game a sickbay ward (type 300) built;
-# the economy has no wards yet, so here the sickbay they're fitted to
-on built sickbay
+# The research's second unlock: the sickbay's medical lab ward (type 300) built.
+on built medical-lab
   research metar-biodata
 on researched metar-biodata
   timer biodata-ready 5
@@ -4592,9 +4591,8 @@ every scan-lost science metar-colony-hub
   say science "Lost the scan."
 on scanned science metar-colony-hub
   say science "Scan done. Nothing we didn't know."
-# The research's second unlock: in the game a sickbay ward (type 306) built;
-# the economy has no wards yet, so here the sickbay they're fitted to
-on built sickbay
+# The research's second unlock: the sickbay's medical lab ward (type 306) built.
+on built medical-lab
   research metar-biodata
 on researched metar-biodata
   say medical "The biodata analysis is finished, and it's worth a look."
@@ -7607,9 +7605,8 @@ every scan-lost science metar-colony-hub
   say science "The scan dropped, Sir. Trying again."
 on scanned science metar-colony-hub
   say science "Scan finished, though Kensal ought to check my results."
-# The research's second unlock: in the game a sickbay ward (type 314) built;
-# the economy has no wards yet, so here the sickbay they're fitted to
-on built sickbay
+# The research's second unlock: the sickbay's medical lab ward (type 314) built.
+on built medical-lab
   research metar-biodata
 on researched metar-biodata
   say medical "The biodata analysis is done. My findings are intriguing."
@@ -9252,8 +9249,8 @@ on timer fail-message
 # C4 "Building" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
 # game's own graph (S/ghidra/scripts_out/C4.json). All lines come from Command, without
 # voice clips. Upgrades by Reluva's names: construction-yard-upgrade / -advanced are the
-# improved and advanced yard (types 161, 162); processor-plant-a and processor-plant-b are
-# the resource processor's two kinds of plant (types 166, 167), built three of each.
+# improved and advanced yard (types 161, 162); the resource processor's plants, one a
+# material (the game's types 166 and 167 by turns: its monitors count three of each).
 mission C4 F
 site colony 88 415
 objective 25
@@ -9274,7 +9271,7 @@ on built resource-processor
   say command "Select the resource processor, go to the next page of the menu with the arrow, and order every upgrade it offers."
 
 # --- The first two plants, then hub and yard upgrades open the rest ---
-on built-all processor-plant-a processor-plant-b
+on built-all dilithium-plant polycomp-plant
   say command "Upgrade the colony hub the same way, and when that's done, the construction yard too."
 on built construction-yard-upgrade
   say command "The resource processor has two new upgrades. The last two need a second upgrade of both the hub and the yard."
@@ -9282,7 +9279,7 @@ on built construction-yard-advanced
   say command "The resource processor's last two upgrades can now be built. Build them both to finish this tutorial."
 
 # --- All six plants: the objective ---
-on built-all processor-plant-a*3 processor-plant-b*3
+on built-all dilithium-plant polycomp-plant thermoconc-plant transalumin-plant nitrium-plant duranium-plant
   say command "Your resource processor has every upgrade now. Keep in mind that new buildings and upgrades appear only as you improve your hub and your construction yard."
   complete 25
 on all-completed

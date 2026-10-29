@@ -791,7 +791,7 @@ void testScriptNames() {
     World world(plain);
     // (The C4 processor plants are upgrades the economy doesn't offer yet:
     // known, and the only ones.)
-    const std::set<std::string> notYet = {"processor-plant-a", "processor-plant-b"};
+    const std::set<std::string> notYet = {};
     for (const MissionScript& m : missionScripts()) {
         if (m.mission == "generic")
             continue;
@@ -2931,6 +2931,39 @@ void testStartingMineAndBees() {
             CHECK(s.blockX == 3 && s.blockY == 3 && !s.exhausted);
 }
 
+// The sickbay's wards and the processor's plants (exe.md#upgrades-and-add-ons):
+// a ward needs its hub or yard upgrade and raises the capacity by 5 as
+// it's ordered; a plant needs its yard; both go with their building, the
+// finished ward taking its 5 with it.
+void testWardsAndPlants() {
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
+    e.addBuilt("colony-hub", 0, 0);
+    e.addBuilt("construction-yard", 20000, 0);
+    const int sickbay = e.addBuilt("sickbay", 0, 20000);
+    const int processor = e.addBuilt("resource-processor", 20000, 20000);
+    auto type = [](const char* id) { return *buildingType(id); };
+    CHECK(!e.available(type("surgical-ward"))); // no improved hub yet
+    CHECK(e.available(type("dilithium-plant")) && !e.available(type("thermoconc-plant")));
+    e.addBuilt("colony-hub-upgrade", 0, 0);
+    CHECK(e.available(type("surgical-ward")) && !e.available(type("null-g-ward")));
+    const int cap = e.capacity();
+    CHECK(e.order("surgical-ward", 0, 20000, 0, 0) != 0);
+    CHECK(e.capacity() == cap + 5 && !e.available(type("surgical-ward")));
+    CHECK(e.order("dilithium-plant", 20000, 20000, 0, 0) != 0);
+    for (int i = 0; i < 2000 && !(e.has("surgical-ward") && e.has("dilithium-plant")); ++i)
+        e.advance(0.05);
+    CHECK(e.has("surgical-ward") && e.has("dilithium-plant"));
+    e.remove(sickbay);
+    CHECK(!e.has("surgical-ward") && e.capacity() == cap && e.available(type("surgical-ward")) == false);
+    e.remove(processor);
+    CHECK(!e.has("dilithium-plant"));
+    // The Klingons have no training ward.
+    CHECK(!type("training-ward").sides[1] && type("training-ward").sides[0]);
+}
+
 void testStartingColonySize() {
     Terrain t;
     t.width = t.height = 128;
@@ -3035,6 +3068,7 @@ int main() {
     testSaveState();
     testStartingYardStock();
     testStartingColonySize();
+    testWardsAndPlants();
     testStartingMineAndBees();
     testPlacement();
     testProjectiles();

@@ -52,6 +52,38 @@ sickbay wards, 166/167 the processor plants. Klingon: hub 168/169, yard
 and 307-311, wards 180 and 312-315, plants 181. Hubs: 23 Federation, 28
 Klingon, 43 Romulan *likely* (not in the build menus).
 
+### Upgrades and add-ons
+
+Each race has 23 add-on slots, each fitted once to one building (a
+building's own list: the item table at 0x671f10, the lists built at
+0x5fccf0-0x5fd040): the hub's and yards' upgrades, the science station's
+labs, slots 6-10 the **sickbay's wards** and 17-22 the **resource
+processor's plants**, one a material (dilithium, polycomp, thermoconc,
+trans al, nitrium, duranium). An add-on needs only its own prerequisite
+(the side has a finished object of that type), not the one before it.
+Ordering one (0x5b8b20, 0x5fd460) checks the stock (else the "upgrade
+delayed" report), gives a ward's +5 capacity at once, puts the add-on on
+its socket and opens a site the construction bees build like a
+building's, by its model's tiles. An add-on has no power, crew or store
+and doesn't count in COLONY SIZE; it is destroyed with its building
+(0x5fd3b0), a finished ward taking its 5 back.
+
+| | Wards (+5 capacity each, nothing else) | Plants (cost 2 polycomp, 12 thermoconc, 10 trans al; Klingon and Romulan 2) |
+|---|---|---|
+| Federation | 165 surgical (improved hub), 298 intensive care (improved yard), 299 null-G (advanced hub), 300 medical lab (advanced yard), 301 training (advanced hub and yard) | 166 and 167 by turns: dilithium and polycomp (the construction yard), thermoconc and trans al (improved yard), nitrium and duranium (advanced yard) |
+| Klingon | 187, 188, 305, 306 as the first four (no training ward) | 190 for all six, as the Federation's |
+| Romulan | 180, 312-315 as the Federation's, the one yard upgrade 176 serving for both yards | 181 for all six: dilithium and polycomp (the yard), the rest (176) |
+
+A ward costs 2 polycomp, 25 thermoconc, 6 trans al (Klingon 4, Romulan
+5). **A plant doubles what the processor makes of its material**: on its
+turn at that ore (0x5bb2b0) it takes up to 250 units, as ever, and adds
+twice that of the material if the plant is fitted and finished
+(0x5fd620): 0.3125 t a second of ore makes 0.625 t. Only that processor's
+own plants count. The scripts' monitors count finished add-ons across the
+side: C4's on 166 and 167 (one each: the first two plants; three each:
+all six), J6's on each race's medical lab (300, 306, 314). Reluva keeps
+the add-ons colony-wide (one of each), as its refining is.
+
 ## Costs and prerequisites
 
 Panel units (T, G, KG all one stock unit each). The build value is the

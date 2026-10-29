@@ -31,6 +31,9 @@ constexpr int64_t kTonne = 1000;
 //   to a quarter tonne of that ore into its material;
 constexpr int kRefineSlots = 16;
 constexpr int64_t kRefinePerVisit = 250;
+// The processor's plants, by the material each doubles.
+constexpr const char* kPlants[] = {"dilithium-plant",   "polycomp-plant", "thermoconc-plant",
+                                   "transalumin-plant", "nitrium-plant",  "duranium-plant"};
 // - the power warning comes when less than three quarters of the asked
 //   power is granted;
 constexpr float kPowerLow = 0.75f;
@@ -295,6 +298,55 @@ const std::vector<BuildingType>& buildingTypes() {
         lab("infiltration-lab", "INFILTRATION LAB", {false, false, true}, fedLab, kliLab, romLab);
         lab("lab-308", "LAB (308)", {false, false, true}, fedLab, kliLab, romLab);
         lab("lab-309", "LAB (309)", {false, false, true}, fedLab, kliLab, romLab);
+        // The resource processor's plants (exe.md#upgrades-and-add-ons):
+        // one a material, each doubling what the processor makes of it;
+        // the Federation's are its types 166 and 167 by turns, the others'
+        // one type each. Built by bees on the processor (times by their
+        // models' tiles).
+        auto plant = [&](const char* id, const char* panel, const std::string& fedNeed, const std::string& kliNeed,
+                         const std::string& romNeed) {
+            BuildingType& p = add(id, panel, {Stock{0, 2, 12, 10, 0, 0}, Stock{0, 2, 12, 2, 0, 0}, Stock{0, 2, 12, 2, 0, 0}},
+                                  {{{"resource-processor", fedNeed}, {"resource-processor", kliNeed},
+                                    {"resource-processor", romNeed}}},
+                                  12);
+            p.upgradeOf = "resource-processor";
+            p.romSeconds = 19;
+        };
+        plant("dilithium-plant", "DILITHIUM PLANT", "construction-yard", "construction-yard", "construction-yard");
+        plant("polycomp-plant", "POLYCOMP PLANT", "construction-yard", "construction-yard", "construction-yard");
+        plant("thermoconc-plant", "THERMOCONC PLANT", "construction-yard-upgrade", "construction-yard-upgrade",
+              "construction-yard-upgrade");
+        plant("transalumin-plant", "TRANS AL PLANT", "construction-yard-upgrade", "construction-yard-upgrade",
+              "construction-yard-upgrade");
+        plant("nitrium-plant", "NITRIUM PLANT", "construction-yard-advanced", "construction-yard-advanced",
+              "construction-yard-upgrade");
+        plant("duranium-plant", "DURANIUM PLANT", "construction-yard-advanced", "construction-yard-advanced",
+              "construction-yard-upgrade");
+        // The sickbay's wards: each raises the colony's capacity by 5 as
+        // it's ordered, and does nothing else (the sickbay heals no one).
+        // Five a sickbay, the Klingons' four; each needs a hub or yard
+        // upgrade (the Romulans' one yard upgrade serves for both).
+        auto ward = [&](const char* id, const char* panel, std::array<bool, 3> sides,
+                        std::array<std::vector<std::string>, 3> needs) {
+            for (auto& n : needs)
+                n.insert(n.begin(), "sickbay");
+            BuildingType& w = add(id, panel, {Stock{0, 2, 25, 6, 0, 0}, Stock{0, 2, 25, 4, 0, 0}, Stock{0, 2, 25, 5, 0, 0}},
+                                  std::move(needs), 18);
+            w.upgradeOf = "sickbay", w.sides = sides, w.capacity = 5;
+            w.kliSeconds = 25, w.romSeconds = 24;
+        };
+        ward("surgical-ward", "SURGICAL WARD", {true, true, true},
+             {{{"colony-hub-upgrade"}, {"colony-hub-upgrade"}, {"colony-hub-upgrade"}}});
+        ward("intensive-care", "INTENSIVE CARE", {true, true, true},
+             {{{"construction-yard-upgrade"}, {"construction-yard-upgrade"}, {"construction-yard-upgrade"}}});
+        ward("null-g-ward", "NULL-G WARD", {true, true, true},
+             {{{"colony-hub-advanced"}, {"colony-hub-advanced"}, {"colony-hub-advanced"}}});
+        ward("medical-lab", "MEDICAL LAB", {true, true, true},
+             {{{"construction-yard-advanced"}, {"construction-yard-advanced"}, {"construction-yard-upgrade"}}});
+        ward("training-ward", "TRAINING WARD", {true, false, true},
+             {{{"colony-hub-advanced", "construction-yard-advanced"},
+               {},
+               {"colony-hub-advanced", "construction-yard-upgrade"}}});
         // The officers each wants, and whether its crew counts.
         for (BuildingType& b : t) {
             const std::string& id = b.upgradeOf.empty() ? b.id : b.upgradeOf;
@@ -1198,7 +1250,8 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         if (slot < kOres) {
             const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
             ore_[size_t(slot)] -= use;
-            refined_[size_t(slot)] += use;
+            // A plant for the material, standing, doubles what it makes.
+            refined_[size_t(slot)] += has(kPlants[size_t(slot)]) ? 2 * use : use;
         }
         // Every 32 ticks its goods go to storage: packed into pods for the
         // bees to carry, or straight there.
@@ -1243,6 +1296,17 @@ void Economy::lowerCapacity(int n) {
 }
 
 void Economy::remove(int id) {
+    // Its upgrades and add-ons (the plants, wards, labs) go with it.
+    if (const ColonyStructure* host = structure(id)) {
+        const std::string type = host->type;
+        const float x = host->x, y = host->y;
+        std::vector<int> fitted;
+        for (const ColonyStructure& c : structures_)
+            if (const BuildingType* t = buildingType(c.type); t && t->upgradeOf == type && c.x == x && c.y == y)
+                fitted.push_back(c.id);
+        for (int f : fitted)
+            remove(f);
+    }
     // What it held goes with it: a storage facility's store (the first
     // stays the yards'), a processor's ore and goods.
     for (auto it = stores_.begin(); it != stores_.end();)
@@ -1264,7 +1328,9 @@ void Economy::remove(int id) {
             // Its people die with it (not those razing let go).
             dead_ += c.crew + c.pool;
             if (const BuildingType* t = buildingType(c.type))
-                lowerCapacity(t->capacity);
+                // (A ward takes its 5 only if it was finished.)
+                if (t->upgradeOf.empty() || c.progress >= 1)
+                    lowerCapacity(t->capacity);
         }
     structures_.erase(std::remove_if(structures_.begin(), structures_.end(),
                                      [&](const ColonyStructure& c) { return c.id == id; }),
