@@ -446,7 +446,7 @@ private:
     int powerClass(std::string_view type) const;
     std::vector<Store> stores_;
     Units refined_{}; // at the processor, waiting to go to storage
-    int capacity_, capBank_ = 0, vehicles_ = 0;
+    int capacity_, capBank_ = 0, freeWorkers_ = 0, vehicles_ = 0;
     ColonyMap map_;
     std::vector<ColonyStructure> structures_;
     std::array<int64_t, kOres> ore_{}; // raw ore at the processor, game units

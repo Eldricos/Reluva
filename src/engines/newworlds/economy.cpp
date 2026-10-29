@@ -541,6 +541,10 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
         addStore(s.id);
     if (const BuildingType* t = buildingType(type)) {
         s.stored = t->bufferCap;
+        // A mine digs round its own block (16384 units a block), as one
+        // ordered in play does.
+        if (t->onDeposit)
+            s.blockX = int(std::floor(x / 16384)), s.blockY = int(std::floor(y / 16384));
         // Housing standing at the start counts twice: the briefing's scene
         // makes the colony's own a first time and never takes it off
         // (exe.md#the-economy).
@@ -1273,7 +1277,9 @@ void Economy::setBees(int construction, int cargo, int worker) {
     // 0 construction, 1 cargo, 2 worker bees.
     auto kindOf = [](const Bee& b) { return b.worker ? 2 : b.cargo ? 1 : 0; };
     for (int kind = 0; kind < 3; ++kind) {
-        const int want = kind == 0 ? construction : kind == 1 ? cargo : worker;
+        // (The worker bees the starting buildings were given free come on
+        // top of those the colony asks for.)
+        const int want = kind == 0 ? construction : kind == 1 ? cargo : worker + freeWorkers_;
         int have = 0;
         for (const Bee& b : bees_)
             have += kindOf(b) == kind && !(b.worker && first);
@@ -1306,6 +1312,7 @@ void Economy::setBees(int construction, int cargo, int worker) {
                 b.worker = true, b.home = false;
                 b.x = s.x, b.y = s.y, b.site = s.id;
                 bees_.push_back(b);
+                ++freeWorkers_;
                 if (s.type != "vehicle-yard" && s.type != "construction-yard")
                     depots_[s.id].worker = b.id;
             }
@@ -1918,7 +1925,7 @@ bool Economy::evacuated(int structure) const {
 }
 
 void Economy::syncState(save::Serializer& s) {
-    s(stores_)(refined_)(capacity_)(capBank_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
+    s(stores_)(refined_)(capacity_)(capBank_)(freeWorkers_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
     s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_);
     s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
     s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastCrewWarning_)(nextId_)(dockFree_);
