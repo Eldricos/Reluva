@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 
 namespace reluva::newworlds {
@@ -301,6 +302,28 @@ MissionRun::MissionRun(const MissionScript& script, const MissionScript* generic
     for (const auto& o : script.objectives)
         if (!o.hidden)
             revealed_.insert(o.id);
+    // The rules' fingerprint, for savestates (FNV-1a over each handler's
+    // event, label, switches, line and actions): a save of a script since
+    // edited is refused rather than read into the wrong rules.
+    uint64_t h = 1469598103934665603ull;
+    auto mix = [&](const std::string& v) {
+        for (const char c : v + '\0')
+            h = (h ^ uint8_t(c)) * 1099511628211ull;
+    };
+    for (const Rule& r : rules_) {
+        const MissionScript::Handler& hd = *r.handler;
+        mix(hd.event.kind);
+        for (const std::string& a : hd.event.args)
+            mix(a);
+        mix(hd.label + (hd.every ? "+every" : "") + (hd.dormant ? "+dormant" : "") + "@" + std::to_string(hd.line));
+        for (const MissionScript::Action& a : hd.actions) {
+            mix(a.verb);
+            for (const std::string& v : a.args)
+                mix(v);
+        }
+        mix("\x01");
+    }
+    rulesHash_ = h;
 }
 
 bool MissionRun::requirementsMet(const ScriptEvent& want) const {
@@ -560,8 +583,16 @@ void MissionRun::checkAllCompleted(std::vector<Output>& out) {
 
 std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
     std::vector<Output> out;
-    if (finished() || depth_ > 16)
+    if (finished())
         return out;
+    if (depth_ > 16) {
+        // Follow-on events nested this deep are a loop in the script
+        // (signals raising each other): dropped, and said so once.
+        if (dropped_++ == 0)
+            std::fprintf(stderr, "mission script %s: events nested over 16 deep, dropped (first: %s)\n",
+                         script_.mission.c_str(), event.kind.c_str());
+        return out;
+    }
     ++depth_;
     if (event.kind == "built" && !event.args.empty())
         ++built_[event.args[0]];
@@ -570,11 +601,19 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
     if ((event.kind == "stock" || event.kind == "count" || event.kind == "colony-size" || event.kind == "colony-total") &&
         !event.args.empty())
         state_[event.kind + " " + (event.args.size() > 1 ? event.args[0] : std::string())] = event;
-    for (Rule& r : rules_) {
-        if (!r.armed || (r.fired && !r.handler->every) || !matches(r.handler->event, event))
+    // The rules that hear it are those on as it happens, worked out before
+    // any runs: one armed by another's actions hears the next such event,
+    // whatever the order they're written in. One switched off (or, once
+    // only, fired by a follow-on) meanwhile doesn't run.
+    std::vector<Rule*> hearing;
+    for (Rule& r : rules_)
+        if (r.armed && (!r.fired || r.handler->every) && matches(r.handler->event, event))
+            hearing.push_back(&r);
+    for (Rule* r : hearing) {
+        if (!r->armed || (r->fired && !r->handler->every))
             continue;
-        r.fired = true;
-        run(*r.handler, event, out);
+        r->fired = true;
+        run(*r->handler, event, out);
         if (finished())
             break;
     }
@@ -586,19 +625,28 @@ std::vector<MissionRun::Output> MissionRun::fire(const ScriptEvent& event) {
 
 std::vector<MissionRun::Output> MissionRun::advance(double seconds) {
     std::vector<Output> out;
-    std::vector<std::string> due;
-    for (auto& [name, left] : timers_) {
+    for (auto& [name, left] : timers_)
         left -= seconds;
-        if (left <= 0)
-            due.push_back(name);
-    }
-    for (const std::string& name : due) {
-        timers_.erase(name);
+    // The timers that ran out, one at a time, soonest first (by name if
+    // together), looked for again after each: a handler may stop one
+    // that's due (it doesn't fire) or start one again (it waits its new
+    // time). One fires at most once a call, so a timer of 0 its handler
+    // restarts fires on the next. (Within a tick's rounding counts as run
+    // out: 0.8 s timers in 50 ms steps.)
+    std::set<std::string> done;
+    while (!finished()) {
+        auto due = timers_.end();
+        for (auto it = timers_.begin(); it != timers_.end(); ++it)
+            if (it->second <= 1e-6 && !done.count(it->first) && (due == timers_.end() || it->second < due->second))
+                due = it;
+        if (due == timers_.end())
+            break;
+        const std::string name = due->first;
+        timers_.erase(due);
+        done.insert(name);
         if (name == kFailTimer) {
-            if (!finished()) {
-                lost_ = true;
-                out.push_back({Output::Lost, {}, {}, failId_, {}});
-            }
+            lost_ = true;
+            out.push_back({Output::Lost, {}, {}, failId_, {}});
             continue;
         }
         auto more = fire({"timer", {name}});
@@ -752,6 +800,10 @@ void MissionRun::syncState(save::Serializer& s) {
     // and is armed changes.
     if (s.count(rules_.size()) != rules_.size() && s.loading())
         s.fail("a mission script of another shape");
+    uint64_t hash = rulesHash_;
+    s(hash);
+    if (s.loading() && hash != rulesHash_)
+        s.fail("mission " + script_.mission + "'s script has changed since the save was made");
     for (Rule& r : rules_)
         s(r.fired)(r.armed);
     s(built_)(completed_)(revealed_)(timers_)(signals_)(state_)(random_)(won_)(lost_)(allDone_)(failing_);

@@ -239,8 +239,9 @@ public:
     // The middle of group N (or of the selection, for n = 0); false if empty.
     bool groupCentre(int n, float& x, float& y) const;
 
-    // Moves time on; true if anything moved or fought. Combat runs at the
-    // game's 20 ticks a second.
+    // Moves time on, in the game's ticks (20 a second: a combat tick, then
+    // a tick's movement); the rest of a tick waits for the next call. True
+    // if a tick ran.
     bool advance(double seconds);
     // What combat did since last asked.
     std::vector<WorldEvent> takeEvents();

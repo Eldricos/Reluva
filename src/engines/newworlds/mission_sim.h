@@ -60,10 +60,15 @@ public:
     // Objects' sizes to shots from their models (exe.md#sides-and-combat):
     // each model's bounds radius, read from the archives; 0.9 of it for a
     // vehicle (half for types 117, 261, 264), times its type's scale for a
-    // building. Without this, fixed sizes.
+    // building. Without this, fixed sizes. All of it is read here (the
+    // docks too), so the archives needn't outlive the sim.
     void useModels(const Archives& archives);
 
-    // Moves time on, in steps of at most a tenth of a second.
+    // Moves time on in the game's fixed ticks of 50 ms (world, AI,
+    // economy, field work, effects, script, all a tick at a time), the
+    // part of a tick left over carried to the next call: the same run
+    // whatever steps it's given (the screen's frames, play-check's
+    // seconds).
     void advance(double seconds);
     double clock() const { return clock_; }
 
@@ -150,7 +155,7 @@ public:
     bool lost() const { return lost_; }
 
 private:
-    void step(double dt);
+    void step();
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
     void spawnColonyObject(size_t index);
     void rollOut();
@@ -221,7 +226,9 @@ private:
     std::map<int, Shooting> shooting_;
     std::set<int> stuck_, placedBadly_, harmless_;
     std::vector<std::string> log_;
-    double clock_ = 0, fogClock_ = 0;
+    double clock_ = 0;
+    int ticks_ = 0;       // ticks run
+    double pending_ = 0;  // seconds passed short of a tick
     bool lost_ = false;
 };
 

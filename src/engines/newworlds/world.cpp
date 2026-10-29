@@ -412,31 +412,33 @@ bool World::groupCentre(int n, float& x, float& y) const {
 }
 
 bool World::advance(double seconds) {
+    // Whole ticks only, each a combat tick and then a tick's movement, so
+    // shots lead a target by one tick's motion and time cut finer or
+    // coarser plays the same (exe.md#the-simulation-clock).
     bool any = false;
     tickClock_ += seconds * 20;
-    while (tickClock_ >= 1) {
+    while (tickClock_ >= 1 - 1e-9) {
         tickClock_ -= 1;
         combatTick();
         any = true;
-    }
-    for (Unit& u : units_) {
-        if ((u.firing && !firesOnTheMove(u)) || u.building)
-            continue;
-        float left = u.kind.speed * float(seconds);
-        while (left > 0 && !u.path.empty()) {
-            const auto [tx, ty] = u.path.front();
-            const float dx = tx - u.x, dy = ty - u.y, d = std::hypot(dx, dy);
-            if (d > 1)
-                u.heading = std::atan2(dy, dx);
-            if (d <= left) {
-                u.x = tx, u.y = ty;
-                left -= d;
-                u.path.erase(u.path.begin());
-            } else {
-                u.x += dx / d * left, u.y += dy / d * left;
-                left = 0;
+        for (Unit& u : units_) {
+            if ((u.firing && !firesOnTheMove(u)) || u.building)
+                continue;
+            float left = u.kind.speed / 20;
+            while (left > 0 && !u.path.empty()) {
+                const auto [tx, ty] = u.path.front();
+                const float dx = tx - u.x, dy = ty - u.y, d = std::hypot(dx, dy);
+                if (d > 1)
+                    u.heading = std::atan2(dy, dx);
+                if (d <= left) {
+                    u.x = tx, u.y = ty;
+                    left -= d;
+                    u.path.erase(u.path.begin());
+                } else {
+                    u.x += dx / d * left, u.y += dy / d * left;
+                    left = 0;
+                }
             }
-            any = true;
         }
     }
     return any;

@@ -90,6 +90,12 @@ namespace reluva::newworlds {
 // of its colony held); count of a side's groups: [<side>-]small-buildings,
 // large-buildings, fighting-units. Any other event, or one with too few
 // or too many arguments, is an error.
+// The handlers that hear an event are those on as it happens, whatever
+// the order they're written in: one armed by another's actions hears the
+// next such event, not this one (though a monitor of the state, built,
+// built-all, stock, count, colony-size, looks at it as it is at once).
+// Timers that run out together fire one at a time, soonest first; one a
+// handler stops meanwhile doesn't fire.
 // An argument "*" matches anything. In text,
 // {site:name} becomes the site's position, {a}, {b} the event's position,
 // {1} the event's first argument (dashes as spaces, capitalised).
@@ -174,6 +180,9 @@ public:
     State objectiveState(uint32_t id) const;
     // Seconds to the next timer, or a negative number if none is running.
     double nextTimer() const;
+    // Follow-on events dropped for being nested over 16 deep (a script's
+    // signals raising each other in a loop); the first is logged.
+    int droppedEvents() const { return dropped_; }
 
     // The events the script's own handlers wait for, in the order written
     // (which is the order they happened in the recording): a walkthrough.
@@ -216,6 +225,8 @@ private:
     bool won_ = false, lost_ = false, allDone_ = false, failing_ = false;
     uint32_t failId_ = 0;
     int depth_ = 0;
+    int dropped_ = 0;        // events dropped nested too deep (not saved)
+    uint64_t rulesHash_ = 0; // the rules' fingerprint, checked by savestates
 };
 
 // The game's spoken announcement (a stem in Media/Misc) for what a step

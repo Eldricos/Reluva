@@ -204,6 +204,8 @@ private:
     std::function<bool(int type)> playerYards_;
     std::map<std::string, int> counts_;
     double clock_ = 0;
+    int ticks_ = 0;        // the game's ticks so far (20 a second)
+    double tickRest_ = 0;  // and a part of one, carried
 };
 
 } // namespace reluva::newworlds

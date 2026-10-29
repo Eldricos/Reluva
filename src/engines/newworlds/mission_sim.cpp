@@ -20,7 +20,9 @@ namespace reluva::newworlds {
 namespace {
 
 constexpr float kBlock = 16384;
-constexpr double kStep = 0.1;
+// The game's tick (exe.md#the-simulation-clock): everything moves on in
+// these, whatever time the caller passes.
+constexpr double kTick = 0.05;
 // How long before something counts as stuck: a unit with a path that
 // hasn't got nearer, a group still gathering, one idle on a leg, a build
 // whose spot hasn't cleared, a unit firing at something it doesn't harm.
@@ -485,20 +487,27 @@ void MissionSim::note(const std::string& line) {
 }
 
 void MissionSim::advance(double seconds) {
-    for (double left = seconds; left > 1e-9; left -= kStep)
-        step(std::min(left, kStep));
+    // Whole ticks, the rest kept for the next call: a run is the same
+    // whether it's moved on a frame (1/60 s) or a second at a time.
+    pending_ += std::max(seconds, 0.0);
+    while (pending_ >= kTick - 1e-9) {
+        pending_ = std::max(pending_ - kTick, 0.0);
+        if (pending_ < 1e-9) // (a frame's rounding: 3 x 1/60 s is a tick)
+            pending_ = 0;
+        step();
+    }
 }
 
-void MissionSim::step(double dt) {
-    const double before = clock_;
-    clock_ += dt;
-    const bool second = std::floor(clock_) != std::floor(before);
+void MissionSim::step() {
+    const double dt = kTick;
+    ++ticks_;
+    clock_ = double(ticks_) * kTick;
+    const bool second = ticks_ % 20 == 0;
     std::vector<ScriptEvent> happened;
     ai_->advance(dt);
     repairs_->advance(dt);
     world_->advance(dt);
-    for (fogClock_ += dt * 20; fogClock_ >= 1; fogClock_ -= 1)
-        fog_->tick(*world_);
+    fog_->tick(*world_);
     // What combat did: a race set neutral turning hostile at its first
     // shot at the player; the colony's buildings lost.
     const auto events = world_->takeEvents();
@@ -699,9 +708,11 @@ void MissionSim::rollOut() {
 }
 
 void MissionSim::useModels(const Archives& archives) {
+    // Read now, all of it: the sim keeps no hold on the archives, which
+    // may go before it does (the callbacks below own what they use).
     // Each building's dock (exe.md#docking): its model's dock points, by
     // the .mdl's names for the .geo's attachments.
-    economy_->setDocks([&archives, side = side_](const std::string& type) {
+    auto dockOf = [&archives, side = side_](const std::string& type) {
         Economy::DockPoints d;
         const std::string geoName = buildingModel(type, side);
         if (geoName.rfind("geo/", 0) != 0)
@@ -735,23 +746,38 @@ void MissionSim::useModels(const Archives& archives) {
         const float dx = d.lock[0] - d.capture[0], dy = d.lock[1] - d.capture[1], dz = d.lock[2] - d.capture[2];
         d.vertical = d.known && std::abs(dz) >= std::cos(10 * 3.14159265f / 180) * std::hypot(std::hypot(dx, dy), dz);
         return d;
+    };
+    auto docks = std::make_shared<std::map<std::string, Economy::DockPoints>>();
+    for (const BuildingType& b : buildingTypes())
+        (*docks)[b.id] = dockOf(b.id);
+    for (const ColonyBuilding& c : colony_)
+        if (!docks->count(c.name))
+            (*docks)[c.name] = dockOf(c.name);
+    economy_->setDocks([docks](const std::string& type) {
+        const auto it = docks->find(type);
+        return it == docks->end() ? Economy::DockPoints{} : it->second;
     });
+    // Each model's bounds radius, by name, from the first archive that
+    // has it.
     auto radii = std::make_shared<std::map<std::string, float>>();
-    world_->setRadius([&archives, radii](const Unit& u) {
+    for (const auto& a : archives)
+        for (const CatEntry& e : a->entries()) {
+            if (e.name.size() < 4 || e.name.compare(e.name.size() - 4, 4, ".geo") != 0)
+                continue;
+            auto [it, fresh] = radii->try_emplace(e.name, 0.0f);
+            std::vector<uint8_t> data;
+            GeoModel geo;
+            if (fresh && !a->read(e, data) && !parseGeo(data, geo))
+                it->second = geo.radius;
+        }
+    world_->setRadius([radii](const Unit& u) {
         const CombatType* t = combatType(u.type);
-        const std::string model = !u.kind.model.empty() ? u.kind.model : t ? t->model : "";
-        if (model.empty())
+        std::string model = !u.kind.model.empty() ? u.kind.model : t ? t->model : "";
+        for (char& c : model) // (as the archives name it)
+            c = c == '\\' ? '/' : char(std::tolower(static_cast<unsigned char>(c)));
+        const auto it = model.empty() ? radii->end() : radii->find(model);
+        if (it == radii->end())
             return 0.0f;
-        auto [it, fresh] = radii->try_emplace(model, 0.0f);
-        if (fresh)
-            for (const auto& a : archives)
-                if (const CatEntry* e = a->find(model)) {
-                    std::vector<uint8_t> data;
-                    GeoModel geo;
-                    if (!a->read(*e, data) && !parseGeo(data, geo))
-                        it->second = geo.radius;
-                    break;
-                }
         const float r = it->second;
         if (u.building)
             return r * (t && t->scale > 0 ? t->scale : 1.0f);
@@ -1051,7 +1077,7 @@ void MissionSim::syncState(save::Serializer& s) {
         run_->syncState(s);
     s(colony_)(colonyObjects_)(structureIds_)(beesHoused_)(housed_)(rallied_)(garage_)(shuttles_)(razing_);
     s(touchyNeutral_)(said_)(events_)(voices_)(lastAttackVoice_)(alerts_)(lastCounts_)(seenSites_)(scannedSites_);
-    s(approached_)(tracks_)(shooting_)(stuck_)(placedBadly_)(harmless_)(log_)(clock_)(fogClock_)(lost_);
+    s(approached_)(tracks_)(shooting_)(stuck_)(placedBadly_)(harmless_)(log_)(clock_)(ticks_)(pending_)(lost_);
 }
 
 } // namespace reluva::newworlds

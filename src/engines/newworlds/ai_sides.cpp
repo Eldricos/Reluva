@@ -742,13 +742,20 @@ void AiSides::steer(Running& r) {
 
 void AiSides::advance(double seconds) {
     clock_ += seconds;
+    // The game's ticks counted (whole ones; the rest carried), for "each
+    // second" below: a clock's rounding never skips or doubles one.
+    tickRest_ += seconds * 20;
+    const int ticks = int(std::floor(tickRest_ + 1e-6));
+    tickRest_ -= ticks;
+    const int before = ticks_;
+    ticks_ += ticks;
     colonies(seconds);
     for (Running& r : running_)
         if (r.started && !r.done)
             r.clock += seconds, r.legClock += seconds;
     // Each second: orders whose time has come fire; builds try their spot
     // again; groups still short gather; the rest are steered.
-    if (std::floor(clock_) != std::floor(clock_ - seconds))
+    if (ticks_ / 20 != before / 20)
         for (size_t i = 0; i < running_.size(); ++i) {
             Running& r = running_[i];
             if (r.done)
@@ -907,7 +914,7 @@ void AiSides::syncState(save::Serializer& s) {
         colony.economy->syncState(s);
     }
     s(factoryQueue_)(factoryJobs_);
-    s(races_)(nativeSites_)(rallied_)(colonyBase_)(colonyShare_)(colonyTotal_)(counts_)(clock_);
+    s(races_)(nativeSites_)(rallied_)(colonyBase_)(colonyShare_)(colonyTotal_)(counts_)(clock_)(ticks_)(tickRest_);
 }
 
 } // namespace reluva::newworlds
