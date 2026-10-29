@@ -47,6 +47,13 @@ bool joinsRallyGroup(const CombatType& type);
 // those sent back to it.
 std::pair<float, float> rallySpot(float hubX, float hubY, int n);
 
+// The vehicles a player's own vehicle yard makes only for one of the
+// mission's orders for the player's side, not on the yard's panel: J8's
+// anomaly devices (224-226) and R9's alien device (227), with their costs
+// and build values as the executable registers them
+// (exe.md#costs-and-prerequisites); nullptr for any other type.
+const VehicleType* orderOnlyVehicle(int type);
+
 // The names the scripts know an object by, for the player playing slot
 // playerSlot: its own side's by type ("colony-hub", "phaser-tank"), other
 // colonies' with their race ("klingon-colony-hub", "klingon-hub"), the
@@ -63,13 +70,15 @@ std::vector<std::string> scriptNames(const Unit& u, int playerSlot);
 // side's vehicle yards, and the group sets off once it has them all. Guards
 // hold their spot and fight what comes near; patrols go round their
 // waypoints; assaults follow theirs, fighting what they meet, then go for
-// the nearest enemy.
+// the nearest enemy. Units an order beams in carry its name as their label
+// (the scripts' group: destroyed orion-attack2j).
 //
 // The other colonies (slots 0-2) each run an economy as the player's does,
 // except that what they build and make costs them nothing. A build order
 // puts a site up on its spot once the spot is clear; a named one (task 9)
 // builds again whenever its building is gone. Orders the game marks as
-// also for a human side run for the player too, with the player's units.
+// also for a human side run for the player too, with the player's units
+// (a device only such an order makes, of the player's yards).
 class AiSides {
 public:
     // A savestate's part (docs/savestates.md): what play changes, saved or
@@ -84,6 +93,15 @@ public:
     void setGround(ColonyMap ground) { ground_ = std::move(ground); }
     // Whether a side sees a block now (its build orders wait for it).
     void setSeen(std::function<bool(int slot, int bx, int by)> seen) { seen_ = std::move(seen); }
+    // The player's vehicle yards, for the player's side's orders (J8's
+    // device controllers, R9's): a group short of a type only an order
+    // makes (orderOnlyVehicle) asks them for it, as a computer's side asks
+    // its own (true if one was ordered); the vehicle, made, is handed over
+    // with delivered().
+    void setPlayerYards(std::function<bool(int type)> order) { playerYards_ = std::move(order); }
+    // A vehicle the player's yard made: to the oldest of the player's
+    // groups waiting for one of its type (false if none is).
+    bool delivered(int type, int id) { return deliver(player_, type, id); }
     // An AI colony's economy; nullptr for the player's slot and natives.
     const Economy* colony(int slot) const;
     // A defensive turret's shot paid for from its colony's power (true if
@@ -104,7 +122,9 @@ public:
 
     // What combat did, as the scripts' events: destroyed <name> for each
     // name of each object destroyed, hub-destroyed <race> for another
-    // colony's hub, count <name> <n> when the number left of a kind
+    // colony's hub (and side-failed <race> when that colony is one of the
+    // mission's playable sides: a joint mission's rival, whose own mission
+    // fails with its hub), count <name> <n> when the number left of a kind
     // changes (other than the player's buildings, which the colony counts)
     // or of a side's group ([<race>-]small-buildings, large-buildings,
     // fighting-units), and colony-size [<race>] <percent> as a side's
@@ -181,6 +201,7 @@ private:
     std::map<int, int> colonyBase_, colonyShare_, colonyTotal_; // per slot: colony size at the start, its shares last told
     ColonyMap ground_;
     std::function<bool(int slot, int bx, int by)> seen_;
+    std::function<bool(int type)> playerYards_;
     std::map<std::string, int> counts_;
     double clock_ = 0;
 };

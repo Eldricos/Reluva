@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/ai_sides.h"
 
+#include "engines/newworlds/levels.h"
 #include "engines/newworlds/placement.h"
 #include "engines/newworlds/start_data.h"
 
@@ -114,6 +115,20 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     u.flies = std::string_view(type.name) == "bird-of-prey";
     u.cloaks = type.cloaks;
     return id;
+}
+
+const VehicleType* orderOnlyVehicle(int type) {
+    // Stock: dilithium, polycomp, thermoconc, trans al, nitrium, duranium.
+    static const std::vector<VehicleType> kDevices = {
+        {224, 'F', "ANOMALY DEVICE", Stock{5, 4, 0, 0, 0, 20}, {}, 128},
+        {225, 'R', "ANOMALY DEVICE", Stock{5, 4, 0, 0, 0, 20}, {}, 128},
+        {226, 'K', "ANOMALY DEVICE", Stock{5, 4, 0, 0, 0, 20}, {}, 128},
+        {227, 'R', "ALIEN DEVICE", Stock{}, {}, 16},
+    };
+    for (const VehicleType& v : kDevices)
+        if (v.type == type)
+            return &v;
+    return nullptr;
 }
 
 std::vector<std::string> scriptNames(const Unit& u, int playerSlot) {
@@ -332,7 +347,7 @@ void AiSides::fire(Running& r) {
         for (int n = 0; n < o.count; ++n) {
             const float angle = float(n) * 1.1f;
             const auto [sx, sy] = openSpot(x + std::cos(angle) * kSpacing, y + std::sin(angle) * kSpacing);
-            r.units.push_back(spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, sx, sy, {}));
+            r.units.push_back(spawnObject(world_, o.slot, race == '?' ? t->race : race, *t, sx, sy, o.name));
             if (o.ways > 0) {
                 const auto [wx, wy] = wayPoint(o, 0);
                 world_.moveTo(r.units.back(), wx, wy);
@@ -385,6 +400,11 @@ void AiSides::gather(Running& r) {
     });
     for (; factory && int(r.units.size()) + r.awaited < o.count; ++r.awaited)
         factoryQueue_[o.slot].push_back(o.type);
+    // The player's side: a device only an order makes, of the player's
+    // yards (paid for as the player's own).
+    while (o.slot == player_ && playerYards_ && orderOnlyVehicle(o.type) && int(r.units.size()) + r.awaited < o.count &&
+           playerYards_(o.type))
+        ++r.awaited;
     if (int(r.units.size()) >= o.count) {
         r.gathered = true;
         steer(r);
@@ -762,8 +782,13 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
         const int a = int(e.what.y / kBlock * 8), b = int(e.what.x / kBlock * 8);
         for (const std::string& n : scriptNames(e.what, player_))
             out.push_back({"destroyed", {n}, a, b});
-        if (e.what.name == "colony-hub" && e.what.slot != player_)
+        if (e.what.name == "colony-hub" && e.what.slot != player_) {
             out.push_back({"hub-destroyed", {raceName(e.what.side)}, a, b});
+            // A joint mission's rival: its own mission fails with its hub.
+            const std::vector<char> sides = missionSides(mission_);
+            if (std::find(sides.begin(), sides.end(), e.what.side) != sides.end())
+                out.push_back({"side-failed", {raceName(e.what.side)}, a, b});
+        }
     }
     std::map<std::string, int> counts;
     for (const Unit& u : world_.units())

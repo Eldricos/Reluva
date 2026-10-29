@@ -11,6 +11,7 @@
 
 #include "engines/newworlds/mission_script.h"
 
+#include <cstdio>
 #include <string>
 
 namespace reluva::newworlds {
@@ -34,7 +35,7 @@ every short-crew
 every hub-destroyed *
   say intelligence "The {1} colony hub has been destroyed."
 every side-failed *
-  say intelligence "The {1} can no longer complete their mission."
+  say intelligence "The {1} side can no longer complete its mission."
 
 # --- Federation ----------------------------------------------------------
 
@@ -311,7 +312,7 @@ on destroyed colony-hub
   fail 21 20
   say command "Our colony hub has been destroyed."
   signal failing
-on destroyed temple
+on destroyed taubat-temple
   fail 22 20
   say security "The Taubat temple has been destroyed."
   signal failing
@@ -755,7 +756,7 @@ every captured-by romulan taubat-colony 30
 )",
 R"(on count klingon-disruptor-tank == 14
   say intelligence "You should know, sir: the Klingons are massing a large force."
-on destroyed temple
+on destroyed taubat-temple
   say intelligence "The Taubat temple has been destroyed."
 
 # --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
@@ -767,7 +768,7 @@ fail 24 colony-total taubat 50   # the settlement down to half (Klingon work, us
   signal failing
 # The temple destroyed before anyone has held it: any side's hold switches
 # this off.
-fail 24 destroyed temple as temple-unheld
+fail 24 destroyed taubat-temple as temple-unheld
   signal failing
 # A rival's hold on the temple (fail 26); only a human rival can capture.
 on held-by klingon temple 60
@@ -1694,21 +1695,22 @@ on timer device-beamed
 
 # Objective 17: a strong science scan of the Metar core (1 s to start, 10 s
 # held) opens the biodata research; 15 s after it's done, the objective
-every scan-started strong-science metar-core
+every scan-started strong-science metar-colony-hub
   say science "Scanning now, with a few tricks to clean up the signal."
-every scan-lost strong-science metar-core
+every scan-lost strong-science metar-colony-hub
   say science "It slipped away. I need more time on it."
-on scanned strong-science metar-core
+on scanned strong-science metar-colony-hub
   say science "Finished... goodness. The biodata keeps shifting - I'd say the Metar are changing as a species. The medical researchers should see this."
   research metar-biodata
-every scan-started science metar-core
+every scan-started science metar-colony-hub
   say science "Scan started, Sir."
-every scan-lost science metar-core
+every scan-lost science metar-colony-hub
   say science "The scan dropped, Sir. Trying again."
-on scanned science metar-core
+on scanned science metar-colony-hub
   say science "Finished, Sir, but I can't draw any firm conclusion. This needs a specialist."
-# The game also offers the research when a sickbay ward (type 300) is built
-on built sickbay-ward
+# The research's second unlock: in the game a sickbay ward (type 300) built;
+# the economy has no wards yet, so here the sickbay they're fitted to
+on built sickbay
   research metar-biodata
 on researched metar-biodata
   timer biodata-ready 5
@@ -2348,7 +2350,7 @@ on signal cfd-online*2
   signal objective
 
 # --- The Hubrin observer ---------------------------------------------------------------------
-on count hubrin-observer == 0
+on count hubrin == 0
   say intelligence "The Hubrin observer is dead."
 
 # --- The pass: both objectives, a message at once, the win at 10 s -----------------------------
@@ -3019,9 +3021,9 @@ on timer orion-wave-10
   ai orion orion-attack2j
 
 )",
-R"(# --- The last wave beaten: that wakes the watch for the last Orion; when none is left,
-# Starfleet's message and the objective ---
-on destroyed orion-attack-group2j
+R"(# --- The last wave (orion-attack2j: its units carry the order's name) hit: that wakes the
+# watch for the last Orion; when none is left, Starfleet's message and the objective ---
+on destroyed orion-attack2j
   arm orions-gone
 on count orion-pirate == 0 as orions-gone dormant
   say "Incoming transmission from Starfleet" "Commander, an Orion vessel above Lanus II was intercepted by the USS Latrides and destroyed, and the others have withdrawn. It appears you made it through; your actions earn Starfleet's commendation."
@@ -3043,9 +3045,9 @@ on timer fail-message
   say command "You have not achieved your objectives."
 
 # Not expressible yet:
-# - The game's armed monitor tests the count at once: if the last Orions die with group 2j,
-#   the "no Orion left" watch fires straight away. Reluva's count event comes only when the
-#   count changes, so it must arrive after the group's "destroyed" for the watch to hear it.
+# - The game wakes the "no Orion left" watch as group 2j beams in (its attack group's
+#   Go_Active); here it wakes at the group's first loss, so that a count still at 0 from
+#   the waves before isn't taken for the end before the group has landed.
 
 # --- K1 as K ----------------------------------------
 # K1 as the Klingons, rewritten from the game's own mission graph (Klingon slot,
@@ -3079,8 +3081,8 @@ on built-all vehicle-yard construction-yard power-generator resource-processor m
   complete 15
   signal objective
 
-# Objective 17: hub and yard upgrades, an arsenal and a disruptor turret.
-on built-all colony-hub-upgrade construction-yard-upgrade arsenal disruptor-turret
+# Objective 17: hub and yard upgrades, an arsenal (security-center) and a disruptor turret (defensive-weapon).
+on built-all colony-hub-upgrade construction-yard-upgrade security-center defensive-weapon
   say engineering "The colony's defences are in place, sir."
   complete 17
   signal objective
@@ -3299,7 +3301,7 @@ on signal rebels-strike
   ai taubat taubat-taubat-colony-assault-seven
 
 # Objectives 13 and 14: five disruptor turrets and eight disruptor tanks.
-on count disruptor-turret == 5
+on count defensive-weapon == 5
   say engineering "The defensive weapon systems are finished."
   complete 13
   signal defences
@@ -4150,7 +4152,7 @@ on count defensive-artillery == 1
 on count defensive-artillery == 2
   say engineering "The second photon torpedo launcher is ready."
   signal expansion
-on count science-station-upgrade == 1
+on count special-weapons == 1
   say engineering "The science block's special weapons wing is finished."
   signal expansion
 on signal expansion*3
@@ -4578,20 +4580,21 @@ on timer ambassador-beamed
 
 # Objective 17: a strong science scan of the Metar core (1 s to start, 10 s
 # held); it also opens the biodata research
-every scan-started strong-science metar-core
+every scan-started strong-science metar-colony-hub
   say science "Scan under way. You'll get your answer."
-every scan-lost strong-science metar-core
+every scan-lost strong-science metar-colony-hub
   say science "Lost the scan. I need longer."
-on scanned strong-science metar-core
+on scanned strong-science metar-colony-hub
   say science "The biodata says these creatures are changing - mutations. Medical research should study it."
   complete 17
   research metar-biodata
-every scan-lost science metar-core
+every scan-lost science metar-colony-hub
   say science "Lost the scan."
-on scanned science metar-core
+on scanned science metar-colony-hub
   say science "Scan done. Nothing we didn't know."
-# The game also offers the research when a sickbay ward (type 306) is built
-on built sickbay-ward
+# The research's second unlock: in the game a sickbay ward (type 306) built;
+# the economy has no wards yet, so here the sickbay they're fitted to
+on built sickbay
   research metar-biodata
 on researched metar-biodata
   say medical "The biodata analysis is finished, and it's worth a look."
@@ -5572,7 +5575,9 @@ on count colony-hub == 0
   fail 13 20
   say intelligence "Our hub has been destroyed."
   signal failing
-on count containment-device == 0
+# (The device is our own placed object, which the colony's counts leave out:
+# heard by its loss, as F14's.)
+on destroyed containment-device
   fail 15 20
   say security "The device for the containment field has been destroyed by the Metar."
   signal failing
@@ -6027,7 +6032,9 @@ on seen rival-base
 on destroyed rival-colony-hub
   say intelligence "The rival Romulans' colony hub is destroyed."
   signal rival-base-down
-on destroyed rival-power-generator
+# (The game's watch here is on the rival's type 153, its power generator by the
+# watch's name; Reluva's tables name that type the rival's defensive weapon.)
+on destroyed rival-defensive-weapon
   say intelligence "The rival Romulans' power generator is destroyed."
   signal rival-base-down
 on signal rival-base-down*2
@@ -6432,7 +6439,7 @@ every captured-by federation temple
   say intelligence "The Federation has got into the Taubat temple."
 every captured-by klingon temple
   say intelligence "The Klingons have got into the Taubat temple."
-on destroyed temple
+on destroyed taubat-temple
   say intelligence "The Taubat temple has been destroyed."
 
 # --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
@@ -6452,7 +6459,7 @@ on held-by klingon temple 60
   signal failing
 # The temple destroyed before anyone has held it (fail 26): any side's hold
 # switches this off.
-fail 26 destroyed temple as temple-unheld
+fail 26 destroyed taubat-temple as temple-unheld
   signal failing
 on signal failing
   timer fail-notice 10
@@ -7586,22 +7593,23 @@ R"(  say engineering "The device is in place."
 
 # Objective 17: a strong science scan of the Metar core (1 s to start, 10 s
 # held); it also opens the biodata research
-every scan-started strong-science metar-core
+every scan-started strong-science metar-colony-hub
   say science "Running a thorough scan."
-every scan-lost strong-science metar-core
+every scan-lost strong-science metar-colony-hub
   say science "Scan lost. You did not allow me enough time."
-on scanned strong-science metar-core
+on scanned strong-science metar-colony-hub
   say science "It worked. The creatures are reshaping their own make-up - remarkable. Medical should study the data."
   complete 17
   research metar-biodata
-every scan-started science metar-core
+every scan-started science metar-colony-hub
   say science "Scan started, Sir."
-every scan-lost science metar-core
+every scan-lost science metar-colony-hub
   say science "The scan dropped, Sir. Trying again."
-on scanned science metar-core
+on scanned science metar-colony-hub
   say science "Scan finished, though Kensal ought to check my results."
-# The game also offers the research when a sickbay ward (type 314) is built
-on built sickbay-ward
+# The research's second unlock: in the game a sickbay ward (type 314) built;
+# the economy has no wards yet, so here the sickbay they're fitted to
+on built sickbay
   research metar-biodata
 on researched metar-biodata
   say medical "The biodata analysis is done. My findings are intriguing."
@@ -8119,7 +8127,7 @@ on timer metar-assault-3
   ai metar met-assault-romulan-3
 on timer metar-assault-2
   ai metar met-assault-romulan-2
-on destroyed hubrin-observer
+on destroyed hubrin
   say intelligence "The Hubrin observer is dead."
 
 # Objective 12: the colony three times its starting size, plus four vehicle
@@ -9543,8 +9551,12 @@ std::string joined() {
 const std::vector<MissionScript>& missionScripts() {
     static const std::vector<MissionScript> scripts = [] {
         std::vector<MissionScript> s;
-        if (Error err = parseMissionScripts(joined(), s))
-            s.clear(); // the tests parse it, so this doesn't happen
+        // (The tests parse them, so this shouldn't happen; if it does, play
+        // goes on unscripted, and says why.)
+        if (Error err = parseMissionScripts(joined(), s)) {
+            std::fprintf(stderr, "mission scripts: %s\n", err.message.c_str());
+            s.clear();
+        }
         return s;
     }();
     return scripts;

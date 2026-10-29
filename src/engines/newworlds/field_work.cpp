@@ -391,10 +391,12 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
                     wanted = wanted || (handled && (handled({"scan-started", {kind, n}}) || handled({"scanned", {kind, n}})));
                 if (!wanted)
                     out.push_back({"scanned-nothing", {kind}});
-                // A scan no raid covers gets a watch of its own, so the
-                // scripts' targets (their sites) still hear of it.
+                // A scan none of the player's raids covers gets a watch of
+                // its own, so the scripts' targets (their sites) still hear
+                // of it. (A rival's raid on it doesn't hear the player.)
                 const bool covered = std::any_of(watches_.begin(), watches_.end(), [&](const Watch& w) {
-                    return w.raid && w.raid->condition == cond && w.raid->label == t->label && !t->label.empty();
+                    return w.raid && w.side == player_ && w.raid->condition == cond && w.raid->label == t->label &&
+                           !t->label.empty();
                 });
                 const bool watched = std::any_of(watches_.begin(), watches_.end(), [&](const Watch& w) {
                     return !w.raid && w.target == t->id && w.condition == cond;
@@ -404,7 +406,8 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
                     w.target = t->id;
                     w.condition = cond;
                     w.start = kOwnStart, w.hold = kOwnHold;
-                    w.ticks = 2;
+                    w.side = player_;
+                    w.ticks = 2; // (its scan's two ticks so far; its names are taken on the next)
                     watches_.push_back(std::move(w));
                 }
             }
@@ -462,11 +465,13 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
             c.state = 3;
             // A building no raid watches: taken at once.
             if (u->slot == player_ && std::none_of(watches_.begin(), watches_.end(), [&](const Watch& w) {
-                    return w.raid && w.condition == 2 && !t->label.empty() && w.raid->label == t->label;
+                    return w.raid && w.side == player_ && w.condition == 2 && !t->label.empty() &&
+                           w.raid->label == t->label;
                 })) {
                 Watch w;
                 w.target = t->id;
                 w.condition = 2;
+                w.side = player_;
                 watches_.push_back(std::move(w));
             }
         }
@@ -520,7 +525,7 @@ void FieldWork::tick(std::vector<ScriptEvent>& out, const std::function<bool(con
                 out.push_back(capture ? ScriptEvent{kind, {n}} : ScriptEvent{kind, {scanName(w.condition), n}});
         };
         if (met) {
-            if (w.ticks == 0) {
+            if (w.ticks == 0 || w.names.empty()) {
                 // Who it's about: the first of the group met.
                 w.names.clear();
                 if (w.raid)

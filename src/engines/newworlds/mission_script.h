@@ -62,25 +62,34 @@ namespace reluva::newworlds {
 //     storm <zone>                   a storm's flashes over the zone
 //     infect | cure                  the disease spreads / is cured
 //
-// Events: start; built <building>; built-all <building>[*count][|...]...;
+// Events: start; built <building> (a building or upgrade by the economy's
+// id; a vehicle, as it rolls out of the yard, by its type's name:
+// ground-scout, anomaly-device); built-all <building>[*count][|...]...;
 // approach <who> <site>; scan-started, scanned, scan-lost <kind> <site>;
-// scanned-nothing <kind>; researched <topic>; entered <site> (an away team
+// scanned-nothing <kind>; researched <topic>; research-available <topic>
+// (the script's own research action); entered <site> (an away team
 // in), captured (held long enough), capture-lost (left before that),
-// vacated (left after), held <site> <seconds>; arrived <site>; destroyed
-// <what>; hub-destroyed, side-failed <side>; completed
-// <objective>; all-completed; timer <name>; signal <name>[*count] (the
-// count-th time it's raised); mine-exhausted, power-low, short-resources,
-// short-crew; and the game's monitors: count <what> <=|>=|== <n>, held
-// <what> <seconds>, seen <site>, colony-size [<side>] <percent> (colony-total
-// counting its buildings other sides hold), stock <material>
-// <amount>, key <code>; cell-scanned <site> (its block scanned in the fog);
-// inside, outside <who> <zone> (a side's units, a
-// unit kind of ours, a group, or "any"); beamed-up <group>; standing <what>
-// <seconds> (built and standing that long); infection <percent>, cured;
-// the rivals' watches: captured-by, scanned-by <side> <what>, and ours
-// beaten or futile <what> after a rival's success; captured <what>
-// <percent> (that share of its colony held); count of a side's groups:
-// [<side>-]small-buildings, large-buildings, fighting-units.
+// vacated (left after), held <site> <seconds>; destroyed <what> (any name
+// the object goes by: its type's, with its race for another colony's,
+// its label, a beamed-in group's order); hub-destroyed <side>,
+// side-failed <side> (a joint mission's rival losing its hub, and with it
+// its mission); completed <objective>; all-completed; timer <name>;
+// signal <name>[*count] (the count-th time it's raised); mine-exhausted,
+// power-low, short-resources, short-crew; and the game's monitors: count
+// <what> <=|>=|== <n> (the player's buildings by the economy's ids; the
+// rest as destroyed names them), held <what> <seconds>, seen <site>,
+// colony-size [<side>] <percent> (colony-total counting its buildings
+// other sides hold), stock <material> <amount>, key <code>; cell-scanned
+// <site> (its block scanned in the fog); inside, outside <who> <zone> (a
+// side's units, a unit kind of ours, a group, or "any"); beamed-up
+// <group>; standing <what> <seconds> (built and standing that long);
+// infection <percent>, cured; the rivals' watches: captured-by,
+// scanned-by <side> <what>, held-by <side> <what> <seconds> (for a human
+// rival: the computer's sides never capture), and ours beaten or futile
+// <what> after a rival's success; captured <what> <percent> (that share
+// of its colony held); count of a side's groups: [<side>-]small-buildings,
+// large-buildings, fighting-units. Any other event, or one with too few
+// or too many arguments, is an error.
 // An argument "*" matches anything. In text,
 // {site:name} becomes the site's position, {a}, {b} the event's position,
 // {1} the event's first argument (dashes as spaces, capitalised).

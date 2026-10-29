@@ -28,12 +28,27 @@ recordings now serve to check them. The scripts are in
   where a message named one.
 - **Events** are what a game would report: a building finished, a set of
   buildings complete (`built-all vehicle-yard*4 power-generator*5|advanced-generator*3`),
-  a unit nearing a site, a scan started, done, lost or of the wrong place,
-  research done, a site entered or captured, something destroyed, a rival's
-  hub destroyed or mission failed, a stock reached, a timer.
+  a vehicle out of the yard, a unit nearing a site, a scan started, done,
+  lost or of the wrong place, research done, a site entered or captured,
+  something destroyed, a rival's hub destroyed or mission failed, a stock
+  reached, a timer. The parser knows every kind and how many arguments it
+  takes, so a misspelt event is an error, not a handler waiting for ever.
+- **Names** are the ones the engine gives: the colony's buildings and
+  upgrades by the economy's ids (`security-center` is the Klingons'
+  arsenal, `defensive-weapon` their disruptor turret, `special-weapons`
+  the science block's wing), vehicles by their type's name
+  (`built ground-scout`), other colonies' objects with their race
+  (`klingon-disruptor-tank`), the natives' as they are (`hubrin`,
+  `taubat-temple`), labels (the placements', and a beamed-in group by its
+  order: `destroyed orion-attack2j`), and the raids' labels for scans and
+  captures (`metar-colony-hub`). A test checks every handler's names
+  against these for each mission and side. Two of the game's upgrades
+  aren't in the economy yet: J6's sickbay ward stands in as the sickbay it
+  fits, and C4's processor plants wait for the economy to offer them.
 - **Generic rules** (`mission generic`) are the messages every mission
-  shares: a building finished, a mine exhausted at a position, short of
-  power, resources or crew, a rival's hub destroyed or mission failed.
+  shares: a building or vehicle finished, a mine exhausted at a position,
+  short of power, resources or crew, a rival's hub destroyed or mission
+  failed (`side-failed`: in a joint mission, a rival losing its hub).
 
 The format is described at the top of `mission_script.h`. Its timers and
 fail delays count the game's script seconds (16 ticks, 0.8 s;
@@ -61,9 +76,13 @@ training missions wait for keys), timers, what combat destroys, the
 counts of every side's units and buildings, sightings of the sites, and
 research (the game's topics, opened by the scripts' `research` and started
 by the player), and scans and captures through the mission's own watches on them (the
-executable's raids: [game.md](game.md#the-other-sides-and-combat)). The
-capture events follow the raids: `entered` when the away team is in,
-`captured` when it has held the building long enough.
+executable's raids: [game.md](game.md#the-other-sides-and-combat)), or a
+watch of the player's own where none of the player's raids covers the
+target. The capture events follow the raids: `entered` when the away team
+is in, `captured` when it has held the building long enough. The devices
+J8 and R9 send off (`built anomaly-device`, `built bad-guy-device`) are
+made in the player's own vehicle yard when the mission's controller order
+asks for one, and go on that order's way.
 
 The game's effect objects are written as actions and its area and
 build-and-hold monitors as events ([exe.md](exe.md#script-effects)):

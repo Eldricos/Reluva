@@ -80,6 +80,42 @@ const char* sectionName(const std::string& s) {
     return nullptr;
 }
 
+// The events a handler can wait for (those the game reports, and the
+// script's own follow-ons), each with the least and most arguments it
+// takes (-1: no most).
+struct EventKind {
+    const char* kind;
+    int least, most;
+};
+constexpr EventKind kEventKinds[] = {
+    {"start", 0, 0},              {"built", 1, 1},              {"built-all", 1, -1},         {"approach", 2, 2},
+    {"scan-started", 2, 2},       {"scanned", 2, 2},            {"scan-lost", 2, 2},          {"scanned-nothing", 1, 1},
+    {"cell-scanned", 1, 1},       {"researched", 1, 1},         {"research-available", 1, 1}, {"entered", 1, 1},
+    {"captured", 1, 2},           {"capture-lost", 1, 1},       {"vacated", 1, 1},            {"held", 2, 2},
+    {"destroyed", 1, 1},          {"hub-destroyed", 1, 1},      {"side-failed", 1, 1},        {"completed", 1, 1},
+    {"all-completed", 0, 0},      {"timer", 1, 1},              {"signal", 1, 1},             {"mine-exhausted", 0, 0},
+    {"power-low", 0, 0},          {"short-resources", 0, 0},    {"short-crew", 0, 0},         {"count", 3, 3},
+    {"seen", 1, 1},               {"colony-size", 1, 2},        {"colony-total", 1, 2},       {"stock", 2, 2},
+    {"key", 1, 1},                {"inside", 2, 2},             {"outside", 2, 2},            {"beamed-up", 1, 1},
+    {"standing", 2, 2},           {"infection", 1, 1},          {"cured", 0, 0},              {"captured-by", 2, 3},
+    {"scanned-by", 2, 2},         {"held-by", 3, 3},            {"beaten", 1, 1},             {"futile", 1, 1},
+};
+
+// Whether a handler's event is one of those, with as many arguments (a
+// count's comparison one the monitors know); else why not.
+std::string badEvent(const ScriptEvent& e) {
+    const auto it = std::find_if(std::begin(kEventKinds), std::end(kEventKinds),
+                                 [&](const EventKind& k) { return e.kind == k.kind; });
+    if (it == std::end(kEventKinds))
+        return "unknown event " + e.kind;
+    const int n = int(e.args.size());
+    if (n < it->least || (it->most >= 0 && n > it->most))
+        return "wrong number of arguments for " + e.kind;
+    if (e.kind == "count" && e.args[1] != "==" && e.args[1] != "<=" && e.args[1] != ">=")
+        return "expected: count <what> <=|>=|== <n>";
+    return {};
+}
+
 } // namespace
 
 Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out) {
@@ -167,6 +203,8 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                 h.every = t[0] == "every";
                 h.event = {t[1], {t.begin() + 2, t.end()}};
             }
+            if (const std::string why = badEvent(h.event); !why.empty())
+                return fail(why);
             m.handlers.push_back(std::move(h));
         } else {
             return fail("unknown line " + t[0]);
@@ -228,8 +266,8 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                         !toInt(a.args[4], n))
                         return bad("expected: spawn <side> <type> <count> <a> <b> [<group>]");
                 } else if (a.verb == "move") {
-                    const size_t points = a.args.size() - 1 - (a.args.back() == "loop" ? 1 : 0);
-                    if (a.args.size() < 3 || points % 2 != 0)
+                    const bool loop = !a.args.empty() && a.args.back() == "loop";
+                    if (a.args.size() < 3 || (a.args.size() - 1 - (loop ? 1 : 0)) % 2 != 0)
                         return bad("expected: move <group> <a> <b>... [loop]");
                 } else if (a.verb == "meteors" || a.verb == "storm") {
                     char* end = nullptr;

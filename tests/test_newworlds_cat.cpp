@@ -30,6 +30,7 @@
 #include "engines/newworlds/model_textures.h"
 #include "engines/newworlds/rasterizer.h"
 #include "engines/newworlds/star_system.h"
+#include "engines/newworlds/start_data.h"
 #include "engines/newworlds/world.h"
 
 #include <algorithm>
@@ -633,6 +634,15 @@ void testMissionScripts() {
     MissionRun lost(s[0], nullptr);
     CHECK(lost.fire({"destroyed", {"hub"}}).back().kind == MissionRun::Output::Lost && lost.finished());
     CHECK(bool(parseMissionScripts("mission T F\non start\n  frobnicate\n", s)));
+    // A move needs its group and points; events are the known kinds, with
+    // their arguments (a misspelt one would wait for ever).
+    CHECK(bool(parseMissionScripts("mission T F\non start\n  move\n", s)));
+    CHECK(bool(parseMissionScripts("mission T F\non start\n  move tug loop\n", s)));
+    CHECK(bool(parseMissionScripts("mission T F\non destroy hub\n  win\n", s)));
+    CHECK(bool(parseMissionScripts("mission T F\non destroyed\n  win\n", s)));
+    CHECK(bool(parseMissionScripts("mission T F\nlose 9 scanned science\n", s)));
+    CHECK(bool(parseMissionScripts("mission T F\non count tank = 3\n  win\n", s)));
+    CHECK(!parseMissionScripts("mission T F\non count tank >= 3\n  win\non start\n  move tug 1 2 loop\n", s));
     // Signals, counted; a random choice; actions for the game to carry out.
     // Handlers switched on and off by label; a fail that ends the mission
     // after its delay.
@@ -763,6 +773,241 @@ void testMissionScripts() {
     CHECK(announcementFor({"built", {"vehicle-yard"}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}}, 'R') == "robjmet");
     CHECK(announcementFor({"x", {}}, {{MissionRun::Output::Completed, {}, {}, 16, {}}, {MissionRun::Output::Won, {}, {}, 0, {}}},
                           'F') == "fmiswin");
+}
+
+// Every name a mission script's handlers wait for, for each mission and
+// side, is one the engine can give that mission: the colony's buildings,
+// upgrades and labs (the economy's ids), the vehicles its yards make and the
+// devices an order makes (built, by their type's names), what's on the map
+// as the scripts know it (scriptNames: the player's by type, other
+// colonies' with their race, the natives' as they are, and labels - the
+// placements', the groups an order or a spawn beams in), the side's
+// groups, the script's sites and zones, the raids' labels and the
+// mission's research topics. A name nothing gives would wait for ever.
+void testScriptNames() {
+    Terrain plain;
+    plain.width = plain.height = 8;
+    plain.moveClass.assign(64, 1);
+    World world(plain);
+    // (The C4 processor plants are upgrades the economy doesn't offer yet:
+    // known, and the only ones.)
+    const std::set<std::string> notYet = {"processor-plant-a", "processor-plant-b"};
+    for (const MissionScript& m : missionScripts()) {
+        if (m.mission == "generic")
+            continue;
+        const int player = m.side == 'K' ? 1 : m.side == 'R' ? 2 : 0;
+        AiSides ai(m.mission, player, world);
+        std::set<std::string> objects, counted, built, standing, who = {"any", "ours"}, labels, races;
+        auto add = [&](int slot, const CombatType& t, const std::string& label) {
+            Unit u;
+            u.slot = slot;
+            u.side = slot == player ? m.side : ai.raceOf(slot) == '?' ? t.race : ai.raceOf(slot);
+            u.name = t.name;
+            u.label = label;
+            u.building = t.building;
+            for (const std::string& n : scriptNames(u, player)) {
+                objects.insert(n);
+                // (AiSides counts all but the player's buildings: those the
+                // colony counts, by the economy's ids.)
+                if (!(slot == player && t.building))
+                    counted.insert(n);
+            }
+            if (!label.empty())
+                labels.insert(label);
+            if (slot == player && t.building && !buildingType(t.name)) {
+                standing.insert(t.name);
+                if (!label.empty())
+                    standing.insert(label);
+            }
+            if (!t.building) {
+                who.insert(slot == player ? std::string(t.name) : std::string(raceName(u.side)));
+                if (!label.empty())
+                    who.insert(label);
+            }
+        };
+        for (const SideInfo* s : slotsOf(m.mission)) {
+            if (s->slot != player)
+                races.insert(raceName(s->race));
+            // A rival colony's vehicles, as its yards would make them (for a
+            // human rival, if not the computer's).
+            for (const VehicleType& v : vehicleTypes())
+                if (s->slot != player && s->slot <= 2 && v.side == s->race)
+                    if (const CombatType* t = combatType(v.type))
+                        add(s->slot, *t, {});
+            for (const SidePlacement* p : sidePlacements(m.mission, s->slot))
+                if (const CombatType* t = combatType(p->type))
+                    add(s->slot, *t, p->label);
+        }
+        for (const StartPlacement& p : startPlacements(m.mission, m.side))
+            if (const CombatType* t = combatType(p.type))
+                add(player, *t, {});
+        for (const NpcOrder* o : npcOrders(m.mission))
+            if (const CombatType* t = combatType(o->type)) {
+                add(o->slot, *t, o->spawn[0] >= 0 ? o->name : "");
+                if (o->slot == player && orderOnlyVehicle(o->type))
+                    built.insert(t->name);
+            }
+        for (const BuildingType& b : buildingTypes())
+            if (b.sides[size_t(player)])
+                built.insert(b.id), counted.insert(b.id), objects.insert(b.id), standing.insert(b.id);
+        for (const VehicleType& v : vehicleTypes())
+            if (v.side == m.side)
+                if (const CombatType* t = combatType(v.type)) {
+                    built.insert(t->name);
+                    add(player, *t, {});
+                }
+        for (const char* g : {"small-buildings", "large-buildings", "fighting-units"}) {
+            counted.insert(g);
+            for (const std::string& r : races)
+                counted.insert(r + "-" + g);
+        }
+        std::set<std::string> topics;
+        const Research research(m.mission, player);
+        for (const Research::Topic& t : research.topics()) {
+            topics.insert(t.name);
+            topics.insert(t.aliases.begin(), t.aliases.end());
+        }
+        for (const MissionScript::Handler& h : m.handlers)
+            for (const MissionScript::Action& a : h.actions) {
+                if (a.verb == "research")
+                    topics.insert(a.args[0]);
+                if (a.verb != "spawn")
+                    continue;
+                const std::vector<int> slots =
+                    a.args[0] == "us" || a.args[0] == raceName(m.side) ? std::vector<int>{player} : ai.slotsNamed(a.args[0]);
+                for (int id = 1; id < 330 && !slots.empty(); ++id)
+                    if (const CombatType* t = combatType(id); t && a.args[1] == t->name)
+                        add(slots[0], *t, a.args.size() > 5 ? a.args[5] : "");
+            }
+        std::set<std::string> targets = objects; // scans and captures: also by site, and the raids' labels
+        for (const auto& [site, at] : m.sites)
+            targets.insert(site);
+        for (const Raid* r : raids(m.mission))
+            targets.insert(r->label);
+        auto check = [&](const MissionScript::Handler& h, const std::string& name, const std::set<std::string>& known) {
+            if (name == "*" || known.count(name) || notYet.count(name))
+                return;
+            std::fprintf(stderr, "%s (%c) line %d: %s waits for %s, which nothing gives\n", m.mission.c_str(), m.side,
+                         h.line, h.event.kind.c_str(), name.c_str());
+            ++failures;
+        };
+        const std::set<std::string> scans = {"science", "medical", "engineering", "strong-science",
+                                             "strong-medical", "strong-engineering", "cell"};
+        std::set<std::string> sites, zones, materials;
+        for (const auto& [site, at] : m.sites)
+            sites.insert(site);
+        for (const auto& [zone, at] : m.zones)
+            zones.insert(zone);
+        for (int i = 0; i < kMaterials; ++i) {
+            std::string n = materialName(i);
+            std::transform(n.begin(), n.end(), n.begin(), [](unsigned char c) { return char(std::tolower(c)); });
+            materials.insert(n);
+        }
+        for (const MissionScript::Handler& h : m.handlers) {
+            const std::string& k = h.event.kind;
+            const std::vector<std::string>& a = h.event.args;
+            if (k == "built")
+                check(h, a[0], built);
+            else if (k == "built-all")
+                for (const std::string& req : a)
+                    for (size_t from = 0; from <= req.size();) {
+                        const size_t bar = std::min(req.find('|', from), req.size());
+                        const std::string alt = req.substr(from, bar - from);
+                        check(h, alt.substr(0, alt.find('*')), built);
+                        from = bar + 1;
+                    }
+            else if (k == "count")
+                check(h, a[0], counted);
+            else if (k == "destroyed")
+                check(h, a[0], objects);
+            else if (k == "scan-started" || k == "scanned" || k == "scan-lost") {
+                check(h, a[0], scans);
+                check(h, a[1], targets);
+            } else if (k == "scanned-nothing")
+                check(h, a[0], scans);
+            else if (k == "entered" || k == "captured" || k == "capture-lost" || k == "vacated" || k == "held" ||
+                     k == "beaten" || k == "futile")
+                check(h, a[0], targets);
+            else if (k == "captured-by" || k == "scanned-by" || k == "held-by") {
+                check(h, a[0], races);
+                check(h, a[1], targets);
+            } else if (k == "seen" || k == "cell-scanned")
+                check(h, a[0], sites);
+            else if (k == "approach")
+                check(h, a[1], sites);
+            else if (k == "inside" || k == "outside") {
+                check(h, a[0], who);
+                check(h, a[1], zones);
+            } else if (k == "researched")
+                check(h, a[0], topics);
+            else if (k == "hub-destroyed" || k == "side-failed" || ((k == "colony-size" || k == "colony-total") && a.size() == 2))
+                check(h, a[0], races);
+            else if (k == "beamed-up")
+                check(h, a[0], labels);
+            else if (k == "standing")
+                check(h, a[0], standing);
+            else if (k == "stock")
+                check(h, a[0], materials);
+        }
+    }
+}
+
+// The scripts hear of vehicles by their type's name as they roll out
+// (built ground-scout), J8's anomaly device among them: made in the
+// player's own yard for its controller order, a minute after the research,
+// and sent on that order's way. A joint mission's rival losing its hub
+// fails its mission; an order's beamed-in units carry its name.
+void testScriptVehicles() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    MissionSim j8("J8", 'F', t, map, 64, 64, MissionSim::placedColony("J8", 'F'));
+    j8.takeSaid();
+    CHECK(j8.economy().orderVehicle(*vehicleType(97)));
+    j8.fireScript({"researched", {"anomaly-device"}});
+    std::set<std::string> built;
+    for (int i = 0; i < 240 && !built.count("anomaly-device"); ++i) {
+        j8.advance(1);
+        for (const MissionSim::Said& said : j8.takeSaid())
+            if (said.fired.kind == "built" && !said.fired.args.empty())
+                built.insert(said.fired.args[0]);
+    }
+    CHECK(built.count("ground-scout") && built.count("anomaly-device"));
+    CHECK(j8.run() && j8.run()->objectiveState(13) == MissionRun::State::Complete);
+    CHECK(std::any_of(j8.world().units().begin(), j8.world().units().end(),
+                      [](const Unit& u) { return u.slot == 0 && u.name == "anomaly-device"; }));
+
+    World w(t);
+    AiSides j1("J1", 0, w);
+    j1.start();
+    j1.observe({});
+    std::vector<WorldEvent> lost;
+    for (const Unit& u : w.units())
+        if (u.slot == 1 && u.name == "colony-hub")
+            {
+                WorldEvent e;
+                e.kind = WorldEvent::Destroyed;
+                e.what = u;
+                lost.push_back(e);
+            }
+    CHECK(lost.size() == 1);
+    const auto ev = j1.observe(lost);
+    auto has = [&](const std::string& kind, const std::string& arg) {
+        return std::any_of(ev.begin(), ev.end(), [&](const ScriptEvent& e) {
+            return e.kind == kind && !e.args.empty() && e.args[0] == arg;
+        });
+    };
+    CHECK(has("hub-destroyed", "klingon") && has("side-failed", "klingon"));
+    World cw(t);
+    AiSides c9("C9", 0, cw);
+    c9.start();
+    spawnObject(cw, 0, 'F', *combatType(23), 8 * 16384, 8 * 16384, {}, {}, true); // (an assault wants a target)
+    CHECK(c9.order("orion", "orion-attack2j"));
+    CHECK(std::count_if(cw.units().begin(), cw.units().end(), [](const Unit& u) { return u.label == "orion-attack2j"; }) == 8);
 }
 
 void testColony() {
@@ -1417,6 +1662,39 @@ void testFieldWork() {
     fw.cancel(apc);
     run(0.2);
     CHECK(fw.heldBy(temple) == -1 && heardIt("vacated taubat-temple") && w.unit(temple)->heldBy == -1);
+
+    // A Klingon player's scan and capture of a building no raid of theirs
+    // watches (K1's Taubat hangar): heard as the Federation's are.
+    World kw(t);
+    AiSides kai("K1", 1, kw);
+    kai.start();
+    kw.setStance(3, 1, 2); // (the Taubat leave the scout be)
+    FieldWork kfw("K1", 1, kw, {});
+    int hangar = 0;
+    for (const Unit& u : kw.units())
+        if (u.label == "taubat-hangar")
+            hangar = u.id;
+    CHECK(hangar != 0);
+    const auto [gx, gy] = at(368, 119);
+    const int scout = spawnObject(kw, 1, 'K', *combatType(37), gx, gy - 12000, {}, {}, true);
+    std::vector<std::string> kheard;
+    auto anyScanOrHold = [](const ScriptEvent& e) { return e.kind == "scanned" || e.kind == "captured"; };
+    auto krun = [&](double seconds) {
+        for (int i = 0; i < int(seconds * 10); ++i) {
+            kw.advance(0.1);
+            for (const ScriptEvent& e : kfw.advance(0.1, anyScanOrHold))
+                kheard.push_back(e.kind + " " + (e.args.empty() ? "" : e.args.back()));
+        }
+    };
+    auto kheardIt = [&](const std::string& s) { return std::find(kheard.begin(), kheard.end(), s) != kheard.end(); };
+    CHECK(kfw.scan(scout, hangar, FieldWork::Science));
+    krun(12);
+    CHECK(kheardIt("scan-started taubat-hangar") && kheardIt("scanned taubat-hangar"));
+    kfw.cancel(scout);
+    const int kapc = spawnObject(kw, 1, 'K', *combatType(40), gx, gy - 15000, {}, {}, true);
+    CHECK(kfw.capture(kapc, hangar));
+    krun(60);
+    CHECK(kfw.heldBy(hangar) == 1 && kheardIt("entered taubat-hangar") && kheardIt("captured taubat-hangar"));
 }
 
 // Officer training (exe.md#research): C1's Bellah (operations, 0.25) and
@@ -2626,6 +2904,33 @@ void testStartingYardStock() {
 // each yard, storage facility, processor and mine, starting housing counted
 // twice. (F12's 90, and J2K's 55 in one play, carry over from earlier
 // missions in the same run, which Reluva doesn't.)
+// A mine standing at the start digs round its own block, and the worker
+// bees the starting buildings get free stay when the colony's bees are
+// set again (a bee from the yard).
+void testStartingMineAndBees() {
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return bx == 3 && by == 3 ? 1 : 0; };
+    ore.depositAmount = [](int bx, int by) { return bx == 3 && by == 3 ? 300 : 0; };
+    Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+    e.addBuilt("colony-hub", 0, 0);
+    e.addBuilt("storage-facility", -20000, 0);
+    e.addBuilt("resource-processor", 20000, 20000);
+    e.addBuilt("vehicle-yard", 0, 20000);
+    e.addBuilt("mining-station", 3.5f * 16384, 3.5f * 16384);
+    auto workers = [&] {
+        return int(std::count_if(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.worker; }));
+    };
+    e.setBees(4, 2, 2);
+    CHECK(workers() == 6); // 2 placed, 4 free (storage, processor, yard, mine)
+    e.setBees(5, 2, 2);
+    CHECK(workers() == 6);
+    for (int i = 0; i < 200; ++i)
+        e.advance(0.05);
+    for (const ColonyStructure& s : e.structures())
+        if (s.type == "mining-station")
+            CHECK(s.blockX == 3 && s.blockY == 3 && !s.exhausted);
+}
+
 void testStartingColonySize() {
     Terrain t;
     t.width = t.height = 128;
@@ -2705,6 +3010,8 @@ int main() {
     testLevels();
     testBriefing();
     testMissionScripts();
+    testScriptNames();
+    testScriptVehicles();
     testColony();
     testStarSystem();
     testModelPose();
@@ -2728,6 +3035,7 @@ int main() {
     testSaveState();
     testStartingYardStock();
     testStartingColonySize();
+    testStartingMineAndBees();
     testPlacement();
     testProjectiles();
     testModelTextures();

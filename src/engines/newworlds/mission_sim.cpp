@@ -223,6 +223,17 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     // buildings as things they can shoot at.
     ai_ = std::make_unique<AiSides>(mission_, player_, *world_);
     ai_->setGround(map);
+    // The devices the player's side's orders want (J8's, R9's), of the
+    // colony's own yards, once it can pay for one (asked again each second
+    // till then, so without the "held up" report each time).
+    ai_->setPlayerYards([this](int type) {
+        const VehicleType* v = orderOnlyVehicle(type);
+        const Stock st = economy_->stock();
+        for (int m = 0; v && m < kMaterials; ++m)
+            if (st[size_t(m)] < v->cost[size_t(m)])
+                return false;
+        return v && economy_->orderVehicle(*v);
+    });
     ai_->start();
     for (size_t i = 0; i < colony_.size(); ++i)
         spawnColonyObject(i);
@@ -567,6 +578,10 @@ void MissionSim::step(double dt) {
             voices_.push_back(e.args.empty() ? std::string() : e.args[0]);
             continue;
         }
+        // A vehicle finished: the script hears built <type> as it rolls
+        // out (rollOut), by the name it knows it by, not the panel's.
+        if (e.kind == "vehicle-built")
+            continue;
         auto alertOn = [&](int structure) {
             for (size_t i = 0; i < structureIds_.size() && i < colonyObjects_.size(); ++i)
                 if (structureIds_[i] == structure && colonyObjects_[i] > 0)
@@ -641,7 +656,12 @@ void MissionSim::rollOut() {
             economy_->setHealth(structureIds_[i], u->hp / u->maxHp);
     }
     for (const auto& [type, yard] : economy_->takeVehicles()) {
+        // The script hears of it by its type's name (the economy's own
+        // report names its panel line: kept from the script); not of a
+        // bee, which goes into the hub with no word from Engineering.
         const VehicleType* v = vehicleType(type);
+        if (const CombatType* ct = combatType(type); ct && !(v && v->bee()))
+            fireScript({"built", {ct->name}});
         if (v && v->bee()) {
             ++housed_;
             if (const CombatType* ct = combatType(type))
@@ -659,12 +679,16 @@ void MissionSim::rollOut() {
                 x = c.x, y = c.y - 1.2f * kTile;
         const ObjectType* t = objectType(type);
         const CombatType* ct = combatType(type);
-        if (!t || !ct)
+        if (!ct || (!t && !orderOnlyVehicle(type)))
             continue;
         const auto [px, py] = world_->openSpot(x, y);
-        const int id = spawnObject(*world_, player_, side_, *ct, px, py, {}, t->model, true);
-        world_->unit(id)->kind = UnitKind{t->name, t->model, kPaceSpeed * t->pace};
-        // An armed one drives on to the rally point.
+        const int id = spawnObject(*world_, player_, side_, *ct, px, py, {}, t ? t->model : "", true);
+        if (t)
+            world_->unit(id)->kind = UnitKind{t->name, t->model, kPaceSpeed * t->pace};
+        // A device goes to the order that asked for it; an armed one
+        // drives on to the rally point.
+        if (orderOnlyVehicle(type) && ai_->delivered(type, id))
+            continue;
         if (ct->weapon.kind != WeaponKind::None && !colony_.empty()) {
             const auto [hx, hy] = worldAt(colony_[0].a, colony_[0].b);
             const auto [rx, ry] = rallySpot(hx, hy, rallied_++);
