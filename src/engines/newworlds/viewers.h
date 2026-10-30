@@ -212,24 +212,40 @@ public:
         dirty_ = true;
     }
     void resetCamera() { resetView(); }
-    // For the game interface: the map drawn small by its terrain codes'
-    // colours, with the camera's target marked; the target as a map
-    // position (eighths of a block, row first); the camera's heading in
-    // degrees (0 when unturned, clockwise).
-    // tiles: how many tiles across it shows, round the camera's target
-    // (the Tricorder's zoom); 0 the whole map.
-    void drawMinimap(Surface& s, int x, int y, int w, int h, int tiles = 0) const;
-    // The Tricorder's map as the game draws it (exe.md#the-tricorder): each
-    // block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6) gives a
-    // hue, saturation and brightness shift, for the player's race, of the
-    // map's own colour for the terrain code there.
-    // Each block is drawn from its class's tile: a hatch (a ring; solid for
-    // unsurveyed blocks and the border), cut at its edges by which of the
-    // blocks round each corner share its class (a block out of view counts
-    // as sharing it).
-    void drawTricorder(Surface& s, int x, int y, int w, int h, int tiles, char race,
-                       const std::function<int(int bx, int by)>& cellClass,
-                       const std::function<bool(int bx, int by)>& inView);
+    // The Tricorder's relief as the game draws it (exe.md#the-tricorder):
+    // the map's five terrain-code layers as stacked sheets, each drawn
+    // where the ground reaches it, seen by the Tricorder's own small
+    // camera centred on the main camera's target. Each point's colour:
+    // its block's class (0 surveyed ground, 1 unsurveyed, 2-7 ores 1-6)
+    // gives a hue, saturation and brightness shift, for the player's
+    // race, of the map's own colour for the terrain code there; each block
+    // drawn from its class's tile: a hatch (a ring; solid for unsurveyed
+    // blocks and the border), cut at its edges by which of the blocks
+    // round each corner share its class (a block out of view counts as
+    // sharing it).
+    // Where it's drawn and its camera (tricorderRelief()).
+    struct Relief {
+        int x = 0, y = 0, w = 0, h = 0; // on the screen
+        float cx = 0, cy = 0;           // the point it looks at (world units)
+        float yaw = 0, pitch = 0;       // radians: the heading (0 north up), the tilt above the ground
+        float distance = 1;             // the camera's distance from that point
+        float step = 0;                 // the layers' spacing, in world units
+    };
+    // The view (0 Starship, 1 Relief, 2 Relief orbit, 3 Relief fixed) at
+    // a zoom (tiles across the width); orbit the Relief orbit view's
+    // heading (radians).
+    Relief tricorderRelief(int x, int y, int w, int h, int tiles, int view, float orbit) const;
+    void drawTricorderRelief(Surface& s, const Relief& relief, char race,
+                             const std::function<int(int bx, int by)>& cellClass,
+                             const std::function<bool(int bx, int by)>& inView);
+    // A world point's pixel on the relief (standing on the ground there;
+    // false if it's outside it), and the ground under a pixel (false if
+    // there's no map there).
+    bool reliefPoint(const Relief& relief, float wx, float wy, int& px, int& py) const;
+    bool reliefToWorld(const Relief& relief, int px, int py, float& wx, float& wy) const;
+    // The last scene drawn (the screen's pixels under the overlay; empty
+    // before the first).
+    const std::vector<uint8_t>& lastScene() const { return scene_; }
     // The class and view sources the Tricorder's colours use (the relief
     // view too, once set), and its scheme (0 the ring hatch, 1 the dot, 2
     // grid lines: a briefing step's).
@@ -241,12 +257,9 @@ public:
             tricorderScheme_ = scheme, dirty_ = true;
     }
     // A point's Tricorder colour, at (fx, fy) in tiles; false where there's
-    // no ground (the background).
-    bool tricorderColour(float fx, float fy, uint8_t* out) const;
-    // A world point's pixel on a minimap drawn at x, y, w, h (false if
-    // it's outside it), and the world point under a pixel.
-    bool minimapPoint(float wx, float wy, int x, int y, int w, int h, int& px, int& py, int tiles = 0) const;
-    void minimapToWorld(int px, int py, int x, int y, int w, int h, int tiles, float& wx, float& wy) const;
+    // no ground (the background). layer: the terrain code of that layer
+    // (0-4), else the highest there.
+    bool tricorderColour(float fx, float fy, uint8_t* out, int layer = -1) const;
     // Moves the camera along the ground, by world units right and forward.
     void pan(float right, float forward);
     void cameraTarget(float& x, float& y) const { x = targetX_, y = targetY_; }
@@ -437,6 +450,12 @@ private:
     std::vector<uint8_t> tricorderViews_;
     std::vector<std::array<uint8_t, 3>> tricorderShifted_; // band * palette size + code
     char tricorderShiftedRace_ = 0;
+    // The relief's layer code at a point (in tiles), 0 for none or off
+    // the map; how many layers the ground has there.
+    unsigned layerCode(float fx, float fy, int layer) const;
+    int groundLayers(float fx, float fy) const;
+    Surface reliefSurface_; // the relief drawn, before it's put on the screen
+    Rasterizer reliefRaster_;
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
 
@@ -468,7 +487,6 @@ private:
     std::optional<Placed> ghost_;
     bool ghostValid_ = false;
     View view_ = View::BirdsEye;
-    void minimapWindow(int w, int h, int tiles, float& ox, float& oy, float& tw, float& th) const;
     float markX_ = 0, markY_ = 0; // Z's camera place
     bool marked_ = false;
     bool locked_ = false;
@@ -772,11 +790,14 @@ private:
     Rect playbookIcon(int i) const; // the playbook's i-th icon, in its column as last drawn
     std::string compassStrip() const;
     Rect fullTricorderRect(int& tiles) const; // the full-screen Tricorder's map, and its zoom
-    // The Tricorder's map a click is on: the full-screen one's, else the
-    // small one's as last drawn; and its zoom.
-    Rect tricorderMap(int& tiles) const;
-    void drawTricorderMap(int x, int y, int w, int h, int tiles = 0);
-    std::string tricorderReadout(const Rect& map, int tiles) const;
+    // The Tricorder's relief a click is on: the full-screen one's, else
+    // the small one's as last drawn (its w 0 if there's none); and a
+    // relief at a place, its view's camera as it is now.
+    MapViewer::Relief tricorderRelief() const;
+    MapViewer::Relief tricorderRelief(const Rect& map, int tiles) const;
+    void drawTricorderMap(const MapViewer::Relief& relief);
+    std::string tricorderReadout(const MapViewer::Relief& relief) const;
+    void drawSceneInset(const Rect& at);
     std::string tricorderReadoutAt(float wx, float wy, float reach) const; // the selection box, the full-screen Tricorder
     std::vector<int> allyRaces() const;
     // A selected object's panel lines, as the game's (exe.md#the-selection-panel),
@@ -906,6 +927,11 @@ private:
     std::unique_ptr<ColonyLayout> colony_;
     // In play: the mission being played (mission_sim.h), and its parts.
     std::unique_ptr<MissionSim> sim_;
+    // The colony's capacity carried from mission to mission in this
+    // session, as the game's (exe.md#the-economy): the next mission played
+    // starts from it (U, between missions, puts it back to 50); and the
+    // one the mission being played started from (saved with it).
+    CarriedCapacity carried_, carryIn_;
     World* world_ = nullptr;
     Economy* economy_ = nullptr;
     // The colony's buildings' world objects (-1 once destroyed) and
@@ -1004,6 +1030,10 @@ private:
     int edgeTicks_ = 0; // F1's edges raise and lower the camera every fourth tick
     bool mouseSeen_ = false;            // the pointer has moved (it starts at 0, 0)
     int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
+    // The Tricorder's view: 0 Starship, 1 Relief (play's), 2 Relief orbit,
+    // 3 Relief fixed (exe.md#the-tricorder). Only a briefing step sets
+    // another in the game; play keeps Relief.
+    int tricorderView_ = 1;
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the

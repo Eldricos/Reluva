@@ -317,13 +317,13 @@ bool MissionViewer::playEvent(const Event& ev) {
         // click: the darkened panels and the hidden map under it aren't
         // there to click.
         {
-            int tiles = 0;
-            const Rect map = tricorderMap(tiles);
-            const bool onMap = (play_.tricorderFull || panel >= 0) && map.w > 0 && map.contains(ev.mouseX, ev.mouseY);
+            const MapViewer::Relief relief = tricorderRelief();
+            float wx = 0, wy = 0;
+            const bool onMap = (play_.tricorderFull || panel >= 0) && relief.w > 0 &&
+                               Rect{relief.x, relief.y, relief.w, relief.h}.contains(ev.mouseX, ev.mouseY) &&
+                               map_.reliefToWorld(relief, ev.mouseX, ev.mouseY, wx, wy);
             if (onMap && !ctrl &&
                 (ev.button == MouseButton::Left || (ev.button == MouseButton::Right && ev.clicks >= 2))) {
-                float wx = 0, wy = 0;
-                map_.minimapToWorld(ev.mouseX, ev.mouseY, map.x, map.y, map.w, map.h, tiles, wx, wy);
                 map_.stopFollowing();
                 play_.followed = 0;
                 map_.centreOn(wx, wy);

@@ -63,7 +63,7 @@ struct ModelEntry {
 // for its models, the metamodels in misc.cat (fpgs "fedpowgen", ruh_a
 // "romsickbay"; colony.md). The Romulan upper-case ones were matched by the
 // selection panel's portrait as well as the model's shape (colony.md). The
-// Klingons' accommodation block (kab) is the panel's Arsenal. Upgrades stand
+// Klingons' accommodation block (kab) is the Colonial House. Upgrades stand
 // on the building they upgrade.
 constexpr ModelEntry kModels[] = {
     {"colony-hub", "FCH", "KCH", "RCH"},

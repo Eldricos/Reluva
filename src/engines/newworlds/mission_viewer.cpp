@@ -17,7 +17,6 @@ namespace reluva::newworlds {
 namespace {
 
 constexpr float kEdgeRamp = 80, kEdgeTop = 6400; // edge scrolling, units a tick
-constexpr float kBriefingTurn = 0.05f / 1000; // radians per millisecond (about 3 degrees a second)
 
 const char* sideName(char side) {
     switch (side) {
@@ -281,9 +280,10 @@ void MissionViewer::startPlay() {
     startColony();
     ColonyMap ground{[this](int bx, int by) { return map_.depositAt(bx, by); },
                      [this](int bx, int by) { return map_.depositAmount(bx, by); }};
+    carryIn_ = carried_;
     sim_ = std::make_unique<MissionSim>(level.shortName, side(), map_.terrain(), ground, map_.blocksWide(),
                                         map_.blocksHigh(),
-                                        colony_ ? colony_->buildings() : std::vector<ColonyBuilding>{});
+                                        colony_ ? colony_->buildings() : std::vector<ColonyBuilding>{}, carryIn_);
     sim_->useModels(archives_);
     world_ = &sim_->world();
     economy_ = &sim_->economy();
@@ -342,6 +342,10 @@ void MissionViewer::stopPlay() {
     if (!playing_)
         return;
     playing_ = false;
+    // The capacity the player's colony has as the mission ends, won, lost
+    // or left, is the next one's (the game never resets it).
+    if (economy_)
+        carried_ = economy_->carried();
     map_.stopFollowing();
     if (mixer_)
         mixer_->stop(stingHandle_);
@@ -419,6 +423,10 @@ void MissionViewer::handleEvent(const Event& ev) {
         break;
     case 'b': briefing_ = !briefing_; break;
     case 'k': setCadetMode(!cadetMode()); break; // the next mission played
+    case 'u': // the carried capacity back to a fresh session's
+        if (!playing_)
+            carried_ = {};
+        break;
     case key::Return:
         if (running_)
             startStep(step_ + 1);
@@ -765,6 +773,9 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
     if (sides.size() > 1)
         t += std::string(", as ") + sideName(side()) + " (J: side)";
     t += cadetMode() ? "; Cadet mode (K)" : "";
+    if (!(carried_ == CarriedCapacity{}))
+        t += "; capacity carried " + std::to_string(carried_.capacity) +
+             (carried_.bank ? " (+" + std::to_string(carried_.bank) + " banked)" : "") + " (U: 50)";
     t += hasMap_ ? "; " + mapName_ : "";
     if (!mapNote_.empty())
         t += " (" + mapNote_ + ")";
@@ -970,7 +981,10 @@ Error MissionViewer::syncState(save::Serializer& s) {
     std::string mission = missions_.empty() ? "" : missions_[size_t(current_)].shortName;
     int sideIndex = side_;
     bool cadet = cadetMode(), flowed = flow_ == Flow::Playing;
-    s(mission)(sideIndex)(cadet)(flowed);
+    // (The capacity it started from: a load restarts from it, as the
+    // session's carried value then.)
+    CarriedCapacity carryIn = carryIn_;
+    s(mission)(sideIndex)(cadet)(flowed)(carryIn);
     if (!s.ok())
         return Error::fail("The save is damaged: " + s.error());
     if (s.loading()) {
@@ -997,6 +1011,7 @@ Error MissionViewer::syncState(save::Serializer& s) {
         if (!hasMap_)
             return Error::fail("The archives have no map for " + mission + ".");
         setCadetMode(cadet);
+        carried_ = carryIn;
         startPlay();
         stopClip(); // the opening's voice, already heard
         if (!sim_)
@@ -1031,7 +1046,10 @@ Error MissionViewer::syncState(save::Serializer& s) {
 bool MissionViewer::restartPlay() {
     if (!playing_)
         return false;
+    // From the capacity it started from (not what this play made of it).
+    const CarriedCapacity in = carryIn_;
     stopPlay();
+    carried_ = in;
     startPlay();
     flowWon_ = false;
     dirty_ = true;

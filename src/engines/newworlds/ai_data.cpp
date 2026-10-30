@@ -53,7 +53,7 @@ constexpr CombatType kTypes[] = {
     {52, "mining-station", "geo/kln/kms.geo", 'K', true, 400, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 2500.0f, 5, 2, true, false, 0x8},
     {53, "construction-yard", "geo/kln/kcy.geo", 'K', true, 450, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 4, true, false, 0x2},
     {54, "defensive-weapon", "geo/kln/kdws.geo", 'K', true, 200, 1.5f, 0.0f, {WeaponKind::Single, 40, 30000.0f, 40, 1, 1, 3.14159f, 0.08725f, 1.5708f}, 0.0f, 0, 1, true, false, 0x10},
-    {55, "unarmed-apc", "geo/fed/fapc2.geo", 'F', false, 30, 1.0f, 0.08333f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 3, 0, false, false, 0x80},
+    {55, "unarmed-apc", "geo/fed/fctp.geo", 'F', false, 30, 1.0f, 0.08333f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 3, 0, false, false, 0x80},
     {56, "armed-apc", "geo/fed/fapc2.geo", 'F', false, 50, 1.5f, 0.16666f, {WeaponKind::Burst, 6, 18000.0f, 50, 4, 1, 3.14159f, 0.17449f, 0.7854f}, 0.0f, 3, 0, true, false, 0x40000},
     {61, "cargo-bee", "geo/kln/kwbc.geo", 'K', false, 1000000, 1.0f, 2.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 0, 0, false, false, 0x800},
     {62, "science-vehicle", "geo/fed/fsv.geo", 'F', false, 40, 1.3f, 0.1f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 18000.0f, 4, 0, true, false, 0x400000},

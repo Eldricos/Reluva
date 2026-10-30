@@ -58,8 +58,9 @@ counts the messages held, not the mission's message number.
 
 Reluva now draws the Tab Tricorder's readout this way (at the top, for the
 camera's target, marked with a cross; the compass on the small panel's
-line). The small panel doesn't yet show the camera's view, and the map
-isn't the game's tilted relief.
+line), the small panel showing the main camera's view meanwhile, and both
+Tricorders as the game's tilted relief (exe.md#the-tricorder; the tilt and
+the layers' spacing are Reluva's, game.md#placeholders).
 
 ## J2: the mine at 196, 436
 

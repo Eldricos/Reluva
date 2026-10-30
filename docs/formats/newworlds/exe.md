@@ -82,7 +82,15 @@ twice that of the material if the plant is fitted and finished
 own plants count. The scripts' monitors count finished add-ons across the
 side: C4's on 166 and 167 (one each: the first two plants; three each:
 all six), J6's on each race's medical lab (300, 306, 314). Reluva keeps
-the add-ons colony-wide (one of each), as its refining is.
+each building's add-ons as its own, as the game does: a second sickbay or
+processor is offered a full set of its own (the build menu fits one to the
+building selected if it can take it, else to the first of its kind still
+without it), and a building lost takes only its own add-ons with it.
+Reluva's refining stays colony-wide (one ore store, one processor's turn a
+tick), so the plants that count are those of the processor doing it: the
+first finished one with its crew. (Another processor's plants double
+nothing until it is that one; the game's processors each refine their
+own ore.) No AI colony orders add-ons.
 
 ## Costs and prerequisites
 
@@ -462,6 +470,16 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
     60); and b carries over everything from earlier missions in the same
     run (F12's 90, J2K's 55 once and 50 another time). That gives F1's 50,
     55, 65, 80, 90.
+  - Reluva: the missions page carries b, and the bank, from one mission
+    played to the next in the same program session: what the player's
+    colony has as a mission ends, won, lost or left, is where the next
+    begins (before its starting housing). A restart begins again from what
+    the mission it replaces began with; a savestate keeps that starting
+    value, and a load restores it. U on the page (not while playing) puts
+    it back to 50; the window title shows it when it isn't 50. Reluva has
+    no debriefing world, so its copies of the colony's housing aren't
+    added. `reluva-tool play-check` and the tests start every mission at
+    50, as a fresh session does, so their runs stay the same.
 - **Crew.** Each building has places for its staff and occupants; it works
   only with its staff in. The hub holds the colony's pool (150).
 
@@ -1211,6 +1229,32 @@ posture to its side (Friendly, Neutral, Hostile) and its class
 (defenses, structure, unit), "Debris" for one gone; Impassable ground;
 an ore (`<ore> at <a:b>`) or the terrain (`Terrain at <a:b>`); with the
 pointer elsewhere, the view's name and the zoom (Relief X2).
+
+**The picture.** Each Tricorder is drawn in 3D, by a small camera of its
+own. Its middle is the main camera's position, and it follows it: there
+is no panning of its own (a click converts its pixel by the main
+camera's place less half the shown width). The map is held as five
+textures, one per terrain layer (128 pixels square for the small one,
+256 for the full-screen one), each pixel the layer's terrain code in
+its block's class band, code 0 the transparent background; the five
+stacked make the relief, a higher one showing only where the ground
+reaches it. The zoom changes how much of the map the textures hold (8,
+4 or 2 pixels a tile), not the camera. The view picks the camera's
+kind: **Starship** (view 0), **Relief** (1, play's; the mission's start
+settings set it, and briefing steps may set another), **Relief orbit**
+(2) and **Relief fixed** (3). Per size (small / full screen) the
+camera is 800 / 1600 away, and its height 340 / 500 for Starship, 175 /
+280 for the three Relief views. Starship keeps a fixed orientation,
+only lifted by its height; Relief takes the orientation of what it
+follows (the main camera); Relief orbit turns an angle by a 256th of a
+turn each camera update; Relief fixed holds that angle at a quarter
+turn. That angle turns the camera's offset about the vertical axis
+before it's scaled by the height, so it is a heading (orbiting the
+middle), not a pitch, as first read. The full-screen Tricorder marks
+the camera's place, white outlined in black. Tab swaps what the small
+Tricorder's dialog shows between its map and another view; in the
+recordings, with the full-screen Tricorder up, the small panel shows
+the main camera's view.
 
 ### Cameras
 

@@ -126,13 +126,24 @@ struct ColonyStructure {
     bool evacuating = false; // being razed: its people leaving
     int evacTicks = 0;       // ticks since
     bool beaming = false;    // its crew on their way down from orbit
+    int host = 0;            // an upgrade or add-on: the building it's fitted to (its id)
     // People on their way to it: how many, and seconds still to walk
     // (kRiding: in, or waiting for, one of the colony's transports).
     std::vector<std::pair<int, double>> coming;
     friend void syncState(save::Serializer& s, ColonyStructure& v) {
         s(v.id)(v.type)(v.x)(v.y)(v.progress)(v.blockX)(v.blockY)(v.exhausted)(v.stored)(v.fill)(v.supply)
-         (v.health)(v.crew)(v.pool)(v.wanted)(v.target)(v.evacuating)(v.evacTicks)(v.beaming)(v.coming);
+         (v.health)(v.crew)(v.pool)(v.wanted)(v.target)(v.evacuating)(v.evacTicks)(v.beaming)(v.coming)
+         (v.host);
     }
+};
+
+// The colony's capacity as a program session carries it from mission to
+// mission (exe.md#the-economy: set to 50 once as the game starts, never
+// reset): its value and what housing banked over 90.
+struct CarriedCapacity {
+    int capacity = 50, bank = 0;
+    bool operator==(const CarriedCapacity&) const = default;
+    friend void syncState(save::Serializer& s, CarriedCapacity& v) { s(v.capacity)(v.bank); }
 };
 
 class Economy {
@@ -140,7 +151,9 @@ public:
     // A savestate's part (docs/savestates.md): what play changes, saved or
     // loaded; the rest is made again as the mission starts.
     void syncState(save::Serializer& s);
-    Economy(char side, Stock start, int capacity, ColonyMap map);
+    // (capacity and bank: what the colony starts from, before its
+    // starting housing; past 90 the rest goes to the bank.)
+    Economy(char side, Stock start, int capacity, ColonyMap map, int bank = 0);
 
     // The stock as the panel shows it: what the colony's storage
     // facilities hold between them (exe.md#stores). Each keeps its own; the
@@ -158,6 +171,8 @@ public:
     // past 90).
     int colonySize() const;
     int capacity() const { return capacity_; }
+    int capacityBank() const { return capBank_; } // housing's banked over 90
+    CarriedCapacity carried() const { return {capacity_, capBank_}; }
     void setVehicles(int n) { vehicles_ = n; }
     // Power: what generators give a tick, what buildings ask a tick, the
     // share granted (DEMAND MET), and the reserve (0-1).
@@ -177,11 +192,22 @@ public:
     // A building already standing (the starting colony).
     int addBuilt(const std::string& type, float x, float y);
     // Whether the menu offers a type now (what it needs stands; an upgrade
-    // not fitted yet), and whether the stock can pay for it.
+    // or add-on: one of its buildings without it yet), and whether the
+    // stock can pay for it. Upgrades and add-ons are each building's own
+    // (exe.md#upgrades-and-add-ons): each fitted once to a building, so a
+    // second sickbay or processor takes a whole set of its own.
     bool available(const BuildingType& t) const;
+    // An upgrade or add-on on one building: what it needs stands, that
+    // building (finished, of its kind) hasn't it yet.
+    bool availableOn(const BuildingType& t, int host) const;
+    // The building an upgrade or add-on would go on: the one asked for if
+    // it can take it, else the first of its kind that can (0: none).
+    int hostFor(const BuildingType& t, int preferred = 0) const;
+    // Whether a building has an upgrade or add-on of a type, finished.
+    bool fittedOn(const std::string& type, int host) const;
     bool affordable(const BuildingType& t) const;
     // Orders a building at a spot (its middle; for an upgrade, where its
-    // building stands). The cost is taken at once; without enough
+    // building stands: it goes on that building). The cost is taken at once; without enough
     // materials nothing is spent, 0 is returned and the colony is told
     // (short-resources). tx, ty: the tile under its middle.
     int order(const std::string& type, float x, float y, int tx, int ty);

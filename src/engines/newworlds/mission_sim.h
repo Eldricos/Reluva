@@ -47,9 +47,12 @@ public:
     // A mission on its map: the terrain, the ground's deposits, the map's
     // size in blocks, and the player's starting colony (its hub first; map
     // positions in eighths of a block, as the scripts and placements
-    // write them).
+    // write them). The colony's capacity starts from what's carried in
+    // (exe.md#the-economy: the game's carries over from the missions
+    // played before in its session; 50 fresh, as play-check and the tests
+    // start every mission).
     MissionSim(std::string_view mission, char side, Terrain terrain, ColonyMap map, int blocksWide, int blocksHigh,
-               std::vector<ColonyBuilding> colony);
+               std::vector<ColonyBuilding> colony, CarriedCapacity carried = {});
     // Headless: the colony as the mission places it (else its hub where
     // the recordings put it).
     MissionSim(std::string_view mission, char side, const Ground& ground);

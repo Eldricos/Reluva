@@ -46,7 +46,7 @@ constexpr ObjectType kTypes[] = {
     {70, true, "power-generator", "geo/rom/rps1.geo", 0},
     {71, true, "vehicle-yard", "geo/rom/rvy.geo", 0},
     {72, true, "transporter-pad", "geo/rom/rbcs.geo", 0},
-    {73, true, "transporter-pad", "geo/kln/kief.geo", 0}, // (guess: its sounds are kief's, the import/export block)
+    {73, true, "transporter-pad", "geo/kln/kief.geo", 0},
     {74, true, "security-center", "geo/rom/risb.geo", 0},
     {75, true, "security-center", "geo/kln/ksc.geo", 0},
     {77, true, "construction-yard", "geo/fed/fcy.geo", 0},
@@ -85,7 +85,7 @@ constexpr ObjectType kTypes[] = {
     {40, false, "ARMED TRANSPORT", "geo/kln/apc.geo", 0.08333f},
     {46, false, "CONSTRUCTION BEE", "geo/kln/conbee.geo", 0.125f},
     {47, false, "PHOTON ARTILLERY", "geo/fed/photart.geo", 0.08333f},
-    {55, false, "TRANSPORT", "geo/fed/fapc2.geo", 0.08333f},
+    {55, false, "TRANSPORT", "geo/fed/fctp.geo", 0.08333f},
     {56, false, "ARMED TRANSPORT", "geo/fed/fapc2.geo", 0.08333f},
     {61, false, "CARGO BEE", "geo/kln/kwbc.geo", 0.125f},
     {62, false, "SCIENCE VEHICLE", "geo/fed/fsv.geo", 0.08333f},

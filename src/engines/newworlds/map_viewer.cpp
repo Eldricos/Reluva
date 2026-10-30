@@ -146,74 +146,6 @@ void MapViewer::lookAt(int a, int b, bool ground) {
     dirty_ = true;
 }
 
-// The part of the map a minimap shows, in tiles: all of it, or a window
-// so many tiles across round the camera's target (as high as the minimap
-// is), kept on the map.
-void MapViewer::minimapWindow(int w, int h, int tiles, float& ox, float& oy, float& tw, float& th) const {
-    const float allW = float(map_.width * 2), allH = float(map_.height * 2);
-    ox = oy = 0, tw = allW, th = allH;
-    if (tiles <= 0 || w <= 0 || h <= 0)
-        return;
-    tw = std::min(float(tiles), allW);
-    th = std::min(allH, tw * float(h) / float(w));
-    ox = std::clamp(targetX_ / kTileSize - tw / 2, 0.0f, allW - tw);
-    oy = std::clamp(targetY_ / kTileSize - th / 2, 0.0f, allH - th);
-}
-
-bool MapViewer::minimapPoint(float wx, float wy, int x0, int y0, int w, int h, int& px, int& py, int tiles) const {
-    float ox = 0, oy = 0, tw = 1, th = 1;
-    minimapWindow(w, h, tiles, ox, oy, tw, th);
-    const float fx = (wx / kTileSize - ox) / tw, fy = (wy / kTileSize - oy) / th;
-    px = x0 + int(fx * float(w));
-    py = y0 + h - 1 - int(fy * float(h));
-    return fx >= 0 && fx < 1 && fy >= 0 && fy < 1;
-}
-
-void MapViewer::minimapToWorld(int px, int py, int x0, int y0, int w, int h, int tiles, float& wx, float& wy) const {
-    float ox = 0, oy = 0, tw = 1, th = 1;
-    minimapWindow(w, h, tiles, ox, oy, tw, th);
-    wx = (ox + (float(px - x0) + 0.5f) / float(w) * tw) * kTileSize;
-    wy = (oy + (float(h - 1 - (py - y0)) + 0.5f) / float(h) * th) * kTileSize;
-}
-
-void MapViewer::drawMinimap(Surface& s, int x0, int y0, int w, int h, int tiles) const {
-    if (map_.width <= 0 || map_.height <= 0)
-        return;
-    float ox = 0, oy = 0, tw = 1, th = 1;
-    minimapWindow(w, h, tiles, ox, oy, tw, th);
-    for (int y = 0; y < h; ++y) {
-        if (y0 + y < 0 || y0 + y >= s.h)
-            continue;
-        // Row 0 of the grid at the bottom, as the map is drawn.
-        const float fy = oy + (float(h - 1 - y) + 0.5f) / float(h) * th;
-        uint8_t* row = s.row(y0 + y);
-        for (int x = 0; x < w; ++x) {
-            if (x0 + x < 0 || x0 + x >= s.w)
-                continue;
-            const float fx = ox + (float(x) + 0.5f) / float(w) * tw;
-            const int t = tileAt(int(fx), int(fy));
-            unsigned code = 0;
-            if (t >= 0 && size_t(t) < map_.tiles.size())
-                code = terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
-                                   std::clamp(int((fy - std::floor(fy)) * 8), 0, 7));
-            uint8_t* p = row + (x0 + x) * 4;
-            if (code && code < map_.palette.size())
-                p[0] = map_.palette[code][0], p[1] = map_.palette[code][1], p[2] = map_.palette[code][2];
-            else
-                p[0] = p[1] = p[2] = 20;
-        }
-    }
-    // The camera's target, a small cross.
-    int cx = 0, cy = 0;
-    minimapPoint(targetX_, targetY_, x0, y0, w, h, cx, cy, tiles);
-    for (int d = -3; d <= 3; ++d)
-        for (const auto& [px, py] : {std::pair{cx + d, cy}, std::pair{cx, cy + d}})
-            if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
-                uint8_t* p = s.row(py) + px * 4;
-                p[0] = 255, p[1] = 255, p[2] = 255;
-            }
-}
-
 namespace {
 
 // An RGB colour turned in HSV: hue added (degrees), saturation and value
@@ -284,15 +216,28 @@ Shift bandShift(int r, int c) {
 
 } // namespace
 
-bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
+unsigned MapViewer::layerCode(float fx, float fy, int layer) const {
+    const int bx = int(std::floor(fx)) / 2, by = int(std::floor(fy)) / 2;
+    const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
+    if (t < 0 || size_t(t) >= map_.tiles.size())
+        return 0;
+    const GmfMap::Tile& tile = map_.tiles[size_t(t)];
+    const int cx = std::clamp(int((fx - std::floor(fx)) * 8), 0, 7), cy = std::clamp(int((fy - std::floor(fy)) * 8), 0, 7);
+    return layer < 0 ? terrainCode(tile, cx, cy) : tile.layers[size_t(layer * 64 + cy * 8 + cx)];
+}
+
+int MapViewer::groundLayers(float fx, float fy) const {
+    int n = 0;
+    while (n < GmfMap::kLayers && layerCode(fx, fy, n))
+        ++n;
+    return n;
+}
+
+bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out, int layer) const {
     const int r = tricorderRace_ == 'K' ? 1 : tricorderRace_ == 'R' ? 2 : 0;
     static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
     const int bx = int(std::floor(fx)) / 2, by = int(std::floor(fy)) / 2;
-    const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
-    const unsigned code = t >= 0 && size_t(t) < map_.tiles.size()
-                              ? terrainCode(map_.tiles[size_t(t)], std::clamp(int((fx - std::floor(fx)) * 8), 0, 7),
-                                            std::clamp(int((fy - std::floor(fy)) * 8), 0, 7))
-                              : 0;
+    const unsigned code = layerCode(fx, fy, layer);
     if (!code || code >= map_.palette.size()) {
         out[0] = kBackground[r][0], out[1] = kBackground[r][1], out[2] = kBackground[r][2];
         return false;
@@ -381,32 +326,115 @@ void MapViewer::prepareTricorder() {
     tricorderShiftedRace_ = tricorderRace_;
 }
 
-void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tiles, char race,
-                              const std::function<int(int bx, int by)>& cellClass,
-                              const std::function<bool(int bx, int by)>& inView) {
-    if (map_.width <= 0 || map_.height <= 0)
+// The Tricorder's camera (exe.md#the-tricorder): the game's has a kind
+// per view and, per size, a distance and a height; how its sheets are
+// laid out in its space isn't known, so the tilts and the layers'
+// spacing here are Reluva's: the Starship view looks down more steeply
+// than the Relief views (its height is the greater), Relief turns with
+// the main camera, Relief orbit turns on its own, Starship and Relief
+// fixed keep north up. The zoom's tiles span the width at the centre (the
+// full-screen one's twice the small one's, as the game's).
+namespace {
+constexpr float kReliefTilt = 45 * kPi / 180, kStarshipTilt = 60 * kPi / 180;
+constexpr float kReliefStep = 1.0f / 40; // a layer's height, of the width shown
+OrbitCamera reliefCamera(const MapViewer::Relief& r) {
+    return OrbitCamera(Vec{r.cx, r.cy, 2 * r.step}, r.yaw, r.pitch, r.distance, r.w, r.h);
+}
+} // namespace
+
+MapViewer::Relief MapViewer::tricorderRelief(int x, int y, int w, int h, int tiles, int view, float orbit) const {
+    Relief r;
+    r.x = x, r.y = y, r.w = std::max(w, 1), r.h = std::max(h, 1);
+    r.cx = targetX_, r.cy = targetY_;
+    const float across = float(tiles > 0 ? tiles : std::max(map_.width, map_.height) * 2) * kTileSize;
+    r.step = across * kReliefStep;
+    r.pitch = view == 0 ? kStarshipTilt : kReliefTilt;
+    r.yaw = view == 1 ? yaw_ : view == 2 ? orbit : 0;
+    // OrbitCamera's focal length is 1.2 heights: across spans the width.
+    r.distance = float(r.h) * 1.2f * across / float(r.w);
+    return r;
+}
+
+void MapViewer::drawTricorderRelief(Surface& s, const Relief& r, char race,
+                                    const std::function<int(int bx, int by)>& cellClass,
+                                    const std::function<bool(int bx, int by)>& inView) {
+    if (map_.width <= 0 || map_.height <= 0 || r.w <= 0 || r.h <= 0)
         return;
     setTricorder(race, cellClass, inView);
     prepareTricorder();
-    float ox = 0, oy = 0, tw = 1, th = 1;
-    minimapWindow(w, h, tiles, ox, oy, tw, th);
-    for (int y = 0; y < h; ++y) {
-        if (y0 + y < 0 || y0 + y >= s.h)
-            continue;
-        const float fy = oy + (float(h - 1 - y) + 0.5f) / float(h) * th; // tiles; row 0 at the bottom
-        uint8_t* row = s.row(y0 + y);
-        for (int x = 0; x < w; ++x)
-            if (x0 + x >= 0 && x0 + x < s.w)
-                tricorderColour(ox + (float(x) + 0.5f) / float(w) * tw, fy, row + (x0 + x) * 4);
+    if (reliefSurface_.w != r.w || reliefSurface_.h != r.h)
+        reliefSurface_.create(r.w, r.h, PixelFormat::RGBA32);
+    // The race's background where no sheet is.
+    uint8_t back[4] = {0, 0, 0, 255};
+    tricorderColour(-1, -1, back);
+    for (int y = 0; y < r.h; ++y) {
+        uint8_t* row = reliefSurface_.row(y);
+        for (int x = 0; x < r.w; ++x, row += 4)
+            row[0] = back[0], row[1] = back[1], row[2] = back[2], row[3] = 255;
     }
-    int cx = 0, cy = 0;
-    minimapPoint(targetX_, targetY_, x0, y0, w, h, cx, cy, tiles);
-    for (int d = -3; d <= 3; ++d)
-        for (const auto& [px, py] : {std::pair{cx + d, cy}, std::pair{cx, cy + d}})
-            if (px >= x0 && px < x0 + w && py >= y0 && py < y0 + h && px < s.w && py < s.h) {
-                uint8_t* q = s.row(py) + px * 4;
-                q[0] = 255, q[1] = 255, q[2] = 255;
-            }
+    const OrbitCamera cam = reliefCamera(r);
+    reliefRaster_.begin(reliefSurface_);
+    const float mapW = float(map_.width * 2) * kTileSize, mapH = float(map_.height * 2) * kTileSize;
+    std::vector<ViewVertex> poly;
+    std::vector<ScreenVertex> projected;
+    // The sheets from the top down: a higher one, where it has ground,
+    // hides the lower ones (the depth test); elsewhere they show through.
+    for (int layer = GmfMap::kLayers - 1; layer >= 0; --layer) {
+        const float z = float(layer) * r.step;
+        poly.clear();
+        for (const auto& [x, y] : {std::pair{0.0f, 0.0f}, std::pair{mapW, 0.0f}, std::pair{mapW, mapH}, std::pair{0.0f, mapH}})
+            poly.push_back(cam.toView(Vec{x, y, z}, x / kTileSize, y / kTileSize));
+        poly = clipNear(poly, cam.nearZ);
+        if (poly.size() < 3)
+            continue;
+        projected.clear();
+        for (const auto& p : poly)
+            projected.push_back(cam.project(p));
+        auto shade = [&](float u, float v, uint8_t* out) {
+            uint8_t c[4];
+            if (!tricorderColour(u, v, c, layer))
+                return false;
+            out[0] = c[0], out[1] = c[1], out[2] = c[2], out[3] = 255;
+            return true;
+        };
+        for (size_t i = 1; i + 1 < projected.size(); ++i)
+            reliefRaster_.drawTriangle(projected[0], projected[i], projected[i + 1], shade);
+    }
+    for (int y = 0; y < r.h; ++y) {
+        if (r.y + y < 0 || r.y + y >= s.h)
+            continue;
+        const int x0 = std::max(0, -r.x), x1 = std::min(r.w, s.w - r.x);
+        if (x1 > x0)
+            std::copy_n(reliefSurface_.row(y) + x0 * 4, size_t(x1 - x0) * 4, s.row(r.y + y) + (r.x + x0) * 4);
+    }
+}
+
+bool MapViewer::reliefPoint(const Relief& r, float wx, float wy, int& px, int& py) const {
+    const OrbitCamera cam = reliefCamera(r);
+    const int layers = groundLayers(wx / kTileSize, wy / kTileSize);
+    const ViewVertex v = cam.toView(Vec{wx, wy, float(std::max(layers - 1, 0)) * r.step});
+    if (v.z < cam.nearZ)
+        return false;
+    const ScreenVertex p = cam.project(v);
+    px = r.x + int(std::floor(p.x)), py = r.y + int(std::floor(p.y));
+    return px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h;
+}
+
+bool MapViewer::reliefToWorld(const Relief& r, int px, int py, float& wx, float& wy) const {
+    const OrbitCamera cam = reliefCamera(r);
+    // The ray through the pixel's centre, down through the sheets: the
+    // first with ground where it meets it, else the lowest.
+    const float dx = (float(px - r.x) + 0.5f - cam.halfW) / cam.focal, dy = (cam.halfH - (float(py - r.y) + 0.5f)) / cam.focal;
+    const Vec dir = cam.right * dx + cam.up * dy + cam.forward;
+    if (dir.z >= 0)
+        return false;
+    for (int layer = GmfMap::kLayers - 1; layer >= 0; --layer) {
+        const float t = (float(layer) * r.step - cam.eye.z) / dir.z;
+        wx = cam.eye.x + dir.x * t, wy = cam.eye.y + dir.y * t;
+        if (layer == 0 || layerCode(wx / kTileSize, wy / kTileSize, layer))
+            break;
+    }
+    return wx >= 0 && wy >= 0 && wx < float(map_.width * 2) * kTileSize && wy < float(map_.height * 2) * kTileSize;
 }
 
 void MapViewer::pan(float right, float forward) {

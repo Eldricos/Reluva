@@ -2979,6 +2979,90 @@ void testWardsAndPlants() {
     CHECK(!type("training-ward").sides[1] && type("training-ward").sides[0]);
 }
 
+// Add-ons are each building's own (exe.md#upgrades-and-add-ons): a second
+// sickbay takes wards of its own, a second processor plants of its own; a
+// building lost takes only its own add-ons with it; a plant doubles what its
+// own processor refines (Reluva's refining: the first processor with crew).
+void testAddOnsPerBuilding() {
+    auto type = [](const char* id) -> const BuildingType& { return *buildingType(id); };
+    // Magnesite (kind 5) in block 2,3 holding 30, nothing else.
+    ColonyMap map;
+    map.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+    map.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 30 : 0; };
+    auto colony = [&](Economy& e, int& sb1, int& sb2, int& p1, int& p2) {
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("colony-hub-upgrade", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.addBuilt("construction-yard-upgrade", 20000, 0);
+        e.addBuilt("construction-yard-advanced", 20000, 0);
+        sb1 = e.addBuilt("sickbay", 0, 20000);
+        sb2 = e.addBuilt("sickbay", 40000, 20000);
+        p1 = e.addBuilt("resource-processor", 20000, 20000);
+        p2 = e.addBuilt("resource-processor", 60000, 20000);
+    };
+    auto run = [](Economy& e, double seconds) {
+        for (double t = 0; t < seconds; t += 0.25)
+            e.advance(0.25);
+    };
+    const Stock rich{5000, 5000, 5000, 5000, 5000, 5000};
+    {
+        Economy e('F', rich, 50, map);
+        int sb1 = 0, sb2 = 0, p1 = 0, p2 = 0;
+        colony(e, sb1, sb2, p1, p2);
+        const BuildingType& ward = type("surgical-ward");
+        CHECK(e.availableOn(ward, sb1) && e.availableOn(ward, sb2) && !e.availableOn(ward, p1));
+        CHECK(e.hostFor(ward) == sb1 && e.hostFor(ward, sb2) == sb2 && e.hostFor(ward, p1) == sb1);
+        const int cap = e.capacity();
+        CHECK(e.order("surgical-ward", 0, 20000, 0, 0) != 0);
+        CHECK(!e.availableOn(ward, sb1) && e.availableOn(ward, sb2) && e.available(ward));
+        CHECK(e.hostFor(ward, sb1) == sb2);
+        CHECK(e.order("surgical-ward", 0, 20000, 0, 0) == 0); // once to a building
+        CHECK(e.order("surgical-ward", 40000, 20000, 0, 0) != 0);
+        CHECK(e.capacity() == cap + 10 && !e.available(ward));
+        // The second processor's plant; the first can still take its own.
+        CHECK(e.order("dilithium-plant", 60000, 20000, 0, 0) != 0);
+        CHECK(e.availableOn(type("dilithium-plant"), p1) && !e.availableOn(type("dilithium-plant"), p2));
+        for (int i = 0; i < 4000 && !(e.fittedOn("surgical-ward", sb1) && e.fittedOn("surgical-ward", sb2) &&
+                                      e.fittedOn("dilithium-plant", p2));
+             ++i)
+            e.advance(0.05);
+        CHECK(e.fittedOn("surgical-ward", sb1) && e.fittedOn("surgical-ward", sb2));
+        CHECK(e.fittedOn("dilithium-plant", p2) && !e.fittedOn("dilithium-plant", p1));
+        // The first sickbay lost: its ward with it (its 5 back), the
+        // second's stays; it can't be ordered again on a sickbay that has it.
+        e.remove(sb1);
+        CHECK(e.capacity() == cap + 5 && e.fittedOn("surgical-ward", sb2) && !e.available(ward));
+        CHECK(std::count_if(e.structures().begin(), e.structures().end(),
+                            [](const ColonyStructure& s) { return s.type == "surgical-ward"; }) == 1);
+        // A processor lost takes its own plant only.
+        e.remove(p1);
+        CHECK(e.fittedOn("dilithium-plant", p2));
+        e.remove(p2);
+        CHECK(!e.has("dilithium-plant"));
+    }
+    // Refining: the block's magnesite into nitrium, about 110 stock units
+    // (testEconomy), doubled only by a nitrium plant on the processor
+    // that refines it.
+    auto refined = [&](bool onFirst) {
+        Economy e('F', rich, 50, map);
+        int sb1 = 0, sb2 = 0, p1 = 0, p2 = 0;
+        colony(e, sb1, sb2, p1, p2);
+        const ColonyStructure* host = e.structure(onFirst ? p1 : p2);
+        CHECK(host && e.order("nitrium-plant", host->x, host->y, 0, 0) != 0);
+        for (int i = 0; i < 4000 && !e.fittedOn("nitrium-plant", onFirst ? p1 : p2); ++i)
+            e.advance(0.05);
+        const int before = e.stock()[Nitrium];
+        CHECK(e.order("mining-station", 5 * kTile, 7 * kTile, 5, 7) != 0);
+        run(e, 400);
+        return e.stock()[Nitrium] - before;
+    };
+    const int single = refined(false), doubled = refined(true);
+    CHECK(single >= 100 && single <= 120);
+    CHECK(doubled >= 200 && doubled <= 240);
+    if (single < 100 || single > 120 || doubled < 200 || doubled > 240)
+        std::printf("  refined %d (plant on the second processor), %d (on the first)\n", single, doubled);
+}
+
 void testStartingColonySize() {
     Terrain t;
     t.width = t.height = 128;
@@ -3005,6 +3089,21 @@ void testStartingColonySize() {
         CHECK(sim.economy().capacity() == w.capacity);
         if (sim.economy().colonySize() != w.size || sim.economy().capacity() != w.capacity)
             std::printf("  %s%c: %d/%d\n", w.mission, w.side, sim.economy().colonySize(), sim.economy().capacity());
+    }
+    // The capacity carried in from the session's missions before
+    // (exe.md#the-economy): J8F's accommodation (twice, 10) on top of it,
+    // past 90 into the bank, the bank carried too.
+    {
+        MissionSim sim("J8", 'F', t, map, 64, 64, MissionSim::placedColony("J8", 'F'), CarriedCapacity{75, 0});
+        CHECK(sim.economy().capacity() == 85 && sim.economy().capacityBank() == 0);
+    }
+    {
+        MissionSim sim("J8", 'F', t, map, 64, 64, MissionSim::placedColony("J8", 'F'), CarriedCapacity{90, 4});
+        CHECK((sim.economy().carried() == CarriedCapacity{90, 14}));
+    }
+    {
+        Economy e('F', {}, 95, map, 2); // (a value past 90 banks the rest)
+        CHECK((e.carried() == CarriedCapacity{90, 7}));
     }
 }
 
@@ -4149,6 +4248,7 @@ int main() {
     testStartingYardStock();
     testStartingColonySize();
     testWardsAndPlants();
+    testAddOnsPerBuilding();
     testStartingMineAndBees();
     testPlacement();
     testProjectiles();

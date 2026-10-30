@@ -494,8 +494,9 @@ const BuildingType* buildingType(std::string_view id) {
     return nullptr;
 }
 
-Economy::Economy(char side, Stock start, int capacity, ColonyMap map)
-    : side_(side), capacity_(std::min(capacity, kCapacityCap)), map_(std::move(map)) {
+Economy::Economy(char side, Stock start, int capacity, ColonyMap map, int bank)
+    : side_(side), capacity_(std::min(capacity, kCapacityCap)),
+      capBank_(std::max(0, bank) + std::max(0, capacity - kCapacityCap)), map_(std::move(map)) {
     stores_.push_back({0, false, unitsOf(start)});
 }
 
@@ -605,9 +606,36 @@ bool Economy::available(const BuildingType& t) const {
     for (const std::string& n : t.needsFor(side_))
         if (!has(n))
             return false;
-    // An upgrade once only.
-    return t.upgradeOf.empty() || std::none_of(structures_.begin(), structures_.end(),
-                                               [&](const ColonyStructure& s) { return s.type == t.id; });
+    // An upgrade or add-on: on any of its buildings still without it.
+    return t.upgradeOf.empty() || hostFor(t) != 0;
+}
+
+bool Economy::availableOn(const BuildingType& t, int host) const {
+    const ColonyStructure* h = structure(host);
+    if (t.upgradeOf.empty() || !h || h->type != t.upgradeOf || h->progress < 1 || !t.orderable ||
+        !t.sides[size_t(sideIndex())])
+        return false;
+    for (const std::string& n : t.needsFor(side_))
+        if (!has(n))
+            return false;
+    // Once to a building (its item leaves the page as it's ordered).
+    return std::none_of(structures_.begin(), structures_.end(),
+                        [&](const ColonyStructure& s) { return s.type == t.id && s.host == host; });
+}
+
+int Economy::hostFor(const BuildingType& t, int preferred) const {
+    if (preferred && availableOn(t, preferred))
+        return preferred;
+    for (const ColonyStructure& s : structures_)
+        if (availableOn(t, s.id))
+            return s.id;
+    return 0;
+}
+
+bool Economy::fittedOn(const std::string& type, int host) const {
+    return std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
+        return s.type == type && s.host == host && s.progress >= 1;
+    });
 }
 
 bool Economy::affordable(const BuildingType& t) const {
@@ -630,6 +658,16 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
     if (type == "storage-facility")
         addStore(s.id);
     if (const BuildingType* t = buildingType(type)) {
+        // An upgrade standing at the start: on its building there (else
+        // the first of its kind).
+        if (!t->upgradeOf.empty()) {
+            for (const ColonyStructure& h : structures_)
+                if (h.type == t->upgradeOf && (h.x == x && h.y == y))
+                    s.host = h.id;
+            for (const ColonyStructure& h : structures_)
+                if (h.type == t->upgradeOf && !s.host)
+                    s.host = h.id;
+        }
         s.stored = t->bufferCap;
         // A mine digs round its own block, as one ordered in play does.
         if (t->onDeposit)
@@ -684,11 +722,24 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
         shortage(t->upgradeOf.empty() ? 2 : 3);
         return 0;
     }
+    // An upgrade or add-on goes on the building standing at the spot, if
+    // it can take it (an AI's on that building, whatever it has).
+    int host = 0;
+    if (!t->upgradeOf.empty()) {
+        for (const ColonyStructure& h : structures_)
+            if (h.type == t->upgradeOf && h.x == x && h.y == y && (free_ || availableOn(*t, h.id))) {
+                host = h.id;
+                break;
+            }
+        if (!host && !free_)
+            return 0;
+    }
     ColonyStructure s;
     s.id = nextId_++;
     s.type = type;
     s.x = x, s.y = y;
     s.progress = 0;
+    s.host = host;
     if (t->onDeposit) {
         s.blockX = tx / 2, s.blockY = ty / 2;
         // (An AI's build order skips this: its mines' spots aren't all on
@@ -1344,19 +1395,21 @@ void Economy::mineTick(std::vector<ScriptEvent>& out) {
 
 // Refining, while a processor stands with its crew: one store slot a tick
 // (ores 1-6 in the first six), a quarter tonne at a time, one for one into
-// the ore's material.
+// the ore's material. (Reluva keeps the ore and the refining colony-wide:
+// the first finished processor with its crew does it, and its own plants
+// are the ones that count.)
 void Economy::refineTick() {
-    const bool refining = std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
+    const auto refiner = std::find_if(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
         return s.type == "resource-processor" && s.progress >= 1 && crewShare(s) > 0;
     });
-    if (!refining)
+    if (refiner == structures_.end())
         return;
     const int slot = refineSlot_++ % kRefineSlots;
     if (slot < kOres) {
         const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
         ore_[size_t(slot)] -= use;
-        // A plant for the material, standing, doubles what it makes.
-        refined_[size_t(slot)] += has(kPlants[size_t(slot)]) ? 2 * use : use;
+        // Its plant for the material, finished, doubles what it makes.
+        refined_[size_t(slot)] += fittedOn(kPlants[size_t(slot)], refiner->id) ? 2 * use : use;
     }
     // Every 32 ticks its goods go to storage: packed into pods for the
     // bees to carry, or straight there.
@@ -1401,12 +1454,12 @@ void Economy::lowerCapacity(int n) {
 
 void Economy::remove(int id) {
     // Its upgrades and add-ons (the plants, wards, labs) go with it.
-    if (const ColonyStructure* host = structure(id)) {
-        const std::string type = host->type;
-        const float x = host->x, y = host->y;
+    // (exe.md#upgrades-and-add-ons: each is destroyed with its host; the
+    // other buildings of its kind keep theirs.)
+    {
         std::vector<int> fitted;
         for (const ColonyStructure& c : structures_)
-            if (const BuildingType* t = buildingType(c.type); t && t->upgradeOf == type && c.x == x && c.y == y)
+            if (c.host == id)
                 fitted.push_back(c.id);
         for (int f : fitted)
             remove(f);

@@ -59,7 +59,7 @@ As the first tutorial teaches them:
 | 1-9, 0 (menu open), or a click on its portrait | picks a building (its hologram follows the pointer) or orders a vehicle; < and > turn the menu's pages, X closes it |
 | Left click (placing) | builds where the hologram is green |
 | Right click or Escape (placing) | puts the hologram away |
-| Tab | the full-screen Tricorder, units marked, a cross on the camera's target; the readout at the top names what's under the cross (an ore once its deposit is surveyed), the compass moving to the small Tricorder's line |
+| Tab | the full-screen Tricorder over the main view, units marked, a cross on the camera's target; the readout at the top names what's under the cross (an ore once its deposit is surveyed), the compass moving to the small Tricorder's line, and the small panel showing the main camera's view |
 | I | the interface on/off |
 | Escape | asks whether to leave the mission (Y / Return or YES leaves, N / Escape or NO stays; the mission runs on meanwhile); first it closes the menu or hologram |
 | Pause | freezes the mission (as does the window losing the focus); again to go on |
@@ -485,6 +485,7 @@ kept apart from the game's behaviour:
 | The Klingon shield generator's model | `ksg` | the manual's picture (p. 87, a hooked arm) |
 | An AI's mining station | stands where its order says, deposit or not | Reluva's: some orders' spots aren't on a deposit as Reluva reads the map |
 | A repair pool at the start | empty | Reluva's |
+| The Tricorder's relief | the five terrain layers as stacked sheets round the main camera's target, a layer a 40th of the shown width above the one below; Relief seen 45 degrees down, turning with the main camera; Starship 60 degrees down, north up; Relief orbit turning 3 degrees a second; Relief fixed north up; the zoom's tiles across the width at the middle; the full-screen one in the main view's place, left of the side panels | the executable gives the views, the layers and the per-size distances and heights (exe.md#the-tricorder), but not how its sheets sit in its camera's space, nor which way Relief fixed's quarter turn faces |
 | The Tricorder's ground and ore colours | each point's terrain colour shifted for its block's class and the race; ores hatched in rings and blended at their edges by the blocks round each corner, unsurveyed blocks solid, the border dark | the executable (exe.md#the-tricorder) |
 | Which playbook icon is which order | by the icons' pictures and names (`pbdefend` attack en route, `pbbombrd` assault, `pbprotct` protect from location, `pbprohre` protect area) | the executable loads them by number; the manual's pictures settle the two protects |
 | Approach | within 1.5 blocks of a site | Reluva's |

@@ -45,10 +45,10 @@ std::string buildingPortrait(std::string_view id, char side) {
         {"colony-hub", "fhub", "kchub", "rchub"},          {"construction-yard", "fcy", "kcy", "rcy"},
         {"vehicle-yard", "fvpy", "kvy", "rvy"},            {"resource-processor", "frps", "krps", "rrpp"},
         {"power-generator", "fpgs1", "kpg1", "rps1"},      {"advanced-generator", "fpgs2", "kpg2", "rps2"},
-        {"mining-station", "fms1", "kms1", "rms1"},        {"accommodation", "fca", "ka", "rab"},
+        {"mining-station", "fms1", "kms1", "rms1"},        {"accommodation", "fca", "kcho", "rab"},
         {"sickbay", "fsb", "ksb", "ruh"},                  {"science-station", "fss", "kss", "rsb"},
-        {"security-center", "fsc", "kief", "risb"},        {"farm", "fhf", "klsf", "rf"},
-        {"storage-facility", "fsfr", "ksf", "rsf"},        {"transporter-pad", "flp", "", "rlp"},
+        {"security-center", "fsc", "ka", "risb"},        {"farm", "fhf", "klsf", "rf"},
+        {"storage-facility", "fsfr", "ksf", "rsf"},        {"transporter-pad", "flp", "kief", "rlp"},
         {"landing-pad", "flp", "", ""},                    {"shield-generator", "fsg", "ksg", "rsg"},
         {"defensive-weapon", "fpdt", "kdws", "rdsb"},      {"defensive-artillery", "fpds", "kdpt", "rddt"}};
     for (const auto& p : kPortraits)
@@ -129,16 +129,29 @@ const char* MissionViewer::pendingOrderName() const {
     }
 }
 
-// The Tricorder's map (exe.md#the-tricorder): blocks the side hasn't
+// The Tricorder's relief (exe.md#the-tricorder): blocks the side hasn't
 // surveyed, its surveyed ground, and the deposits it has surveyed by ore,
-// in the map's palette shifted for the race.
-void MissionViewer::drawTricorderMap(int x, int y, int w, int h, int tiles) {
-    map_.drawTricorder(screen_, x, y, w, h, tiles, side(), [&](int bx, int by) {
+// in the map's palette shifted for the race; the main camera's place
+// marked, white outlined in black.
+void MissionViewer::drawTricorderMap(const MapViewer::Relief& relief) {
+    map_.drawTricorderRelief(screen_, relief, side(), [&](int bx, int by) {
         if (fog_ && !fog_->has(bx, by, Fog::Surveyed, playerSlot_))
             return 1;
         const int kind = map_.depositAt(bx, by);
         return kind >= 1 && kind <= 6 && map_.depositAmount(bx, by) > 0 ? 1 + kind : 0;
     }, [&](int bx, int by) { return !fog_ || fog_->has(bx, by, Fog::Seen, playerSlot_); });
+    float cx = 0, cy = 0;
+    int px = 0, py = 0;
+    map_.cameraTarget(cx, cy);
+    if (map_.reliefPoint(relief, cx, cy, px, py)) {
+        const int arm = relief.w > 200 ? 5 : 3;
+        auto cross = [&](int a, int t, Color c) {
+            fillRect(screen_, px - a - t, py - t, 2 * (a + t) + 1, 2 * t + 1, c);
+            fillRect(screen_, px - t, py - a - t, 2 * t + 1, 2 * (a + t) + 1, c);
+        };
+        cross(arm, 1, Color{0, 0, 0});
+        cross(arm, 0, Color{255, 255, 255});
+    }
 }
 
 // The playbook: its icons in a column left of the Tricorder; the one
@@ -434,19 +447,28 @@ std::string MissionViewer::compassStrip() const {
     return strip;
 }
 
-// Where the full-screen Tricorder (Tab) draws its map, and its zoom.
+// Where the full-screen Tricorder (Tab) draws its relief, and its zoom:
+// the main view's place, left of the right-hand panels (the small
+// Tricorder's panel showing the main view meanwhile).
 MissionViewer::Rect MissionViewer::fullTricorderRect(int& tiles) const {
-    const int size = std::min(screen_.w, screen_.h) - 40;
     // (Twice as many tiles across as the small one.)
     tiles = kTricorderTiles << (tricorderZoom_ + 1);
-    return {(screen_.w - size) / 2, (screen_.h - size) / 2, size, size};
+    return {0, 0, std::max(screen_.w - sideW_, screen_.w / 2), screen_.h};
 }
 
-MissionViewer::Rect MissionViewer::tricorderMap(int& tiles) const {
+MapViewer::Relief MissionViewer::tricorderRelief(const Rect& map, int tiles) const {
+    // Relief orbit turns as the briefings' relief does.
+    const float orbit = float(nowMs_ % 3600000) * kBriefingTurn;
+    return map_.tricorderRelief(map.x, map.y, map.w, map.h, tiles, tricorderView_, orbit);
+}
+
+MapViewer::Relief MissionViewer::tricorderRelief() const {
+    int tiles = 0;
     if (play_.tricorderFull && hasMap_)
-        return fullTricorderRect(tiles);
-    tiles = kTricorderTiles << tricorderZoom_;
-    return tricorder_;
+        return tricorderRelief(fullTricorderRect(tiles), tiles);
+    if (tricorder_.w <= 0)
+        return {};
+    return tricorderRelief(tricorder_, kTricorderTiles << tricorderZoom_);
 }
 
 // What play adds over the map: the full-screen Tricorder (Tab), with the
@@ -455,19 +477,14 @@ void MissionViewer::drawPlay() {
     if (play_.tricorderFull && hasMap_) {
         int tiles = 0;
         const Rect map = fullTricorderRect(tiles);
+        const MapViewer::Relief relief = tricorderRelief(map, tiles);
         dimRect(screen_, 0, 0, screen_.w, screen_.h);
-        drawTricorderMap(map.x, map.y, map.w, map.h, tiles);
-        // The cross the readout at the top reads under: the camera's target
-        // (the game keeps it at its map's centre).
-        {
-            float cx = 0, cy = 0;
-            int px = 0, py = 0;
-            map_.cameraTarget(cx, cy);
-            if (map_.minimapPoint(cx, cy, map.x, map.y, map.w, map.h, px, py, tiles)) {
-                fillRect(screen_, px - 5, py, 11, 1, Color{255, 255, 255});
-                fillRect(screen_, px, py - 5, 1, 11, Color{255, 255, 255});
-            }
-        }
+        // The marked place the readout at the top reads under: the camera's
+        // target (the game keeps it at its map's centre).
+        drawTricorderMap(relief);
+        // The small Tricorder's panel shows the main camera's view
+        // (play-fed-lp.md): the scene under the overlay, made small.
+        drawSceneInset(tricorder_);
         // Its readout along the top, in the compass's place: the map under
         // the cross, the camera's target, not the pointer (play-fed-lp.md).
         {
@@ -483,7 +500,7 @@ void MissionViewer::drawPlay() {
                 if (!visible(u))
                     continue;
                 int px = 0, py = 0;
-                if (!map_.minimapPoint(u.x, u.y, map.x, map.y, map.w, map.h, px, py, tiles))
+                if (!map_.reliefPoint(relief, u.x, u.y, px, py))
                     continue;
                 const bool own = u.slot == playerSlot_, enemy = world_->stance(u.slot, playerSlot_) == 3;
                 const uint8_t r = u.selected ? 255 : own ? 120 : 255;
@@ -808,9 +825,10 @@ void MissionViewer::drawInterface() {
         }
     }
 
-    // TRICORDER (exe.md#the-tricorder): the map round the camera at its
-    // zoom, the side's units on it; a line naming what's under the pointer
-    // (else the view and zoom); COMMS, ALLY, ZOOM under it.
+    // TRICORDER (exe.md#the-tricorder): the relief round the camera at
+    // its zoom, the side's units on it (with the full-screen one up, the
+    // main view instead: drawPlay()); a line naming what's under the
+    // pointer (else the view and zoom); COMMS, ALLY, ZOOM under it.
     {
         const int x = screen_.w - sideW, w = sideW, h = kTricorderH + lh + 4, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
@@ -819,8 +837,10 @@ void MissionViewer::drawInterface() {
                   mh = h - kTricorderMapCut - 2 * lh;
         const int tiles = kTricorderTiles << tricorderZoom_;
         if (hasMap_) {
-            drawTricorderMap(mx, my, mw, mh, tiles);
             tricorder_ = {mx, my, mw, mh};
+            const MapViewer::Relief relief = tricorderRelief(tricorder_, tiles);
+            if (!play_.tricorderFull)
+                drawTricorderMap(relief);
             // Each side's own colour, whoever it is to the player
             // (exe.md#the-tricorder): the Federation blue, the Klingons
             // orange, the Romulans green, the Taubat and Metar yellow, the
@@ -830,12 +850,12 @@ void MissionViewer::drawInterface() {
             static constexpr Color kSideColours[] = {{0, 0, 255},   {255, 128, 0}, {0, 255, 0},  {255, 255, 0},
                                                      {255, 0, 255}, {255, 255, 0}, {255, 0, 0}};
             const bool blink = (nowMs_ / 500) % 2 == 1;
-            if (world_)
+            if (world_ && !play_.tricorderFull)
                 for (const Unit& u : world_->units()) {
                     if (!visible(u))
                         continue;
                     int px = 0, py = 0;
-                    if (!map_.minimapPoint(u.x, u.y, mx, my, mw, mh, px, py, tiles))
+                    if (!map_.reliefPoint(relief, u.x, u.y, px, py))
                         continue;
                     const bool alerted = u.slot == playerSlot_ && sim_ && sim_->alerted(u.id);
                     const Color fill = alerted                                     ? Color{255, 0, 0}
@@ -847,7 +867,7 @@ void MissionViewer::drawInterface() {
                 }
             // With the full-screen Tricorder up its line carries the compass.
             ui_.drawSmall(screen_, x + kTextLeft, y + h - 14 - 2 * lh,
-                          play_.tricorderFull ? compassStrip() : tricorderReadout(tricorder_, tiles), text);
+                          play_.tricorderFull ? compassStrip() : tricorderReadout(relief), text);
         }
         int bx = x + kTextLeft;
         for (const auto& [label, action] : {std::pair{"COMMS", "tri-comms"}, std::pair{"ALLY", "tri-ally"},
@@ -1083,16 +1103,39 @@ const char* MissionViewer::buildMenuTitle() const {
 // STRUCTURE or UNIT), ground no unit can cross (IMPASSABLE), a surveyed
 // deposit (its ore AT <a:b>) or the ground (TERRAIN AT <a:b>); else the
 // view and its zoom (RELIEF X2).
-std::string MissionViewer::tricorderReadout(const Rect& map, int tiles) const {
+std::string MissionViewer::tricorderReadout(const MapViewer::Relief& relief) const {
+    static const char* const kView[] = {"STARSHIP ", "RELIEF ", "RELIEF ORBIT ", "RELIEF FIXED "};
     static const char* const kZoom[] = {"X4", "X2", "X1"};
-    if (!map.contains(mouseX_, mouseY_))
-        return std::string("RELIEF ") + kZoom[tricorderZoom_];
     float wx = 0, wy = 0;
-    map_.minimapToWorld(mouseX_, mouseY_, map.x, map.y, map.w, map.h, tiles, wx, wy);
+    if (!Rect{relief.x, relief.y, relief.w, relief.h}.contains(mouseX_, mouseY_) ||
+        !map_.reliefToWorld(relief, mouseX_, mouseY_, wx, wy))
+        return std::string(kView[std::clamp(tricorderView_, 0, 3)]) + kZoom[tricorderZoom_];
     // An object within two pixels' worth of the pointer.
-    float x1 = 0, y1 = 0;
-    map_.minimapToWorld(mouseX_ + 2, mouseY_, map.x, map.y, map.w, map.h, tiles, x1, y1);
-    return tricorderReadoutAt(wx, wy, std::max(std::fabs(x1 - wx), 1500.0f));
+    float x1 = wx, y1 = wy;
+    map_.reliefToWorld(relief, mouseX_ + 2, mouseY_, x1, y1);
+    return tricorderReadoutAt(wx, wy, std::max(std::hypot(x1 - wx, y1 - wy), 1500.0f));
+}
+
+// The main camera's view made small in a panel's place (the scene as last
+// drawn, under the overlay): its middle, as wide as the place allows.
+void MissionViewer::drawSceneInset(const Rect& at) {
+    const std::vector<uint8_t>& scene = map_.lastScene();
+    if (at.w <= 0 || at.h <= 0 || scene.size() != size_t(screen_.w) * size_t(screen_.h) * 4)
+        return;
+    // The scene's part with the place's shape, centred.
+    int sw = screen_.w, sh = screen_.w * at.h / at.w;
+    if (sh > screen_.h)
+        sh = screen_.h, sw = screen_.h * at.w / at.h;
+    const int sx = (screen_.w - sw) / 2, sy = (screen_.h - sh) / 2;
+    for (int y = 0; y < at.h; ++y) {
+        if (at.y + y < 0 || at.y + y >= screen_.h)
+            continue;
+        const uint8_t* src = &scene[size_t(sy + y * sh / at.h) * size_t(screen_.w) * 4];
+        uint8_t* row = screen_.row(at.y + y);
+        for (int x = 0; x < at.w; ++x)
+            if (at.x + x >= 0 && at.x + x < screen_.w)
+                std::copy_n(src + size_t(sx + x * sw / at.w) * 4, 4, row + (at.x + x) * 4);
+    }
 }
 
 // What the Tricorder's line says of a world point (objects within reach).

@@ -341,26 +341,30 @@ void MissionViewer::choose(const BuildingType& t) {
     if (!economy_ || !economy_->available(t))
         return;
     if (!t.upgradeOf.empty()) {
-        // An upgrade goes on its building at once, its model (where it has
-        // one) on the building. One the stock can't pay is refused, with
-        // Engineering's report.
-        for (const ColonyStructure& s : economy_->structures())
-            if (s.type == t.upgradeOf && s.progress >= 1) {
-                if (!economy_->affordable(t)) {
-                    economy_->order(t.id, s.x, s.y, 0, 0);
-                } else if (colony_ && colony_->add(t.id)) {
-                    const ColonyBuilding& c = colony_->buildings().back();
-                    sim_->placeUpgrade(t.id, c.model, c.a, c.b, s.x, s.y);
-                    showColony();
-                } else if (colony_ && buildingModel(t.id, side()).empty()) {
-                    for (const ColonyBuilding& c : colony_->buildings())
-                        if (c.name == t.upgradeOf) {
-                            sim_->placeUpgrade(t.id, "", c.a, c.b, s.x, s.y);
-                            break;
-                        }
-                }
-                break;
+        // An upgrade or add-on goes on its building at once, its model
+        // (where it has one) on the building: the building selected if it
+        // can take it, else the first of its kind still without it (each
+        // building has its own, exe.md#upgrades-and-add-ons). One the
+        // stock can't pay is refused, with Engineering's report.
+        const ColonyStructure* picked = structureOf(play_.selectedBuilding);
+        if (const ColonyStructure* s = economy_->structure(economy_->hostFor(t, picked ? picked->id : 0))) {
+            if (!economy_->affordable(t)) {
+                economy_->order(t.id, s->x, s->y, 0, 0);
+            } else if (colony_ && colony_->add(t.id)) {
+                const ColonyBuilding& c = colony_->buildings().back();
+                sim_->placeUpgrade(t.id, c.model, c.a, c.b, s->x, s->y);
+                showColony();
+            } else if (colony_ && buildingModel(t.id, side()).empty()) {
+                // Shown on its own building's spot.
+                const auto& ids = sim_->structureIds();
+                for (size_t i = 0; i < ids.size() && i < sim_->colony().size(); ++i)
+                    if (ids[i] == s->id) {
+                        const ColonyBuilding& c = sim_->colony()[i];
+                        sim_->placeUpgrade(t.id, "", c.a, c.b, s->x, s->y);
+                        break;
+                    }
             }
+        }
         play_.buildMenu = false;
         return;
     }

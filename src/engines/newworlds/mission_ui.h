@@ -27,6 +27,9 @@ constexpr int kPanelFirstLine = 15;
 constexpr int kPanelInset = 12;
 
 constexpr int kTricorderTiles = 16; // tiles across the small Tricorder at its closest (X4)
+// The briefings' relief turns about 3 degrees a second (radians per
+// millisecond); the Tricorder's Relief orbit view alike.
+constexpr float kBriefingTurn = 0.05f / 1000;
 
 // JUMP TO's left column (exe.md#the-colony-overview): per race, the type
 // whose portrait each slot shows: the hub, the mining stations, the

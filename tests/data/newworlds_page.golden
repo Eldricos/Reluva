@@ -1,41 +1,41 @@
 # The New Worlds missions page's run (tests/test_newworlds_page.cpp): each point's name,
 # frame and hash of every frame so far. Rewrite with reluva_newworlds_page_tests --update.
 page 3 040dc5bf54d33e5e
-page-interface 15 72bbafdce55b47e5
-pages 117 ab7681222af3497e
-F1-briefing 160 43b708efcb670913
-F1-script 206 5684cfafdb196661
-F1-play 209 60fa2f634a1321bf
-F1-panels 241 b060d3cf114abc0a
-F1-tricorder 245 14405c2878c20824
-F1-mid 361 8317fbe40c515bce
-F1-end 00 467 c1e86a35c34e5c59
-K2-briefing 514 f76c69d132a37940
-K2-script 560 56f51fbc8a5b86b9
-K2-play 625 5ed0d2c713ca0653
-K2-panels 657 b19ab19b841f7c6d
-K2-tricorder 661 4f9613f3f8dc3d17
-K2-mid 803 d6a9d1ff7525397a
-K2-end 00 918 0a7800fb7e8a8087
-R8-briefing 972 17571e7aeb5e03b5
-R8-script 1018 2a9aa7e93b5edb10
-R8-play 1021 e99accb892f37889
-R8-panels 1053 f4de7dab2b9cd8a5
-R8-tricorder 1057 5593d8c3ebd3667c
-R8-mid 1167 03799ec6e0fbab2e
-R8-end 00 1286 90543152822ebf74
-J1-briefing 1363 f4f4b0aa14547ee8
-J1-script 1409 5398fb4c7b45a2bf
-J1-play 1474 c3ca281bac1e77e1
-J1-panels 1506 1b2aa861cd5402ae
-J1-tricorder 1510 480551ba5ad85490
-J1-mid 1633 5fe1dbf1dd4ab864
-J1-end 00 1742 29083b728fc23af9
-C4-briefing 1810 a59a8887b816795f
-C4-script 1856 7bfc4ebdd5ab51e6
-C4-play 1859 2824634958f35a22
-C4-panels 1891 284fb3edeb745ce4
-C4-tricorder 1895 3747fd6a6f1c0185
-C4-mid 2027 c3d9264f4b32eb41
-C4-end 00 2140 4e601d6d375569e3
-done 2141 fc2d3971c6195614
+page-interface 15 055c5273748db11b
+pages 117 31466b37a6d8069c
+F1-briefing 160 54f96d2c1d39c609
+F1-script 206 89be885283786fd3
+F1-play 209 0b3f8c9e093a1cbb
+F1-panels 241 1f116c9671b10deb
+F1-tricorder 245 8fd0d1e72a4b0989
+F1-mid 361 e15a1b200511a0e7
+F1-end 00 467 bfaadd2b2b1adda3
+K2-briefing 514 dc348fe4ddf6abda
+K2-script 560 476810be916d4f27
+K2-play 625 22a681e08d828225
+K2-panels 657 11c6038b4bad6183
+K2-tricorder 661 1fabbf402ce21725
+K2-mid 803 4056a4c50fbef963
+K2-end 00 918 43a5d96b35a27fa2
+R8-briefing 972 9f519c4d91b7b8d0
+R8-script 1018 6684b968d01c2b17
+R8-play 1021 35a7de49601aae1c
+R8-panels 1053 4b06e7ea32a73d6a
+R8-tricorder 1057 38d01a7689953f55
+R8-mid 1167 99ce99ca3eb9797c
+R8-end 00 1286 ceaf20414d569758
+J1-briefing 1363 102643be953eea24
+J1-script 1409 0bab65cf7b905883
+J1-play 1474 5cd114b1360ec91d
+J1-panels 1506 17ce88663f4bb13a
+J1-tricorder 1510 db5e0b651d093e2c
+J1-mid 1633 8a3b7d915d28e2cd
+J1-end 00 1742 66cdbf60f8e76b28
+C4-briefing 1810 1b9d03d38c37d59c
+C4-script 1856 7332f7725103639d
+C4-play 1859 4c1b85441b4fac52
+C4-panels 1891 0b6e94dfec546200
+C4-tricorder 1895 9c5ccc5d3c0d0dbf
+C4-mid 2027 1c56816fecf1eee8
+C4-end 00 2140 84192736a383d470
+done 2141 1aba5cac56155c14

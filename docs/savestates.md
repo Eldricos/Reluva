@@ -107,7 +107,11 @@ unit, shot and group), each colony's economy (its bees, pods, crew, rides,
 power and life support), the AI's running orders, the fog, repairs, field
 work (scans, captures, officers, courses, raids), research, the script's
 effects, the mission script's state, and the missions page's messages,
-camera and Cadet mode. Its random numbers are seeded counters, saved with
+camera and Cadet mode. It also keeps the colony capacity the mission
+started from (what the session carried in from the missions played
+before it, [exe.md](formats/newworlds/exe.md#the-economy)): a load puts
+that back as the session's value, so a restart of the loaded mission
+begins from it, and the next mission from what the loaded one ends with. Its random numbers are seeded counters, saved with
 the rest, so a mission loaded carries on exactly as it would have. A load
 that fails once the mission has started (a damaged save, bytes left over)
 starts that mission over from its beginning, as whom it was saved, and

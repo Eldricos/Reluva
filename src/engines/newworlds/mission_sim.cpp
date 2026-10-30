@@ -204,7 +204,7 @@ MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground
                  ground.blocksWide(), ground.blocksHigh(), headlessColony(mission, side)) {}
 
 MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, ColonyMap map, int blocksWide,
-                       int blocksHigh, std::vector<ColonyBuilding> colony)
+                       int blocksHigh, std::vector<ColonyBuilding> colony, CarriedCapacity carried)
     : mission_(mission), side_(side), player_(side == 'K' ? 1 : side == 'R' ? 2 : 0), blocksWide_(blocksWide),
       blocksHigh_(blocksHigh), ground_(map), colony_(std::move(colony)) {
     world_ = std::make_unique<World>(std::move(terrain));
@@ -212,7 +212,7 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     // the Romulan recordings start a construction yard's cost short.
     Stock stock = side_ == 'R' ? Stock{500, 988, 2211, 497, 3500, 5000} : Stock{500, 1000, 2300, 500, 4000, 5000};
     startStock(mission_, side_, stock);
-    economy_ = std::make_unique<Economy>(side_, stock, 50, map);
+    economy_ = std::make_unique<Economy>(side_, stock, carried.capacity, map, carried.bank);
     economy_->setOfficers(int(officers(mission_, player_).size()));
     economy_->setTransports(true);
     for (const ColonyBuilding& c : colony_) {
@@ -659,8 +659,10 @@ void MissionSim::rollOut() {
         const BuildingType* b = buildingType(colony_[i].name);
         const int wanted = b ? b->speciality : 0;
         int in = colonyObjects_[i];
-        for (size_t j = 0; b && !b->upgradeOf.empty() && j < colony_.size() && j < colonyObjects_.size(); ++j)
-            if (colony_[j].name == b->upgradeOf && colony_[j].a == colony_[i].a && colony_[j].b == colony_[i].b)
+        // (An upgrade's or add-on's host: the building it's fitted to.)
+        const ColonyStructure* fitted = b && !b->upgradeOf.empty() ? economy_->structure(structureIds_[i]) : nullptr;
+        for (size_t j = 0; fitted && j < structureIds_.size() && j < colonyObjects_.size(); ++j)
+            if (structureIds_[j] == fitted->host)
                 in = colonyObjects_[j];
         float best = 0;
         for (const FieldWork::OfficerAt& o : fieldWork_->officers())

@@ -25,7 +25,9 @@ approximate colony from it (`src/engines/newworlds/colony.h`).
   recapture. **J8K** starts with about a dozen buildings, and **C10**
   with its colony already built (52/50).
 - Every other mission's start isn't seen closely enough to say. The
-  colony size at the start varies (F1 20/50, F2 24/90, K2 35/90).
+  colony size at the start varies (F1 20/50, F2 24/90, K2 35/90): the
+  capacity carries over from the missions played before in the same
+  session (exe.md#the-economy), as Reluva's missions page carries it.
 
 None of the recordings shows which way a colony faces.
 
@@ -126,7 +128,7 @@ facility and utility hospital as marked.
 | Hydroponics / livestock / clone farm | `fhf` | `klf` | `rcbf` *name* |
 | Storage facility (the Romulans' material storage) | `prostor` (the manual's picture, p. 47) | `ksf` | `rsf` |
 | Landing pad | `landpad` *name* | | |
-| Transporter pad | | `kief` *guess* (its sounds are the import/export block's) | `rbcs` (the manual, p. 113) |
+| Transporter pad | | `kief` (the game's model table) | `rbcs` (the manual, p. 113) |
 | Photon turret (the Klingons' photon launcher, the Romulans' photon defense) | `fpdt` *guess* | `kdwsp` (the manual, p. 86) | `rpds` (the manual, p. 117) |
 | Disruptor turret (the Romulans' static disruptor) | | `kdws` (the manual, p. 85) | `rdds` (the manual, p. 116) |
 | Shield generator | `fsg` | `ksg` (the manual, p. 87: not the disruptor turret) | `rcss` (the manual, p. 118) |
@@ -149,7 +151,7 @@ model, in the game's own words for internal use (`reluva-tool mdl-info`):
   sickbay (`_b`, `_c`), `kss_a` science block (`_b`-`_d`), `kab`
   accommodation block (the Colonial House), `ksc` security centre (the
   Arsenal: the manual's picture of it is `ksc`), `klf`
-  livestock farm, `kief` import/export, `kdwsp` defence artillery, `kmdb`
+  livestock farm, `kief` transporter pad (its metamodel is named import/export), `kdwsp` defence artillery, `kmdb`
   disruptor battery. `ksf`, `ksg` and `kdws` have no metamodel.
 - **Romulan:** `rch` hub (`_b`, `_c`; `rch_i` interior), `rcy_a`
   construction yard (`_b`), `rvy` vehicle yard (`_b`), `rrpp_a` storage
@@ -203,6 +205,11 @@ only):
 The upgrades are separate models that stand in the base's bays (the base
 metamodels list `BAY_0`-`BAY_5` places), which is why an upgrade can be
 selected on its own. Reluva still draws an upgrade on its base's spot.
+Each building's add-ons are its own (exe.md#upgrades-and-add-ons): a
+second sickbay or resource processor takes its own wards or plants, which
+stand on its spot and go with it; ordered from the build menu, an add-on
+goes on the selected building if it can take it, else on the first of its
+kind still without it.
 
 Units, by portrait: ground scout `rfgs` (the surveillance squad shows the
 same portrait, so probably the same craft), science vehicle `rsv`, APC

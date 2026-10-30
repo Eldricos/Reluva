@@ -84,8 +84,8 @@ Where the panels sit, from recordings of play ([play.md](play.md)), on the
 - A compass strip along the top centre, ticks every 5 degrees.
 - **COMMUNICATIONS**, bottom centre, about 200 × 62: the sender's portrait,
   the sender's section, the message, and which message of how many.
-- **TRICORDER**, bottom right: the map small, with "TERRAIN AT <a:b>" under
-  it.
+- **TRICORDER**, bottom right: the map small, a tilted relief round the
+  camera, with "TERRAIN AT <a:b>" under it.
 - **COMMAND**, a list of the mission's objectives, each marked complete or
   incomplete.
 
