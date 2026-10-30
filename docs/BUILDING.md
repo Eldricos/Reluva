@@ -137,6 +137,72 @@ build\Release\reluva.exe
 With this generator, choose Debug or Release with `--config` when building
 (`CMAKE_BUILD_TYPE` is ignored). `cmake --open build` opens the generated `.sln`.
 
+### Non-ASCII folders on Windows
+
+Game folders, the settings file (`%APPDATA%\reluva\reluva\reluva.ini`) and the
+savestates beside it may have any name, `D:\Jeux\Données` or a Japanese
+user name included. Inside Reluva every path is UTF-8 (`fs::fromUtf8` /
+`fs::toUtf8` in `src/common/fs.h`); the command-line arguments of `reluva`,
+`reluva-tool` and the tests are taken as UTF-16 from Windows and turned into
+UTF-8 (SDL does it for `reluva`, `fs::Utf8Args` for the others), and
+`reluva-tool` expands `*` and `?` in file names itself, which Windows' shells
+leave to the program, so `reluva-tool geo-survey games\nw\*.cat` works there
+too. The settings file may have Windows (CRLF) or Unix line ends and a UTF-8
+mark at the start, as Notepad saves it; Reluva itself writes it with `\n`
+line ends. Settings and savestates are saved beside the old file first and
+then moved over it, so a failed save leaves the old one.
+
+## Windows: cross-compiling with MinGW-w64 (from Linux)
+
+To check that Reluva builds and runs on Windows without a Windows machine,
+build it with MinGW-w64 and run it under Wine. On Ubuntu / Debian:
+
+```sh
+sudo apt install mingw-w64 wine64 ninja-build cmake
+cmake -S . -B build-win -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-w64.cmake
+cmake --build build-win
+export LC_ALL=C.UTF-8 WINEDEBUG=-all   # see below
+wine build-win/reluva_tests.exe
+ctest --test-dir build-win             # runs each test through Wine
+wine build-win/reluva-tool.exe play-check C1 300 'Z:\path\to\game\*.cat'
+```
+
+`cmake/mingw-w64.cmake` uses the `-posix` compilers (the `-win32` ones have no
+`std::thread`) and links everything statically, so the `.exe` files run
+without MinGW's DLLs. Paths given to the programs under Wine are Windows
+paths: the Linux file system is drive `Z:`, so `/home/me/nw` is `Z:\home\me\nw`.
+
+Wine maps Windows file names to Linux ones through the locale: in a shell
+whose locale isn't UTF-8 (`LANG` unset, as in containers) every non-ASCII file
+name fails with "file not found". Set `LC_ALL=C.UTF-8` before running Wine.
+
+What has been checked this way (Wine 9.0, MinGW-w64 GCC 13): the unit tests,
+the fuzz-corpus replay and the New Worlds tests pass; `reluva-tool play-check`
+over every mission, with the game copied into a folder named `Données_ニュー`
+and its archives named on the command line, gives the same report as on
+Linux; `reluva --hash` reads files with such names; `reluva testbed` starts
+(with SDL's offscreen video driver). The missions page test
+(`reluva_newworlds_page_tests`) runs but doesn't match its golden hashes:
+those are hashes of the drawn frames, and Windows' maths library rounds
+`sin`, `cos` and the like slightly differently from Linux's, which moves a
+few pixels (the game's own state stays the same, as the play-check shows).
+The golden file is made on Linux.
+
+MinGW's standard library differs from MSVC's in one way that matters here:
+it reads a narrow `std::string` given to `std::filesystem::path` as UTF-8,
+where MSVC uses the ANSI code page. So a Wine run doesn't catch a path made
+from a `std::string` without `fs::fromUtf8`; the Windows CI build (MSVC,
+below) runs the tests that do, with folder names the ANSI code page can't
+hold.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` builds Release and runs `ctest` on every push and
+pull request, on Ubuntu (GCC, Ninja) and on Windows (MSVC, the Visual Studio
+generator). There's no game data there, so the tests that need it skip. MSVC
+builds with `/W4` warnings but not `/WX`: its warnings don't fail the build.
+
 ## Troubleshooting
 
 - **The first configure fails while downloading:** CMake fetches SDL and ImGui

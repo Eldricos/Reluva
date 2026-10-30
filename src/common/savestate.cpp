@@ -19,7 +19,7 @@ void Serializer::raw(void* p, size_t n) {
         const size_t at = bytes_.size();
         bytes_.insert(bytes_.end(), b, b + n);
         if constexpr (std::endian::native == std::endian::big)
-            std::reverse(bytes_.begin() + long(at), bytes_.end());
+            std::reverse(bytes_.begin() + std::ptrdiff_t(at), bytes_.end());
         return;
     }
     if (!ok() || bytes_.size() - pos_ < n) {

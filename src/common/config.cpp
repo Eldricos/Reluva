@@ -71,8 +71,12 @@ Error Config::load(const std::filesystem::path& path) {
         return Error::fail("Can't read " + fs::toUtf8(path) + ": settings won't be saved over it");
     }
 
+    // Read as bytes, so a line may end in "\r\n" (as Windows editors write)
+    // or "\n" (as Reluva writes, on every system): trim() drops the '\r'.
     std::string line, section;
-    while (std::getline(in, line)) {
+    for (bool first = true; std::getline(in, line); first = false) {
+        if (first && line.starts_with("\xEF\xBB\xBF"))
+            line.erase(0, 3); // the UTF-8 mark Notepad has put at the start
         line = trim(line);
         if (line.empty() || line[0] == '#' || line[0] == ';')
             continue;

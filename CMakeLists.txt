@@ -55,7 +55,12 @@ endif()
 # --- Warnings -----------------------------------------------------------------
 add_library(reluva_warnings INTERFACE)
 if(MSVC)
-    target_compile_options(reluva_warnings INTERFACE /W4 /permissive-)
+    # Warnings only, never errors (/WX): nobody here builds with MSVC daily.
+    # /utf-8: the sources are UTF-8 whatever the system's code page.
+    # /bigobj: the larger test and tool files have too many sections otherwise.
+    target_compile_options(reluva_warnings INTERFACE /W4 /permissive- /utf-8 /bigobj /Zc:__cplusplus)
+    # The C library's "use the _s version instead" warnings (getenv, fopen...).
+    target_compile_definitions(reluva_warnings INTERFACE _CRT_SECURE_NO_WARNINGS)
 else()
     target_compile_options(reluva_warnings INTERFACE -Wall -Wextra -Wpedantic)
 endif()
@@ -80,6 +85,9 @@ target_include_directories(reluva_common PUBLIC src)
 # our warnings don't apply to them.
 target_include_directories(reluva_common SYSTEM PRIVATE third_party/minimp3)
 target_link_libraries(reluva_common PRIVATE reluva_warnings)
+if(WIN32)
+    target_link_libraries(reluva_common PUBLIC shell32) # CommandLineToArgvW (fs::Utf8Args)
+endif()
 
 # --- engines: talk only to common/ --------------------------------------------
 add_library(reluva_engines STATIC
@@ -153,9 +161,6 @@ target_compile_definitions(reluva PRIVATE RELUVA_VERSION="${PROJECT_VERSION}")
 # --- developer tools -----------------------------------------------------------
 add_executable(reluva-tool src/tools/reluva_tool.cpp)
 target_link_libraries(reluva-tool PRIVATE reluva_engines reluva_warnings)
-if(WIN32)
-    target_link_libraries(reluva-tool PRIVATE shell32) # CommandLineToArgvW: UTF-8 arguments
-endif()
 
 # --- tests ----------------------------------------------------------------------
 if(RELUVA_BUILD_TESTS)

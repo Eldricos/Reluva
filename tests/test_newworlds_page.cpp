@@ -22,6 +22,7 @@
 
 #include "common/audio/mixer.h"
 #include "common/events.h"
+#include "common/fs.h"
 #include "common/savestate.h"
 #include "common/system.h"
 #include "engines/newworlds/cat_archive.h"
@@ -88,6 +89,16 @@ struct Options {
     bool update = false;
 };
 
+// The log file, by its path as it is (path::string() is the ANSI code page
+// on Windows).
+FILE* openLog(const std::filesystem::path& file) {
+#ifdef _WIN32
+    return _wfopen(file.c_str(), L"w");
+#else
+    return std::fopen(file.c_str(), "w");
+#endif
+}
+
 // The run: the checked points ("<name> <frame> <hash>", the hash of every
 // frame so far), in order.
 std::vector<std::string> run(const Options& o) {
@@ -117,7 +128,7 @@ std::vector<std::string> run(const Options& o) {
     mv.seed(7);
 
     std::vector<std::string> points;
-    std::unique_ptr<FILE, int (*)(FILE*)> log(o.log.empty() ? nullptr : std::fopen(o.log.string().c_str(), "w"),
+    std::unique_ptr<FILE, int (*)(FILE*)> log(o.log.empty() ? nullptr : openLog(o.log),
                                               [](FILE* f) { return f ? std::fclose(f) : 0; });
     uint64_t hash = fnv("page", 4);
     int frame = 0;
@@ -406,15 +417,16 @@ std::vector<std::string> run(const Options& o) {
 } // namespace
 
 int main(int argc, char** argv) {
+    fs::Utf8Args utf8(argc, argv);
     Options o;
     for (int i = 1; i < argc; ++i) {
         const std::string a = argv[i];
         if (a == "--update")
             o.update = true;
         else if ((a == "--log" || a == "--shots") && i + 1 < argc)
-            (a == "--log" ? o.log : o.shots) = argv[++i];
+            (a == "--log" ? o.log : o.shots) = fs::fromUtf8(argv[++i]);
         else if (!a.empty() && a[0] != '-')
-            o.data = a;
+            o.data = fs::fromUtf8(a);
         else {
             std::fprintf(stderr, "usage: %s [game folder] [--update] [--log <file>] [--shots <folder>]\n", argv[0]);
             return 2;
@@ -433,7 +445,7 @@ int main(int argc, char** argv) {
 
     const std::vector<std::string> points = run(o);
     if (o.update) {
-        std::ofstream out(RELUVA_PAGE_GOLDEN, std::ios::binary);
+        std::ofstream out(fs::fromUtf8(RELUVA_PAGE_GOLDEN), std::ios::binary);
         out << "# The New Worlds missions page's run (tests/test_newworlds_page.cpp): each point's name,\n"
                "# frame and hash of every frame so far. Rewrite with reluva_newworlds_page_tests --update.\n";
         for (const std::string& p : points)
@@ -447,7 +459,7 @@ int main(int argc, char** argv) {
     }
 
     std::vector<std::string> golden;
-    std::ifstream in(RELUVA_PAGE_GOLDEN);
+    std::ifstream in(fs::fromUtf8(RELUVA_PAGE_GOLDEN));
     for (std::string line; std::getline(in, line);)
         if (!line.empty() && line[0] != '#')
             golden.push_back(line);

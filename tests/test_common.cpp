@@ -41,6 +41,12 @@ static int failures = 0;
         }                                                               \
     } while (0)
 
+// A whole file (closed again before returning: Windows can't remove an open file).
+static std::string readAll(const std::filesystem::path& file) {
+    std::ifstream in(file, std::ios::binary);
+    return std::string((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+}
+
 static std::string md5Of(const std::string& s) {
     Md5 m;
     m.update(s.data(), s.size());
@@ -87,10 +93,48 @@ static void testFsAndDetection(const std::filesystem::path& tmp) {
     // replaceFile: a new file, then over it; nothing left beside it.
     CHECK(!fs::replaceFile(dir / "r.txt", "one"));
     CHECK(!fs::replaceFile(dir / "r.txt", "two\n"));
-    std::ifstream in(dir / "r.txt", std::ios::binary);
-    std::string got((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-    CHECK(got == "two\n" && !std::filesystem::exists(dir / "r.txt.tmp"));
+    CHECK(readAll(dir / "r.txt") == "two\n" && !std::filesystem::exists(dir / "r.txt.tmp"));
     CHECK(bool(fs::replaceFile(tmp / "missing" / "r.txt", "x")));
+    // A failed write leaves the old file as it was.
+    std::filesystem::create_directories(dir / "r.txt.tmp");
+    CHECK(bool(fs::replaceFile(dir / "r.txt", "three")) && readAll(dir / "r.txt") == "two\n");
+    std::filesystem::remove(dir / "r.txt.tmp");
+    // A larger file over a smaller one and back: nothing of the old left.
+    const std::string big(100000, 'b');
+    CHECK(!fs::replaceFile(dir / "r.txt", big) && readAll(dir / "r.txt") == big);
+    CHECK(!fs::replaceFile(dir / "r.txt", "s") && readAll(dir / "r.txt") == "s");
+    // A non-ASCII file name, and md5File and findFile through it.
+    const std::string jp = "\xe3\x83\x8b\xe3\x83\xa5\xe3\x83\xbc.ini"; // katakana "nyu-"
+    CHECK(!fs::replaceFile(dir / fs::fromUtf8(jp), "abc"));
+    CHECK(fs::md5File(dir / fs::fromUtf8(jp), 0) == "900150983cd24fb0d6963f7d28e17f72");
+    const auto jpFound = fs::findFile(tmp, cafe + "/" + jp);
+    CHECK(jpFound && fs::toUtf8(jpFound->filename()) == jp);
+    // Wildcards as a shell expands them (what reluva-tool does on Windows).
+    {
+        const std::filesystem::path w = dir / "w";
+        std::filesystem::create_directories(w);
+        for (const char* n : {"b.cat", "A.CAT", "c.cata", "\xe3\x83\x8b.cat", ".h.cat", "d.dat"})
+            std::ofstream(w / fs::fromUtf8(n)) << "x";
+        const std::string base = fs::toUtf8(w) + "/";
+        CHECK((fs::expandWildcards(base + "*.cat") ==
+               std::vector<std::string>{base + "A.CAT", base + "b.cat", base + "\xe3\x83\x8b.cat"}));
+        CHECK((fs::expandWildcards(base + "?.CAT").size() == 3));
+        CHECK((fs::expandWildcards(base + "*a*") ==
+               std::vector<std::string>{base + "A.CAT", base + "b.cat", base + "c.cata", base + "d.dat",
+                                        base + "\xe3\x83\x8b.cat"}));
+        CHECK((fs::expandWildcards(base + ".*") == std::vector<std::string>{base + ".h.cat"}));
+        CHECK((fs::expandWildcards(base + "*.none") == std::vector<std::string>{base + "*.none"}));
+        CHECK((fs::expandWildcards(base + "d.dat") == std::vector<std::string>{base + "d.dat"}));
+        CHECK((fs::expandWildcards("all") == std::vector<std::string>{"all"}));
+    }
+
+    // A game found in a folder whose name the ANSI code page can't hold.
+    const std::filesystem::path jpDir = tmp / fs::fromUtf8("\xe3\x83\x8b\xe3\x83\xa5\xe3\x83\xbc " + cafe);
+    std::filesystem::create_directories(jpDir / "Data");
+    { std::ofstream(jpDir / "Data" / "GAME.DAT", std::ios::binary) << "abc"; }
+    CHECK(detectFromTable("eng", table, jpDir).size() == 1);
+    CHECK(fs::toUtf8(fs::fromUtf8(cafe) / fs::fromUtf8(jp)) == cafe + "/" + jp ||
+          fs::toUtf8(fs::fromUtf8(cafe) / fs::fromUtf8(jp)) == cafe + "\\" + jp);
 
     std::filesystem::remove_all(tmp);
 }
@@ -125,9 +169,23 @@ static void testConfig(const std::filesystem::path& tmp) {
         CHECK(d.get("foo", k, "?") == v);
     CHECK(!std::filesystem::exists(tmp / "test.ini.tmp"));
     {
-        std::ofstream(path) << "[old]\r\npath = C:\\Games\\Old \r\nname=\"x\\ny\"\r\n";
+        std::ofstream(path, std::ios::binary) << "[old]\r\npath = C:\\Games\\Old \r\nname=\"x\\ny\"\r\n";
     }
     CHECK(!d.load(path) && d.get("old", "path") == "C:\\Games\\Old" && d.get("old", "name") == "x\ny");
+    // As Windows editors save it: CRLF line ends, a UTF-8 mark first, a
+    // non-ASCII path, the last line without an end.
+    {
+        std::ofstream(path, std::ios::binary)
+            << "\xEF\xBB\xBF[game]\r\n; note\r\n\r\npath=D:\\Jeux\\Donn\xc3\xa9" "es\r\nlast_slot = 3";
+    }
+    CHECK(!d.load(path) && d.targets() == std::vector<std::string>{"game"});
+    CHECK(d.get("game", "path") == "D:\\Jeux\\Donn\xc3\xa9" "es" && d.get("game", "last_slot") == "3");
+    // What Reluva writes has "\n" line ends on every system, and reads back.
+    CHECK(!d.save());
+    const std::string saved = readAll(path);
+    CHECK(saved.find('\r') == std::string::npos && saved.starts_with("[game]\n"));
+    Config e;
+    CHECK(!e.load(path) && e.get("game", "path") == "D:\\Jeux\\Donn\xc3\xa9" "es");
 
     // One that's there but can't be read isn't saved over.
     const auto unreadable = tmp / "dir.ini";
@@ -410,6 +468,13 @@ static void testSavestate(const std::filesystem::path& tmp) {
     CHECK(save::readHeader(save::slotPath(dir, 1), back).ok); // the header is still fine
     std::ofstream(dir / "slot05.rlvs") << "nonsense";
     CHECK(save::listSlots(dir).size() == 3 && !save::listSlots(dir)[2].error.empty());
+    // Saving over a slot replaces it whole.
+    CHECK(save::writeFile(save::slotPath(dir, 4), h, out.bytes()).ok);
+    CHECK(save::readFile(save::slotPath(dir, 4), back, state).ok && state == out.bytes());
+    CHECK(save::writeFile(save::slotPath(dir, 4), h, {}).ok);
+    CHECK(save::readFile(save::slotPath(dir, 4), back, state).ok && state.empty());
+    CHECK(!std::filesystem::exists(save::slotPath(dir, 4) += ".tmp"));
+    std::filesystem::remove_all(tmp);
 }
 
 // A one-frame 8x8 Bink movie (version i) built bit by bit: each plane a
@@ -525,9 +590,12 @@ int main() {
     testMp3();
     testMixer();
     testBink(tmp / "bink");
-    testSavestate(tmp / "save");
+    // Savestates and settings in folders with names beyond ASCII (and beyond
+    // what Windows' ANSI code page holds), as a user's profile may be.
+    const std::string beyond = " Donn\xc3\xa9" "es \xe3\x83\x8b\xe3\x83\xa5\xe3\x83\xbc";
+    testSavestate(tmp / fs::fromUtf8("save" + beyond));
     testFsAndDetection(tmp / "fs");
-    testConfig(tmp / "cfg");
+    testConfig(tmp / fs::fromUtf8("cfg" + beyond));
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);
     else

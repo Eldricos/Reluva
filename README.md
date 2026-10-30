@@ -38,7 +38,8 @@ cmake --build build -j
 ```
 
 See **[docs/BUILDING.md](docs/BUILDING.md)** for step-by-step instructions for
-Linux (with each distro's packages) and Windows with Visual Studio 2022.
+Linux (with each distro's packages) and Windows with Visual Studio 2022, and
+for cross-compiling for Windows with MinGW-w64 to try it under Wine.
 
 ## Usage
 

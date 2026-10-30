@@ -8,6 +8,8 @@
 
 #include "fuzz.h"
 
+#include "common/fs.h"
+
 #include <algorithm>
 #include <cstdio>
 #include <iterator>
@@ -20,11 +22,12 @@ std::vector<Registered>& targets() {
 } // namespace reluva::fuzz
 
 int main(int argc, char** argv) {
+    reluva::fs::Utf8Args utf8(argc, argv);
     if (argc < 2) {
         std::fprintf(stderr, "usage: reluva_fuzz_replay <corpus dir> [target]\n");
         return 2;
     }
-    const std::filesystem::path root = argv[1];
+    const std::filesystem::path root = reluva::fs::fromUtf8(argv[1]);
     int failed = 0;
     for (const auto& [name, run] : reluva::fuzz::targets()) {
         if (argc > 2 && std::string(argv[2]) != name)
@@ -36,7 +39,7 @@ int main(int argc, char** argv) {
                 files.push_back(e.path());
         std::sort(files.begin(), files.end());
         if (files.empty()) {
-            std::fprintf(stderr, "%s: no corpus in %s\n", name, (root / name).string().c_str());
+            std::fprintf(stderr, "%s: no corpus in %s\n", name, reluva::fs::toUtf8(root / name).c_str());
             ++failed;
             continue;
         }

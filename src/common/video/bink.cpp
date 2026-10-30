@@ -4,6 +4,7 @@
 #include "common/video/bink.h"
 
 #include "common/video/bink_tables.h"
+#include "common/fs.h"
 
 #include <algorithm>
 #include <bit>
@@ -42,7 +43,7 @@ public:
     void skip(size_t n) { pos_ += n; }
     void align32() { pos_ = (pos_ + 31) & ~size_t(31); }
     size_t pos() const { return pos_; }
-    long left() const { return long(size_) - long(pos_); }
+    int64_t left() const { return int64_t(size_) - int64_t(pos_); } // (long is 32 bits on Windows)
 
 private:
     const uint8_t* data_;
@@ -920,7 +921,7 @@ Error BinkMovie::open(const std::filesystem::path& file) {
     file_.clear();
     file_.open(file, std::ios::binary);
     if (!file_)
-        return Error::fail("can't open " + file.string());
+        return Error::fail("can't open " + fs::toUtf8(file));
     uint8_t h[44];
     if (!file_.read(reinterpret_cast<char*>(h), sizeof h))
         return Error::fail("too short for a Bink movie");

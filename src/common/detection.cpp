@@ -41,7 +41,7 @@ std::vector<DetectedGame> detectFromTable(const std::string& engineId,
                 }
             }
             if (!sig.md5.empty()) {
-                auto key = path->string();
+                auto key = fs::toUtf8(*path); // (string() is the ANSI code page on Windows, and throws)
                 auto it = hashes.find(key);
                 if (it == hashes.end())
                     it = hashes.emplace(key, fs::md5File(*path, kDetectionHashBytes)).first;

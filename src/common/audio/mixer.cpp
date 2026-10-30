@@ -69,7 +69,7 @@ void Mixer::append(SoundHandle stream, const int16_t* samples, size_t count) {
         return;
     spent.swap(st.spent);
     // The chunks mix() has finished with (moved to `spent`) make room.
-    st.chunks.erase(st.chunks.begin(), st.chunks.begin() + long(st.head));
+    st.chunks.erase(st.chunks.begin(), st.chunks.begin() + std::ptrdiff_t(st.head));
     st.head = 0;
     st.frames += chunk.size() / size_t(c->channels);
     st.chunks.push_back(std::move(chunk));

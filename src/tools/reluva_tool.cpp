@@ -42,12 +42,6 @@
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
 #include "common/fs.h"
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#include <shellapi.h>
-#endif
 #include "common/savestate.h"
 #include "common/video/bink.h"
 #include "common/audio/decode.h"
@@ -462,7 +456,7 @@ int cmdStbDump(int argc, char** argv) {
     if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
         // Every table in the archive (one in misc.cat has the texture tag).
         nw::CatArchive cat;
-        if (reluva::Error err = cat.open(path)) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(path))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -1083,7 +1077,7 @@ int cmdMdlInfo(int argc, char** argv) {
     const std::string path = argv[2];
     if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
         nw::CatArchive cat;
-        if (reluva::Error err = cat.open(path)) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(path))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -1164,7 +1158,7 @@ int cmdWavInfo(int argc, char** argv) {
     const std::string path = argv[2];
     if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
         nw::CatArchive cat;
-        if (reluva::Error err = cat.open(path)) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(path))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -1824,7 +1818,7 @@ int cmdFifInfo(int argc, char** argv) {
     const std::string path = argv[2];
     if (path.size() > 4 && path.compare(path.size() - 4, 4, ".cat") == 0) {
         auto cat = std::make_unique<nw::CatArchive>();
-        if (reluva::Error err = cat->open(path)) {
+        if (reluva::Error err = cat->open(reluva::fs::fromUtf8(path))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -1917,8 +1911,8 @@ int cmdGmfDump(int argc, char** argv) {
             continue;
         }
         ++maps;
-        std::ofstream tiles(out / (stem + "_tiles.csv")), cells(out / (stem + "_cells.csv")),
-            objects(out / (stem + "_objects.csv"));
+        const auto csv = [&](const char* what) { return out / reluva::fs::fromUtf8(stem + what); };
+        std::ofstream tiles(csv("_tiles.csv")), cells(csv("_cells.csv")), objects(csv("_objects.csv"));
         tiles << "tx,ty,record,model,name,flags\n";
         for (int ty = 0; ty < map.height * 2; ++ty)
             for (int tx = 0; tx < map.width * 2; ++tx) {
@@ -1968,7 +1962,7 @@ int cmdGeoSheet(int argc, char** argv) {
     nw::Archives archives;
     for (int i = 4; i < argc; ++i) {
         auto cat = std::make_unique<nw::CatArchive>();
-        if (reluva::Error err = cat->open(argv[i])) {
+        if (reluva::Error err = cat->open(reluva::fs::fromUtf8(argv[i]))) {
             std::fprintf(stderr, "%s: %s\n", argv[i], err.message.c_str());
             return 1;
         }
@@ -2088,7 +2082,7 @@ int cmdGeoTextures(int argc, char** argv) {
     nw::Archives archives;
     for (int a = first; a < argc; ++a) {
         auto cat = std::make_unique<nw::CatArchive>();
-        if (reluva::Error err = cat->open(argv[a])) {
+        if (reluva::Error err = cat->open(reluva::fs::fromUtf8(argv[a]))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -2405,7 +2399,7 @@ int cmdPlayCheck(int argc, char** argv) {
     nw::Archives archives;
     for (int i = first + 2; i < argc; ++i) {
         auto cat = std::make_unique<nw::CatArchive>();
-        if (reluva::Error err = cat->open(argv[i])) {
+        if (reluva::Error err = cat->open(reluva::fs::fromUtf8(argv[i]))) {
             std::fprintf(stderr, "%s: %s\n", argv[i], err.message.c_str());
             return 1;
         }
@@ -2608,59 +2602,41 @@ int cmdBinkDecode(int argc, char** argv) {
                 movie.hasAudio() ? "audio" : "no audio");
     std::fflush(stdout); // before the frames, should they go to stdout too
     const uint32_t frames = argc > 4 ? std::min(movie.frames(), uint32_t(parseNumber(argv[4]))) : movie.frames();
-    std::FILE* out = std::fopen(argv[3], "wb");
+    std::ofstream out(reluva::fs::fromUtf8(argv[3]), std::ios::binary);
     if (!out)
         return 1;
     for (uint32_t f = 0; f < frames; ++f) {
         if (reluva::Error err = movie.nextFrame()) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
-            std::fclose(out);
             return 1;
         }
         for (int p = 0; p < 3; ++p) {
             const int w = p ? movie.width() / 2 : movie.width(), h = p ? movie.height() / 2 : movie.height();
             for (int y = 0; y < h; ++y)
-                std::fwrite(movie.plane(p).data() + size_t(y) * movie.stride(p), 1, size_t(w), out);
+                out.write(reinterpret_cast<const char*>(movie.plane(p).data()) + size_t(y) * movie.stride(p),
+                          std::streamsize(w));
         }
     }
-    std::fclose(out);
+    if (!out.flush())
+        return 1;
     if (argc > 5) {
         reluva::audio::Sound sound;
         if (reluva::Error err = movie.decodeAudio(sound)) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
-        std::FILE* pcm = std::fopen(argv[5], "wb");
-        if (!pcm)
+        std::ofstream pcm(reluva::fs::fromUtf8(argv[5]), std::ios::binary);
+        pcm.write(reinterpret_cast<const char*>(sound.samples.data()), std::streamsize(sound.samples.size() * 2));
+        if (!pcm.flush())
             return 1;
-        std::fwrite(sound.samples.data(), 2, sound.samples.size(), pcm);
-        std::fclose(pcm);
         std::printf("audio: %d Hz, %d channels, %zu frames\n", sound.rate, sound.channels, sound.frames());
     }
     return 0;
 }
 
 int main(int argc, char** argv) {
-#ifdef _WIN32
-    // Windows hands main its arguments in the ANSI code page: take them
-    // again as UTF-16 and pass them on as UTF-8, as the paths expect.
-    std::vector<std::string> utf8;
-    std::vector<char*> args;
-    if (int n = 0; LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &n)) {
-        for (int i = 0; i < n; ++i) {
-            const int len = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
-            std::string a(size_t(std::max(len, 1)), '\0');
-            WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, a.data(), len, nullptr, nullptr);
-            a.resize(a.size() - 1);
-            utf8.push_back(std::move(a));
-        }
-        LocalFree(wide);
-        for (std::string& a : utf8)
-            args.push_back(a.data());
-        args.push_back(nullptr);
-        argc = n, argv = args.data();
-    }
-#endif
+    // (On Windows they come in the ANSI code page, and *.cat unexpanded.)
+    reluva::fs::Utf8Args utf8(argc, argv, true);
     if (argc >= 2 && std::strcmp(argv[1], "bink-decode") == 0)
         return cmdBinkDecode(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "hexdump") == 0)

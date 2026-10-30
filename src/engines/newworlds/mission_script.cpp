@@ -46,7 +46,7 @@ bool toInt(const std::string& s, int& out) {
     if (s.empty())
         return false;
     char* end = nullptr;
-    const long v = std::strtol(s.c_str(), &end, 10);
+    const long long v = std::strtoll(s.c_str(), &end, 10); // (long is 32 bits on Windows)
     if (*end)
         return false;
     out = int(v);

@@ -1,2 +1,4 @@
 # The mission scripts are embedded byte for byte: keep their line endings.
 *.nws text eol=lf
+# The fuzz corpora are inputs byte for byte, whatever they look like.
+tests/fuzz/corpus/** -text
