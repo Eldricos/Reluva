@@ -2197,7 +2197,7 @@ std::vector<std::string> MissionViewer::staffCards() const {
     for (const FieldWork::OfficerAt& o : fieldWork_->officers()) {
         out.push_back(upper(std::string(rankTitle(race, o.officer->rank)) + " " + o.officer->name));
         out.push_back(std::string(specialityName(o.officer->speciality)) + ", " + skillWord(o.skill));
-        std::string where = "IN ORBIT";
+        std::string where = o.in < 0 ? "DEAD" : "IN ORBIT"; // (-1: died with what they were in)
         if (const Unit* u = o.in > 0 && world_ ? world_->unit(o.in) : nullptr) {
             const BuildingType* t = u->building ? buildingType(u->name) : nullptr;
             where = t ? t->panel : u->kind.name;

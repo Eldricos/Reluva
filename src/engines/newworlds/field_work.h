@@ -73,7 +73,8 @@ public:
     void cancel(int unit);
 
     // The side's officers, and where each is: in a building or vehicle
-    // (by its world id; 0 if that's gone).
+    // (by its world id; 0 in orbit, before they're placed or with no hub
+    // to go to; -1 dead).
     struct OfficerAt {
         const Officer* officer;
         int in;
@@ -92,6 +93,10 @@ public:
     // colony's buildings, or a vehicle that carries officers (16 at most);
     // false if it can't take them.
     bool moveOfficer(size_t officer, int into);
+    // The building or vehicle was destroyed (razed too): the officers
+    // still in it die with it (exe.md#crew-and-efficiency), and can't be
+    // moved again.
+    void destroyed(int unit);
     std::vector<const Officer*> aboard(int vehicle) const;
     bool strong(int unit, Kind kind) const;
     // The best skill at a speciality among the officers in a building or

@@ -6030,9 +6030,9 @@ on seen rival-base
 on destroyed rival-colony-hub
   say intelligence "The rival Romulans' colony hub is destroyed."
   signal rival-base-down
-# (The game's watch here is on the rival's type 153, its power generator by the
-# watch's name; Reluva's tables name that type the rival's defensive weapon.)
-on destroyed rival-defensive-weapon
+# (The game's watch here is on the rival's type 153, its power generator: the
+# Romulans' generator model, rps1, as a small building.)
+on destroyed rival-power-generator
   say intelligence "The rival Romulans' power generator is destroyed."
   signal rival-base-down
 on signal rival-base-down*2

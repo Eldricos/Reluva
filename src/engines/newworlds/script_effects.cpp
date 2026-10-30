@@ -97,10 +97,7 @@ void ScriptEffects::apply(const std::string& verb, const std::string& args) {
         if (slot < 0)
             return;
         const char race = ai_ ? ai_->raceOf(slot) : 'F';
-        const CombatType* type = nullptr;
-        for (int id = 1; id < 330 && !type; ++id)
-            if (const CombatType* t = combatType(id); t && a[1] == t->name && (t->race == race || !type))
-                type = t;
+        const CombatType* type = typeNamed(a[1], race);
         if (!type)
             return;
         const auto [x, y] = worldAt(std::atoi(a[3].c_str()), std::atoi(a[4].c_str()));

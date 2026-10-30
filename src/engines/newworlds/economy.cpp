@@ -1383,7 +1383,11 @@ void Economy::remove(int id) {
             it = stores_.erase(it);
         else
             (it->structure == id ? it->gone = true : false), ++it;
-    // Its pods waiting go with it; those bound for it look again.
+    // Its pods waiting go with it; those bound for it look again. Its
+    // bees let go of what they carry.
+    for (Bee& b : bees_)
+        if ((b.cargo || b.worker) && b.site == id)
+            releaseBee(b, id);
     depots_.erase(id);
     pods_.erase(std::remove_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.origin == id && p.state != Pod::Aboard; }),
                 pods_.end());
@@ -1631,9 +1635,11 @@ void Economy::podTick() {
         fly(b, x, y);
         b.flight = std::max(10, int(std::hypot(x - b.fromX, y - b.fromY) / kWorkerSpeed));
     };
-    // Worker bees for the buildings that handle pods.
+    // Worker bees for the buildings that handle pods (not one being razed:
+    // the game's searches pass it over, exe.md#demolishing).
     for (const ColonyStructure& s : structures_) {
-        if (s.progress < 1 || (s.type != "mining-station" && s.type != "resource-processor" && s.type != "storage-facility"))
+        if (s.progress < 1 || s.evacuating ||
+            (s.type != "mining-station" && s.type != "resource-processor" && s.type != "storage-facility"))
             continue;
         Depot& d = depots_[s.id];
         if (const Bee* w = beeById(d.worker); !w || w->site != s.id)
@@ -1758,7 +1764,7 @@ void Economy::podTick() {
         }
         const int coming = int(std::count_if(pods_.begin(), pods_.end(),
                                              [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }));
-        if (freeCount(s->id) - coming < cargoBays())
+        if (freeCount(s->id) - coming < 2)
             continue;
         for (Pod& p : pods_)
             if (p.origin == s->id && p.state == Pod::Queued) {
@@ -1791,7 +1797,7 @@ void Economy::podTick() {
         Depot& d = dit->second;
         if (const Bee* c = beeById(d.cargo); !c || c->site != s.id)
             d.cargo = 0;
-        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < cargoBays())
+        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < 2)
             continue;
         for (Bee& b : bees_)
             if (b.cargo && !b.site && b.dock == 0) {
@@ -2080,11 +2086,35 @@ bool Economy::raze(int structure) {
             if (auto d = depots_.find(s.id); d != depots_.end()) {
                 for (int id : {d->second.worker, d->second.cargo})
                     if (Bee* b = beeById(id); b && b->site == s.id)
-                        b->site = 0;
+                        releaseBee(*b, s.id);
                 d->second.worker = d->second.cargo = 0;
             }
         }
     return true;
+}
+
+// A bee let go by its building (the game's pods in transit there weren't
+// traced; Reluva's): a worker bee's pod, out from its store or in to it,
+// goes with the building, as the pods waiting on its yard do; a cargo
+// bee's, bound for it from another yard, are set down where the bee is,
+// off any yard, for whoever takes them next. Then it's free (home, or
+// another building's).
+void Economy::releaseBee(Bee& b, int structure) {
+    for (int id : b.pods)
+        for (auto it = pods_.begin(); it != pods_.end(); ++it)
+            if (it->id == id) {
+                if (!b.cargo) {
+                    pods_.erase(it);
+                    break;
+                }
+                it->state = Pod::Parked, it->inbound = false, it->pad = 0, it->slot = -1;
+                it->x = b.x, it->y = b.y;
+                if (it->dest == structure)
+                    it->dest = 0;
+                break;
+            }
+    b.pods.clear();
+    b.site = 0, b.fetching = 0, b.inside = false, b.retries = 0;
 }
 
 // Evacuated: its people out, no bee of its still docked there, and a few

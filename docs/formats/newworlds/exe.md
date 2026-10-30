@@ -382,8 +382,9 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   the 7 x 7 blocks round its own, taking from the nearest ore cell (ring by
   ring); each take uses one unit of the cell's amount and gives a tonne of
   raw ore. A cell at 0 turns into plain ground. A mine fills 40 t loads and
-  waits for the bees to carry them (the Federation's cargo bees carry two, the Klingons' and Romulans' one
-  of their 160 T pods, worker bees one);
+  waits for the bees to carry them (the Federation's cargo bees carry two
+  of its 80 T pods, the Klingons' and Romulans' one of their 160 T pods,
+  worker bees one);
   with 4 loads waiting, or no crew, it waits 24 s before trying again. A
   counter shared by all the colony's mines makes every mine yield all six
   ores: in each 8 takes, 2 of the cell's own kind and 1 of each kind (so 3
@@ -584,7 +585,11 @@ A human side's requests wait for an APC that's free; the pool never
 orders one built. One made at a vehicle yard drives straight to a waiting
 request, else into the hub. An AI side gets one built free for each
 request no APC is free for. A hub destroyed takes the vehicles inside it
-with it. The player has no control that brings one out.
+with it; those out on the map are stopped or released to the pool, and
+one released with no hub to take it goes to a request waiting then, or
+else stands where it is while there's no hub (no garage takes it; the
+side's TRANSPORT count, of its objects of that class, still has it). The player
+has no control that brings one out.
 
 In Reluva the player's transports work this way (`MissionSim`, with the
 economy's rides); a ride's stops last 4 s each (the game's 80 ticks at a
@@ -835,6 +840,10 @@ hold (J1's temple: held 60 s).
 skill, posted in a building (the hub, the sickbay, a yard). A vehicle
 with room for people (science vehicles, APCs) takes up to 16; an
 officer moves to a selected vehicle within 1414 units of where they are.
+Like the crew, an officer dies with the building or vehicle they're in
+(the personnel destructor kills every occupant; the evacuation of a
+razed building doesn't take officers, so ours moves them to the hub
+first). A dead officer is never moved again.
 
 **Range and replies.** A scanner drives for the same kind of point as an
 attack, about a target's radius off, and scans as soon as it is within
@@ -1447,15 +1456,20 @@ hub's pool after 55-65 s, about 19 s more a block each way.
   the first processor with room (the list's order, not the nearest),
   refined goods to a storage facility; a processor packs its refined
   stock for storage every 32 ticks. A building with more than one pod
-  coming asks for a cargo bee, which carries two a trip: it waits
-  (checking every 16 ticks) until its building's yard has two places
-  free and two pods are ready (after 64 checks, about 51 s, it goes for
-  one), flies to them, takes each up (a tick, a 50-tick climb), flies to
-  its own building's yard and sets each down (a tick, a 30-tick lift, a
-  50-tick climb). It never docks there: the building's worker bee takes
-  each pod in (out of its dock, to the pod, a tick, back in; the pod's
-  contents go into the store and the pod is gone). Lost bees are asked
-  for again. While the starting colony is set up, pods arrive at once.
+  coming asks for a cargo bee, which carries a pod a bay (the
+  Federation's has two bays, the Klingons' and Romulans' one): it waits
+  (checking every 16 ticks) until its building's yard has a place free a
+  bay and a pod a bay is ready (after 64 checks, about 51 s, a Federation
+  one goes for one), flies to them, takes each up (a tick, a 50-tick
+  climb), flies to its own building's yard and sets each down (a tick, a
+  30-tick lift, a 50-tick climb). It never docks there: the building's
+  worker bee takes each pod in (out of its dock, to the pod, a tick, back
+  in; the pod's contents go into the store and the pod is gone). Lost bees are asked
+  for again. A building razed or lost lets its bees go; what happens to
+  the pods they carry wasn't traced, so in Reluva its worker bee's pod
+  goes with it, as those waiting on its yard and in its store do, and
+  its cargo bee sets its pods down where it is for the next taker. While
+  the starting colony is set up, pods arrive at once.
 - Not found: the number of tiles each building's model gives (so the
   build times; the training missions' timings stand in, with four bees).
 
@@ -1484,8 +1498,12 @@ the same way; one without an idle construction bee gets one made free.
 **Cargo.** A cargo bee never docks at the mine or the processor: it
 takes and sets down pods on their pads, about 8-9.5 s for its two at the
 mine and 11 s at the processor; inside, a worker bee spends about 8.5 s a
-pod at a Federation mine and 6 s at the processor. A trip carries two
-pods: 80 T for the Federation, 160 T for the others.
+pod at a Federation mine and 6 s at the processor. A trip carries 160 T
+for every race: two 80 T pods for the Federation, one 160 T pod for the
+others (their cargo bees have one bay: the bee's constructors give 13
+two, 61 and 90 one). The worker bee's "two places free" and the "more
+than one pod coming" that asks for a cargo bee are fixed at 2 for every
+race.
 
 ### Docking
 

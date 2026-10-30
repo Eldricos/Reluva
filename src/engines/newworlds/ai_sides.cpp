@@ -117,6 +117,18 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
     return id;
 }
 
+const CombatType* typeNamed(std::string_view name, char race, bool buildingsOnly) {
+    const CombatType* first = nullptr;
+    for (int id = 1; id < 330; ++id)
+        if (const CombatType* t = combatType(id); t && name == t->name && (t->building || !buildingsOnly)) {
+            if (t->race == race)
+                return t;
+            if (!first)
+                first = t;
+        }
+    return first;
+}
+
 const VehicleType* orderOnlyVehicle(int type) {
     // Stock: dilithium, polycomp, thermoconc, trans al, nitrium, duranium.
     static const std::vector<VehicleType> kDevices = {

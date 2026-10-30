@@ -3341,6 +3341,311 @@ void testEconomyFixes() {
     }
 }
 
+// Corrupt files the readers must turn down cleanly (or, for level.dat,
+// read round).
+void testCorruptReaders() {
+    // level.dat: a line that isn't a mission is skipped, the rest kept.
+    std::vector<Level> l;
+    std::vector<std::string> skipped;
+    CHECK(!parseLevelList("F1,2,Power Corrupts\nF2,two,Bad\nF3,2,Third\n", l, &skipped));
+    CHECK(l.size() == 2 && l[1].shortName == "F3" && skipped.size() == 1 &&
+          skipped[0].find("line 2") != std::string::npos);
+
+    // A map whose list runs off the table's end, unended; and one whose
+    // cells both start one list, more objects than the table has.
+    GmfMap map;
+    const size_t lists = tinyGmf().size() - 1024 - 2 * 10 - 3 * 4;
+    auto bad = tinyGmf();
+    set32(bad, lists + 8, 0x00a1b277);
+    CHECK(parseGmf(bad, map));
+    bad = tinyGmf();
+    set32(bad, lists + 4, 0x00a1b277);
+    set32(bad, lists + 8, 0xffffffffu);
+    set32(bad, bad.size() - 1024 - 4, 0); // the last cell's list at 0 too
+    CHECK(parseGmf(bad, map));
+
+    // A glyph whose right edge overflows an int lies outside the image.
+    std::vector<uint8_t> b(std::begin("FONTPROP"), std::end("FONTPROP") - 1);
+    b.push_back(32); b.push_back(0); b.push_back(1); b.push_back(0);
+    put32(b, 2); put32(b, 4); put32(b, 0);
+    for (uint32_t v : {0x7ffffff0u, 0u, 0x20u, 1u})
+        put32(b, v);
+    GameFont f;
+    CHECK(!parseFif(b, f));
+    const Error outside = setFontImage(textureBytes(4, 4), f);
+    CHECK(outside && outside.message.find("outside") != std::string::npos && f.coverage.empty());
+
+    // A model with no part data fails there.
+    GeoModel m;
+    auto geo = triangleGeo();
+    geo[268] = 2; // the part data's u32 1
+    const Error err = parseGeo(geo, m);
+    CHECK(err && err.message == "no part data");
+
+    // A system model with a texture number past the limit draws nothing.
+    GeoModel sys;
+    sys.parts.resize(1);
+    sys.parts[0].vertices = {{0, 0, 0}, {10, 0, 0}, {0, 10, 0}};
+    GeoModel::Face face;
+    for (uint32_t c = 0; c < 3; ++c)
+        face.corners.push_back({c, 0, 0, {0, 0, 0, 0, 0}});
+    face.corners.back().extra[4] = 0xfffffff0u;
+    sys.faces.push_back(face);
+    const StarSystemLayout layout = readStarSystem(sys);
+    CHECK(layout.bodies.empty() && layout.faceSlot == std::vector<int>{-1} && starSystemTextures(layout, "ice").empty());
+}
+
+// A script's spawn (and the colony's buildings) take the side's own type
+// of the name, else the first: K12's containment device is the
+// Klingons' 207, not the Federation's 118.
+void testSpawnOwnType() {
+    CHECK(typeNamed("containment-device", 'K')->id == 207 && typeNamed("containment-device", 'R')->id == 208);
+    CHECK(typeNamed("containment-device", 'F')->id == 118 && typeNamed("containment-device", 'X')->id == 118);
+    CHECK(typeNamed("containment-device", 'K', true)->id == 207 && !typeNamed("no-such-thing", 'K'));
+    std::vector<MissionScript> parsed;
+    CHECK(!parseMissionScripts("mission F1 F\non start\n  spawn klingon containment-device 1 410 220 device\n", parsed));
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    World w(t);
+    AiSides ai("F1", 0, w);
+    ai.start();
+    ScriptEffects fx(0, w, &ai, nullptr, &parsed[0]);
+    fx.apply("spawn", "klingon containment-device 1 410 220 device");
+    int found = 0;
+    for (const Unit& u : w.units())
+        if (u.label == "device")
+            ++found;
+    for (const Unit& u : w.units())
+        if (u.label == "device")
+            CHECK(u.type == 207 && u.slot == 1);
+    CHECK(found == 1);
+}
+
+// The colony's officers (exe.md#crew-and-efficiency, #people): an upgrade
+// counts its host's officers at its speciality; an officer dies with the
+// building or vehicle they're in, and can't be moved after.
+void testOfficersAndUpgrades() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    std::vector<ColonyBuilding> colony = MissionSim::placedColony("F1", 'F');
+    CHECK(!colony.empty() && colony[0].name == "colony-hub");
+    colony.push_back({"colony-hub-upgrade", "", colony[0].a, colony[0].b});
+    MissionSim sim("F1", 'F', t, map, 64, 64, colony);
+    const int hub = sim.colonyObjects()[0];
+    const int upgrade = sim.structureIds().back();
+    // The best command officer (7) in the hub counts for the upgrade too.
+    float best = 0;
+    for (const FieldWork::OfficerAt& o : sim.fieldWork().officers())
+        if (o.officer->speciality == 7 && o.in == hub)
+            best = std::max(best, o.skill);
+    size_t command = 0;
+    for (size_t i = 0; best == 0 && i < sim.fieldWork().officers().size(); ++i)
+        if (sim.fieldWork().officers()[i].officer->speciality == 7) {
+            CHECK(sim.fieldWork().moveOfficer(command = i, hub));
+            best = sim.fieldWork().officers()[i].skill;
+        }
+    CHECK(best > 0);
+    sim.advance(0.1);
+    const ColonyStructure* up = sim.economy().structure(upgrade);
+    CHECK(up && std::abs(sim.economy().efficiency(*up) - 0.4f * (2 + best)) < 1e-4f);
+    // Officers in the sickbay die with it.
+    int bay = 0;
+    for (size_t i = 0; i < sim.colony().size(); ++i)
+        if (sim.colony()[i].name == "sickbay")
+            bay = sim.colonyObjects()[i];
+    CHECK(bay > 0);
+    size_t inBay = 0;
+    for (size_t i = 0; i < sim.fieldWork().officers().size(); ++i)
+        if (sim.fieldWork().officers()[i].in == hub && i != command)
+            inBay = i;
+    CHECK(sim.fieldWork().moveOfficer(inBay, bay) && sim.fieldWork().officers()[inBay].in == bay);
+    sim.world().unit(bay)->hp = 0;
+    sim.advance(0.1);
+    CHECK(!sim.world().unit(bay) && sim.fieldWork().officers()[inBay].in == -1);
+    CHECK(!sim.fieldWork().moveOfficer(inBay, hub) && sim.fieldWork().officers()[inBay].in == -1);
+    CHECK(sim.fieldWork().aboard(bay).empty() && sim.fieldWork().skill(bay, 3) == 0);
+}
+
+// The transports with the hub lost (exe.md#transports): one on its way
+// home stops where it is and stands there, still one of the side's
+// transports; none is housed.
+void testTransportsWithoutHub() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    std::vector<ColonyBuilding> colony = MissionSim::placedColony("F1", 'F');
+    colony.push_back({"accommodation", "", 446, 210});
+    MissionSim sim("F1", 'F', t, map, 64, 64, colony);
+    int store = 0, crew = 0;
+    for (const ColonyStructure& c : sim.economy().structures())
+        if (c.type == "sickbay")
+            store = c.id, crew = c.crew;
+    sim.economy().setCrewTarget(store, 0);
+    sim.economy().setCrewTarget(store, crew);
+    // Until the rides are done and one is on its way home.
+    sim.advance(1);
+    for (int i = 0; i < 3000 && (!sim.economy().rides().empty() || sim.transportsHoused() > 1); ++i)
+        sim.advance(0.1);
+    CHECK(sim.economy().rides().empty() && sim.transportsHoused() < 2);
+    auto apcs = [&] {
+        std::vector<const Unit*> out;
+        for (const Unit& u : sim.world().units())
+            if (u.slot == sim.playerSlot() && u.name == "unarmed-apc")
+                out.push_back(&u);
+        return out;
+    };
+    bool homeward = false;
+    for (const Unit* u : apcs())
+        homeward = homeward || u->moving();
+    CHECK(homeward);
+    sim.world().unit(sim.colonyObjects()[0])->hp = 0;
+    sim.advance(0.1);
+    CHECK(!sim.economy().hub());
+    const auto out = apcs();
+    CHECK(!out.empty() && int(out.size()) == sim.transports() && sim.transportsHoused() == 0);
+    std::vector<std::pair<float, float>> at;
+    for (const Unit* u : out) {
+        CHECK(!u->moving());
+        at.push_back({u->x, u->y});
+    }
+    sim.advance(60);
+    const auto later = apcs();
+    CHECK(later.size() == out.size() && sim.transports() == int(later.size()) && sim.transportsHoused() == 0);
+    for (size_t i = 0; i < later.size() && i < at.size(); ++i)
+        CHECK(!later[i]->moving() && later[i]->x == at[i].first && later[i]->y == at[i].second);
+}
+
+// Pods aboard a bee whose building goes (exe.md#bees): a worker bee's go
+// with its building; a cargo bee's are set down where it is, off any
+// yard, for the next taker; neither bee keeps any.
+void testPodsOfLostBuildings() {
+    auto run = [](Economy& e, double seconds, const std::function<bool()>& until) {
+        for (double s = 0; s < seconds && !until(); s += 0.05)
+            e.advance(0.05);
+        return until();
+    };
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+    ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 300 : 0; };
+    auto colony = [&](Economy& m) {
+        m.addBuilt("colony-hub", 0, 0);
+        m.addBuilt("construction-yard", 20000, 0);
+        const int proc = m.addBuilt("resource-processor", 20000, 20000);
+        m.addBuilt("storage-facility", -20000, 0);
+        m.setBees(4, 1, 1);
+        CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
+        return proc;
+    };
+    auto carrying = [](const Economy& m, bool cargo) -> const Economy::Bee* {
+        for (const Economy::Bee& b : m.bees())
+            if (b.cargo == cargo && b.worker == !cargo && b.site && !b.pods.empty())
+                return &b;
+        return nullptr;
+    };
+    // The mine's worker bee with a pod out: razed, the pod goes.
+    {
+        Economy m('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        colony(m);
+        int mine = 0;
+        CHECK(run(m, 600, [&] {
+            const Economy::Bee* b = carrying(m, false);
+            const Economy::Pod* p = nullptr;
+            for (const Economy::Pod& q : m.pods())
+                if (b && q.id == b->pods[0] && !q.inbound)
+                    p = &q;
+            return p && (mine = p->origin) > 0;
+        }));
+        const int bee = carrying(m, false)->id, pod = carrying(m, false)->pods[0];
+        CHECK(m.raze(mine));
+        for (const Economy::Bee& b : m.bees())
+            if (b.id == bee)
+                CHECK(b.pods.empty() && !b.site);
+        CHECK(std::none_of(m.pods().begin(), m.pods().end(), [&](const Economy::Pod& p) { return p.id == pod; }));
+        m.advance(5);
+        CHECK(std::none_of(m.pods().begin(), m.pods().end(),
+                           [&](const Economy::Pod& p) { return p.state == Economy::Pod::Aboard && p.pad == mine; }));
+    }
+    // The processor's cargo bee on its way with pods: the processor lost,
+    // they're set down under it.
+    {
+        Economy m('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        const int proc = colony(m);
+        CHECK(run(m, 900, [&] { return carrying(m, true) != nullptr; }));
+        const Economy::Bee* c = carrying(m, true);
+        const int bee = c->id;
+        const std::vector<int> pods = c->pods;
+        const float x = c->x, y = c->y;
+        m.remove(proc);
+        for (const Economy::Bee& b : m.bees())
+            if (b.id == bee)
+                CHECK(b.pods.empty() && !b.site);
+        for (const Economy::Pod& p : m.pods())
+            if (std::find(pods.begin(), pods.end(), p.id) != pods.end())
+                CHECK(p.state == Economy::Pod::Parked && p.pad == 0 && p.dest == 0 && p.x == x && p.y == y);
+        CHECK(int(std::count_if(m.pods().begin(), m.pods().end(), [&](const Economy::Pod& p) {
+                  return std::find(pods.begin(), pods.end(), p.id) != pods.end();
+              })) == int(pods.size()));
+    }
+}
+
+// The pods' rules for every race (exe.md#bees): with nobody to take
+// a Klingon processor's goods (its storage facility without crew), its
+// worker bee fills its yard with them but for the game's two places (not
+// its race's one cargo bay), so the ore still comes in; its cargo bee
+// carries one pod a trip.
+void testKlingonPods() {
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return std::abs(bx - 2) <= 1 && std::abs(by - 3) <= 1 ? 5 : 0; };
+    ore.depositAmount = [](int bx, int by) { return std::abs(bx - 2) <= 1 && std::abs(by - 3) <= 1 ? 4000 : 0; };
+    Economy m('K', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+    m.addBuilt("colony-hub", 0, 0);
+    m.addBuilt("construction-yard", 20000, 0);
+    const int store = m.addBuilt("storage-facility", -20000, 0);
+    const int proc = m.addBuilt("resource-processor", 20000, 20000);
+    m.setBees(4, 1, 1);
+    CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
+    m.setCrewTarget(store, 0);
+    size_t carried = 0;
+    int most = 0;
+    for (double s = 0; s < 2400; s += 0.05) {
+        m.advance(0.05);
+        for (const Economy::Bee& b : m.bees())
+            if (b.cargo)
+                carried = std::max(carried, b.pods.size());
+        most = std::max(most, int(std::count_if(m.pods().begin(), m.pods().end(), [&](const Economy::Pod& p) {
+                            return p.pad == proc && p.refined && p.state == Economy::Pod::Parked;
+                        })));
+    }
+    CHECK(carried == 1 && most >= 13 && most <= 15); // of its 16
+}
+
+// R1's rival base (exe.md, the natives' types): type 153 is the rival
+// Romulans' power generator (model rps1), and the script's watch on it
+// hears it destroyed by that name.
+void testRivalPowerGenerator() {
+    const CombatType* t = combatType(153);
+    CHECK(t && std::string_view(t->name) == "power-generator" && t->race == 'V' && t->building);
+    Unit u;
+    u.side = 'V', u.slot = 4, u.name = t ? t->name : "", u.type = 153;
+    const auto names = scriptNames(u, 2);
+    CHECK(std::find(names.begin(), names.end(), "rival-power-generator") != names.end());
+    MissionRun r1(*findMissionScript("R1", 'R'), nullptr);
+    const auto out = r1.fire({"destroyed", {"rival-power-generator"}});
+    CHECK(std::any_of(out.begin(), out.end(), [](const MissionRun::Output& o) {
+        return o.text == "The rival Romulans' power generator is destroyed.";
+    }));
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -3390,6 +3695,13 @@ int main() {
     testEconomyFixes();
     testScriptOrder();
     testFixedTicks();
+    testCorruptReaders();
+    testSpawnOwnType();
+    testOfficersAndUpgrades();
+    testTransportsWithoutHub();
+    testPodsOfLostBuildings();
+    testKlingonPods();
+    testRivalPowerGenerator();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

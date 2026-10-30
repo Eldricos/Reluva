@@ -124,7 +124,7 @@ constexpr CombatType kTypes[] = {
     {148, "tank", "geo/rom/rct.geo", 'R', false, 70, 1.5f, 0.16666f, {WeaponKind::Burst, 10, 20000.0f, 40, 4, 1, 3.14159f, 0.52357f, 1.04723f}, 0.0f, 3, 0, true, false, 0x100},
     {149, "tank", "geo/rom/rct.geo", 'V', false, 75, 1.5f, 0.16666f, {WeaponKind::Burst, 10, 20000.0f, 40, 4, 1, 3.14159f, 0.08725f, 1.30906f}, 0.0f, 3, 0, true, true, 0x100},
     {150, "colony-hub", "geo/rom/rch.geo", 'V', true, 450, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 0, 0, true, false, 0x4},
-    {153, "defensive-weapon", "geo/rom/rps1.geo", 'V', true, 200, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 0, 0, true, false, 0x2},
+    {153, "power-generator", "geo/rom/rps1.geo", 'V', true, 200, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 0, 0, true, false, 0x2},
     {154, "mobile-shield-generator", "geo/fed/fmsg.geo", 'F', false, 100, 1.3f, 0.16666f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 0.0f, 2, 0, true, false, 0x100},
     {158, "advanced-generator", "geo/fed/fpgs2.geo", 'F', true, 350, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 5000.0f, 4, 1, true, false, 0x2},
     {163, "mining-station", "geo/fed/fms2.geo", 'F', true, 900, 1.0f, 0.0f, {WeaponKind::None, 0, 0.0f, 0, 0, 0, 3.14159f, 1.5708f, 1.5708f}, 1666.0f, 5, 2, true, false, 0x8},

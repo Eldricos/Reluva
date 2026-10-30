@@ -129,11 +129,17 @@ int FieldWork::board(int vehicle) {
 
 bool FieldWork::moveOfficer(size_t officer, int into) {
     const Unit* u = world_.unit(into);
-    if (officer >= officers_.size() || !u || u->slot != player_ || (!u->building && !canCarry(*u)) ||
-        (!u->building && aboard(into).size() >= kOfficerSeats))
+    if (officer >= officers_.size() || officers_[officer].in < 0 || !u || u->slot != player_ ||
+        (!u->building && !canCarry(*u)) || (!u->building && aboard(into).size() >= kOfficerSeats))
         return false;
     officers_[officer].in = into;
     return true;
+}
+
+void FieldWork::destroyed(int unit) {
+    for (OfficerAt& o : officers_)
+        if (o.in == unit && unit > 0)
+            o.in = -1;
 }
 
 int FieldWork::disembark(int vehicle) {

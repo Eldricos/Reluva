@@ -162,7 +162,8 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   places round it; each goes to the first processor that takes it
   (built, crewed, with its own worker bee, fewer than 17 coming); a
   building with more than one coming gets a cargo bee, which brings two
-  a trip and empties them into its store. Every mine, processor and
+  a trip (the Klingons' and Romulans' one of their bigger pods) and
+  empties them into its store. Every mine, processor and
   storage facility has a worker bee: those standing at the start get one
   free, a later one takes a spare from the hub or has the vehicle yard
   make one. The processor refines a quarter tonne a tick, in

@@ -356,10 +356,8 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
 namespace {
 // The side's building of that name.
 const CombatType* buildingOfSide(const std::string& name, char side) {
-    for (int id = 1; id < 330; ++id)
-        if (const CombatType* t = combatType(id); t && t->building && t->race == side && name == t->name)
-            return t;
-    return nullptr;
+    const CombatType* t = typeNamed(name, side, true);
+    return t && t->race == side ? t : nullptr;
 }
 } // namespace
 
@@ -527,6 +525,7 @@ void MissionSim::step() {
         }
         if (e.kind != WorldEvent::Destroyed)
             continue;
+        fieldWork_->destroyed(e.what.id);
         for (size_t i = 0; i < colonyObjects_.size(); ++i)
             if (colonyObjects_[i] == e.what.id) {
                 colonyObjects_[i] = -1;
@@ -642,23 +641,20 @@ void MissionSim::step() {
 }
 
 // The colony's buildings' officer terms (the best officer posted of its
-// speciality) and health; vehicles out of the yards: bees into the hub,
-// the rest beside their yard, armed ones on to the rally point.
+// speciality; an upgrade, with no object of its own, its host's) and
+// health; vehicles out of the yards: bees into the hub, the rest beside
+// their yard, armed ones on to the rally point.
 void MissionSim::rollOut() {
     for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i) {
-        const std::string& type = colony_[i].name;
-        const int wanted = type == "construction-yard" || type == "vehicle-yard"                 ? 1
-                           : type == "security-center"                                          ? 2
-                           : type == "sickbay"                                                  ? 3
-                           : type == "science-station"                                          ? 4
-                           : type == "mining-station" || type == "resource-processor"           ? 6
-                           : type == "colony-hub"                                               ? 7
-                           : type == "storage-facility"                                         ? 8
-                           : type == "accommodation"                                            ? 9
-                                                                                                : 0;
+        const BuildingType* b = buildingType(colony_[i].name);
+        const int wanted = b ? b->speciality : 0;
+        int in = colonyObjects_[i];
+        for (size_t j = 0; b && !b->upgradeOf.empty() && j < colony_.size() && j < colonyObjects_.size(); ++j)
+            if (colony_[j].name == b->upgradeOf && colony_[j].a == colony_[i].a && colony_[j].b == colony_[i].b)
+                in = colonyObjects_[j];
         float best = 0;
         for (const FieldWork::OfficerAt& o : fieldWork_->officers())
-            if (o.in == colonyObjects_[i] && o.in > 0 && o.officer->speciality == wanted)
+            if (o.in == in && o.in > 0 && o.officer->speciality == wanted)
                 best = std::max(best, o.skill);
         economy_->setOfficer(structureIds_[i], best);
         if (const Unit* u = colonyObjects_[i] > 0 ? world_->unit(colonyObjects_[i]) : nullptr)
@@ -789,7 +785,8 @@ void MissionSim::useModels(const Archives& archives) {
 // takes one from the hub, which drives to where its people are, stops to
 // take them on, drives them to where they're going, stops to set them
 // down and drives home into the hub. One lost on the way loses its
-// passengers; a hub lost loses those inside it.
+// passengers; a hub lost loses those inside it, and those out stand idle
+// once they're done.
 void MissionSim::runTransports(double dt) {
     // A stop: in through the building's dock and out again (an unarmed
     // APC as far as RELEASE), at 100 a tick (exe.md#docking).
@@ -863,6 +860,30 @@ void MissionSim::runTransports(double dt) {
             sh.leg = 4;
             if (hub)
                 goTo(sh, hub->x, hub->y);
+        }
+        // Home with no hub (exe.md#transports): released to the vehicle
+        // pool with no garage to take it, it takes a ride waiting for one,
+        // else stops where it is and stands idle on the map (leg 5; still
+        // one of the side's transports) until there's a hub again.
+        if (sh.leg == 4 && !hub) {
+            sh.leg = 5, sh.ride = 0;
+            world_->setPath(sh.unit, {});
+            float fx = 0, fy = 0;
+            for (const Economy::Ride& w : economy_->rides())
+                if (w.wait <= 0 && !w.loaded && structureAt(w.from, fx, fy) &&
+                    std::none_of(shuttles_.begin(), shuttles_.end(), [&](const Shuttle& o) { return o.ride == w.id; })) {
+                    sh.leg = 0, sh.ride = w.id;
+                    goTo(sh, fx, fy);
+                    break;
+                }
+            ++it;
+            continue;
+        }
+        if (sh.leg == 5) {
+            if (hub)
+                sh.leg = 4, goTo(sh, hub->x, hub->y);
+            ++it;
+            continue;
         }
         const bool there = !u->moving() && std::hypot(u->x - sh.tx, u->y - sh.ty) < 1.5f * kTile;
         if (!u->moving() && !there && sh.leg % 2 == 0 && ++sh.tries < 3)

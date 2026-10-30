@@ -24,6 +24,11 @@ namespace reluva::newworlds {
 // points, the Romulans 1.3; exe.md#sides-and-combat). Returns its id.
 int spawnObject(World& world, int slot, char race, const CombatType& type, float x, float y, const std::string& label,
                 const std::string& model = {}, bool player = false);
+// The type of that name for a side of that race: the race's own if it
+// has one, else the first of that name (several races' types share a
+// name: the containment device is 118 for the Federation, 207 for the
+// Klingons); only buildings if asked. nullptr: none.
+const CombatType* typeNamed(std::string_view name, char race, bool buildingsOnly = false);
 
 // The setup's Cadet box (exe.md#vehicles-and-turrets): the player's objects
 // get twice their hit points instead of the race's bonus. A setting for the

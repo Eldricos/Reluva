@@ -353,7 +353,8 @@ public:
     // storage facility has a worker bee of its own that flies its pods out
     // to a pad round it; each pod goes to the first processor (ore) or
     // storage facility (goods) that takes it, and a building with more
-    // than one coming asks for a cargo bee, which brings two a trip and
+    // than one coming asks for a cargo bee, which brings its bays' worth a
+    // trip (the Federation's two, the others' one) and
     // puts their contents in its store. The processor packs its refined
     // goods into pods every 32 ticks. Without bees (the computer's
     // colonies) the ore and goods go straight on.
@@ -421,9 +422,14 @@ private:
     bool takes(const ColonyStructure& s, const Pod& p) const;
     void unload(const Pod& p);
     Bee* beeById(int id);
+    // A worker or cargo bee let go by its building (razed or gone), and
+    // what it carries: see the definition.
+    void releaseBee(Bee& b, int structure);
     int64_t podSize() const { return side_ == 'F' ? 80000 : 160000; }
-    // A cargo bee's bays: the Federation's two, the Klingons' and Romulans' one
-    // (so every cargo bee carries 160 T a trip).
+    // A cargo bee's bays: the Federation's two, the Klingons' and Romulans'
+    // one (so every cargo bee carries 160 T a trip). The worker bee's two
+    // places free and the two pods coming that ask for a cargo bee are the
+    // game's own 2 for every race, not the bays.
     int cargoBays() const { return side_ == 'F' ? 2 : 1; }
     void fly(Bee& b, float x, float y);
 

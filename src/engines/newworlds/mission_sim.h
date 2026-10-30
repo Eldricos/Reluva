@@ -185,8 +185,8 @@ private:
     int housed_ = 0, rallied_ = 0;
     // The transports: those in the hub, and each one out on a ride: its
     // unit, the ride, the leg (0 to the pick-up, 1 loading, 2 to the
-    // drop, 3 unloading, 4 home), seconds left at a stop, tries to get
-    // where it's going.
+    // drop, 3 unloading, 4 home, 5 idle with no hub to go home to),
+    // seconds left at a stop, tries to get where it's going.
     int garage_ = 0;
     struct Shuttle {
         int unit, ride, leg = 0;
