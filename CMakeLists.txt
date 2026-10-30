@@ -87,6 +87,12 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/arf.cpp
     src/engines/newworlds/map_viewer.cpp
     src/engines/newworlds/mission_viewer.cpp
+    src/engines/newworlds/mission_play.cpp
+    src/engines/newworlds/mission_input.cpp
+    src/engines/newworlds/mission_hud.cpp
+    src/engines/newworlds/mission_briefing.cpp
+    src/engines/newworlds/mission_flow.cpp
+    src/engines/newworlds/mission_audio.cpp
     src/engines/newworlds/movie_player.cpp
     src/engines/newworlds/briefing.cpp
     src/engines/newworlds/briefing_data.cpp

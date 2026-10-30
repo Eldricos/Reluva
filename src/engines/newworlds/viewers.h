@@ -637,7 +637,14 @@ private:
 //   C: the colony on/off (its hub where the recordings put it, and the
 //   buildings the script builds; see colony.h)   V: look at the colony
 //   F3: play on the map (the game's camera and controls, the colony's
-//   starting units to select and move; world.h): Escape or F3 leaves
+//   starting units to select and move; world.h): Escape asks whether to
+//   leave (in play F1, F2 and F3 are the game's cameras, F3 its close-up)
+//   G: the mission as the game runs it (loading, briefing, play, report)
+// Its parts: mission_viewer.cpp the page, play's start and its savestates;
+// mission_play.cpp play's world drawn (units, combat, buildings going up);
+// mission_input.cpp play's controls; mission_hud.cpp play's panels;
+// mission_briefing.cpp the briefing; mission_flow.cpp the run (G);
+// mission_audio.cpp the voices, sounds and music.
 class MissionViewer {
 public:
     MissionViewer(System& sys, Surface& screen, const Archives& archives, std::vector<Level> levels,
@@ -677,7 +684,13 @@ private:
         std::string text;
         uint32_t id = 0; // the string's (the first one's, for plain strings run together)
     };
+    // A rectangle on the screen, drawn and clicked.
+    struct Rect {
+        int x = 0, y = 0, w = 0, h = 0;
+        bool contains(int px, int py) const { return px >= x && py >= y && px < x + w && py < y + h; }
+    };
 
+    // --- The page (mission_viewer.cpp) ---------------------------------------
     void show(int index);
     void loadSide(); // the briefing and clips for the mission's current side
     void drawBriefing();
@@ -685,105 +698,123 @@ private:
     std::string title(const std::string& mapTitle) const;
     void updateTitle();
     void redraw();
-    // The briefing player: steps run one after another, each as long as its
-    // clip (a few seconds when it has none, or its clip is missing).
-    void drawInterface();
     void stepScript(); // the next scripted event (X)
     void startColony(); // the hub alone, for the mission's side
     // Play: the game's controls over the map.
     void startPlay();
     void stopPlay();
     void resetPlayUi(); // play's panels closed and its picks dropped (both of the above)
-    bool playEvent(const Event& ev); // true if play used it
-    void showUnits();
-    void drawPlay();
-    std::string compassStrip() const;
-    void fullTricorderRect(int& x0, int& y0, int& size, int& tiles) const;
-    std::string tricorderReadoutAt(float wx, float wy, float reach) const; // the selection box, the full-screen Tricorder
     bool hubPosition(float& x, float& y) const;
+    void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
+    void showColony();  // hands the colony's buildings to the map
+    void stopScript();
+    bool mapInView() const; // the map is drawn (not a briefing backdrop)
+    // Text in the briefing's font: the game's fe8pt if there, else Reluva's.
+    int measure(std::string_view text) const;
+    int lineHeight() const;
+    void drawText(int x, int y, std::string_view text, Color color);
+
+    // --- Play's world drawn (mission_play.cpp) -------------------------------
+    void showUnits();
     // Building in play (B): the menu's types for the side, the hologram
     // under the pointer, placing it, and its construction drawn.
     std::vector<const BuildingType*> buildMenu() const;
+    std::vector<const VehicleType*> vehicleMenu() const; // the yards' offer, in the game's order
     void choose(const BuildingType& t);
     void updateGhost();
     void placeBuilding();
     void showProgress();
+    void combatStep(); // what combat did, to draw
+    void drawCombat();
+    bool visible(const Unit& u) const;
+    // What moves is drawn between ticks (mission_sim.h's tickShare): a
+    // unit as far from where the last tick found it to where it is (its
+    // place, heading and turret); a bee from where it was drawn as the
+    // tick before last ended (by id: x, y, heading, lift), noted as each
+    // tick runs.
+    struct Pose {
+        float x, y, heading, turretYaw;
+    };
+    Pose drawnAt(const Unit& u) const;
+    void noteBees();
+
+    // --- Play's controls (mission_input.cpp) ---------------------------------
+    bool playEvent(const Event& ev); // true if play used it
+    bool pressButton(int x, int y, bool right = false, int clicks = 1);
+    int panelAt(int x, int y) const; // the topmost panel there (its index in panels), or -1
+    // The selection replaced by these units: no building picked, nothing
+    // asked about one, the hub's details put away (as a click selects).
+    void selectUnits(const std::vector<int>& ids);
+    void selectAllOfKind(char k);
+    void orderOn(int target);
+    void openPlaybook(int target, float gx, float gy);
+    void playbookOrder(char order);
+    void rallySelected();
+    void jumpTo(int slot);
+    void cycleCamera(bool buildings);
+    void doubleClicked(int unit);
+    void followInF1(int unit);
+    void cameraTo(const Unit& u);
+
+    // --- Play's panels (mission_hud.cpp) -------------------------------------
+    void drawInterface();
+    void drawPlay();
+    void drawPlaybook();
+    Rect playbookIcon(int i) const; // the playbook's i-th icon, in its column as last drawn
+    std::string compassStrip() const;
+    Rect fullTricorderRect(int& tiles) const; // the full-screen Tricorder's map, and its zoom
+    // The Tricorder's map a click is on: the full-screen one's, else the
+    // small one's as last drawn; and its zoom.
+    Rect tricorderMap(int& tiles) const;
     void drawTricorderMap(int x, int y, int w, int h, int tiles = 0);
-    std::string tricorderReadout(int mx, int my, int mw, int mh, int tiles) const;
+    std::string tricorderReadout(const Rect& map, int tiles) const;
+    std::string tricorderReadoutAt(float wx, float wy, float reach) const; // the selection box, the full-screen Tricorder
     std::vector<int> allyRaces() const;
     // A selected object's panel lines, as the game's (exe.md#the-selection-panel),
     // and its hit points' share for the bar under them.
     std::vector<std::string> objectPanel(const Unit& u) const;
-    void openPlaybook(int target, float gx, float gy);
-    void playbookOrder(char order);
-    void drawPlaybook();
-    void rallySelected();
-    bool pressButton(int x, int y, bool right = false, int clicks = 1);
-    int panelAt(int x, int y) const; // the topmost panel there (its index in panels_), or -1
-    // The selection replaced by these units: no building picked, nothing
-    // asked about one, the hub's details put away (as a click selects).
-    void selectUnits(const std::vector<int>& ids);
     std::vector<std::string> staffCards() const;
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
     std::vector<std::string> colonyDetails() const;
     std::vector<int> pendingBuilds() const;
-    std::vector<const VehicleType*> vehicleMenu() const; // the yards' offer, in the game's order
     int menuLines(int lh) const;
     void drawMenu(int x, int ty, int w, const std::vector<const VehicleType*>& vehicles,
                   const std::vector<const BuildingType*>& buildings, size_t jobs);
     const char* buildMenuTitle() const;
-    void jumpTo(int slot);
-    void selectAllOfKind(char k);
-    void speak(const std::string& what);
-    void unitSpeaks(int unit, int group);
-    void doubleClicked(int unit);
-    void followInF1(int unit);
-    void flyScene(int index, uint64_t nowMs);
-    audio::SoundHandle objectSoundHandle_ = audio::kNoSound; // the last double-clicked building's
-    audio::SoundHandle playAt(const std::string& archive, const std::string& stem, float x, float y, float gain);
-    std::map<std::string, std::shared_ptr<const audio::Sound>> archiveSounds_; // decoded, by archive/stem
-    std::map<int, audio::SoundHandle> driveHandles_;                           // each unit's start-up sound
-    void cameraTo(const Unit& u);
-    int followed_ = 0;                  // the object F1's camera follows
-    bool quitAsked_ = false;            // Escape's box up
-    int quitYes_[4] = {}, quitNo_[4] = {};
-    bool paused_ = false, unfocused_ = false;
-    static constexpr size_t kMultiPage = 15;            // MULTISELECTION entries a page
-    static constexpr int kMultiCellW = 46, kMultiCellH = 48;
-    int multiPage_ = 0;
-    std::set<int> multiTicked_;
-    void orderSpoken(bool moving);
-    std::map<int, int> unitVoices_;     // each vehicle's voice, once it's spoken
-    std::vector<int> spokenSelection_;  // the selection its first vehicle last answered
-    std::minstd_rand rng_{std::random_device{}()};
-    std::map<std::string, uint64_t> spokenAt_; // each clip, when it last played
-    audio::SoundHandle stingHandle_ = audio::kNoSound; // the colony's danger music
-    void cycleCamera(bool buildings);
-    void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
-    void showColony();  // hands the colony's buildings to the map
-    void stopScript();
+    const char* pendingOrderName() const;
+
+    // --- The briefing (mission_briefing.cpp) ---------------------------------
+    // The briefing player: steps run one after another, each as long as its
+    // clip (a few seconds when it has none, or its clip is missing).
     void startBriefing();
     void stopBriefing();
     void startStep(int step);
-    bool mapInView() const; // the map is drawn (not a briefing backdrop)
+    void flyScene(int index, uint64_t nowMs);
     void drawBackdrop(BriefingView view);
     // The game's own art for the briefing's scenes, when the archives have
     // it (glblgui.cat, glblgame.cat): each side's emblem screen, and the
     // Tabula Rasa galaxy model with its textures.
     void loadBriefingArt();
+    bool loadScreen(const std::string& prefix, Texture& out) const;
     bool drawEmblem(char side);
     bool drawGalaxy();
     void loadStarSystem(); // the one the mission's table names
     bool drawStarSystem();
     // A model turning on the grid, with its textures (loaded once).
     bool drawModel(const std::string& name);
-    struct BriefingModel {
-        TexturedModel model;
-        bool ok = false;
-    };
-    std::map<std::string, BriefingModel> models_;
-    std::vector<TextureFile> textureFiles_;
+
+    // --- The run, G (mission_flow.cpp) ---------------------------------------
+    void startFlow();
+    void endFlow();
+    void drawFlow();
+    std::string levelLabel() const;
+
+    // --- Voices, sounds and music (mission_audio.cpp) ------------------------
+    void speak(const std::string& what);
+    void unitSpeaks(int unit, int group);
+    void orderSpoken(bool moving);
+    audio::SoundHandle playAt(const std::string& archive, const std::string& stem, float x, float y, float gain);
     void playClip(int index);
     void stopClip();
     void startMusic(); // the shown map's planet theme, looped
@@ -791,10 +822,23 @@ private:
     bool clipPlaying() const;
     // Reads and decodes one of the game folder's sound files.
     std::shared_ptr<const audio::Sound> loadSound(const std::string& stem);
-    // Text in the briefing's font: the game's fe8pt if there, else Reluva's.
-    int measure(std::string_view text) const;
-    int lineHeight() const;
-    void drawText(int x, int y, std::string_view text, Color color);
+
+    audio::SoundHandle objectSoundHandle_ = audio::kNoSound; // the last double-clicked building's
+    std::map<std::string, std::shared_ptr<const audio::Sound>> archiveSounds_; // decoded, by archive/stem
+    std::map<int, audio::SoundHandle> driveHandles_;                           // each unit's start-up sound
+    Rect quitYes_, quitNo_;             // Escape's box's buttons, as last drawn
+    bool unfocused_ = false;
+    static constexpr size_t kMultiPage = 15;            // MULTISELECTION entries a page
+    static constexpr int kMultiCellW = 46, kMultiCellH = 48;
+    std::minstd_rand rng_{std::random_device{}()};
+    std::map<std::string, uint64_t> spokenAt_; // each clip, when it last played
+    audio::SoundHandle stingHandle_ = audio::kNoSound; // the colony's danger music
+    struct BriefingModel {
+        TexturedModel model;
+        bool ok = false;
+    };
+    std::map<std::string, BriefingModel> models_;
+    std::vector<TextureFile> textureFiles_;
 
     System& sys_;
     Surface& screen_;
@@ -827,15 +871,10 @@ private:
     static constexpr uint64_t kFlowUnstarted = ~uint64_t(0);
     uint64_t flowStartMs_ = 0;
     bool flowWon_ = false;
-    std::array<int, 4> continue_{}; // the CONTINUE button
+    Rect continue_; // the CONTINUE button
     bool flowScreen() const {
         return flow_ == Flow::Loading || flow_ == Flow::Starting || flow_ == Flow::Debriefing || flow_ == Flow::Report;
     }
-    void startFlow();
-    void endFlow();
-    void drawFlow();
-    std::string levelLabel() const;
-    bool loadScreen(const std::string& prefix, Texture& out) const;
     GeoModel galaxy_;
     std::vector<Texture> galaxyTextures_; // in the order its faces number them
     std::vector<std::string> systemNames_; // geo/solsys/'s systems
@@ -866,10 +905,6 @@ private:
     const std::vector<int>& structureIds() const;
     const std::map<std::string, int>& beesHoused() const;
     int housed() const { return sim_ ? sim_->housed() : 0; }
-    int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
-    int razeAsked_ = 0;             // DEMOLISH pressed: the building asked about (yes / no)
-    int cancelAsked_ = 0;           // a site or upgrade picked on the colony's details (yes / no)
-    int cancelFrom_ = 0;            // the building whose details it was picked on (the hub)
     // The playbook (exe.md#orders): the orders a double click offers for
     // the selection and what was clicked, as a column of icons beside the
     // Tricorder. Each entry: its icon, its name, and the order (f follow
@@ -881,45 +916,85 @@ private:
         const char* name;
         char order;
     };
-    std::vector<PlaybookEntry> playbook_;
-    int playbookTarget_ = 0;            // what it was opened on (0: the ground)
-    float playbookX_ = 0, playbookY_ = 0;
-    std::array<int, 2> playbookAt_{};   // its column's top-left
     // Buttons drawn on the panels this frame: where, and what they do.
     struct PanelButton {
         int x, y, w, h;
         std::string action;
     };
-    std::vector<PanelButton> buttons_;
     // The panels drawn this frame, in order (each over those before): where,
-    // and its first button in buttons_ (those after it, up to the next
+    // and its first button in buttons (those after it, up to the next
     // panel's, are its own). A click inside one is the interface's.
     struct PanelArea {
         int x, y, w, h;
         size_t firstButton;
     };
-    std::vector<PanelArea> panels_;
+    struct Flash {
+        float x0, y0, x1, y1;
+        WeaponKind weapon;
+        uint64_t until;
+    };
+    struct Blast {
+        float x, y, size;
+        uint64_t start;
+    };
+    // What play's panels show and wait on, and what it draws between
+    // ticks: nothing open, picked or asked as a mission starts (and once
+    // it stops), so none of it outlives its play (resetPlayUi()).
+    struct PlayUi {
+        bool quitAsked = false;            // Escape's box up
+        bool paused = false;
+        bool boxing = false;               // a left drag's box being drawn
+        bool tricorderFull = false;        // the full-screen Tricorder (Tab)
+        std::vector<Flash> flashes;
+        std::vector<Blast> blasts;
+        char pendingOrder = 0;
+        bool researchMenu = false;
+        bool vehicleMenu = false;          // the vehicle yards' list shown (V)
+        bool buildMenu = false, ghostOk = false;
+        std::string placing;               // the type being placed, or empty
+        int ghostA = -1, ghostB = -1;      // where its hologram stands
+        int selectedBuilding = 0;          // a building selected (its unit id), its details in NEW WORLDS
+        int razeAsked = 0;                 // DEMOLISH pressed: the building asked about (yes / no)
+        int cancelAsked = 0;               // a site or upgrade picked on the colony's details (yes / no)
+        int cancelFrom = 0;                // the building whose details it was picked on (the hub)
+        bool colonyDetails = false;        // the hub's INFO: the colony's details instead of the hub's
+        bool staffView = false;            // the STAFF panel: the officers' cards
+        bool trainingView = false;         // its TRAINING list: the officers' courses
+        int pickedOfficer = -1;            // a card picked: the next building or vehicle clicked takes them
+        uint64_t officerClickMs = 0;       // when a card was last clicked (a double click: the camera to them)
+        std::vector<PlaybookEntry> playbook;
+        int playbookTarget = 0;            // what it was opened on (0: the ground)
+        float playbookX = 0, playbookY = 0;
+        std::array<int, 2> playbookAt{};   // its column's top-left
+        int multiPage = 0;
+        std::set<int> multiTicked;
+        std::map<int, std::array<float, 4>> beesBefore, beesNoted;
+        std::array<int, 5> jumpedTo{};     // JUMP TO: each class's object the camera went to last
+        int cycledBuilding = 0, cycledVehicle = 0; // Shift+B / Shift+V: where the camera went last
+        int followed = 0;                  // the object F1's camera follows
+        int alertedLast = 0;               // Space: the alerted object the camera went to last
+        int rallied = 0;                   // vehicles sent back to the rally point (Y): its parking places in turn
+        int menuPage = 0;                  // the build or vehicle menu's page
+        std::pair<int, uint64_t> menuFlash{-1, 0}; // the menu item last clicked, and when
+        int commsShown = -1;               // the message COMMUNICATIONS shows (-1: the latest)
+        bool commsClosed = false;          // put away with X, until the next message
+        bool commandShown = true;          // the COMMAND panel (MISSION shows or hides it)
+        bool allyOpen = false;             // the ALLY page
+        int allyPick = -1;                 // its race clicked (a slot): the postures offered
+        std::set<int> shownOthers;         // the other sides' buildings in sight
+        std::vector<std::pair<int, float>> otherBuildings; // the other sides' shown: unit id, progress shown
+        std::map<int, int> unitVoices;     // each vehicle's voice, once it's spoken
+        std::vector<int> spokenSelection;  // the selection its first vehicle last answered
+        std::vector<PanelButton> buttons;
+        std::vector<PanelArea> panels;
+    };
+    PlayUi play_;
     uint64_t blinkPhase_ = 0;           // the Tricorder's blink, as last drawn (nowMs / 500)
-    bool staffView_ = false;            // the STAFF panel: the officers' cards
-    bool trainingView_ = false;         // its TRAINING list: the officers' courses
-    int alertedLast_ = 0;               // Space: the alerted object the camera went to last
     double edgeClock_ = 0;
     float edgeSpeed_ = 0;               // edge scrolling's speed, units a tick
     int edgeTicks_ = 0; // F1's edges raise and lower the camera every fourth tick
     bool mouseSeen_ = false;            // the pointer has moved (it starts at 0, 0)
     int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
-    bool allyOpen_ = false;             // the ALLY page
-    int allyPick_ = -1;                 // its race clicked (a slot): the postures offered
-    int commsShown_ = -1;               // the message COMMUNICATIONS shows (-1: the latest)
-    bool commsClosed_ = false;          // put away with X, until the next message
-    bool commandShown_ = true;          // the COMMAND panel (MISSION shows or hides it)
-    int menuPage_ = 0;                  // the build or vehicle menu's page
-    std::pair<int, uint64_t> menuFlash_{-1, 0}; // the menu item last clicked, and when
-    bool colonyDetails_ = false;        // the hub's INFO: the colony's details instead of the hub's
-    std::array<int, 5> jumpedTo_{};
-    int cycledBuilding_ = 0, cycledVehicle_ = 0; // Shift+B / Shift+V: where the camera went last     // JUMP TO: each class's object the camera went to last
-    int pickedOfficer_ = -1;            // a card picked: the next building or vehicle clicked takes them
-    uint64_t officerClickMs_ = 0; // when a card was last clicked (a double click: the camera to them)
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     // The other sides, and combat: each colony building's object in the
     // world (0 once destroyed), shots and blasts being drawn, and the
@@ -931,47 +1006,11 @@ private:
     Research* research_ = nullptr;     // the side's research, and its list shown (R)
     ScriptEffects* effects_ = nullptr; // the script's effects in play
     Fog* fog_ = nullptr;               // the fog of war
-    std::set<int> shownOthers_;  // the other sides' buildings in sight
-    int rallied_ = 0;            // vehicles sent back to the rally point (Y): its parking places in turn
-    bool visible(const Unit& u) const;
-    // What moves is drawn between ticks (mission_sim.h's tickShare): a
-    // unit as far from where the last tick found it to where it is (its
-    // place, heading and turret); a bee from where it was drawn as the
-    // tick before last ended (by id: x, y, heading, lift), noted as each
-    // tick runs.
-    struct Pose {
-        float x, y, heading, turretYaw;
-    };
-    Pose drawnAt(const Unit& u) const;
-    std::map<int, std::array<float, 4>> beesBefore_, beesNoted_;
-    void noteBees();
-    bool researchMenu_ = false;
-    bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
-    char pendingOrder_ = 0;
-    void orderOn(int target);
-    const char* pendingOrderName() const;
     int playerSlot_ = 0;
     size_t shownBuildings_ = 0;
     size_t buildingsShown_ = 0; // all the map's, the colony's first
-    std::vector<std::pair<int, float>> otherBuildings_; // the other sides' shown: unit id, progress shown
-    std::array<int, 4> tricorder_{}; // the TRICORDER panel's map, as last drawn (x, y, w, h)      // the other sides' buildings last shown
-    struct Flash {
-        float x0, y0, x1, y1;
-        WeaponKind weapon;
-        uint64_t until;
-    };
-    std::vector<Flash> flashes_;
-    struct Blast {
-        float x, y, size;
-        uint64_t start;
-    };
-    std::vector<Blast> blasts_;
-    void combatStep(); // what combat did, to draw
-    void drawCombat();
-    bool buildMenu_ = false, ghostOk_ = false;
-    std::string placing_;            // the type being placed, or empty
-    int ghostA_ = -1, ghostB_ = -1; // where its hologram stands
-    bool playing_ = false, boxing_ = false, tricorderFull_ = false;
+    Rect tricorder_; // the TRICORDER panel's map, as last drawn
+    bool playing_ = false;
     int mouseX_ = 0, mouseY_ = 0, boxX_ = 0, boxY_ = 0;
     uint64_t lastTickMs_ = 0;
     ColonySite colonySite_;
