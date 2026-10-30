@@ -22,8 +22,9 @@ struct Level {
 
 // Reads level.dat's text: "short name,max players,title" per line, "//"
 // starting a comment. Commented-out lines that still look like a level are
-// kept, marked.
-Error parseLevelList(std::string_view text, std::vector<Level>& out);
+// kept, marked. A line that isn't a level fails it, or with `skipped` is
+// left out and said there (one message per line), the rest kept.
+Error parseLevelList(std::string_view text, std::vector<Level>& out, std::vector<std::string>* skipped = nullptr);
 
 // The level whose short name is the map's file stem ("map/f1.gmf" -> F1),
 // ignoring case; listed levels before commented-out ones; nullptr if none.

@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/fif.h"
 
+#include "common/fs.h"
 #include "common/text.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/texture.h"
@@ -53,7 +54,7 @@ Error setFontImage(const std::vector<uint8_t>& fbp, GameFont& font) {
     if (Error err = decodeTexture(fbp, t))
         return err;
     for (const GameFont::Glyph& g : font.glyphs)
-        if (g.height > 0 && (g.x + g.width > t.width || g.y + g.height > t.height))
+        if (g.height > 0 && (int64_t(g.x) + g.width > t.width || int64_t(g.y) + g.height > t.height)) // (no overflow)
             return Error::fail("a glyph lies outside the " + std::to_string(t.width) + "x" + std::to_string(t.height) +
                                " image");
     font.imageWidth = t.width;
@@ -129,7 +130,7 @@ std::vector<GameFont> loadGameFonts(const Archives& archives) {
                 setFontImage(fbp, font))
                 continue;
             font.name = stem;
-            font.archive = cat->path().filename().string();
+            font.archive = fs::toUtf8(cat->path().filename());
             fonts.push_back(std::move(font));
         }
     return fonts;

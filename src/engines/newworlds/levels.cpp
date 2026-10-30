@@ -48,7 +48,7 @@ bool parseLine(std::string_view line, Level& out) {
 
 } // namespace
 
-Error parseLevelList(std::string_view text, std::vector<Level>& out) {
+Error parseLevelList(std::string_view text, std::vector<Level>& out, std::vector<std::string>* skipped) {
     out.clear();
     size_t lineNo = 0;
     while (!text.empty()) {
@@ -66,8 +66,13 @@ Error parseLevelList(std::string_view text, std::vector<Level>& out) {
             }
             continue;
         }
-        if (!parseLine(line, level))
-            return Error::fail("level.dat line " + std::to_string(lineNo) + " isn't \"name,players,title\"");
+        if (!parseLine(line, level)) {
+            const std::string why = "level.dat line " + std::to_string(lineNo) + " isn't \"name,players,title\"";
+            if (!skipped)
+                return Error::fail(why);
+            skipped->push_back(why);
+            continue;
+        }
         out.push_back(std::move(level));
     }
     return Error::success();

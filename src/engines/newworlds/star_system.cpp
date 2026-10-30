@@ -47,6 +47,11 @@ StarSystemLayout readStarSystem(const GeoModel& model) {
     StarSystemLayout out;
     out.faceSlot.assign(model.faces.size(), -1);
     out.faceBody.assign(model.faces.size(), -1);
+    // A texture number past the limit (one per texture to load) is a
+    // corrupt model: nothing in it is drawn.
+    for (const GeoModel::Face& f : model.faces)
+        if (!f.corners.empty() && f.corners.back().extra[4] > uint32_t(kMaxStarSystemSlot))
+            return out;
     struct Info {
         GeoModel::Vec3 centre{0, 0, 0}, lo{0, 0, 0}, hi{0, 0, 0};
         float size = 0;
@@ -161,7 +166,8 @@ std::vector<std::string> starSystemTextures(const StarSystemLayout& layout, std:
                                             std::string_view system) {
     int slots = 0;
     for (const int s : layout.faceSlot)
-        slots = std::max(slots, s + 1);
+        if (s <= kMaxStarSystemSlot)
+            slots = std::max(slots, s + 1);
     std::vector<std::string> out(static_cast<size_t>(slots));
     for (size_t i = 0; i < layout.backdropSlots.size(); ++i)
         if (size_t(layout.backdropSlots[i]) < out.size())

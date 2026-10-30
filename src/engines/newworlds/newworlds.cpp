@@ -18,6 +18,7 @@
 #include "common/fs.h"
 
 #include <algorithm>
+#include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <memory>
@@ -90,7 +91,7 @@ public:
             total += c;
         if (total == 0)
             return Error::fail("No missions, models, textures, maps, sounds, strings or fonts found in " +
-                               target_.path.string());
+                               fs::toUtf8(target_.path));
         // Viewer 0 shows missions, 1 models, 2 textures, 3 maps, 4 sounds, 5 strings, 6 fonts;
         // Tab moves to the next one that has something to show. They draw
         // into the screen, so it must exist before the first activate().
@@ -158,7 +159,13 @@ public:
                 }
                 if (viewer == 0 && !game && ev.type == EventType::KeyDown && !ev.repeat &&
                     (ev.key == key::F1 + 4 || ev.key == key::F1 + 5)) {
-                    movies.play({ev.key == key::F1 + 4 ? "STNW.BIK" : raceMovie(missions.side())});
+                    // The page stops (its voice clip and music) while the
+                    // movie plays; it comes back when the movie ends.
+                    missions.deactivate();
+                    if (movies.play({ev.key == key::F1 + 4 ? "STNW.BIK" : raceMovie(missions.side())}) == 0)
+                        activate(); // (no movie to play)
+                    else
+                        moviesOn = true;
                     continue;
                 }
                 if (viewer == 0)
@@ -198,8 +205,13 @@ public:
             }
             if (viewer == 0)
                 missions.update(sys_.getMillis());
-            if (const char won = missions.takeCampaignWon())
+            if (const char won = missions.takeCampaignWon()) {
+                // The race's movie, the page quiet under it (as F5/F6).
+                missions.deactivate();
                 moviesOn = movies.play({raceMovie(won)}) > 0;
+                if (!moviesOn)
+                    activate();
+            }
             else if (viewer == 1)
                 models.update(sys_.getMillis());
             else if (viewer == 3)
@@ -261,7 +273,8 @@ private:
     static constexpr uint32_t kStateVersion = 8;
 
     // The main menu's mission list, if the game folder has one; a missing
-    // or unreadable level.dat only loses the missions' names.
+    // or unreadable level.dat only loses the missions' names, a line in it
+    // that isn't a mission only that line.
     std::vector<newworlds::Level> readLevels() const {
         std::vector<newworlds::Level> levels;
         const auto path = fs::findFile(target_.path, "level.dat");
@@ -269,8 +282,11 @@ private:
             return levels;
         std::ifstream in(*path, std::ios::binary);
         const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-        if (newworlds::parseLevelList(text, levels))
+        std::vector<std::string> skipped;
+        if (newworlds::parseLevelList(text, levels, &skipped))
             levels.clear();
+        for (const std::string& why : skipped)
+            std::fprintf(stderr, "New Worlds: %s, skipped\n", why.c_str());
         return levels;
     }
 
@@ -278,18 +294,24 @@ private:
         std::vector<std::filesystem::path> paths;
         std::error_code ec;
         for (std::filesystem::directory_iterator it(target_.path, ec), end; !ec && it != end; it.increment(ec))
-            if (fs::toLower(it->path().extension().string()) == ".cat")
+            if (fs::toLower(fs::toUtf8(it->path().extension())) == ".cat")
                 paths.push_back(it->path());
         if (paths.empty())
-            return Error::fail("No .cat archives in " + target_.path.string());
+            return Error::fail("No .cat archives in " + fs::toUtf8(target_.path));
         std::sort(paths.begin(), paths.end());
 
+        // One that won't open (unreadable, or not the game's) is left out,
+        // the rest shown.
         for (const auto& p : paths) {
             auto cat = std::make_unique<CatArchive>();
-            if (Error err = cat->open(p))
-                return err;
+            if (Error err = cat->open(p)) {
+                std::fprintf(stderr, "New Worlds: %s, skipped\n", err.message.c_str());
+                continue;
+            }
             archives_.push_back(std::move(cat));
         }
+        if (archives_.empty())
+            return Error::fail("No readable .cat archives in " + fs::toUtf8(target_.path));
         return Error::success();
     }
 

@@ -42,9 +42,12 @@ SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives,
     std::error_code ec;
     if (!gameDir.empty())
         for (std::filesystem::recursive_directory_iterator it(gameDir, ec), end; !ec && it != end; it.increment(ec)) {
-            const std::string ext = fs::toLower(it->path().extension().string());
-            if (it->is_regular_file(ec) && (ext == ".mp3" || ext == ".wav"))
-                loose.push_back({it->path().lexically_relative(gameDir).generic_string(), it->path()});
+            const std::string ext = fs::toLower(fs::toUtf8(it->path().extension()));
+            if (it->is_regular_file(ec) && (ext == ".mp3" || ext == ".wav")) {
+                std::string name = fs::toUtf8(it->path().lexically_relative(gameDir));
+                std::replace(name.begin(), name.end(), char(std::filesystem::path::preferred_separator), '/');
+                loose.push_back({std::move(name), it->path()});
+            }
         }
     std::sort(loose.begin(), loose.end(),
               [](const auto& x, const auto& y) { return fs::toLower(x.first) < fs::toLower(y.first); });
@@ -65,7 +68,7 @@ Error SoundViewer::read(size_t sound, std::vector<uint8_t>& data) const {
     }
     std::ifstream in(item.file, std::ios::binary);
     if (!in)
-        return Error::fail("cannot open " + item.file.string());
+        return Error::fail("cannot open " + fs::toUtf8(item.file));
     data.assign(std::istreambuf_iterator<char>(in), std::istreambuf_iterator<char>());
     return Error::success();
 }
@@ -74,7 +77,7 @@ const std::string& SoundViewer::nameOf(size_t sound) const { return sounds_[soun
 
 std::string SoundViewer::archiveOf(size_t sound) const {
     const Item& item = sounds_[sound];
-    return item.file.empty() ? archives_[item.ref.archive]->path().filename().string() : "the game folder";
+    return item.file.empty() ? fs::toUtf8(archives_[item.ref.archive]->path().filename()) : "the game folder";
 }
 
 void SoundViewer::activate() {

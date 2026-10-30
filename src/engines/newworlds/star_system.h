@@ -41,6 +41,9 @@ struct StarSystemLayout {
     // part of, or -1 for the starfield.
     std::vector<int> faceSlot, faceBody;
 };
+// The highest texture number a system model may use (the real ones stay
+// far below); a model past it gets a layout of nothing to draw.
+constexpr int kMaxStarSystemSlot = 255;
 StarSystemLayout readStarSystem(const GeoModel& model);
 
 // Texture stems (in lbp/txr/solsys/) for each texture number: stars1-4 for

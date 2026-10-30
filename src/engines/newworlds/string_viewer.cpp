@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "common/font.h"
+#include "common/fs.h"
 #include "common/text.h"
 #include "engines/newworlds/viewers.h"
 
@@ -258,7 +259,7 @@ void StringViewer::updateTitle() {
     const EntryRef& ref = tables_[size_t(current_)];
     std::string title = "New Worlds strings " + std::to_string(current_ + 1) + "/" + std::to_string(tables_.size()) +
                         ": " + archives_[ref.archive]->entries()[ref.entry].name + " in " +
-                        archives_[ref.archive]->path().filename().string() + " (";
+                        fs::toUtf8(archives_[ref.archive]->path().filename()) + " (";
     if (!status_.empty()) {
         title += status_ + ")";
     } else {

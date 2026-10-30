@@ -125,6 +125,8 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
         for (size_t q = p; r.has(q, 20) && !partData; ++q)
             if (isPartData(q))
                 partData = q;
+        if (!partData)
+            return Error::fail("no part data");
     }
     p = partData + 12;
 

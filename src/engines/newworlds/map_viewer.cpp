@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 The Reluva contributors
 
+#include "common/fs.h"
 #include "engines/newworlds/ground.h"
 #include "engines/newworlds/ground_textures.h"
 #include "engines/newworlds/view3d.h"
@@ -424,7 +425,7 @@ float MapViewer::heading() const {
 }
 
 std::string MapViewer::mapArchive() const {
-    return maps_.empty() ? std::string() : archives_[maps_[size_t(current_)].archive]->path().filename().string();
+    return maps_.empty() ? std::string() : fs::toUtf8(archives_[maps_[size_t(current_)].archive]->path().filename());
 }
 
 void MapViewer::resetView() {
@@ -1145,7 +1146,7 @@ void MapViewer::updateTitle() {
     if (const Level* level = levelForMap(levels_, archives_[ref.archive]->entries()[ref.entry].name))
         title += " [" + level->shortName + " \"" + level->title + "\", " + std::to_string(level->maxPlayers) +
                  (level->maxPlayers == 1 ? " player" : " players") + (level->commentedOut ? ", not listed" : "") + "]";
-    title += " (" + archives_[ref.archive]->path().filename().string();
+    title += " (" + fs::toUtf8(archives_[ref.archive]->path().filename());
     if (!status_.empty()) {
         title += "; " + status_ + ")";
         setTitle(titleFilter_ ? titleFilter_(title) : title);

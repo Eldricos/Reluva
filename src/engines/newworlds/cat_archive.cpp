@@ -55,9 +55,9 @@ Error CatArchive::open(const std::filesystem::path& path) {
     file_.clear();
     file_.open(path, std::ios::binary);
     if (!file_)
-        return Error::fail("Cannot open " + path.string());
+        return Error::fail("Cannot open " + fs::toUtf8(path));
 
-    const std::string where = path.filename().string() + ": ";
+    const std::string where = fs::toUtf8(path.filename()) + ": ";
     std::error_code ec;
     const uint64_t fileSize = std::filesystem::file_size(path, ec);
     if (ec || fileSize < kHeaderSize + 4)
@@ -147,7 +147,7 @@ Error CatArchive::read(const CatEntry& entry, std::vector<uint8_t>& out) {
     file_.seekg(std::streamoff(entry.offset));
     file_.read(reinterpret_cast<char*>(out.data()), std::streamsize(entry.size));
     if (!file_)
-        return Error::fail("Cannot read " + entry.name + " from " + path_.filename().string());
+        return Error::fail("Cannot read " + entry.name + " from " + fs::toUtf8(path_.filename()));
     return Error::success();
 }
 

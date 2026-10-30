@@ -109,12 +109,19 @@ Error parseGmf(const std::vector<uint8_t>& data, GmfMap& out) {
             return Error::fail("grid cell " + std::to_string(i) + " uses block " + std::to_string(c.block) + " of " +
                                std::to_string(out.blocks.size()));
         out.cells.push_back(c);
-        // The cell's list of objects, ended by ffffffff.
+        // The cell's list of objects, ended by ffffffff inside the table.
+        // The lists don't share objects, so there are no more of them than
+        // the table has entries (cells all pointing into one long list
+        // would otherwise make cells x entries).
         size_t at = r.u32(p + 6);
         if (at >= lists)
             return Error::fail("grid cell " + std::to_string(i) + "'s list starts at " + std::to_string(at) + " of " +
                                std::to_string(lists));
-        for (uint32_t e; at < lists && (e = r.u32(listStart + 4 * at)) != 0xffffffff; ++at) {
+        for (uint32_t e; (e = r.u32(listStart + 4 * at)) != 0xffffffff; ++at) {
+            if (at + 1 >= lists)
+                return Error::fail("grid cell " + std::to_string(i) + "'s list runs past the table's end");
+            if (out.scenery.size() >= lists)
+                return Error::fail("grid cell " + std::to_string(i) + "'s list makes more objects than the table has");
             GmfMap::Scenery o;
             o.bx = uint16_t(i % size_t(out.width));
             o.by = uint16_t(i / size_t(out.width));

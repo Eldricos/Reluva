@@ -167,9 +167,9 @@ MissionViewer::MissionViewer(System& sys, Surface& screen, const Archives& archi
     std::error_code ec;
     if (!gameDir.empty())
         for (std::filesystem::recursive_directory_iterator it(gameDir, ec), end; !ec && it != end; it.increment(ec)) {
-            const std::string ext = fs::toLower(it->path().extension().string());
+            const std::string ext = fs::toLower(fs::toUtf8(it->path().extension()));
             if (it->is_regular_file(ec) && (ext == ".mp3" || ext == ".wav"))
-                mediaFiles_.emplace(upperCase(it->path().stem().string()), it->path());
+                mediaFiles_.emplace(upperCase(fs::toUtf8(it->path().stem())), it->path());
         }
 
     // Without any of the missions' maps or text there's nothing to show.
@@ -289,7 +289,7 @@ void MissionViewer::loadSide() {
     }
 
     for (const auto& [stem, path] : mediaFiles_)
-        if (fs::toLower(path.extension().string()) == ".mp3" && isMissionClip(stem, level.shortName, side))
+        if (fs::toLower(fs::toUtf8(path.extension())) == ".mp3" && isMissionClip(stem, level.shortName, side))
             clips_.push_back(stem);
     std::sort(clips_.begin(), clips_.end(), clipBefore);
     script_ = briefingScript(level.shortName, side, table_, clips_);
@@ -507,6 +507,9 @@ void MissionViewer::stopPlay() {
     map_.setGhost({}, 0, 0, false);
     map_.setUnits({});
     map_.unlock();
+    // The mission's colony as it starts again, not the one played (the
+    // player's buildings and the other sides', with no world behind them).
+    startColony();
     redraw();
     updateTitle();
 }
@@ -3479,7 +3482,7 @@ audio::SoundHandle MissionViewer::playAt(const std::string& archive, const std::
     if (!cache) {
         std::vector<uint8_t> data;
         for (const auto& a : archives_)
-            if (fs::toLower(a->path().filename().string()) == archive)
+            if (fs::toLower(fs::toUtf8(a->path().filename())) == archive)
                 if (const CatEntry* e = a->find("stnwsfx/" + stem + ".wav"); e && !a->read(*e, data))
                     break;
         auto sound = std::make_shared<audio::Sound>();
@@ -4009,6 +4012,10 @@ void MissionViewer::loadStarSystem() {
     if (system_.faces.empty())
         return;
     systemLayout_ = readStarSystem(system_);
+    if (systemLayout_.bodies.empty() && systemLayout_.backdropSlots.empty()) {
+        system_ = GeoModel{}; // nothing in it to draw (a corrupt model)
+        return;
+    }
     for (const std::string& stem : starSystemTextures(systemLayout_, hasMap_ ? planetPicture(map_.mapArchive()) : "",
                                                           systemName_)) {
         Texture tex;

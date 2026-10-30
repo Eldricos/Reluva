@@ -41,6 +41,7 @@
 //   reluva-tool lbp-info <file> [out]              decode a texture, show its key and colours,
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
+#include "common/fs.h"
 #include "common/savestate.h"
 #include "common/video/bink.h"
 #include "common/audio/decode.h"
@@ -418,7 +419,7 @@ int cmdCatExtract(int argc, char** argv) {
         if (e.container || e.name.empty() || e.name.find(filter) == std::string::npos)
             continue;
         // Names come from the archive: refuse anything that could escape outDir.
-        const std::filesystem::path rel(e.name);
+        const std::filesystem::path rel = reluva::fs::fromUtf8(e.name);
         bool safe = !rel.is_absolute() && !rel.has_root_name();
         for (const auto& part : rel)
             safe &= part != "..";
@@ -436,12 +437,12 @@ int cmdCatExtract(int argc, char** argv) {
         std::ofstream f(out, std::ios::binary);
         f.write(reinterpret_cast<const char*>(data.data()), std::streamsize(data.size()));
         if (!f) {
-            std::fprintf(stderr, "cannot write %s\n", out.string().c_str());
+            std::fprintf(stderr, "cannot write %s\n", reluva::fs::toUtf8(out).c_str());
             return 1;
         }
         ++written;
     }
-    std::printf("extracted %u files to %s\n", written, outDir.string().c_str());
+    std::printf("extracted %u files to %s\n", written, reluva::fs::toUtf8(outDir).c_str());
     return 0;
 }
 
@@ -1789,7 +1790,7 @@ int cmdLevelInfo(int argc, char** argv) {
         }
         for (const auto& e : cat.entries())
             if (e.tag == nw::cattag::Gmf)
-                maps.emplace_back(e.name, std::filesystem::path(argv[a]).filename().string());
+                maps.emplace_back(e.name, reluva::fs::toUtf8(std::filesystem::path(argv[a]).filename()));
     }
     for (const auto& l : levels) {
         std::string where;
