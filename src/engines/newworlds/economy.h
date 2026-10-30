@@ -417,13 +417,33 @@ private:
     void requestCrew(ColonyStructure& s);
     void staff(ColonyStructure& s, std::vector<ScriptEvent>& out);
     void retryCrew();
+    // A tick: its steps in turn, as they're defined below it.
     void tick(std::vector<ScriptEvent>& out);
+    void buildTick(std::vector<ScriptEvent>& out); // construction (the bees' tick first)
+    void staffTick(std::vector<ScriptEvent>& out); // people arriving, rides waiting, walkers home
+    void powerTick(std::vector<ScriptEvent>& out); // power shared out, life support first
+    double lifeSupportTick(double supply);         // what's left of the supply after it
     void produce(std::vector<ScriptEvent>& out);
+    void mineTick(std::vector<ScriptEvent>& out);
+    void refineTick();
     float crewShare(const ColonyStructure& s) const;
     int sideIndex() const;
     bool mineTake(ColonyStructure& mine, std::array<int64_t, kOres>& into); // one mining take; false when dry
+    // A mine's tick of takes, at the bees' pace, into a store (its own, or
+    // the processor's).
+    void dig(ColonyStructure& mine, std::array<int64_t, kOres>& into, std::vector<ScriptEvent>& out);
     void beeTick();
+    // The pods' tick, by steps: worker bees found for the buildings, each
+    // worker bee's turn, the pods offered, cargo bees asked for, each cargo
+    // bee's turn.
     void podTick();
+    void assignWorkerBees();
+    void workerBeeTick(Bee& w);
+    void offerPods();
+    void assignCargoBees();
+    void cargoBeeTick(Bee& b);
+    void flyWorker(Bee& b, float x, float y);
+    Pod* podById(int id);
     void pack(int structure, std::array<int64_t, kMaterials>& stock, bool refined);
     bool takes(const ColonyStructure& s, const Pod& p) const;
     void unload(const Pod& p);
@@ -499,6 +519,7 @@ private:
     void shortage(int line);
     const ColonyStructure* pad() const;
     ColonyStructure* structureById(int id);
+    ColonyStructure* mutableHub() { return const_cast<ColonyStructure*>(hub()); } // hub(), to change
     // When each shortage line was last reported: manufacture (001),
     // construction (002), an upgrade (003) delayed.
     std::array<double, 3> lastShortage_{-1e9, -1e9, -1e9};

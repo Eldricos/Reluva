@@ -27,6 +27,9 @@ constexpr double kWarnEvery = 60;
 //   take, each take using one unit of the cell's amount;
 constexpr int kMineReach = 3;
 constexpr int64_t kTonne = 1000;
+// - in each 8 takes (counted for the whole colony) 2 of the cell's own ore
+//   and 1 of each kind (exe.md#the-economy);
+constexpr int kOreCycle = 8, kOwnOre = 2;
 // - the processor turns to one of its 16 store slots a tick and refines up
 //   to a quarter tonne of that ore into its material;
 constexpr int kRefineSlots = 16;
@@ -39,8 +42,15 @@ constexpr const char* kPlants[] = {"dilithium-plant",   "polycomp-plant", "therm
 constexpr float kPowerLow = 0.75f;
 // - generators and the hub run at 1.2 efficiency when whole, powered and
 //   staffed (the panel's 120 %);
-// - the colony's capacity never passes 90.
+// - the colony's capacity never passes 90;
 constexpr int kCapacityCap = 90;
+// - at most 10 constructions ordered at once (exe.md#demolishing);
+constexpr int kMostPending = 10;
+// - a block is 16384 units across (exe.md#building-placement);
+constexpr float kBlockSize = 16384;
+// - a vehicle yard placed with the starting colony puts 160 T of each
+//   material but thermoconc in the first store (exe.md#stores).
+constexpr int64_t kStartingYardUnits = 160000;
 // Bees (exe.md#bees): their flying speeds (units a tick, as the game's
 // start-up rewrite sets them: construction bees 1000, cargo bees 600), the
 // shortest flight, how far a site's spots are from its middle, and the
@@ -65,6 +75,17 @@ constexpr float kWorkerSpeed = 400;
 // goes for one after 64).
 constexpr int kWorkerSetDown = 1 + 30, kCargoTakeUp = 1 + 50, kCargoSetDown = 1 + 30 + 50;
 constexpr int kCargoCheck = 16, kCargoChecks = 64;
+// A yard's place where a cargo bee hovers, its corner (the ninth;
+// exe.md#bees); the worker bee's two places free more than are coming and
+// the more than one pod coming that asks for a cargo bee, the game's 2 for
+// every race (exe.md#bees).
+constexpr int kPadCorner = 8, kWorkerRoom = 2, kCargoAsk = 2;
+// The worker bees' type ids, the Federation's, Klingons' and Romulans'
+// (exe.md#costs-and-prerequisites).
+constexpr bool workerBeeType(int type) { return type == 12 || type == 11 || type == 92; }
+// A dock's legs (exe.md#docking): each at least 10 ticks, the lock and
+// release legs three times as long, and 5 ticks once locked in.
+constexpr int kShortestLeg = 10, kSlowLeg = 3, kLockTicks = 5;
 // Shortage lines repeat at most every 600 ms (exe.md#stores).
 constexpr double kShortageEvery = 0.6;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
@@ -78,6 +99,7 @@ constexpr double kWorkPerValue = 300;
 constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
 double rolloutSeconds(char side, int type) {
     const double tank = side == 'K' ? 4 : side == 'R' ? 7.3 : 9.5;
+    // (97, 37, 98: the sides' ground scouts, exe.md#costs-and-prerequisites.)
     return type == 97 || type == 37 || type == 98 ? tank * 6.5 / 9.5 : tank;
 }
 // People (exe.md#crew-and-efficiency): a race's roster, an accommodation
@@ -511,7 +533,7 @@ void Economy::startingYardStock() {
     Units u{};
     for (int m = 0; m < kMaterials; ++m)
         if (m != Thermoconc)
-            u[size_t(m)] = 160000;
+            u[size_t(m)] = kStartingYardUnits;
     deposit(u);
 }
 
@@ -609,10 +631,9 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
         addStore(s.id);
     if (const BuildingType* t = buildingType(type)) {
         s.stored = t->bufferCap;
-        // A mine digs round its own block (16384 units a block), as one
-        // ordered in play does.
+        // A mine digs round its own block, as one ordered in play does.
         if (t->onDeposit)
-            s.blockX = int(std::floor(x / 16384)), s.blockY = int(std::floor(y / 16384));
+            s.blockX = int(std::floor(x / kBlockSize)), s.blockY = int(std::floor(y / kBlockSize));
         // Housing standing at the start counts twice: the briefing's scene
         // makes the colony's own a first time and never takes it off
         // (exe.md#the-economy).
@@ -650,8 +671,8 @@ int Economy::order(const std::string& type, float x, float y, int tx, int ty) {
     // game those are types of their own, the AI's 189 an advanced mine.)
     if (!t || (free_ ? !t->sides[size_t(sideIndex())] : !available(*t)))
         return 0;
-    // The colony's queue holds 10 at most (exe.md#the-selection-panel).
-    if (!free_ && pendingBuilds() >= 10)
+    // The colony's queue holds 10 at most.
+    if (!free_ && pendingBuilds() >= kMostPending)
         return 0;
     // The build buttons work only while COLONY SIZE is below the limit
     // (exe.md#the-economy; no report is named); upgrades and add-ons don't
@@ -763,7 +784,7 @@ void Economy::handOffJobs(int yard, bool rollingOut) {
             if (Store* st = free_ ? nullptr : yardStore())
                 for (int m = 0; m < kMaterials; ++m)
                     st->units[size_t(m)] += int64_t(v->cost[size_t(m)]) * unitsPerMaterial(m);
-            if (v->type == 12 || v->type == 11 || v->type == 92)
+            if (workerBeeType(v->type))
                 for (auto& [id, d] : depots_)
                     d.asked = false;
         }
@@ -880,7 +901,7 @@ int Economy::endRide(int ride, bool delivered) {
     if (delivered) {
         if (to && !to->evacuating)
             (r.toPool ? to->pool : to->crew) += r.people;
-        else if (ColonyStructure* h = structureById(hub() ? hub()->id : -1))
+        else if (ColonyStructure* h = mutableHub())
             h->pool += r.people;
         else
             orbit_ += r.people;
@@ -969,13 +990,10 @@ void Economy::setCrewTarget(int structure, int n) {
                 }
             }
         }
-        if (s.crew > s.target)
-            for (ColonyStructure& h : structures_)
-                if (h.type == "colony-hub" && h.progress >= 1) {
-                    h.pool += s.crew - s.target;
-                    s.crew = s.target;
-                    break;
-                }
+        if (ColonyStructure* h = mutableHub(); h && s.crew > s.target) {
+            h->pool += s.crew - s.target;
+            s.crew = s.target;
+        }
         if (s.progress >= 1)
             requestCrew(s);
         return;
@@ -1013,11 +1031,12 @@ void Economy::staff(ColonyStructure& s, std::vector<ScriptEvent>& out) {
     const BuildingType* t = buildingType(s.type);
     if (t && s.type == "accommodation" && s.progress >= 1 && !s.evacuating &&
         std::none_of(s.coming.begin(), s.coming.end(), [](const auto& c) { return c.first < 0; })) {
+        // (The finished hubs' pools between them, taken from the first.)
+        ColonyStructure* hub = mutableHub();
         int hubPool = 0;
-        ColonyStructure* hub = nullptr;
-        for (ColonyStructure& h : structures_)
+        for (const ColonyStructure& h : structures_)
             if (h.type == "colony-hub" && h.progress >= 1)
-                hubPool += h.pool, hub = hub ? hub : &h;
+                hubPool += h.pool;
         const int room = t->poolSlots - s.pool;
         const int m = std::min({kBatch, room, hubPool > 0 ? hubPool : (has("transporter-pad") ? orbit_ : 0)});
         if (m > 0) {
@@ -1073,8 +1092,8 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
         if (busy.count(j.yard))
             continue; // one at a time per yard
         busy.insert(j.yard);
-        auto s = std::find_if(structures_.begin(), structures_.end(), [&](const ColonyStructure& c) { return c.id == j.yard; });
-        if (s == structures_.end())
+        ColonyStructure* s = structureById(j.yard);
+        if (!s)
             continue;
         // No crew, no work (the colony told, as the game's, when it's
         // ordered); a vehicle rolling out goes on without (a razed yard's
@@ -1127,10 +1146,10 @@ bool Economy::mineTake(ColonyStructure& mine, std::array<int64_t, kOres>& into) 
                 if (dug >= held)
                     continue;
                 ++dug;
-                // Every eight takes (counted for the whole colony) give two
-                // tonnes of the cell's own ore and one of each kind.
-                const int step = oreCycle_++ % 8;
-                const int got = step < 2 ? kind : step - 1;
+                // The colony's cycle of takes: the cell's own ore, then
+                // one of each kind.
+                const int step = oreCycle_++ % kOreCycle;
+                const int got = step < kOwnOre ? kind : step - (kOwnOre - 1);
                 into[size_t(got - 1)] += kTonne;
                 return true;
             }
@@ -1139,8 +1158,17 @@ bool Economy::mineTake(ColonyStructure& mine, std::array<int64_t, kOres>& into) 
 
 void Economy::tick(std::vector<ScriptEvent>& out) {
     clock_ += 1 / kTicksPerSecond;
-    // Construction, at each type's pace (with bees, as many quarters of it
-    // as there are at work).
+    buildTick(out);
+    staffTick(out);
+    powerTick(out);
+    produce(out);
+    mineTick(out);
+    refineTick();
+}
+
+// Construction, at each type's pace (with bees, as many quarters of it as
+// there are at work).
+void Economy::buildTick(std::vector<ScriptEvent>& out) {
     if (beesModelled_)
         beeTick();
     for (ColonyStructure& s : structures_) {
@@ -1162,21 +1190,22 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             requestCrew(s);
         }
     }
+}
+
+// People: those on their way arriving (and a razed building's time
+// evacuating counted), the rides' waits run down, and those walking back
+// from a razed building reaching the hub's pool (with no hub, the roster
+// in orbit).
+void Economy::staffTick(std::vector<ScriptEvent>& out) {
     for (ColonyStructure& s : structures_) {
         staff(s, out);
         s.evacTicks += s.evacuating;
     }
     for (Ride& r : rides_)
         r.wait = std::max(0.0, r.wait - 1 / kTicksPerSecond);
-    // People walking back from a razed building reach the hub's pool (with
-    // no hub, the roster in orbit).
     for (auto& w : walking_)
         if ((w.second -= 1 / kTicksPerSecond) <= 0) {
-            ColonyStructure* h = nullptr;
-            for (ColonyStructure& c : structures_)
-                if (c.type == "colony-hub" && c.progress >= 1)
-                    h = h ? h : &c;
-            if (h)
+            if (ColonyStructure* h = mutableHub())
                 h->pool += w.first;
             else
                 orbit_ += w.first;
@@ -1186,48 +1215,20 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
                    walking_.end());
     if (arrived)
         retryCrew();
-    // Power: each built consumer asks to fill its buffer, at most its
-    // intake a tick; the supply (with the reserve behind it) is shared out
-    // class by class (exe.md#the-economy), each class in proportion; then
-    // each uses its standing demand from its buffer.
+}
+
+// Power: each built consumer asks to fill its buffer, at most its intake a
+// tick; the supply (with the reserve behind it) is shared out class by
+// class (exe.md#the-economy), each class in proportion, after the hub's
+// life support; then each uses its standing demand from its buffer.
+void Economy::powerTick(std::vector<ScriptEvent>& out) {
     std::array<float, 4> asked{};
     for (ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); t && s.progress >= 1 && t->intake > 0)
             asked[size_t(powerClass(s.type))] += std::min(t->intake, t->bufferCap - s.stored + t->demand);
     const float askedAll = asked[1] + asked[2] + asked[3];
-    // Life support first: everyone on the planet uses 16 a tick; farms add
-    // to it; the hub buys back what's used with power, before any other
-    // building (its request divided by its efficiency).
-    lifeUsed_ = kLifePerPerson * people();
-    life_ -= lifeUsed_;
-    lifeProduced_ = 0;
-    float hubEff = 0;
-    for (const ColonyStructure& s : structures_)
-        if (s.progress >= 1) {
-            if (s.type == "farm")
-                lifeProduced_ += kFarmLife * efficiency(s);
-            else if (s.type == "colony-hub")
-                hubEff = std::max(hubEff, efficiency(s));
-        }
-    life_ = std::clamp(life_ + lifeProduced_, 0.0, kLifeCap);
-    lifeMet_ = 1;
-    lifeDraw_ = 0;
-    double supply = powerSupply();
-    const double produced = supply;
-    if (hubEff > 0) {
-        // (What it's granted buys back as much less as its request was
-        // more: the whole request fills the pool.)
-        const double ask = (kLifeCap - life_) / kLifePerPower / hubEff;
-        const double grant = std::min(ask, supply + reserve_);
-        lifeMet_ = ask > 0 ? float(grant / ask) : 1;
-        life_ = std::min(kLifeCap, life_ + grant * kLifePerPower * hubEff);
-        supply -= grant;
-        if (supply < 0) {
-            reserve_ += supply;
-            supply = 0;
-        }
-        lifeDraw_ = float(grant);
-    }
+    const double produced = powerSupply();
+    const double supply = lifeSupportTick(produced);
     double give = supply;
     if (askedAll > supply) {
         const double draw = std::min(reserve_, double(askedAll) - supply);
@@ -1261,14 +1262,66 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
         out.push_back({"power-low", {}});
         lastPowerWarning_ = clock_;
     }
-    produce(out);
-    // Mining, for as long as there's a processor to take the ore: the bees
-    // bring it at their pace. Neither a mine nor the processor works
-    // without its crew (exe.md#crew-and-efficiency).
+}
+
+// Life support, before any other building's power: everyone on the planet
+// uses 16 a tick; farms add to it; the hub buys back what's used with
+// power (its request divided by its efficiency), from the supply and then
+// the reserve.
+double Economy::lifeSupportTick(double supply) {
+    lifeUsed_ = kLifePerPerson * people();
+    life_ -= lifeUsed_;
+    lifeProduced_ = 0;
+    float hubEff = 0;
+    for (const ColonyStructure& s : structures_)
+        if (s.progress >= 1) {
+            if (s.type == "farm")
+                lifeProduced_ += kFarmLife * efficiency(s);
+            else if (s.type == "colony-hub")
+                hubEff = std::max(hubEff, efficiency(s));
+        }
+    life_ = std::clamp(life_ + lifeProduced_, 0.0, kLifeCap);
+    lifeMet_ = 1;
+    lifeDraw_ = 0;
+    if (hubEff > 0) {
+        // (What it's granted buys back as much less as its request was
+        // more: the whole request fills the pool.)
+        const double ask = (kLifeCap - life_) / kLifePerPower / hubEff;
+        const double grant = std::min(ask, supply + reserve_);
+        lifeMet_ = ask > 0 ? float(grant / ask) : 1;
+        life_ = std::min(kLifeCap, life_ + grant * kLifePerPower * hubEff);
+        supply -= grant;
+        if (supply < 0) {
+            reserve_ += supply;
+            supply = 0;
+        }
+        lifeDraw_ = float(grant);
+    }
+    return supply;
+}
+
+void Economy::dig(ColonyStructure& mine, std::array<int64_t, kOres>& into, std::vector<ScriptEvent>& out) {
+    auto it = std::find_if(mineCarry_.begin(), mineCarry_.end(), [&](const auto& c) { return c.first == mine.id; });
+    if (it == mineCarry_.end()) {
+        mineCarry_.push_back({mine.id, 0});
+        it = mineCarry_.end() - 1;
+    }
+    it->second += kMineTonnesPerSecond / kTicksPerSecond;
+    while (it->second >= 1) {
+        it->second -= 1;
+        if (!mineTake(mine, into)) {
+            mine.exhausted = true;
+            out.push_back({"mine-exhausted", {}, mine.blockY * 8 + 4, mine.blockX * 8 + 4});
+            break;
+        }
+    }
+}
+
+// Mining, for as long as there's a processor to take the ore: the bees
+// bring it at their pace. A mine doesn't work without its crew
+// (exe.md#crew-and-efficiency).
+void Economy::mineTick(std::vector<ScriptEvent>& out) {
     const bool processor = has("resource-processor");
-    const bool refining = std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
-        return s.type == "resource-processor" && s.progress >= 1 && crewShare(s) > 0;
-    });
     for (ColonyStructure& s : structures_) {
         if (s.type != "mining-station" || s.progress < 1 || s.exhausted || crewShare(s) == 0)
             continue;
@@ -1280,64 +1333,43 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
                     return p.origin == s.id && p.state == Pod::Queued;
                 }) >= kPodsWaiting)
                 continue;
-            auto it = std::find_if(mineCarry_.begin(), mineCarry_.end(), [&](const auto& c) { return c.first == s.id; });
-            if (it == mineCarry_.end()) {
-                mineCarry_.push_back({s.id, 0});
-                it = mineCarry_.end() - 1;
-            }
-            it->second += kMineTonnesPerSecond / kTicksPerSecond;
             Depot& d = depots_[s.id];
-            while (it->second >= 1) {
-                it->second -= 1;
-                if (!mineTake(s, d.dug)) {
-                    s.exhausted = true;
-                    out.push_back({"mine-exhausted", {}, s.blockY * 8 + 4, s.blockX * 8 + 4});
-                    break;
-                }
-            }
+            dig(s, d.dug, out);
             pack(s.id, d.dug, false);
-            continue;
-        }
-        if (!processor)
-            continue;
-        auto it = std::find_if(mineCarry_.begin(), mineCarry_.end(), [&](const auto& c) { return c.first == s.id; });
-        if (it == mineCarry_.end()) {
-            mineCarry_.push_back({s.id, 0});
-            it = mineCarry_.end() - 1;
-        }
-        it->second += kMineTonnesPerSecond / kTicksPerSecond;
-        while (it->second >= 1) {
-            it->second -= 1;
-            if (!mineTake(s, ore_)) {
-                s.exhausted = true;
-                out.push_back({"mine-exhausted", {}, s.blockY * 8 + 4, s.blockX * 8 + 4});
-                break;
-            }
+        } else if (processor) {
+            dig(s, ore_, out);
         }
     }
-    // Refining: one store slot a tick (ores 1-6 in the first six), a
-    // quarter tonne at a time, one for one into the ore's material.
-    if (refining) {
-        const int slot = refineSlot_++ % kRefineSlots;
-        if (slot < kOres) {
-            const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
-            ore_[size_t(slot)] -= use;
-            // A plant for the material, standing, doubles what it makes.
-            refined_[size_t(slot)] += has(kPlants[size_t(slot)]) ? 2 * use : use;
-        }
-        // Every 32 ticks its goods go to storage: packed into pods for the
-        // bees to carry, or straight there.
-        if (refineSlot_ % kShipEvery == 0) {
-            if (beesModelled_) {
-                for (const ColonyStructure& c : structures_)
-                    if (c.type == "resource-processor" && c.progress >= 1) {
-                        pack(c.id, refined_, true);
-                        break;
-                    }
-            } else {
-                deposit(refined_);
-                refined_ = {};
-            }
+}
+
+// Refining, while a processor stands with its crew: one store slot a tick
+// (ores 1-6 in the first six), a quarter tonne at a time, one for one into
+// the ore's material.
+void Economy::refineTick() {
+    const bool refining = std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
+        return s.type == "resource-processor" && s.progress >= 1 && crewShare(s) > 0;
+    });
+    if (!refining)
+        return;
+    const int slot = refineSlot_++ % kRefineSlots;
+    if (slot < kOres) {
+        const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
+        ore_[size_t(slot)] -= use;
+        // A plant for the material, standing, doubles what it makes.
+        refined_[size_t(slot)] += has(kPlants[size_t(slot)]) ? 2 * use : use;
+    }
+    // Every 32 ticks its goods go to storage: packed into pods for the
+    // bees to carry, or straight there.
+    if (refineSlot_ % kShipEvery == 0) {
+        if (beesModelled_) {
+            for (const ColonyStructure& c : structures_)
+                if (c.type == "resource-processor" && c.progress >= 1) {
+                    pack(c.id, refined_, true);
+                    break;
+                }
+        } else {
+            deposit(refined_);
+            refined_ = {};
         }
     }
 }
@@ -1598,7 +1630,7 @@ namespace {
 int leg(const std::array<float, 3>& a, const std::array<float, 3>& b, float speed, bool level) {
     const float d = level ? std::hypot(b[0] - a[0], b[1] - a[1])
                           : std::hypot(std::hypot(b[0] - a[0], b[1] - a[1]), b[2] - a[2]);
-    return std::max(10, int(d / speed));
+    return std::max(kShortestLeg, int(d / speed));
 }
 } // namespace
 
@@ -1609,14 +1641,15 @@ int Economy::dockIn(const ColonyStructure& s, float speed) const {
     const DockPoints& d = dockOf(s);
     if (!d.known)
         return kDockTicks;
-    return 1 + leg(d.arrival, d.capture, speed, false) + 3 * leg(d.capture, d.lock, speed, !d.vertical) + 5;
+    return 1 + leg(d.arrival, d.capture, speed, false) + kSlowLeg * leg(d.capture, d.lock, speed, !d.vertical) + kLockTicks;
 }
 
 int Economy::dockOut(const ColonyStructure& s, float speed, bool toDeparture) const {
     const DockPoints& d = dockOf(s);
     if (!d.known)
         return kDockTicks;
-    return 1 + 3 * leg(d.lock, d.release, speed, !d.vertical) + (toDeparture ? leg(d.release, d.departure, speed, false) : 0);
+    return 1 + kSlowLeg * leg(d.lock, d.release, speed, !d.vertical) +
+           (toDeparture ? leg(d.release, d.departure, speed, false) : 0);
 }
 
 const ColonyStructure* Economy::structure(int id) const {
@@ -1640,7 +1673,7 @@ std::pair<float, float> Economy::padPlace(const ColonyStructure& s, int slot) co
     // along the other.
     const DockPoints& d = dockOf(s);
     const float px = s.x + (d.known ? d.release[0] : 0), py = s.y + (d.known ? d.release[1] : 0);
-    constexpr float kBlockSize = 16384, kQuarter = 8192;
+    constexpr float kQuarter = kBlockSize / 2;
     const float bx = std::floor(px / kBlockSize) * kBlockSize, by = std::floor(py / kBlockSize) * kBlockSize;
     const bool east = px - bx >= kQuarter, north = py - by >= kQuarter;
     const float ox = bx + (east ? kQuarter : 0), oy = by + (north ? kQuarter : 0);
@@ -1658,24 +1691,69 @@ std::pair<float, float> Economy::padPlace(const ColonyStructure& s, int slot) co
     return {ox + x, oy + y};
 }
 
+namespace {
+// Whether a bee is at a spot.
+bool beeAt(const Economy::Bee& b, float x, float y) { return std::hypot(b.x - x, b.y - y) < 1; }
+// A building's yard: its places taken (by pods standing there or being set
+// down there).
+std::array<bool, kPadPlaces> yardUsed(const std::vector<Economy::Pod>& pods, int id) {
+    std::array<bool, kPadPlaces> used{};
+    for (const Economy::Pod& p : pods)
+        if (p.pad == id && p.slot >= 0)
+            used[size_t(p.slot)] = true;
+    return used;
+}
+// The highest free place (the game fills them from the far end), or -1.
+int freePlace(const std::vector<Economy::Pod>& pods, int id) {
+    const auto used = yardUsed(pods, id);
+    for (int k = kPadPlaces - 1; k >= 0; --k)
+        if (!used[size_t(k)])
+            return k;
+    return -1;
+}
+int freeCount(const std::vector<Economy::Pod>& pods, int id) {
+    const auto used = yardUsed(pods, id);
+    return int(std::count(used.begin(), used.end(), false));
+}
+} // namespace
+
+Economy::Pod* Economy::podById(int id) {
+    for (Pod& q : pods_)
+        if (q.id == id)
+            return &q;
+    return nullptr;
+}
+
+void Economy::flyWorker(Bee& b, float x, float y) {
+    fly(b, x, y);
+    b.flight = std::max(kShortestFlight, int(std::hypot(x - b.fromX, y - b.fromY) / kWorkerSpeed));
+}
+
 // The pods' tick: each building's worker bee (given one, or asked of
 // the yard), flying its pods out to its pad; the pods offered to whoever
 // takes them; cargo bees for buildings with more than one coming,
 // bringing two a trip.
 void Economy::podTick() {
-    auto find = [&](int id) -> const ColonyStructure* {
-        for (const ColonyStructure& s : structures_)
-            if (s.id == id)
-                return &s;
-        return nullptr;
-    };
-    auto at = [](const Bee& b, float x, float y) { return std::hypot(b.x - x, b.y - y) < 1; };
-    auto flyWorker = [&](Bee& b, float x, float y) {
-        fly(b, x, y);
-        b.flight = std::max(10, int(std::hypot(x - b.fromX, y - b.fromY) / kWorkerSpeed));
-    };
-    // Worker bees for the buildings that handle pods (not one being razed:
-    // the game's searches pass it over, exe.md#demolishing).
+    assignWorkerBees();
+    for (Bee& w : bees_)
+        if (w.worker && w.site && !w.flight && !w.dock)
+            workerBeeTick(w);
+    offerPods();
+    assignCargoBees();
+    for (Bee& b : bees_)
+        if (b.cargo && b.site && !b.flight && !b.dock)
+            cargoBeeTick(b);
+    // Pods aboard move with their bee.
+    for (const Bee& b : bees_)
+        for (int id : b.pods)
+            for (Pod& p : pods_)
+                if (p.id == id)
+                    p.x = b.x, p.y = b.y;
+}
+
+// Worker bees for the buildings that handle pods (not one being razed: the
+// game's searches pass it over, exe.md#demolishing).
+void Economy::assignWorkerBees() {
     for (const ColonyStructure& s : structures_) {
         if (s.progress < 1 || s.evacuating ||
             (s.type != "mining-station" && s.type != "resource-processor" && s.type != "storage-facility"))
@@ -1696,130 +1774,101 @@ void Economy::podTick() {
         // each refusal reported, at most every 600 ms).
         if (!d.worker && !d.asked && !free_)
             for (const VehicleType& v : vehicleTypes())
-                if (v.side == side_ && (v.type == 12 || v.type == 11 || v.type == 92) && vehicleAvailable(v) && orderVehicle(v)) {
+                if (v.side == side_ && workerBeeType(v.type) && vehicleAvailable(v) && orderVehicle(v)) {
                     d.asked = true;
                     break;
                 }
     }
-    // A building's yard: its places taken (by pods standing there or being
-    // set down there), and the pods on their way to it.
-    auto yardUsed = [&](int id) {
-        std::array<bool, kPadPlaces> used{};
-        for (const Pod& p : pods_)
-            if (p.pad == id && p.slot >= 0)
-                used[size_t(p.slot)] = true;
-        return used;
-    };
-    auto freePlace = [&](int id) { // the highest free place (the game fills them from the far end), or -1
-        const auto used = yardUsed(id);
-        for (int k = kPadPlaces - 1; k >= 0; --k)
-            if (!used[size_t(k)])
-                return k;
-        return -1;
-    };
-    auto freeCount = [&](int id) {
-        const auto used = yardUsed(id);
-        return int(std::count(used.begin(), used.end(), false));
-    };
-    auto podById = [&](int id) -> Pod* {
-        for (Pod& q : pods_)
-            if (q.id == id)
-                return &q;
-        return nullptr;
-    };
-    // Each worker bee (exe.md#bees): docked in its building, it takes in a
-    // pod set down on its yard (out of the dock, to the pod, a tick to take
-    // it, back and in: its contents go into the store), or takes one of its
-    // own out (with two places free more than are coming): out of the dock,
-    // to the highest free place, a tick and a 30-tick lift to set it down,
-    // back and in.
-    for (Bee& w : bees_) {
-        if (!w.worker || !w.site || w.flight || w.dock)
-            continue;
-        const ColonyStructure* s = find(w.site);
-        if (!s) {
-            w.site = 0, w.inside = false;
-            continue;
+}
+
+// A worker bee's turn, not flying or docking (exe.md#bees): docked in its
+// building, it takes in a pod set down on its yard (out of the dock, to the
+// pod, a tick to take it, back and in: its contents go into the store), or
+// takes one of its own out (with two places free more than are coming): out
+// of the dock, to the highest free place, a tick and a 30-tick lift to set
+// it down, back and in.
+void Economy::workerBeeTick(Bee& w) {
+    const ColonyStructure* s = structure(w.site);
+    if (!s) {
+        w.site = 0, w.inside = false;
+        return;
+    }
+    if (w.fetching) { // at the pod it went for
+        Pod* p = podById(w.fetching);
+        w.fetching = 0;
+        if (p && p->state == Pod::Parked && beeAt(w, p->x, p->y)) {
+            p->state = Pod::Aboard, p->inbound = true, p->pad = 0, p->slot = -1;
+            w.pods = {p->id};
+            w.dock = 1;
         }
-        if (w.fetching) { // at the pod it went for
-            Pod* p = podById(w.fetching);
-            w.fetching = 0;
-            if (p && p->state == Pod::Parked && at(w, p->x, p->y)) {
-                p->state = Pod::Aboard, p->inbound = true, p->pad = 0, p->slot = -1;
-                w.pods = {p->id};
-                w.dock = 1;
-            }
-            flyWorker(w, s->x, s->y);
-            continue;
-        }
-        if (!w.pods.empty()) {
-            Pod* p = podById(w.pods[0]);
-            if (!p) {
+        flyWorker(w, s->x, s->y);
+        return;
+    }
+    if (!w.pods.empty()) {
+        Pod* p = podById(w.pods[0]);
+        if (!p) {
+            w.pods.clear();
+        } else if (p->inbound) {
+            if (beeAt(w, s->x, s->y)) { // in through the dock with it
+                w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
+                w.inside = true;
                 w.pods.clear();
-            } else if (p->inbound) {
-                if (at(w, s->x, s->y)) { // in through the dock with it
-                    w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
-                    w.inside = true;
-                    w.pods.clear();
-                    for (auto it = pods_.begin(); it != pods_.end(); ++it)
-                        if (it->id == p->id) {
-                            unload(*it);
-                            pods_.erase(it);
-                            break;
-                        }
-                } else {
-                    flyWorker(w, s->x, s->y);
-                }
-            } else if (at(w, p->x, p->y)) { // set down on its place
-                p->state = Pod::Parked;
-                w.pods.clear();
-                w.dock = kWorkerSetDown;
+                for (auto it = pods_.begin(); it != pods_.end(); ++it)
+                    if (it->id == p->id) {
+                        unload(*it);
+                        pods_.erase(it);
+                        break;
+                    }
+            } else {
                 flyWorker(w, s->x, s->y);
             }
-            continue;
-        }
-        if (!at(w, s->x, s->y)) {
+        } else if (beeAt(w, p->x, p->y)) { // set down on its place
+            p->state = Pod::Parked;
+            w.pods.clear();
+            w.dock = kWorkerSetDown;
             flyWorker(w, s->x, s->y);
-            continue;
         }
-        if (!w.inside) {
-            w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
-            w.inside = true;
-            continue;
-        }
-        // A pod for it on its yard first.
-        Pod* in = nullptr;
-        for (Pod& p : pods_)
-            if (p.state == Pod::Parked && p.pad == s->id && p.dest == s->id) {
-                in = &p;
-                break;
-            }
-        if (in) {
-            w.inside = false;
-            w.fetching = in->id;
-            flyWorker(w, in->x, in->y);
-            w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
-            continue;
-        }
-        const int coming = int(std::count_if(pods_.begin(), pods_.end(),
-                                             [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }));
-        if (freeCount(s->id) - coming < 2)
-            continue;
-        for (Pod& p : pods_)
-            if (p.origin == s->id && p.state == Pod::Queued) {
-                p.state = Pod::Aboard;
-                p.pad = s->id, p.slot = freePlace(s->id);
-                std::tie(p.x, p.y) = padPlace(*s, p.slot);
-                w.pods = {p.id};
-                w.inside = false;
-                flyWorker(w, p.x, p.y);
-                w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
-                break;
-            }
+        return;
     }
-    // The pods offered: the first building in the list that takes each.
+    if (!beeAt(w, s->x, s->y)) {
+        flyWorker(w, s->x, s->y);
+        return;
+    }
+    if (!w.inside) {
+        w.dock = dockTurn(s->id, dockIn(*s, kWorkerSpeed));
+        w.inside = true;
+        return;
+    }
+    // A pod for it on its yard first.
+    for (Pod& p : pods_)
+        if (p.state == Pod::Parked && p.pad == s->id && p.dest == s->id) {
+            w.inside = false;
+            w.fetching = p.id;
+            flyWorker(w, p.x, p.y);
+            w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
+            return;
+        }
+    const int coming = int(std::count_if(pods_.begin(), pods_.end(),
+                                         [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }));
+    if (freeCount(pods_, s->id) - coming < kWorkerRoom)
+        return;
+    for (Pod& p : pods_)
+        if (p.origin == s->id && p.state == Pod::Queued) {
+            p.state = Pod::Aboard;
+            p.pad = s->id, p.slot = freePlace(pods_, s->id);
+            std::tie(p.x, p.y) = padPlace(*s, p.slot);
+            w.pods = {p.id};
+            w.inside = false;
+            flyWorker(w, p.x, p.y);
+            w.dock = dockTurn(s->id, dockOut(*s, kWorkerSpeed));
+            break;
+        }
+}
+
+// The pods offered: the first building in the list that takes each.
+void Economy::offerPods() {
     for (Pod& p : pods_) {
-        if (p.dest && !find(p.dest))
+        if (p.dest && !structure(p.dest))
             p.dest = 0;
         if (!p.dest && p.state != Pod::Aboard)
             for (const ColonyStructure& s : structures_)
@@ -1828,7 +1877,10 @@ void Economy::podTick() {
                     break;
                 }
     }
-    // A building with more than one coming asks for a cargo bee.
+}
+
+// A building with more than one pod coming asks for a cargo bee.
+void Economy::assignCargoBees() {
     for (const ColonyStructure& s : structures_) {
         auto dit = depots_.find(s.id);
         if (dit == depots_.end())
@@ -1836,7 +1888,7 @@ void Economy::podTick() {
         Depot& d = dit->second;
         if (const Bee* c = beeById(d.cargo); !c || c->site != s.id)
             d.cargo = 0;
-        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < 2)
+        if (d.cargo || std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) < kCargoAsk)
             continue;
         for (Bee& b : bees_)
             if (b.cargo && !b.site && b.dock == 0) {
@@ -1844,75 +1896,68 @@ void Economy::podTick() {
                 break;
             }
     }
-    // Each cargo bee (exe.md#bees): it waits (checking every 16 ticks)
-    // until its building's yard has room and pods enough for its bays (the
-    // Federation's two, the others' one) are ready (after 64 checks it goes
-    // for one); flies to them, takes up to its bays' worth (a
-    // tick each, a 50-tick climb), flies to its building's yard and sets
-    // each down (a tick, a 30-tick lift, a 50-tick climb), for the
-    // building's worker bee to take in. It never docks there.
-    for (Bee& b : bees_) {
-        if (!b.cargo || !b.site || b.flight || b.dock)
-            continue;
-        const ColonyStructure* s = find(b.site);
-        if (!s) {
-            b.site = 0;
-            continue;
-        }
-        if (!b.pods.empty()) {
-            const auto [cx, cy] = padPlace(*s, 8);
-            if (!at(b, cx, cy)) {
-                fly(b, cx, cy);
-                continue;
-            }
-            if (freeCount(s->id) < int(b.pods.size())) {
-                b.dock = kCargoCheck;
-                continue;
-            }
-            for (int id : b.pods)
-                if (Pod* p = podById(id)) {
-                    p->state = Pod::Parked, p->pad = s->id, p->slot = freePlace(s->id);
-                    std::tie(p->x, p->y) = padPlace(*s, p->slot);
-                }
-            b.dock = kCargoSetDown * int(b.pods.size());
-            b.pods.clear();
-            continue;
-        }
-        std::vector<Pod*> ready;
-        for (Pod& p : pods_)
-            if (p.dest == s->id && p.state == Pod::Parked && p.pad != s->id)
-                ready.push_back(&p);
-        if (ready.empty()) {
-            // Nothing ready: free again, unless more are on their way.
-            if (std::none_of(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }))
-                b.site = 0, depots_[s->id].cargo = 0, b.retries = 0;
-            continue;
-        }
-        const int origin = ready[0]->pad;
-        const bool full = std::count_if(ready.begin(), ready.end(), [&](const Pod* p) { return p->pad == origin; }) >= cargoBays();
-        if (freeCount(s->id) < cargoBays() || (!full && b.retries < kCargoChecks)) {
-            ++b.retries;
-            b.dock = kCargoCheck;
-            continue;
-        }
-        if (!at(b, ready[0]->x, ready[0]->y)) {
-            fly(b, ready[0]->x, ready[0]->y);
-            continue;
-        }
-        for (Pod* p : ready)
-            if (int(b.pods.size()) < cargoBays() && p->pad == origin) {
-                p->state = Pod::Aboard, p->pad = 0, p->slot = -1;
-                b.pods.push_back(p->id);
-            }
-        b.retries = 0;
-        b.dock = kCargoTakeUp * int(b.pods.size());
+}
+
+// A cargo bee's turn, not flying or waiting (exe.md#bees): it waits
+// (checking every 16 ticks) until its building's yard has room and pods
+// enough for its bays (the Federation's two, the others' one) are ready
+// (after 64 checks it goes for one); flies to them, takes up to its bays'
+// worth (a tick each, a 50-tick climb), flies to its building's yard and
+// sets each down (a tick, a 30-tick lift, a 50-tick climb), for the
+// building's worker bee to take in. It never docks there.
+void Economy::cargoBeeTick(Bee& b) {
+    const ColonyStructure* s = structure(b.site);
+    if (!s) {
+        b.site = 0;
+        return;
     }
-    // Pods aboard move with their bee.
-    for (const Bee& b : bees_)
+    if (!b.pods.empty()) {
+        const auto [cx, cy] = padPlace(*s, kPadCorner);
+        if (!beeAt(b, cx, cy)) {
+            fly(b, cx, cy);
+            return;
+        }
+        if (freeCount(pods_, s->id) < int(b.pods.size())) {
+            b.dock = kCargoCheck;
+            return;
+        }
         for (int id : b.pods)
-            for (Pod& p : pods_)
-                if (p.id == id)
-                    p.x = b.x, p.y = b.y;
+            if (Pod* p = podById(id)) {
+                p->state = Pod::Parked, p->pad = s->id, p->slot = freePlace(pods_, s->id);
+                std::tie(p->x, p->y) = padPlace(*s, p->slot);
+            }
+        b.dock = kCargoSetDown * int(b.pods.size());
+        b.pods.clear();
+        return;
+    }
+    std::vector<Pod*> ready;
+    for (Pod& p : pods_)
+        if (p.dest == s->id && p.state == Pod::Parked && p.pad != s->id)
+            ready.push_back(&p);
+    if (ready.empty()) {
+        // Nothing ready: free again, unless more are on their way.
+        if (std::none_of(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s->id && p.pad != s->id; }))
+            b.site = 0, depots_[s->id].cargo = 0, b.retries = 0;
+        return;
+    }
+    const int origin = ready[0]->pad;
+    const bool full = std::count_if(ready.begin(), ready.end(), [&](const Pod* p) { return p->pad == origin; }) >= cargoBays();
+    if (freeCount(pods_, s->id) < cargoBays() || (!full && b.retries < kCargoChecks)) {
+        ++b.retries;
+        b.dock = kCargoCheck;
+        return;
+    }
+    if (!beeAt(b, ready[0]->x, ready[0]->y)) {
+        fly(b, ready[0]->x, ready[0]->y);
+        return;
+    }
+    for (Pod* p : ready)
+        if (int(b.pods.size()) < cargoBays() && p->pad == origin) {
+            p->state = Pod::Aboard, p->pad = 0, p->slot = -1;
+            b.pods.push_back(p->id);
+        }
+    b.retries = 0;
+    b.dock = kCargoTakeUp * int(b.pods.size());
 }
 
 int Economy::beesAt(int site) const {
@@ -1946,12 +1991,6 @@ void Economy::fly(Bee& b, float x, float y) {
 // short of bees, a mine without a cargo bee, or home.
 void Economy::beeTick() {
     const ColonyStructure* h = hub();
-    auto find = [&](int id) -> const ColonyStructure* {
-        for (const ColonyStructure& s : structures_)
-            if (s.id == id)
-                return &s;
-        return nullptr;
-    };
     ++beeClock_;
     for (Bee& b : bees_) {
         if (b.home) {
@@ -1991,7 +2030,7 @@ void Economy::beeTick() {
     // A site gone (or done) lets its bees go.
     for (Bee& b : bees_)
         if (!b.cargo && !b.worker && b.site)
-            if (const ColonyStructure* s = find(b.site); !s || s->progress >= 1)
+            if (const ColonyStructure* s = structure(b.site); !s || s->progress >= 1)
                 b.site = 0, b.working = false;
     // The construction bees: each site, first ordered first, takes up to
     // four, at its free corners.
