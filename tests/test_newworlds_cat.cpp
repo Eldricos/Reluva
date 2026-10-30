@@ -1822,7 +1822,10 @@ void testBees() {
             built(m, 60);
             const auto later = m.oreStock();
             CHECK(std::accumulate(later.begin(), later.end(), 0.0f) == 0);
-            CHECK(m.pods().size() <= 4); // the mine stops with four waiting
+            // The mine stops with four waiting inside it (those on its yard
+            // aside).
+            CHECK(std::count_if(m.pods().begin(), m.pods().end(),
+                                [](const Economy::Pod& p) { return p.state == Economy::Pod::Queued; }) <= 5);
         }
         for (const Economy::Pod& p : m.pods())
             CHECK(p.load[size_t(4)] > 0 || p.refined); // magnesite (kind 5) in every ore pod
@@ -3629,6 +3632,127 @@ void testKlingonPods() {
     CHECK(carried == 1 && most >= 13 && most <= 15); // of its 16
 }
 
+// A mine stops while four of its pods wait inside it for its worker bee
+// (exe.md#bees): those its bee has set down on its yard don't count, so
+// with nobody taking them (no cargo bee) it goes on until its yard is
+// full (the bee takes one out while two places are free: 15 of its 16),
+// then four more inside.
+void testMineStopsOnQueuedPods() {
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+    ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 4000 : 0; };
+    Economy m('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+    m.addBuilt("colony-hub", 0, 0);
+    m.addBuilt("resource-processor", 20000, 20000);
+    m.addBuilt("storage-facility", -20000, 0);
+    const int mine = m.addBuilt("mining-station", 2.5f * 16384, 3.5f * 16384);
+    m.setBees(0, 0, 0);
+    int queued = 0, parked = 0;
+    for (double s = 0; s < 1500; s += 0.05) {
+        m.advance(0.05);
+        int q = 0, p = 0;
+        for (const Economy::Pod& x : m.pods())
+            if (x.origin == mine)
+                q += x.state == Economy::Pod::Queued, p += x.state == Economy::Pod::Parked;
+        queued = std::max(queued, q), parked = std::max(parked, p);
+    }
+    // Two pods a packing (80 t into two of 40), so four or five inside.
+    CHECK(queued >= 4 && queued <= 5 && parked == 15);
+    const auto stock = m.mineStock(mine);
+    const size_t before = m.pods().size();
+    m.advance(60);
+    CHECK(m.pods().size() == before && m.mineStock(mine) == stock); // full: stopped
+}
+
+// Bees docked inside a building lost go with it (exe.md#bees): a hub's
+// at home, a mine's or storage facility's worker bee in its dock; those
+// out are let go. A lost worker bee comes off the starting buildings'
+// free ones first, else off the hub's counts, which the caller takes.
+void testBeesLostWithBuildings() {
+    ColonyMap none;
+    none.depositKind = [](int, int) { return 0; };
+    none.depositAmount = [](int, int) { return 0; };
+    auto kinds = [](const Economy& e) {
+        std::array<int, 3> n{};
+        for (const Economy::Bee& b : e.bees())
+            ++n[b.worker ? 2 : b.cargo ? 1 : 0];
+        return n;
+    };
+    // The hub: its bees at home go, the four construction bees out to a
+    // site survive, and setBees (given the old counts until the losses
+    // are taken) doesn't make them again.
+    {
+        Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, none);
+        const int hub = e.addBuilt("colony-hub", 0, 0);
+        e.setBees(6, 2, 3);
+        CHECK(e.order("construction-yard", 30000, 0, 0, 0));
+        e.advance(2);
+        CHECK(std::count_if(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return !b.home; }) == 4);
+        e.remove(hub);
+        CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
+        CHECK(std::none_of(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.home || b.docking; }));
+        e.setBees(6, 2, 3);
+        CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
+        CHECK((e.takeLostBees() == std::array<int, 3>{2, 2, 3}));
+        CHECK((e.takeLostBees() == std::array<int, 3>{}));
+        e.setBees(4, 0, 0); // the caller's counts, less the losses
+        CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
+    }
+    // A storage facility's worker bee docked in it: one of the free ones
+    // the starting buildings were given (so not off the hub's counts); a
+    // second one's, from the hub, is.
+    {
+        Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, none);
+        e.addBuilt("colony-hub", 0, 0);
+        const int first = e.addBuilt("storage-facility", -20000, 0);
+        e.setBees(0, 0, 1);
+        CHECK(kinds(e)[2] == 2);
+        const int second = e.addBuilt("storage-facility", 20000, 0);
+        auto docked = [&](int at) {
+            const ColonyStructure* s = e.structure(at);
+            return std::any_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) {
+                return s && b.worker && b.site == at && b.inside && b.flight == 0 && b.dock == 0 && b.x == s->x && b.y == s->y;
+            });
+        };
+        for (double s = 0; s < 60 && !(docked(first) && docked(second)); s += 0.05)
+            e.advance(0.05);
+        CHECK(docked(first) && docked(second));
+        e.remove(first);
+        CHECK(kinds(e)[2] == 1);
+        CHECK((e.takeLostBees() == std::array<int, 3>{}));
+        e.setBees(0, 0, 1);
+        CHECK(kinds(e)[2] == 1);
+        e.remove(second);
+        CHECK(kinds(e)[2] == 0);
+        e.setBees(0, 0, 1);
+        CHECK(kinds(e)[2] == 0);
+        CHECK((e.takeLostBees() == std::array<int, 3>{0, 0, 1}));
+    }
+    // One out on the map with a pod (the mine's worker bee setting it down
+    // on its yard) is let go, not lost.
+    {
+        ColonyMap ore;
+        ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
+        ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 300 : 0; };
+        Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("resource-processor", 20000, 20000);
+        const int mine = e.addBuilt("mining-station", 2.5f * 16384, 3.5f * 16384);
+        e.setBees(0, 0, 0);
+        int bee = 0;
+        for (double s = 0; s < 900 && !bee; s += 0.05) {
+            e.advance(0.05);
+            for (const Economy::Bee& b : e.bees())
+                if (b.worker && b.site == mine && !b.pods.empty() && b.flight > 0)
+                    bee = b.id;
+        }
+        CHECK(bee != 0);
+        e.remove(mine);
+        CHECK(std::any_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) { return b.id == bee && !b.site; }));
+        CHECK(kinds(e)[2] == 2 && (e.takeLostBees() == std::array<int, 3>{}));
+    }
+}
+
 // R1's rival base (exe.md, the natives' types): type 153 is the rival
 // Romulans' power generator (model rps1), and the script's watch on it
 // hears it destroyed by that name.
@@ -3888,6 +4012,8 @@ int main() {
     testTransportsWithoutHub();
     testPodsOfLostBuildings();
     testKlingonPods();
+    testMineStopsOnQueuedPods();
+    testBeesLostWithBuildings();
     testRivalPowerGenerator();
     testLookupsAndCaches();
     testWorldPathCaches();

@@ -1444,7 +1444,9 @@ hub's pool after 55-65 s, about 19 s more a block each way.
   Federation's and 160 t the Klingons' and Romulans'; drawn as the
   Federation's crate (`crate_l`), the Klingons' `kwbc` and the Romulans'
   `rc`, each with its `_s` shadow. A mine that holds a pod's worth packs
-  its stock into pods, evenly; it stops while four wait. Every mine,
+  its stock into pods, evenly; it stops while four wait inside it for its
+  worker bee (the queue it packs into; those already set down on its yard
+  don't count). Every mine,
   processor and storage facility has a worker bee of its own, which only
   moves pods between its building and its **yard**: 16 places in an L
   along the two outer edges of the quarter block its dock's RELEASE
@@ -1465,7 +1467,12 @@ hub's pool after 55-65 s, about 19 s more a block each way.
   30-tick lift, a 50-tick climb). It never docks there: the building's
   worker bee takes each pod in (out of its dock, to the pod, a tick, back
   in; the pod's contents go into the store and the pod is gone). Lost bees are asked
-  for again. A building razed or lost lets its bees go; what happens to
+  for again. A building lost takes the vehicles docked inside it with it
+  (off the map: a hub's bees at home, a mine's, processor's or storage
+  facility's worker bee in its dock); none is made again in their place
+  (the building that would ask for its worker bee is gone; a cargo bee
+  asked for again is one that's free), so the side has that many fewer. Its bees out on the map, and a building razed
+  (which waits for its bees to leave), let them go; what happens to
   the pods they carry wasn't traced, so in Reluva its worker bee's pod
   goes with it, as those waiting on its yard and in its store do, and
   its cargo bee sets its pods down where it is for the next taker. While

@@ -190,8 +190,9 @@ public:
     // never below nothing.
     void give(int material, int amount);
     // A building destroyed: it no longer counts, works or draws power. Its
-    // people die with it; those on their way to it go back to the hub; a
-    // vehicle yard's jobs go to another yard, or are dropped and paid back.
+    // people die with it, and the bees docked inside it; those on their
+    // way to it go back to the hub; a vehicle yard's jobs go to another
+    // yard, or are dropped and paid back.
     void remove(int id);
     // Demolishing (exe.md#demolishing): whether a building may be razed
     // (built, not the hub or a storage facility, not already evacuating);
@@ -284,6 +285,10 @@ public:
     // at each; a mine with none serving it sends nothing. Bees fly
     // straight, 150 units a tick, a flight at least 10 ticks.
     void setBees(int construction, int cargo, int worker = 0);
+    // Bees lost with a building they were docked in since last asked
+    // (construction, cargo, worker: to come off the counts setBees is
+    // given; until they're taken, setBees leaves them out itself).
+    std::array<int, 3> takeLostBees();
 
     // The colony's transports (exe.md#transports), once switched on (the
     // player's colony; an AI's people all walk): the unarmed APCs that live
@@ -349,7 +354,8 @@ public:
     // Cargo pods (exe.md#bees), with bees: a mine packs what it digs into
     // pods (80 t the Federation's, 160 t the Klingons' and Romulans'; its
     // stock split evenly over stock / size + 1 of them) once it holds a
-    // pod's worth, and stops while four wait; every mine, processor and
+    // pod's worth, and stops while four wait inside it (not those out on
+    // its yard) for its worker bee; every mine, processor and
     // storage facility has a worker bee of its own that flies its pods out
     // to a pad round it; each pod goes to the first processor (ore) or
     // storage facility (goods) that takes it, and a building with more
@@ -508,6 +514,7 @@ private:
     bool free_ = false;
     bool beesModelled_ = false;
     std::vector<Bee> bees_;
+    std::array<int, 3> lostBees_{}; // lost with their building, not yet taken: construction, cargo, worker
     int nextBee_ = 1, nextPod_ = 1;
     std::vector<Pod> pods_;
     // Each mine, processor and storage facility's worker bee (its id; 0

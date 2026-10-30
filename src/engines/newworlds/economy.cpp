@@ -1274,8 +1274,11 @@ void Economy::tick(std::vector<ScriptEvent>& out) {
             continue;
         if (beesModelled_) {
             // Into its own store, packed into pods; it stops while four
-            // wait to be taken.
-            if (std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.origin == s.id; }) >= kPodsWaiting)
+            // wait inside it for its worker bee (those set down on its
+            // yard, or on their way, don't count).
+            if (std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) {
+                    return p.origin == s.id && p.state == Pod::Queued;
+                }) >= kPodsWaiting)
                 continue;
             auto it = std::find_if(mineCarry_.begin(), mineCarry_.end(), [&](const auto& c) { return c.first == s.id; });
             if (it == mineCarry_.end()) {
@@ -1383,8 +1386,37 @@ void Economy::remove(int id) {
             it = stores_.erase(it);
         else
             (it->structure == id ? it->gone = true : false), ++it;
+    // The bees docked inside it go with it (exe.md#bees): a hub's, home in
+    // it, and its own worker bee waiting in its dock (a yard's too). Those
+    // out on the map, or still on their way in, are let go where they are.
+    // None is made again in its place (the building that would ask for
+    // its worker bee is gone; a cargo bee asked for again is a free one):
+    // the colony has one fewer of each (takeLostBees). A lost worker bee comes off those the
+    // starting buildings were given free while any are left.
+    if (const ColonyStructure* self = structure(id)) {
+        const ColonyStructure* h = hub();
+        const bool isHub = h && h->id == id;
+        const float x = self->x, y = self->y;
+        for (auto it = bees_.begin(); it != bees_.end();) {
+            const bool inside = isHub ? it->home
+                                      : it->worker && it->site == id && it->flight == 0 && it->dock == 0 &&
+                                            it->pods.empty() && std::hypot(it->x - x, it->y - y) < 1;
+            if (!inside) {
+                if (isHub && it->docking)
+                    it->docking = false, it->dock = 0; // (no dock to finish going in through)
+                ++it;
+                continue;
+            }
+            const int kind = it->worker ? 2 : it->cargo ? 1 : 0;
+            if (kind == 2 && freeWorkers_ > 0)
+                --freeWorkers_;
+            else
+                ++lostBees_[size_t(kind)];
+            it = bees_.erase(it);
+        }
+    }
     // Its pods waiting go with it; those bound for it look again. Its
-    // bees let go of what they carry.
+    // bees out let go of what they carry.
     for (Bee& b : bees_)
         if ((b.cargo || b.worker) && b.site == id)
             releaseBee(b, id);
@@ -1440,7 +1472,10 @@ void Economy::setBees(int construction, int cargo, int worker) {
     for (int kind = 0; kind < 3; ++kind) {
         // (The worker bees the starting buildings were given free come on
         // top of those the colony asks for.)
-        const int want = kind == 0 ? construction : kind == 1 ? cargo : worker + freeWorkers_;
+        // (Less those lost with a building that the caller hasn't taken
+        // off its counts yet.)
+        const int want = std::max(0, (kind == 0 ? construction : kind == 1 ? cargo : worker + freeWorkers_) -
+                                         lostBees_[size_t(kind)]);
         int have = 0;
         for (const Bee& b : bees_)
             have += kindOf(b) == kind && !(b.worker && first);
@@ -1477,6 +1512,10 @@ void Economy::setBees(int construction, int cargo, int worker) {
                 if (s.type != "vehicle-yard" && s.type != "construction-yard")
                     depots_[s.id].worker = b.id;
             }
+}
+
+std::array<int, 3> Economy::takeLostBees() {
+    return std::exchange(lostBees_, {});
 }
 
 Economy::Bee* Economy::beeById(int id) {
@@ -2144,7 +2183,7 @@ void Economy::syncState(save::Serializer& s) {
     s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_);
     s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
     s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastShortage_)(nextId_)(dockFree_);
-    s(beeClock_)(free_)(beesModelled_)(bees_)(nextBee_)(nextPod_)(pods_)(depots_);
+    s(beeClock_)(free_)(beesModelled_)(bees_)(nextBee_)(nextPod_)(pods_)(depots_)(lostBees_);
 }
 
 } // namespace reluva::newworlds
