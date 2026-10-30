@@ -1778,18 +1778,25 @@ large craft and the tractor and anomaly devices always take the whole
 hit, as does another side's unit in the field. There's no minimum: a
 hit can do nothing at all, and the shooter isn't told (see Targets).
 
-**Where officers start.** Mission set-up (0x583658, after the
-placements) puts each officer, in the list's order, into the first of
-its side's objects of their start type; with none, into whatever the
-officer before went into (the variable isn't cleared), the first
-officer falling back on the head of another side list (likely the
-hub). So J4's Gage (security centre, which J4 hasn't) sits in the hub,
-as Kellerman went there. Reluva puts every officer whose building is
-missing in the hub: the same for most, but where the officer before
-went into a vehicle yard (J3, J4, J6, J8, F12, F14, K7, K8, K14, R14:
-the doctors and scientists after the yard's engineer) the game seats
-them in the yard instead. Reluva doesn't follow that yet; it shows on
-the STAFF cards and in who dies with the yard.
+**Where officers start.** Mission set-up (0x583658, run for each side
+with officers once its placements are made) goes through the side's
+officers in the mission's list order. Each goes into the first object
+in the side's object list whose type is the officer's start type. With
+no such object the officer goes where the officer before went: the
+variable holding the chosen object is set once before the loop and
+never cleared, so "before" means the previous officer's actual seat
+(itself perhaps inherited). Only when nothing has been chosen yet (the
+first officer's type missing) does it take the head of another side
+list (likely the hub). Reluva does the same, with the hub for that
+first case; it never arises (every mission's first officer is the
+commander in the hub, and no side starts with two objects of an
+officer's start type, so "first" doesn't matter either). So J4's Gage
+(security centre, which J4 hasn't) sits in the hub after Kellerman, and
+where the engineer starts in a vehicle yard the doctor and scientist
+after them sit in the yard: J4 (Federation, Romulans), J6, J8, F12, F14,
+K7, K8, K14, R14. J3's yard is placed only for an AI side, so a player
+there has everyone in the hub. It shows on the STAFF cards and in who
+dies with the yard.
 
 - **Shield generators** (21, 29, 69) pick their field each tick from
   their efficiency: above 0.6 the 3 x 3 blocks round them, above 0.2 a

@@ -81,8 +81,9 @@ public:
         float skill; // now (training raises it)
     };
     const std::vector<OfficerAt>& officers() const { return officers_; }
-    // Places the officers in the buildings they start in (the hub if it
-    // isn't there); call once the colony's buildings are in the world.
+    // Places the officers in the buildings they start in; one whose
+    // building isn't there goes where the officer before went (the first
+    // to the hub); call once the colony's buildings are in the world.
     void placeOfficers();
     // Takes aboard the officers of the nearest of the player's buildings
     // in reach (the game's 1414 units, from its walls), up to 16; or puts

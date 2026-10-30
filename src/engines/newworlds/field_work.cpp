@@ -90,13 +90,21 @@ void FieldWork::placeOfficers() {
     for (const Unit& u : world_.units())
         if (u.slot == player_ && u.name == "colony-hub")
             hub = u.id;
+    // In the list's order, each into the first of the side's objects of
+    // their start type; with none, where the officer before went (the
+    // game keeps that from one to the next: J4's Gage follows Kellerman
+    // into the hub, the doctor and scientist after a yard's engineer sit
+    // in the yard); the first with none goes to the hub
+    // (exe.md, "Where officers start").
+    int last = 0;
     for (OfficerAt& o : officers_) {
-        o.in = hub;
         for (const Unit& u : world_.units())
             if (u.slot == player_ && u.type == o.officer->building) {
-                o.in = u.id;
+                last = u.id;
                 break;
             }
+        o.in = last ? last : hub;
+        last = o.in;
     }
 }
 

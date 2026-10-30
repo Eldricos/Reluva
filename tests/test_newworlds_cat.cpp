@@ -3725,6 +3725,53 @@ void testSpawnOwnType() {
     CHECK(found == 1);
 }
 
+// Where officers start (exe.md, "Where officers start"): each, in the
+// list's order, in the first of the colony's objects of their start type;
+// one whose type isn't there goes where the officer before went (the
+// game's set-up keeps that), so after a vehicle yard's engineer the doctor
+// and scientist sit in the yard, and J4's Gage follows Kellerman into the
+// hub.
+void testWhereOfficersStart() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    struct Case {
+        const char* mission;
+        char race;
+        std::vector<std::pair<const char*, const char*>> seats; // officer, building
+    };
+    const Case cases[] = {
+        {"F1", 'F', {{"Bellah", "colony-hub"}, {"Gage", "colony-hub"}, {"Dante", "colony-hub"},
+                     {"Kowalski", "sickbay"}, {"Tayback", "colony-hub"}}},
+        {"J4", 'F', {{"Kellerman", "colony-hub"}, {"Gage", "colony-hub"}, {"Ruskin", "vehicle-yard"},
+                     {"Morton", "vehicle-yard"}, {"Caruso", "vehicle-yard"}}},
+        // J3's yard is for an AI side only: a player's engineer starts in the hub, and so the rest.
+        {"J3", 'F', {{"Bellah", "colony-hub"}, {"Gage", "colony-hub"}, {"Ruskin", "colony-hub"},
+                     {"Morton", "colony-hub"}, {"Caruso", "colony-hub"}}},
+        {"K7", 'K', {{"Murg", "colony-hub"}, {"Tokag", "colony-hub"}, {"Geruge", "vehicle-yard"},
+                     {"Garkan", "vehicle-yard"}, {"Kr'ann", "vehicle-yard"}}},
+        {"R14", 'R', {{"Borak", "colony-hub"}, {"M'Kel", "colony-hub"}, {"Evun", "vehicle-yard"},
+                      {"Jetel", "vehicle-yard"}, {"Telok", "vehicle-yard"}}},
+    };
+    for (const Case& c : cases) {
+        MissionSim sim(c.mission, c.race, t, map, 64, 64, MissionSim::placedColony(c.mission, c.race));
+        const auto& offs = sim.fieldWork().officers();
+        CHECK(offs.size() == c.seats.size());
+        for (size_t i = 0; i < offs.size() && i < c.seats.size(); ++i) {
+            const Unit* in = sim.world().unit(offs[i].in);
+            CHECK(std::string(offs[i].officer->name) == c.seats[i].first);
+            CHECK(in && in->name == c.seats[i].second);
+            if (!in || in->name != c.seats[i].second)
+                std::fprintf(stderr, "  %s%c %s in %s\n", c.mission, c.race, offs[i].officer->name,
+                             in ? in->name.c_str() : "nothing");
+        }
+    }
+}
+
 // The colony's officers (exe.md#crew-and-efficiency, #people): an upgrade
 // counts its host's officers at its speciality; an officer dies with the
 // building or vehicle they're in, and can't be moved after.
@@ -4884,6 +4931,7 @@ int main() {
     testFixedTicks();
     testCorruptReaders();
     testSpawnOwnType();
+    testWhereOfficersStart();
     testOfficersAndUpgrades();
     testFinishedClips();
     testTransportsWithoutHub();
