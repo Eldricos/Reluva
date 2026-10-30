@@ -338,7 +338,7 @@ int World::addUnit(char side, const UnitKind& kind, float x, float y, float head
     u.id = nextId_++;
     u.side = side;
     u.kind = kind;
-    u.x = u.lastX = x, u.y = u.lastY = y, u.heading = heading;
+    u.x = u.lastX = x, u.y = u.lastY = y, u.heading = u.lastHeading = heading;
     units_.push_back(std::move(u));
     const int id = units_.back().id;
     if (id >= 0) {
@@ -580,6 +580,7 @@ void World::combatTick() {
     for (Unit& u : units_) {
         u.vx = u.x - u.lastX, u.vy = u.y - u.lastY;
         u.lastX = u.x, u.lastY = u.y;
+        u.lastHeading = u.heading, u.lastTurretYaw = u.turretYaw;
     }
     // A line of fire, kept 8-11 ticks (artillery lobs over anything).
     auto clear = [&](Unit& u, const Unit& t) {
@@ -1029,6 +1030,9 @@ void World::flyProjectiles() {
 
 void World::syncState(save::Serializer& s) {
     s(stances_)(events_)(projectiles_)(tickClock_)(tick_)(units_)(groups_)(nextId_);
+    if (s.loading())
+        for (Unit& u : units_)
+            u.lastHeading = u.heading, u.lastTurretYaw = u.turretYaw;
     reindex();
 }
 

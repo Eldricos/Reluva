@@ -71,6 +71,9 @@ public:
     // seconds).
     void advance(double seconds);
     double clock() const { return clock_; }
+    // How far time is into the next tick (0 to 1): the screen draws what
+    // moves that far between where the last tick found it and where it is.
+    double tickShare() const;
 
     World& world() { return *world_; }
     const World& world() const { return *world_; }
@@ -86,8 +89,8 @@ public:
     char side() const { return side_; }
 
     // The colony's buildings in the order they were put up: what each is,
-    // its world object (-1 once destroyed) and its structure in the
-    // economy.
+    // its world object (-1 once destroyed, -2 a site cancelled) and its
+    // structure in the economy.
     const std::vector<ColonyBuilding>& colony() const { return colony_; }
     const std::vector<int>& colonyObjects() const { return colonyObjects_; }
     const std::vector<int>& structureIds() const { return structureIds_; }

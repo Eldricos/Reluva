@@ -426,7 +426,7 @@ bool MissionSim::cancelBuild(int structure) {
     for (size_t i = 0; i < structureIds_.size() && i < colonyObjects_.size(); ++i)
         if (structureIds_[i] == structure && colonyObjects_[i] > 0) {
             world_->remove(colonyObjects_[i]);
-            colonyObjects_[i] = -1;
+            colonyObjects_[i] = -2;
         }
     return true;
 }
@@ -496,6 +496,10 @@ void MissionSim::advance(double seconds) {
     }
 }
 
+double MissionSim::tickShare() const {
+    return std::clamp(pending_ / kTick, 0.0, 1.0);
+}
+
 void MissionSim::step() {
     const double dt = kTick;
     ++ticks_;
@@ -529,8 +533,14 @@ void MissionSim::step() {
         for (size_t i = 0; i < colonyObjects_.size(); ++i)
             if (colonyObjects_[i] == e.what.id) {
                 colonyObjects_[i] = -1;
-                if (i < structureIds_.size())
+                if (i < structureIds_.size()) {
                     economy_->remove(structureIds_[i]);
+                    // Bees docked inside it went with it: the hub's counts drop.
+                    const auto lost = economy_->takeLostBees();
+                    beesHoused_["construction-bee"] -= lost[0];
+                    beesHoused_["cargo-bee"] -= lost[1];
+                    beesHoused_["worker-bee"] -= lost[2];
+                }
             }
         note("destroyed: slot " + std::to_string(e.what.slot) + " " + e.what.name + " at " +
              mapPosition(e.what.x, e.what.y));

@@ -188,9 +188,10 @@ public:
     // Only what the overlay draws changed: the last scene again under it,
     // not drawn anew (the scene's own changes mark it themselves).
     void redrawOverlay() { overlayDirty_ = true; }
-    // While held, the scene isn't drawn at all: the last one stays under
-    // the overlay (the full-screen Tricorder covers it); let go, it's
-    // drawn as it now is.
+    // While held, the scene is drawn only when the camera moves, and at
+    // most every kHeldMs when what's on it changed: else the last one
+    // stays under the overlay (the full-screen Tricorder dims it); let
+    // go, it's drawn as it now is.
     void holdScene(bool hold) {
         if (hold != sceneHeld_)
             sceneHeld_ = hold, dirty_ = true;
@@ -263,7 +264,7 @@ public:
         std::string model;
         int a = 0, b = 0;
         int turn = 0;
-        float progress = 1; // under construction: 0 just begun, 1 built
+        float progress = 1; // under construction: 0 just begun, 1 built; below 0 not drawn (a site cancelled)
         std::string builder; // the construction bee working on it ("geo/fed/fconbee.geo"), or none
         int builders = 2;    // how many of them are at work (0-4)
     };
@@ -313,7 +314,7 @@ public:
     // Redraws only if they changed.
     void setUnits(std::vector<UnitDraw> units) {
         if (units != units_)
-            units_ = std::move(units), dirty_ = true;
+            units_ = std::move(units), dirty_ = sceneChanged_ = true;
     }
     // The ground's height at a world point (0 off the map); the map's size
     // in world units.
@@ -487,6 +488,11 @@ private:
     int dragX_ = 0, dragY_ = 0;
     bool dirty_ = true, overlayDirty_ = false, sceneHeld_ = false;
     std::vector<uint8_t> scene_; // the last scene drawn (the screen's pixels before the overlay)
+    // The camera it was drawn from (mode, target, yaw, pitch, distance)
+    // and when; whether the units or buildings changed since.
+    std::array<float, 7> sceneCamera_{};
+    uint64_t sceneMs_ = 0;
+    bool sceneChanged_ = false;
     std::string shownTitle_;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
     char tricorderRace_ = 'F';
@@ -928,6 +934,17 @@ private:
     std::set<int> shownOthers_;  // the other sides' buildings in sight
     int rallied_ = 0;            // vehicles sent back to the rally point (Y): its parking places in turn
     bool visible(const Unit& u) const;
+    // What moves is drawn between ticks (mission_sim.h's tickShare): a
+    // unit as far from where the last tick found it to where it is (its
+    // place, heading and turret); a bee from where it was drawn as the
+    // tick before last ended (by id: x, y, heading, lift), noted as each
+    // tick runs.
+    struct Pose {
+        float x, y, heading, turretYaw;
+    };
+    Pose drawnAt(const Unit& u) const;
+    std::map<int, std::array<float, 4>> beesBefore_, beesNoted_;
+    void noteBees();
     bool researchMenu_ = false;
     bool vehicleMenu_ = false; // the vehicle yards' list shown (U)
     char pendingOrder_ = 0;

@@ -119,6 +119,9 @@ struct Unit {
     int heldBy = -1;            // a building another side's away team holds: that side's slot
     // How far it moved last tick (for leading it), and where it was.
     float vx = 0, vy = 0, lastX = 0, lastY = 0;
+    // Its heading and turret then too: for the screen, drawing it between
+    // ticks (not saved; on load, as they are).
+    float lastHeading = 0, lastTurretYaw = 0;
     // Its size to shots (exe.md#sides-and-combat): set on first use.
     mutable float radius = 0;
     // Its line of fire to its target, as last checked (every 8-11 ticks).

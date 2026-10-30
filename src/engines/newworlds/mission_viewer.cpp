@@ -352,9 +352,12 @@ void MissionViewer::showColony() {
     if (colony_ && colonyShown_)
         for (size_t i = 0; i < colony_->buildings().size(); ++i) {
             const ColonyBuilding& c = colony_->buildings()[i];
-            // A destroyed one is left as its flattened wreck.
-            const bool razed = i < colonyObjects().size() && colonyObjects()[i] < 0;
-            buildings.push_back({c.model, c.a, c.b, 0, razed ? 0.0f : 1.0f, razed ? std::string() : bee, 0});
+            // A destroyed one is left as its flattened wreck; a site
+            // cancelled is gone (kept in the list, the progress shown by
+            // its place in it).
+            const int object = i < colonyObjects().size() ? colonyObjects()[i] : 0;
+            buildings.push_back({c.model, c.a, c.b, 0, object == -2 ? -1.0f : object < 0 ? 0.0f : 1.0f,
+                                 object < 0 ? std::string() : bee, 0});
         }
     // The other sides' buildings.
     // The other sides' buildings (an AI colony's sites going up with its
@@ -473,6 +476,7 @@ void MissionViewer::resetPlayUi() {
     playbookTarget_ = 0, playbookX_ = playbookY_ = 0, playbookAt_ = {};
     multiPage_ = 0;
     multiTicked_.clear();
+    beesBefore_.clear(), beesNoted_.clear();
     jumpedTo_ = {};
     cycledBuilding_ = cycledVehicle_ = 0;
     followed_ = alertedLast_ = rallied_ = 0;
@@ -630,20 +634,37 @@ void MissionViewer::drawCombat() {
     };
     auto seen = [&](float x, float y) { return !fog_ || fog_->seenAt(x, y, playerSlot_); };
     // The projectiles in flight: a phaser pulse an orange streak, a
-    // disruptor bolt a green one, a shell a bright dot up its arc.
+    // disruptor bolt a green one, a shell a bright dot up its arc; each as
+    // far between its last two ticks as the units are (drawnAt), a beam
+    // or bolt its tick's length along its way (not back past where it set
+    // out), a pulse's from its shooter's muzzle as drawn.
+    const float share = sim_ ? float(sim_->tickShare()) : 1;
     for (const Projectile& p : world_->projectiles()) {
         if (p.fromSlot != playerSlot_ && !seen(p.x, p.y))
             continue;
         int ax = 0, ay = 0, bx = 0, by = 0;
         if (p.kind == WeaponKind::Artillery) {
-            if (!map_.worldToScreen(p.x, p.y, p.z + 300, ax, ay))
+            const float x = p.px + (p.x - p.px) * share, y = p.py + (p.y - p.py) * share;
+            if (!map_.worldToScreen(x, y, p.pz + (p.z - p.pz) * share + 300, ax, ay))
                 continue;
             for (int dy = -1; dy <= 1; ++dy)
                 for (int dx = -1; dx <= 1; ++dx)
                     plot(screen_, ax + dx, ay + dy, 255, 240, 160);
             continue;
         }
-        if (!toScreen(p.px, p.py, 600, ax, ay) || !toScreen(p.x, p.y, 600, bx, by))
+        float ox = p.x - p.dx * p.speed * float(p.age), oy = p.y - p.dy * p.speed * float(p.age);
+        float run = std::max(float(p.age) - 1 + share, 0.0f) * p.speed;
+        if (p.kind != WeaponKind::Single) {
+            ox = p.ox, oy = p.oy;
+            if (const Unit* s = world_->unit(p.from)) {
+                const Pose at = drawnAt(*s);
+                ox = at.x, oy = at.y;
+            }
+            run = std::min(run, p.range);
+        }
+        const float tail = std::max(run - p.speed, 0.0f);
+        if (!toScreen(ox + p.dx * tail, oy + p.dy * tail, 600, ax, ay) ||
+            !toScreen(ox + p.dx * run, oy + p.dy * run, 600, bx, by))
             continue;
         if (p.kind == WeaponKind::Single) {
             line(screen_, ax, ay, bx, by, 90, 255, 90);
@@ -704,8 +725,10 @@ void MissionViewer::drawCombat() {
             const Unit* a = world_->unit(from);
             const Unit* b = world_->unit(to);
             int ax = 0, ay = 0, bx = 0, by = 0;
-            if (!a || !b || !visible(*a) || !visible(*b) || !toScreen(a->x, a->y, 700, ax, ay) ||
-                !toScreen(b->x, b->y, 800, bx, by))
+            if (!a || !b || !visible(*a) || !visible(*b))
+                continue;
+            const Pose pa = drawnAt(*a), pb = drawnAt(*b);
+            if (!toScreen(pa.x, pa.y, 700, ax, ay) || !toScreen(pb.x, pb.y, 800, bx, by))
                 continue;
             const int n = std::max({std::abs(bx - ax), std::abs(by - ay), 1});
             const int phase = int(nowMs_ / 60 % 6);
@@ -725,7 +748,7 @@ void MissionViewer::drawCombat() {
         if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0 || !visible(u))
             continue;
         int sx = 0, sy = 0;
-        if (!toScreen(u.x, u.y, u.building ? 3000 : 1500, sx, sy))
+        if (const Pose at = drawnAt(u); !toScreen(at.x, at.y, u.building ? 3000 : 1500, sx, sy))
             continue;
         const int w = u.building ? 24 : 14, filled = int(float(w) * u.hp / u.maxHp);
         for (int x = 0; x < w; ++x)
@@ -744,6 +767,49 @@ bool MissionViewer::visible(const Unit& u) const {
     return u.slot == playerSlot_ || ((!fog_ || fog_->seenAt(u.x, u.y, playerSlot_)) && !u.cloaked);
 }
 
+// Turning the short way round; one that appeared or jumped this tick
+// (further than it drives in one) is where it is.
+MissionViewer::Pose MissionViewer::drawnAt(const Unit& u) const {
+    const float share = sim_ ? float(sim_->tickShare()) : 1;
+    const float dx = u.x - u.lastX, dy = u.y - u.lastY, reach = u.kind.speed / 20 * 1.01f + 1;
+    if (share >= 1 || dx * dx + dy * dy > reach * reach)
+        return {u.x, u.y, u.heading, u.turretYaw};
+    auto turn = [share](float from, float to) { return from + std::remainder(to - from, 2 * 3.14159265f) * share; };
+    return {u.lastX + dx * share, u.lastY + dy * share, turn(u.lastHeading, u.heading),
+            turn(u.lastTurretYaw, u.turretYaw)};
+}
+
+namespace {
+
+// A bee's height above the ground in flight (showUnits): construction
+// and cargo bees cruise in eight lanes 9000-12500 up (exe.md#docking),
+// worker bees 500 up, rising off and settling back down.
+float beeLift(const Economy::Bee& b) {
+    const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
+    const float height = b.worker ? 500.0f : 9000.0f + 500.0f * float(b.id % 8);
+    return b.flight > 0 ? height * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
+}
+
+// Whether showUnits draws a bee: out of the hub, not at work on a site
+// (the map draws those at its corners), not waiting docked inside its
+// building.
+bool beeShown(const Economy::Bee& b) {
+    return !(b.home || b.working || (b.worker && b.flight == 0 && b.pods.empty()));
+}
+
+} // namespace
+
+// As a tick runs: the bees as the tick before left them become where
+// they're drawn from.
+void MissionViewer::noteBees() {
+    beesBefore_ = std::move(beesNoted_);
+    beesNoted_.clear();
+    if (economy_)
+        for (const Economy::Bee& b : economy_->bees())
+            if (beeShown(b))
+                beesNoted_[b.id] = {b.x, b.y, b.heading, beeLift(b)};
+}
+
 void MissionViewer::showUnits() {
     std::vector<MapViewer::UnitDraw> draw;
     if (world_)
@@ -758,15 +824,17 @@ void MissionViewer::showUnits() {
                     const float towards = float(u.cloaking ? 63 - u.fading : u.fading) / 63;
                     shimmer = u.slot == playerSlot_ ? 97 * std::sin(3.14159265f * towards) : 98 * towards;
                 }
-                MapViewer::UnitDraw d{u.kind.model, u.x, u.y, u.heading, u.selected, u.turretYaw, 0, shimmer};
+                const Pose at = drawnAt(u);
+                MapViewer::UnitDraw d{u.kind.model, at.x, at.y, at.heading, u.selected, at.turretYaw, 0, shimmer};
                 d.health = u.maxHp > 0 ? u.hp / u.maxHp : 1;
                 draw.push_back(d);
             }
     // The colony's bees out of the hub: flying (rising off and settling
-    // back down), or docked at a mine or the processor; those at work on a
-    // site the map draws at its corners. Construction and cargo bees cruise
-    // in eight lanes 9000-12500 up (exe.md#docking), worker bees 500 up
-    // between their building and its yard; a pod aboard hangs under its bee.
+    // back down, beeLift), or docked at a mine or the processor; those at
+    // work on a site the map draws at its corners. Each is drawn between
+    // where the last two ticks found it (one just out, or gone further
+    // than a bee flies in a tick or two, where it is); a pod aboard hangs
+    // under its bee.
     if (economy_) {
         const char side = missionSides(missions_[size_t(current_)].shortName)[size_t(side_)];
         const char* conBee = side == 'K' ? "geo/kln/conbee.geo" : side == 'R' ? "geo/rom/rcb.geo" : "geo/fed/fconbee.geo";
@@ -774,18 +842,23 @@ void MissionViewer::showUnits() {
         const char* workBee = side == 'K' ? "geo/kln/kwb.geo" : side == 'R' ? "geo/rom/rwb.geo" : "geo/fed/workbee.geo";
         // The pods: the Federation's crate, the Klingons' and Romulans' own.
         const char* pod = side == 'K' ? "geo/kln/kwbc.geo" : side == 'R' ? "geo/rom/rc.geo" : "geo/fed/crate_l.geo";
+        const float share = sim_ ? float(sim_->tickShare()) : 1;
         for (const Economy::Bee& b : economy_->bees()) {
-            // (A worker bee waiting at its building is docked inside it.)
-            if (b.home || b.working || (b.worker && b.flight == 0 && b.pods.empty()))
+            if (!beeShown(b))
                 continue;
-            const float f = b.flight > 0 ? float(b.flown) / float(b.flight) : 0;
-            const float height = b.worker ? 500.0f : 9000.0f + 500.0f * float(b.id % 8);
-            const float lift = b.flight > 0 ? height * std::min(1.0f, 4 * std::min(f, 1 - f)) : 0;
-            MapViewer::UnitDraw d{b.worker ? workBee : b.cargo ? cargoBee : conBee, b.x, b.y, b.heading};
+            float x = b.x, y = b.y, heading = b.heading, lift = beeLift(b);
+            if (const auto it = beesBefore_.find(b.id);
+                it != beesBefore_.end() && std::hypot(x - it->second[0], y - it->second[1]) < 2500) {
+                const auto [x0, y0, heading0, lift0] = it->second;
+                x = x0 + (x - x0) * share, y = y0 + (y - y0) * share;
+                heading = heading0 + std::remainder(heading - heading0, 2 * 3.14159265f) * share;
+                lift = lift0 + (lift - lift0) * share;
+            }
+            MapViewer::UnitDraw d{b.worker ? workBee : b.cargo ? cargoBee : conBee, x, y, heading};
             d.lift = lift;
             draw.push_back(d);
             for (size_t k = 0; k < b.pods.size(); ++k) {
-                MapViewer::UnitDraw c{pod, b.x + float(k) * 600, b.y, b.heading};
+                MapViewer::UnitDraw c{pod, x + float(k) * 600, y, heading};
                 c.lift = std::max(0.0f, lift - 400);
                 draw.push_back(c);
             }
@@ -1050,6 +1123,8 @@ bool MissionViewer::playEvent(const Event& ev) {
             for (size_t i = 0; economy_ && i < colonyObjects().size() && i < structureIds().size(); ++i)
                 if (const ColonyStructure* c = structureOf(colonyObjects()[i]); c && c->type == "colony-hub") {
                     world_->clearSelection();
+                    if (selectedBuilding_ != colonyObjects()[i])
+                        razeAsked_ = cancelAsked_ = cancelFrom_ = 0;
                     selectedBuilding_ = colonyObjects()[i];
                     colonyDetails_ = true;
                     buildMenu_ = vehicleMenu_ = researchMenu_ = false;
@@ -1345,6 +1420,8 @@ bool MissionViewer::playEvent(const Event& ev) {
             const bool ordering = !world_->selection().empty() && other >= 0 && building == other;
             if (building >= 0 && best < 0 && !ordering && world_->selection().empty()) {
                 world_->clearSelection();
+                if (building != selectedBuilding_) // (a question is dropped with its building)
+                    razeAsked_ = cancelAsked_ = cancelFrom_ = 0;
                 selectedBuilding_ = building;
                 if (ev.clicks >= 2)
                     doubleClicked(building);
@@ -1602,10 +1679,14 @@ void MissionViewer::update(uint64_t nowMs) {
             shownOthers_ = std::move(others);
             showColony();
         }
-        if (advanced) {
+        // What moves is drawn on its way between ticks (drawnAt), so as
+        // time passes; under the full-screen Tricorder only as ticks run.
+        if (advanced)
+            noteBees();
+        if (advanced || (dt > 0 && !tricorderFull_))
             showUnits();
+        if (advanced)
             redraw();
-        }
         combatStep();
         showProgress();
         for (const MissionSim::Said& said : sim_->takeSaid())
@@ -1615,10 +1696,12 @@ void MissionViewer::update(uint64_t nowMs) {
         // F1 following an object: the camera on it, till it's gone.
         if (map_.following()) {
             const Unit* f = world_->unit(followed_);
-            if (!f || f->hp <= 0 || map_.view() != MapViewer::View::FirstPerson)
+            if (!f || f->hp <= 0 || map_.view() != MapViewer::View::FirstPerson) {
                 map_.stopFollowing();
-            else
-                map_.follow(f->x, f->y, f->heading, f->kind.model);
+            } else {
+                const Pose at = drawnAt(*f);
+                map_.follow(at.x, at.y, at.heading, f->kind.model);
+            }
         }
         // A new selection: its first vehicle answers; MULTISELECTION starts
         // at its first page, nothing ticked.
@@ -2136,8 +2219,9 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
             // (Only the question asked on this building's details.)
             const std::vector<int> pending = pendingBuilds();
             if (sim_ && u && cancelFrom_ == u->id && colonyDetails_ &&
-                std::find(pending.begin(), pending.end(), cancelAsked_) != pending.end())
-                sim_->cancelBuild(cancelAsked_);
+                std::find(pending.begin(), pending.end(), cancelAsked_) != pending.end() &&
+                sim_->cancelBuild(cancelAsked_))
+                showColony();
             cancelAsked_ = cancelFrom_ = 0;
         } else if (b.action == "cancel-no") {
             cancelAsked_ = cancelFrom_ = 0;
@@ -2660,10 +2744,13 @@ void MissionViewer::drawInterface() {
             }
             if (const ColonyStructure* c = structureOf(picked->id); c && economy_->razable(c->id))
                 actions.push_back({"DEMOLISH", "raze"});
-            // DEMOLISH asks first; so does cancelling a site.
+            // DEMOLISH asks first; so does cancelling a site (while it's
+            // still going up).
             if (razeAsked_ == picked->id)
                 actions = {{"DEMOLISH? YES", "raze-yes"}, {"NO", "raze-no"}};
-            if (cancelAsked_ && cancelFrom_ == picked->id && colonyDetails_)
+            if (const std::vector<int> pending = cancelAsked_ ? pendingBuilds() : std::vector<int>{};
+                cancelFrom_ == picked->id && colonyDetails_ &&
+                std::find(pending.begin(), pending.end(), cancelAsked_) != pending.end())
                 actions = {{"CANCEL IT? YES", "cancel-yes"}, {"NO", "cancel-no"}};
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
@@ -3518,7 +3605,8 @@ void MissionViewer::followInF1(int unit) {
         return;
     followed_ = unit;
     map_.startFollowing();
-    map_.follow(u->x, u->y, u->heading, u->kind.model);
+    const Pose at = drawnAt(*u);
+    map_.follow(at.x, at.y, at.heading, u->kind.model);
 }
 
 // The camera to one of the player's objects (JUMP TO, Space): in F1 it

@@ -27,6 +27,7 @@ constexpr uint64_t kFrameMs = 100; // animation frames: 10 a second (arf.md#open
 // thrown anew each, the selection's marks blink every 10
 // (exe.md#cloaking, exe.md#the-tricorder).
 constexpr uint64_t kShimmerMs = 50, kBlinkMs = 500;
+constexpr uint64_t kHeldMs = 250; // a held scene's changes drawn at most this often
 // Where a block's four tiles go, in its record's order: round the square
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
@@ -606,7 +607,7 @@ void MapViewer::placeScenery() {
 void MapViewer::setPaved(const std::vector<std::pair<int, int>>& tiles) {
     paved_ = {tiles.begin(), tiles.end()};
     updateHidden();
-    dirty_ = true;
+    dirty_ = sceneChanged_ = true;
 }
 
 // No trees or rocks under a building or on its colony's concrete.
@@ -708,12 +709,12 @@ void MapViewer::setBuildings(const std::vector<Building>& buildings) {
         const float y = float(b.a) / 8 * kBlockSize - (cx * sn + cy * cs);
         const float ground = groundHeight(float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize);
         buildings_.push_back({{x, y, ground}, angle, &m, b.progress, b.builder, b.builders});
-        const bool across = b.turn % 2 != 0;
+        const bool across = b.turn % 2 != 0, gone = b.progress < 0;
         buildingAreas_.push_back({float(b.b) / 8 * kBlockSize, float(b.a) / 8 * kBlockSize,
-                                  (across ? h : w) / 2 + 512, (across ? w : h) / 2 + 512});
+                                  gone ? 0 : (across ? h : w) / 2 + 512, gone ? 0 : (across ? w : h) / 2 + 512});
     }
     updateHidden();
-    dirty_ = true;
+    dirty_ = sceneChanged_ = true;
 }
 
 const MapViewer::Motion& MapViewer::motionOf(const std::string& model) {
@@ -728,11 +729,11 @@ const MapViewer::Motion& MapViewer::motionOf(const std::string& model) {
 void MapViewer::setBuildingProgress(size_t i, float progress, int builders) {
     if (i < buildings_.size() && buildings_[i].progress != progress) {
         buildings_[i].progress = progress;
-        dirty_ = true;
+        dirty_ = sceneChanged_ = true;
     }
     if (i < buildings_.size() && builders >= 0 && buildings_[i].builders != builders) {
         buildings_[i].builders = builders;
-        dirty_ = true;
+        dirty_ = sceneChanged_ = true;
     }
 }
 
@@ -1115,9 +1116,12 @@ void MapViewer::update(uint64_t nowMs) {
     animClockMs_ = nowMs;
     shimmerFrame_ = uint32_t(nowMs / kShimmerMs);
     const bool kept = scene_.size() == screen_.pixels.size();
-    if (dirty_ && (!sceneHeld_ || !kept)) {
+    const std::array camera{float(view_), targetX_, targetY_, targetZ_, yaw_, pitch_, distance_};
+    const bool stale = !kept || camera != sceneCamera_ || (sceneChanged_ && nowMs - sceneMs_ >= kHeldMs);
+    if (sceneHeld_ ? stale : dirty_) {
         render();
         scene_ = screen_.pixels;
+        sceneCamera_ = camera, sceneMs_ = nowMs, sceneChanged_ = false;
         if (overlay_)
             overlay_();
         updateTitle();
@@ -1382,7 +1386,7 @@ void MapViewer::render() {
     constexpr float kApron = 0.15f;
     for (const Placed& o : buildings_) {
         const Vec at{o.position.x, o.position.y, o.position.z};
-        if (cam.toView(at).z < cam.nearZ)
+        if (o.progress < 0 || cam.toView(at).z < cam.nearZ)
             continue;
         ++drawnObjects_;
         const float rise = o.progress >= 1 ? 1 : std::max(0.02f, (o.progress - kApron) / (1 - kApron));

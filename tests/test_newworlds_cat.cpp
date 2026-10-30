@@ -3957,6 +3957,36 @@ void testWorldPathCaches() {
     CHECK(added == ids.back() + 1 && loaded.unit(added) && loaded.unit(added)->side == 'K');
 }
 
+// What the screen draws between ticks (mission_sim.h's tickShare): the
+// share of a tick time is into, and each unit's place, heading and turret
+// as the last tick found them.
+void testDrawnBetweenTicks() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    MissionSim sim("F1", 'F', t, map, 64, 64, MissionSim::placedColony("F1", 'F'));
+    CHECK(sim.tickShare() == 0);
+    sim.advance(0.075);
+    CHECK(std::abs(sim.tickShare() - 0.5) < 1e-6);
+    World& w = sim.world();
+    const int u = w.addUnit('F', groundScout('F'), 40.5f * kTile, 40.5f * kTile, 0.5f);
+    CHECK(w.unit(u)->lastHeading == 0.5f && w.unit(u)->lastX == w.unit(u)->x);
+    w.moveTo(u, 40.5f * kTile, 60.5f * kTile); // due north
+    sim.advance(0.025);
+    const Unit* v = w.unit(u);
+    CHECK(sim.tickShare() == 0 && v->lastX == 40.5f * kTile && v->lastY == 40.5f * kTile);
+    CHECK(v->lastHeading == 0.5f && std::abs(v->heading - 1.5707963f) < 1e-4f);
+    CHECK(v->y > v->lastY && v->y - v->lastY <= v->kind.speed / 20 + 1);
+    const float y = v->y;
+    sim.advance(0.05);
+    v = w.unit(u);
+    CHECK(v->lastY == y && v->lastHeading == v->heading);
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -4017,6 +4047,7 @@ int main() {
     testRivalPowerGenerator();
     testLookupsAndCaches();
     testWorldPathCaches();
+    testDrawnBetweenTicks();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);
