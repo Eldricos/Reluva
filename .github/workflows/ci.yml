@@ -11,7 +11,7 @@ jobs:
     name: Linux (GCC)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Install SDL's build dependencies
         # (the Ubuntu list from docs/BUILDING.md)
         run: |
@@ -33,7 +33,7 @@ jobs:
     name: Windows (MSVC)
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Configure
         run: cmake -S . -B build -A x64
       - name: Build
