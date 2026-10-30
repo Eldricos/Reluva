@@ -257,15 +257,15 @@ bool MissionViewer::drawStarSystem() {
                 continue;
             const Texture& tex = systemTextures_[size_t(slot)];
             const auto& verts = system_.parts[face.part].vertices;
-            const int body = systemLayout_.faceBody[f];
+            const int faceBody = systemLayout_.faceBody[f];
             std::vector<ViewVertex> poly;
             for (const GeoModel::Corner& c : face.corners) {
                 if (c.vertex >= verts.size())
                     break;
                 const GeoModel::Vec3& p = verts[c.vertex];
                 Vec at{p.x, p.y, p.z};
-                if (body >= 0) {
-                    const GeoModel::Vec3& o = systemLayout_.bodies[size_t(body)].centre;
+                if (faceBody >= 0) {
+                    const GeoModel::Vec3& o = systemLayout_.bodies[size_t(faceBody)].centre;
                     const Vec d{p.x - o.x, p.y - o.y, p.z - o.z};
                     at = Vec{o.x, o.y, o.z} + cam.right * d.x + cam.up * d.y - cam.forward * d.z;
                 }

@@ -767,10 +767,10 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
         } else if (b.action == "research") {
             play_.researchMenu = true;
         } else if ((b.action == "crew-" || b.action == "crew+") && u && economy_) {
-            for (size_t i = 0; i < colonyObjects().size() && i < structureIds().size(); ++i)
-                if (colonyObjects()[i] == u->id)
+            for (size_t slot = 0; slot < colonyObjects().size() && slot < structureIds().size(); ++slot)
+                if (colonyObjects()[slot] == u->id)
                     for (const ColonyStructure& c : economy_->structures())
-                        if (c.id == structureIds()[i]) {
+                        if (c.id == structureIds()[slot]) {
                             const BuildingType* t = buildingType(c.type);
                             const int now = c.target < 0 ? (t ? t->crewSlots : 0) : c.target;
                             economy_->setCrewTarget(c.id, now + (b.action == "crew+" ? 1 : -1));
@@ -778,12 +778,12 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
         } else if (b.action.rfind("officer", 0) == 0) {
             // A click picks the officer; a second on the same card brings
             // the camera to whatever they're in (exe.md#crew-and-efficiency).
-            const int i = std::atoi(b.action.c_str() + 7);
-            if (i == play_.pickedOfficer && nowMs_ - play_.officerClickMs < 400 && fieldWork_ &&
-                size_t(i) < fieldWork_->officers().size())
-                if (const Unit* in = world_ ? world_->unit(fieldWork_->officers()[size_t(i)].in) : nullptr)
+            const int officer = std::atoi(b.action.c_str() + 7);
+            if (officer == play_.pickedOfficer && nowMs_ - play_.officerClickMs < 400 && fieldWork_ &&
+                size_t(officer) < fieldWork_->officers().size())
+                if (const Unit* in = world_ ? world_->unit(fieldWork_->officers()[size_t(officer)].in) : nullptr)
                     cameraTo(*in);
-            play_.pickedOfficer = i;
+            play_.pickedOfficer = officer;
             play_.officerClickMs = nowMs_;
         }
         redraw();

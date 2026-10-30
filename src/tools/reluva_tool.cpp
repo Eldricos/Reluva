@@ -1005,10 +1005,10 @@ int cmdGeoInfo(int argc, char** argv) {
         }
         const double len = std::sqrt(n[0] * n[0] + n[1] * n[1] + n[2] * n[2]);
         const auto& s = part.normalLists[0][face.groupB];
-        const double d = len > 0 ? (n[0] * s.x + n[1] * s.y + n[2] * s.z) / len : 0;
-        if (d > 0.99)
+        const double cosine = len > 0 ? (n[0] * s.x + n[1] * s.y + n[2] * s.z) / len : 0;
+        if (cosine > 0.99)
             ++same;
-        else if (d < -0.99)
+        else if (cosine < -0.99)
             ++opposite;
         else
             ++other;
@@ -2160,11 +2160,11 @@ int cmdGmfInfo(int argc, char** argv) {
         const reluva::Error err = reluva::newworlds::parseGmf(d, map);
         std::printf("engine's reader: %s\n", err ? err.message.c_str() : "reads it");
         if (!err) {
-            std::map<int, size_t> types;
+            std::map<int, size_t> sceneryTypes;
             for (const auto& o : map.scenery)
-                ++types[o.type];
+                ++sceneryTypes[o.type];
             std::printf("placed objects: %zu;", map.scenery.size());
-            for (const auto& [type, n] : types)
+            for (const auto& [type, n] : sceneryTypes)
                 std::printf(" type %d x%zu", type, n);
             std::printf("\n");
         }
@@ -2263,8 +2263,8 @@ int cmdGmfInfo(int argc, char** argv) {
                     std::printf("\n");
                 }
                 std::printf("second values of the grid entries:");
-                for (const auto& [v, n] : seconds)
-                    std::printf(" %u x%u", v, n);
+                for (const auto& [value, count] : seconds)
+                    std::printf(" %u x%u", value, count);
                 std::printf("\nlast 1024 bytes start:\n");
                 hexdump(d, end + size_t(w) * h * 10, 0x40);
             } else {

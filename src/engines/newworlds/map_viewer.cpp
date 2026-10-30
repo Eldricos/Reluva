@@ -208,10 +208,14 @@ Shift bandShift(int r, int c) {
         {{0, 1, 0.8f}, {0, 1.2f, 0.53f}, {0, 1, 0.4f}},
         {{180, 0.7f, 0.8f}, {180, 0.8f, 0.63f}, {180, 0.6f, 0.31f}},
         {{300, 1, 0.9f}, {300, 1.2f, 0.63f}, {300, 1.2f, 0.31f}}};
-    static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
-                                       {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
+    static constexpr Shift kOreBands[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
+                                           {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
     static constexpr Shift kGrid[3] = {{0, 0.75f, 0.8f}, {180, 0.6f, 0.9f}, {300, 1, 0.9f}};
-    return c == 10 ? kGrid[r] : c == 8 ? kRaced[r][2] : c == 9 ? Shift{0, 0, 1} : c >= 2 ? kOres[c - 2] : kRaced[r][c];
+    return c == 10 ? kGrid[r]
+           : c == 8 ? kRaced[r][2]
+           : c == 9 ? Shift{0, 0, 1}
+           : c >= 2 ? kOreBands[c - 2]
+                    : kRaced[r][c];
 }
 
 } // namespace
@@ -999,9 +1003,9 @@ bool MapViewer::gameKey(uint32_t k, int mouseX, int mouseY) {
     case key::Kp0 + 3:
     case key::PageUp: // (the game's other pitch keys)
     case key::PageDown: {
-        const float step = (k == key::Kp0 + 9 || k == key::PageUp ? 1 : -1) * kKeyTurn / 2;
-        pitch_ = view_ == View::FirstPerson ? std::clamp(pitch_ + step / 8, -kEyeTilt, kEyeTilt)
-                                            : std::clamp(pitch_ + step, 0.02f, kMaxPitch);
+        const float tilt = (k == key::Kp0 + 9 || k == key::PageUp ? 1 : -1) * kKeyTurn / 2;
+        pitch_ = view_ == View::FirstPerson ? std::clamp(pitch_ + tilt / 8, -kEyeTilt, kEyeTilt)
+                                            : std::clamp(pitch_ + tilt, 0.02f, kMaxPitch);
         break;
     }
     // F1, F2, F3 the game's cameras; Q the next of them; Z keeps the
@@ -1256,10 +1260,10 @@ void MapViewer::render() {
                 Vec3 v = pp ? pp->apply(verts[corner.vertex]) : verts[corner.vertex];
                 if (shimmer > 0) { // the same throw for a corner each face shares
                     auto jitter = [&](uint32_t k) {
-                        uint32_t h = (uint32_t(corner.vertex) * 2654435761u) ^ (shimmerFrame_ * 40503u) ^ (k * 97u) ^
-                                     uint32_t(face.part) * 7919u;
-                        h ^= h >> 15, h *= 2246822519u, h ^= h >> 13;
-                        return (float(h & 0xffff) / 32767.5f - 1) * shimmer / scale;
+                        uint32_t hash = (uint32_t(corner.vertex) * 2654435761u) ^ (shimmerFrame_ * 40503u) ^ (k * 97u) ^
+                                        uint32_t(face.part) * 7919u;
+                        hash ^= hash >> 15, hash *= 2246822519u, hash ^= hash >> 13;
+                        return (float(hash & 0xffff) / 32767.5f - 1) * shimmer / scale;
                     };
                     v.x += jitter(1), v.y += jitter(2), v.z += jitter(3);
                 }

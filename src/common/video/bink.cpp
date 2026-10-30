@@ -1032,8 +1032,8 @@ Error BinkMovie::nextFrame() {
         // From version h the chroma planes come V first.
         const int p = plane == 0 || version_ < 'h' ? plane : plane ^ 3;
         const bool chroma = plane != 0;
-        if (!dec.decode(planes_[p].data(), last_[p].data(), chroma ? cstride_ : ystride_, width_ >> chroma,
-                        height_ >> chroma, chroma ? cbw : bw, chroma ? cbh : bh))
+        if (!dec.decode(planes_[p].data(), last_[p].data(), chroma ? cstride_ : ystride_, width_ >> int(chroma),
+                        height_ >> int(chroma), chroma ? cbw : bw, chroma ? cbh : bh))
             return Error::fail("bad Bink plane " + std::to_string(plane) + " in frame " + std::to_string(next_));
         if (bits.pos() >= total)
             break;

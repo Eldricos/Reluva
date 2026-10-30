@@ -212,15 +212,15 @@ void MissionViewer::drawCombat() {
         if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0 || !visible(u))
             continue;
         int sx = 0, sy = 0;
-        if (const Pose at = drawnAt(u); !toScreen(at.x, at.y, u.building ? 3000 : 1500, sx, sy))
+        if (const Pose at = drawnAt(u); !toScreen(at.x, at.y, u.building ? 3000.0f : 1500.0f, sx, sy))
             continue;
         const int w = u.building ? 24 : 14, filled = int(float(w) * u.hp / u.maxHp);
         for (int x = 0; x < w; ++x)
             for (int y = 0; y < 2; ++y) {
                 const bool on = x < filled;
-                const float share = u.hp / u.maxHp;
-                plot(screen_, sx - w / 2 + x, sy + y, on ? uint8_t(share < 0.5f ? 255 : 80) : 40,
-                     on ? uint8_t(share < 0.25f ? 60 : 220) : 40, on ? 60 : 40);
+                const float health = u.hp / u.maxHp;
+                plot(screen_, sx - w / 2 + x, sy + y, on ? uint8_t(health < 0.5f ? 255 : 80) : 40,
+                     on ? uint8_t(health < 0.25f ? 60 : 220) : 40, on ? 60 : 40);
             }
     }
 }

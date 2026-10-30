@@ -100,10 +100,11 @@ bool drawModelView(Surface& target, Rasterizer& raster, const TexturedModel& m, 
                     return false; // colour-keyed: see-through
                 c[0] = p[0], c[1] = p[1], c[2] = p[2];
             }
-            const uint8_t light[3] = {style.light.r, style.light.g, style.light.b};
+            const uint8_t tint[3] = {style.light.r, style.light.g, style.light.b};
             for (int k = 0; k < 3; ++k) {
-                const float v = float(c[k]) * lit * float(light[k]) / 255.0f;
-                out[k] = uint8_t(style.opacity >= 1 ? v : float(out[k]) * (1 - style.opacity) + v * style.opacity);
+                const float level = float(c[k]) * lit * float(tint[k]) / 255.0f;
+                out[k] =
+                    uint8_t(style.opacity >= 1 ? level : float(out[k]) * (1 - style.opacity) + level * style.opacity);
             }
             return style.opacity >= 1; // see-through faces don't hide those behind
         };

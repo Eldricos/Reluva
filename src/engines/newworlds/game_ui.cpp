@@ -127,8 +127,8 @@ bool GameUi::load(const Archives& archives, char side) {
         largeFaces_.push_back(std::move(l));
     }
     // The portraits of the side's buildings and craft, small ("fhub_s") and large ("fhub").
-    for (const char* folder : {"ptrt/build/sm/", "ptrt/craft/sm/", "ptrt/build/lg/", "ptrt/craft/lg/"}) {
-        const std::string under = base + folder;
+    for (const char* portraitDir : {"ptrt/build/sm/", "ptrt/craft/sm/", "ptrt/build/lg/", "ptrt/craft/lg/"}) {
+        const std::string under = base + portraitDir;
         for (const auto& a : archives)
             for (const CatEntry& e : a->entries())
                 if (e.name.rfind(under, 0) == 0 && e.name.size() > under.size() + 4 &&

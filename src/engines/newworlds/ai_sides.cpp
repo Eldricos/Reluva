@@ -297,7 +297,7 @@ const Economy* AiSides::colony(int slot) const {
 
 std::pair<float, float> AiSides::wayPoint(const NpcOrder& o, int leg) const {
     if (o.ways == 0)
-        return {-1, -1};
+        return {-1.0f, -1.0f};
     const int i = std::clamp(leg, 0, o.ways - 1);
     return worldAt(o.way[i][0], o.way[i][1]);
 }

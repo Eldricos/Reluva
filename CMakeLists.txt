@@ -63,6 +63,12 @@ if(MSVC)
     target_compile_definitions(reluva_warnings INTERFACE _CRT_SECURE_NO_WARNINGS)
 else()
     target_compile_options(reluva_warnings INTERFACE -Wall -Wextra -Wpedantic)
+    # A local declaration hiding another local (MSVC's C4456/C4457 at /W4).
+    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        target_compile_options(reluva_warnings INTERFACE -Wshadow -Wshadow-uncaptured-local)
+    else()
+        target_compile_options(reluva_warnings INTERFACE -Wshadow=local)
+    endif()
 endif()
 
 # --- common: platform-independent core, no SDL allowed here -------------------

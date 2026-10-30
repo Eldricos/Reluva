@@ -237,7 +237,7 @@ static void testWav() {
     put16(0x11); put16(1); put32(b, 22050); put32(b, 22050); put16(8); put16(4); put16(2); put16(9);
     tag("fact"); put32(b, 4); put32(b, 5);
     tag("data"); put32(b, 8);
-    for (uint8_t v : {100, 0, 0, 0, 0x04, 0, 0, 0})
+    for (uint8_t v : std::initializer_list<uint8_t>{100, 0, 0, 0, 0x04, 0, 0, 0})
         b.push_back(v);
     Sound s;
     CHECK(!decodeWav(b, s));

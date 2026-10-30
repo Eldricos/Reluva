@@ -720,14 +720,14 @@ void MissionViewer::drawInterface() {
             // Its buttons, in a row (wrapping) under the bar.
             int bx = x + kTextLeft, byy = by + 8;
             for (const auto& [label, action] : actions) {
-                const int bw = ui_.smallWidth(label) + 8;
-                if (bx + bw > x + w - 6)
+                const int buttonW = ui_.smallWidth(label) + 8;
+                if (bx + buttonW > x + w - 6)
                     bx = x + kTextLeft, byy += lh + 4;
-                fillRect(screen_, bx, byy - 2, bw, 1, text);
-                fillRect(screen_, bx, byy + lh + 1, bw, 1, text);
+                fillRect(screen_, bx, byy - 2, buttonW, 1, text);
+                fillRect(screen_, bx, byy + lh + 1, buttonW, 1, text);
                 ui_.drawSmall(screen_, bx + 4, byy, label, bright);
-                play_.buttons.push_back({bx, byy - 2, bw, lh + 4, action});
-                bx += bw + 4;
+                play_.buttons.push_back({bx, byy - 2, buttonW, lh + 4, action});
+                bx += buttonW + 4;
             }
         } else if (sel.size() > 1) {
             // MULTISELECTION (exe.md#the-multiselection): pages of 15, three

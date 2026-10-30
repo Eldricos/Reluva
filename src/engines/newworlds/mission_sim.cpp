@@ -346,8 +346,8 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         }
     if (script_) {
         run_ = std::make_unique<MissionRun>(*script_, findMissionScript("generic", 'F'));
-        const ScriptEvent start{"start", {}};
-        deliver(start, run_->fire(start));
+        const ScriptEvent startEvent{"start", {}};
+        deliver(startEvent, run_->fire(startEvent));
     }
 }
 

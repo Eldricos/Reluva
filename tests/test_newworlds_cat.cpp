@@ -717,8 +717,8 @@ void testMissionScripts() {
             continue;
         MissionRun r(m, generic);
         for (const ScriptEvent& e : r.walkthrough()) {
-            double waited = 0;
-            r.walk(e, waited); // timers first while a timer has yet to arm its handler
+            double stepWaited = 0;
+            r.walk(e, stepWaited); // timers first while a timer has yet to arm its handler
         }
         // Time passes (two hours at most: some timers repeat for ever).
         for (double t = 0; !r.finished() && r.nextTimer() >= 0 && t < 7200; t += r.nextTimer())
@@ -1235,7 +1235,7 @@ void testEconomy() {
         const auto said = poor.advance(0.1);
         CHECK(count(said, "short-resources") == 1 && poor.structures().size() == 1);
         // ... and its officer reports construction delayed (exe.md#sounds).
-        CHECK(std::any_of(said.begin(), said.end(), [](const ScriptEvent& ev) { return ev.kind == "officer" && ev.args[0] == "002"; }));
+        CHECK(std::any_of(said.begin(), said.end(), [](const ScriptEvent& event) { return event.kind == "officer" && event.args[0] == "002"; }));
     }
     // Power: three yards' buffers draining faster than the hub's 600 a tick
     // refills them.
@@ -1530,11 +1530,11 @@ void testAiSides() {
         for (const Unit& u : w3.units())
             yards += u.slot == 1 && u.name == "construction-yard";
         CHECK(yards == 1 && w3.unit(yard));
-        WorldEvent gone;
-        gone.kind = WorldEvent::Destroyed;
-        gone.what = *w3.unit(yard);
+        WorldEvent yardGone;
+        yardGone.kind = WorldEvent::Destroyed;
+        yardGone.what = *w3.unit(yard);
         w3.remove(yard);
-        ai3.observe({gone});
+        ai3.observe({yardGone});
         ai3.advance(2.0);
         yards = 0;
         for (const Unit& u : w3.units())
@@ -2039,7 +2039,7 @@ void testProjectiles() {
         CHECK(std::abs(combatType(64)->weapon.arc - 1.047f) < 0.01f);
         r.unit(apc)->heading = 0; // facing east
         const int behind = spawnObject(r, 0, 'F', *combatType(8), 88000, y, {});
-        auto fired = [&](int ticks) {
+        auto apcFired = [&](int ticks) {
             bool any = false;
             for (int i = 0; i < ticks; ++i) {
                 r.advance(0.05);
@@ -2048,10 +2048,10 @@ void testProjectiles() {
             }
             return any;
         };
-        CHECK(!fired(100) && std::abs(r.unit(apc)->heading) < 0.01f);
+        CHECK(!apcFired(100) && std::abs(r.unit(apc)->heading) < 0.01f);
         r.select({apc});
         r.attack({apc}, behind);
-        CHECK(fired(200));
+        CHECK(apcFired(200));
     }
     // A shell: up its arc and down onto a building 18000 away.
     World a(t);
@@ -2074,14 +2074,14 @@ void testProjectiles() {
     {
         World l(t);
         l.setStance(1, 0, 3);
-        const int gun = spawnObject(l, 1, 'K', *combatType(10), 100000, 100000, {});
+        const int leadGun = spawnObject(l, 1, 'K', *combatType(10), 100000, 100000, {});
         const int scout = spawnObject(l, 0, 'F', *combatType(97), 100000, 115000, {});
         l.moveTo(scout, 250000, 115000);
         float aimX = 0, atX = 0;
         for (int i = 0; i < 200 && aimX == 0; ++i) {
             l.advance(0.05);
             for (const WorldEvent& e : l.takeEvents())
-                if (e.kind == WorldEvent::Shot && e.from == gun && l.unit(scout))
+                if (e.kind == WorldEvent::Shot && e.from == leadGun && l.unit(scout))
                     aimX = e.x1, atX = l.unit(scout)->x;
         }
         CHECK(aimX > atX + 100);

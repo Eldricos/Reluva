@@ -2215,8 +2215,8 @@ bool Economy::raze(int structure) {
             }
             // Its bees fly off.
             if (auto d = depots_.find(s.id); d != depots_.end()) {
-                for (int id : {d->second.worker, d->second.cargo})
-                    if (Bee* b = beeById(id); b && b->site == s.id)
+                for (int beeId : {d->second.worker, d->second.cargo})
+                    if (Bee* b = beeById(beeId); b && b->site == s.id)
                         releaseBee(*b, s.id);
                 d->second.worker = d->second.cargo = 0;
             }
