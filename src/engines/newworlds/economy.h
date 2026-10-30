@@ -137,6 +137,12 @@ struct ColonyStructure {
     }
 };
 
+// Where a mine's mine-exhausted report sits (its ScriptEvent's a, b): the
+// middle of its block, row first, in map cells.
+inline std::pair<int, int> mineReportPlace(const ColonyStructure& mine) {
+    return {mine.blockY * 8 + 4, mine.blockX * 8 + 4};
+}
+
 // The colony's capacity as a program session carries it from mission to
 // mission (exe.md#the-economy: set to 50 once as the game starts, never
 // reset): its value and what housing banked over 90.

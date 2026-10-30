@@ -3,6 +3,8 @@
 
 #include "common/md5.h"
 
+#include "common/bytes.h"
+
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -41,8 +43,7 @@ void Md5::block(const uint8_t* p) {
     const uint32_t* K = constants().k;
     uint32_t m[16];
     for (int i = 0; i < 16; ++i)
-        m[i] = uint32_t(p[i * 4]) | uint32_t(p[i * 4 + 1]) << 8 | uint32_t(p[i * 4 + 2]) << 16 |
-               uint32_t(p[i * 4 + 3]) << 24;
+        m[i] = bytes::u32(p + i * 4);
 
     uint32_t a = state_[0], b = state_[1], c = state_[2], d = state_[3];
     for (int i = 0; i < 64; ++i) {

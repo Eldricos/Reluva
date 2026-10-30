@@ -655,7 +655,7 @@ void MissionSim::step() {
         }
         if (e.kind == "mine-exhausted")
             for (const ColonyStructure& c : economy_->structures())
-                if (c.type == "mining-station" && c.blockY * 8 + 4 == e.a && c.blockX * 8 + 4 == e.b)
+                if (c.type == "mining-station" && mineReportPlace(c) == std::pair(e.a, e.b))
                     alertOn(c.id);
         happened.push_back(std::move(e));
     }

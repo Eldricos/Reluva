@@ -3,8 +3,9 @@
 
 #include "common/video/bink.h"
 
-#include "common/video/bink_tables.h"
+#include "common/bytes.h"
 #include "common/fs.h"
+#include "common/video/bink_tables.h"
 
 #include <algorithm>
 #include <bit>
@@ -17,9 +18,8 @@ namespace reluva::video {
 
 namespace {
 
-uint32_t le32(const uint8_t* p) {
-    return uint32_t(p[0]) | uint32_t(p[1]) << 8 | uint32_t(p[2]) << 16 | uint32_t(p[3]) << 24;
-}
+using bytes::u16;
+using bytes::u32;
 
 // Bits read low bit first from little-endian bytes (Bink's order).
 class Bits {
@@ -931,14 +931,14 @@ Error BinkMovie::open(const std::filesystem::path& file) {
     // The header's size, but never past the file's real end.
     std::error_code ec;
     const uintmax_t real = std::filesystem::file_size(file, ec);
-    fileSize_ = uint32_t(std::min<uint64_t>(uint64_t(le32(h + 4)) + 8, ec ? 0 : real));
-    const uint32_t frames = le32(h + 8);
-    width_ = int(le32(h + 20));
-    height_ = int(le32(h + 24));
-    fpsNum_ = le32(h + 28);
-    fpsDen_ = le32(h + 32);
-    flags_ = le32(h + 36);
-    const uint32_t tracks = le32(h + 40);
+    fileSize_ = uint32_t(std::min<uint64_t>(uint64_t(u32(h + 4)) + 8, ec ? 0 : real));
+    const uint32_t frames = u32(h + 8);
+    width_ = int(u32(h + 20));
+    height_ = int(u32(h + 24));
+    fpsNum_ = u32(h + 28);
+    fpsDen_ = u32(h + 32);
+    flags_ = u32(h + 36);
+    const uint32_t tracks = u32(h + 40);
     // At most 4096x4096 (Bink 1 movies are far smaller), which keeps the
     // planes and bundles below about 160 MB.
     if (!frames || frames > 1000000 || uint64_t(frames) * 4 > fileSize_ || width_ <= 0 || width_ > 4096 ||
@@ -953,8 +953,8 @@ Error BinkMovie::open(const std::filesystem::path& file) {
             return Error::fail("bad Bink audio header");
         for (uint32_t i = 0; i < tracks; ++i) {
             const uint8_t* p = t.data() + tracks * 4 + i * 4;
-            const int flags = p[2] | p[3] << 8;
-            tracks_.push_back({p[0] | p[1] << 8, (flags & 0x2000) != 0, (flags & 0x1000) != 0});
+            const int flags = u16(p + 2);
+            tracks_.push_back({u16(p), (flags & 0x2000) != 0, (flags & 0x1000) != 0});
         }
     }
     std::vector<uint8_t> idx(size_t(frames) * 4);
@@ -962,7 +962,7 @@ Error BinkMovie::open(const std::filesystem::path& file) {
         return Error::fail("bad Bink frame index");
     index_.resize(frames);
     for (uint32_t i = 0; i < frames; ++i)
-        index_[i] = le32(idx.data() + i * 4) & ~1u;
+        index_[i] = u32(idx.data() + i * 4) & ~1u;
     for (uint32_t i = 0; i < frames; ++i)
         if ((i + 1 < frames ? index_[i + 1] : fileSize_) <= index_[i])
             return Error::fail("bad Bink frame index");
@@ -1010,7 +1010,7 @@ Error BinkMovie::nextFrame() {
     for (size_t t = 0; t < tracks_.size(); ++t) {
         if (at + 4 > packet_.size())
             return Error::fail("bad Bink frame");
-        at += 4 + le32(packet_.data() + at);
+        at += 4 + u32(packet_.data() + at);
     }
     if (at > packet_.size())
         return Error::fail("bad Bink frame");
@@ -1078,7 +1078,7 @@ Error BinkMovie::decodeAudio(uint32_t frame, std::vector<int16_t>& out) {
     uint8_t size[4];
     if (!file_.read(reinterpret_cast<char*>(size), 4))
         return Error::fail("Bink audio cut short");
-    const uint32_t n = le32(size);
+    const uint32_t n = u32(size);
     if (n < 4)
         return Error::success();
     const uint32_t end = frame + 1 < index_.size() ? index_[frame + 1] : fileSize_;

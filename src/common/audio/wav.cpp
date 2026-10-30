@@ -3,6 +3,8 @@
 
 #include "common/audio/wav.h"
 
+#include "common/bytes.h"
+
 #include <algorithm>
 #include <cstring>
 #include <string>
@@ -11,8 +13,8 @@ namespace reluva::audio {
 
 namespace {
 
-uint16_t u16(const std::vector<uint8_t>& d, size_t o) { return uint16_t(d[o] | d[o + 1] << 8); }
-uint32_t u32(const std::vector<uint8_t>& d, size_t o) { return uint32_t(u16(d, o)) | uint32_t(u16(d, o + 2)) << 16; }
+using bytes::u16;
+using bytes::u32;
 
 // The IMA ADPCM tables (the published IMA/DVI standard): the quantiser step
 // for each of the 89 step indices, and how each code changes the index.

@@ -110,8 +110,10 @@ std::vector<std::string> costLines(const Stock& c) {
 
 constexpr int kJumpRows = 2; // JUMP TO: an icon's height, in lines
 // The build and vehicle menus' portraits: at their own size, cut to the
-// game's 64 x 60 (its cells are 90 x 60).
+// game's 64 x 60 (its cells are 90 x 60); the first kMenuTitleGap under
+// the title, kMenuIconGap apart, each one's name kMenuNameGap right of it.
 constexpr int kMenuIconW = 64, kMenuIcon = 60;
+constexpr int kMenuTitleGap = 2, kMenuIconGap = 4, kMenuNameGap = 6;
 
 // The play screen's layout (gui.md#the-in-game-interface), on the 640 x
 // 480 screen; a panel's lines of text add to the heights.
@@ -129,8 +131,48 @@ constexpr int kTricorderH = 102, kTricorderMapTop = 14, kTricorderMapCut = 34;
 // COMMUNICATIONS: 220 wide, 70 high over its row of buttons.
 constexpr int kCommsW = 220, kCommsH = 70;
 constexpr int kCommandW = 260; // COMMAND
-// The playbook: icons 32 across, in a column 4 apart.
+// The playbook: icons 32 across, in a column 4 apart, kPlaybookRight left
+// of the right-hand panels and kPlaybookFoot over the screen's foot; the
+// name under the pointer in a bar kPlaybookGap left of its icon, the name
+// kPlaybookLabelX and kPlaybookLabelY in from the bar's edges.
 constexpr int kPlaybookIcon = 32, kPlaybookGap = 4;
+constexpr int kPlaybookRight = 8, kPlaybookFoot = 4;
+constexpr int kPlaybookLabelX = 5, kPlaybookLabelY = 3;
+
+constexpr int kStripTop = 2; // the compass strip (or the Tricorder's readout) along the top
+
+// A panel's text buttons: the label kButtonPad in from each end, the
+// button kButtonRise above and below its line, kButtonGap to the next in
+// its row. COMMUNICATIONS' buttons and ALLY's postures are tighter
+// (kTightPad each end; COMMUNICATIONS' as far apart), the menus' arrows
+// wider (kArrowPad each end, kArrowGap apart), the quit box's YES and NO
+// wider still (kQuitButtonPad each end).
+constexpr int kButtonPad = 4, kButtonRise = 2, kButtonGap = 4;
+constexpr int kTightPad = 3;
+constexpr int kArrowPad = 5, kArrowGap = 6;
+constexpr int kQuitButtonPad = 6;
+// A button that is a whole line of a list (a course, an officer's card, a
+// site going up, an order, an ALLY race): kRowInset in from the panel's
+// sides; the button rows wrap there too.
+constexpr int kRowInset = 6;
+// A row of buttons along a panel's foot (TRICORDER, COMMUNICATIONS): its
+// line kButtonRowFoot and a line above the foot; the line over it (the
+// Tricorder's readout, the message's last) kOverButtonRowFoot and two.
+constexpr int kButtonRowFoot = 11, kOverButtonRowFoot = 14;
+// A selected object's hit points: a bar kHpBarH high, kHpBarGap under its
+// lines and over what follows.
+constexpr int kHpBarH = 4, kHpBarGap = 2;
+// JUMP TO's icons: kJumpGapX between its two columns, kJumpGapY between rows.
+constexpr int kJumpGapX = 8, kJumpGapY = 2;
+// ALLY: its rows a line and kAllyRowGap apart; a race's postures
+// kAllyIndent in from the panel's left.
+constexpr int kAllyRowGap = 2, kAllyIndent = 14;
+// COMMUNICATIONS: the message beside its sender's 44 x 41 portrait,
+// kCommsText from the panel's left, its first line kCommsTop under the top.
+constexpr int kCommsText = 58, kCommsTop = 14;
+// Escape's box: at least kQuitMinW wide, its question kQuitMargin in from
+// each side and kQuitFirstLine under the top.
+constexpr int kQuitMinW = 180, kQuitMargin = 20, kQuitFirstLine = 18;
 
 } // namespace
 
@@ -177,7 +219,8 @@ void MissionViewer::drawPlaybook() {
     if (play_.playbook.empty())
         return;
     const int n = int(play_.playbook.size());
-    play_.playbookAt = {screen_.w - sideW_ - kPlaybookIcon - 8, screen_.h - n * (kPlaybookIcon + kPlaybookGap) - 4};
+    play_.playbookAt = {screen_.w - sideW_ - kPlaybookIcon - kPlaybookRight,
+                         screen_.h - n * (kPlaybookIcon + kPlaybookGap) - kPlaybookFoot};
     for (int i = 0; i < n; ++i) {
         const Rect r = playbookIcon(i);
         if (const Texture* t = ui_.icon(play_.playbook[size_t(i)].icon))
@@ -187,9 +230,10 @@ void MissionViewer::drawPlaybook() {
                           ui_.brightColor());
         if (r.contains(mouseX_, mouseY_)) {
             const std::string name = play_.playbook[size_t(i)].name;
-            const int w = ui_.smallWidth(name) + 10, bx = r.x - w - 4, by = r.y + r.h / 2 - ui_.smallHeight() / 2 - 3;
-            fillRect(screen_, bx, by, w, ui_.smallHeight() + 6, Color{30, 120, 40});
-            ui_.drawSmall(screen_, bx + 5, by + 3, name, Color{220, 255, 220});
+            const int w = ui_.smallWidth(name) + 2 * kPlaybookLabelX, bx = r.x - w - kPlaybookGap,
+                      by = r.y + r.h / 2 - ui_.smallHeight() / 2 - kPlaybookLabelY;
+            fillRect(screen_, bx, by, w, ui_.smallHeight() + 2 * kPlaybookLabelY, Color{30, 120, 40});
+            ui_.drawSmall(screen_, bx + kPlaybookLabelX, by + kPlaybookLabelY, name, Color{220, 255, 220});
         }
     }
 }
@@ -513,7 +557,7 @@ void MissionViewer::drawPlay() {
             float cx = 0, cy = 0;
             map_.cameraTarget(cx, cy);
             const std::string line = tricorderReadoutAt(cx, cy, 1500.0f);
-            ui_.drawSmall(screen_, (screen_.w - ui_.smallWidth(line)) / 2, 2, line, Color{220, 220, 225});
+            ui_.drawSmall(screen_, (screen_.w - ui_.smallWidth(line)) / 2, kStripTop, line, Color{220, 220, 225});
         }
         // What the side sees: its own green (selected orange), those
         // hostile to it red, the rest yellow.
@@ -538,17 +582,18 @@ void MissionViewer::drawPlay() {
     }
     // Escape's box (Reluva's wording).
     if (play_.quitAsked) {
-        const int lh = ui_.smallHeight() + 2, w = std::max(180, ui_.smallWidth("LEAVE THIS MISSION?") + 40),
+        const int lh = ui_.smallHeight() + 2, w = std::max(kQuitMinW, ui_.smallWidth("LEAVE THIS MISSION?") + 2 * kQuitMargin),
                   h = kPanelTitleH + lh * 3;
         const int x = (screen_.w - w) / 2, y = (screen_.h - h) / 2;
         ui_.drawPanel(screen_, x, y, w, h, "QUIT");
         const std::string q = "LEAVE THIS MISSION?";
-        ui_.drawSmall(screen_, x + (w - ui_.smallWidth(q)) / 2, y + 18, q, ui_.brightColor());
-        const int by = y + 18 + lh * 2, yw = ui_.smallWidth("YES") + 12, nw = ui_.smallWidth("NO") + 12;
-        quitYes_ = {x + w / 4 - yw / 2, by - 2, yw, lh + 4};
-        quitNo_ = {x + 3 * w / 4 - nw / 2, by - 2, nw, lh + 4};
-        ui_.drawSmall(screen_, quitYes_.x + 6, by, "YES", ui_.brightColor());
-        ui_.drawSmall(screen_, quitNo_.x + 6, by, "NO", ui_.brightColor());
+        ui_.drawSmall(screen_, x + (w - ui_.smallWidth(q)) / 2, y + kQuitFirstLine, q, ui_.brightColor());
+        const int by = y + kQuitFirstLine + lh * 2, yw = ui_.smallWidth("YES") + 2 * kQuitButtonPad,
+                  nw = ui_.smallWidth("NO") + 2 * kQuitButtonPad;
+        quitYes_ = {x + w / 4 - yw / 2, by - kButtonRise, yw, lh + 2 * kButtonRise};
+        quitNo_ = {x + 3 * w / 4 - nw / 2, by - kButtonRise, nw, lh + 2 * kButtonRise};
+        ui_.drawSmall(screen_, quitYes_.x + kQuitButtonPad, by, "YES", ui_.brightColor());
+        ui_.drawSmall(screen_, quitNo_.x + kQuitButtonPad, by, "NO", ui_.brightColor());
     }
 }
 
@@ -587,7 +632,7 @@ void MissionViewer::drawInterface() {
             const int adv = ui_.smallWidth("-");
             int x = screen_.w / 2 - adv * int(strip.size() / 2) - adv / 2;
             for (size_t i = 0; i < strip.size(); ++i, x += adv)
-                ui_.drawSmall(screen_, x, 2, std::string(1, strip[i]), pale);
+                ui_.drawSmall(screen_, x, kStripTop, std::string(1, strip[i]), pale);
         }
     }
 
@@ -646,7 +691,7 @@ void MissionViewer::drawInterface() {
                                                                   : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = kColonyTop + lines * lh + kColonyFoot;
         ui_.drawPanel(screen_, x, y, w, h, play_.vehicleMenu && !play_.buildMenu ? "ENGINEERING" : "NEW WORLDS");
-        play_.panels.push_back({x, y, w, h, play_.buttons.size()});
+        play_.panels.push_back({{x, y, w, h}, play_.buttons.size()});
         // The Romulans start with a little less (most of their recordings).
         static const char* const kNames[] = {"DILITHIUM", "POLYCOMP", "THERMOCONC", "TRANSALUMIN", "NITRIUM", "DURANIUM"};
         static constexpr int kStart[] = {500, 1000, 2300, 500, 4000, 5000}, kRomulan[] = {500, 988, 2211, 497, 3500, 5000};
@@ -692,7 +737,7 @@ void MissionViewer::drawInterface() {
                 const int cy = ty + lh * int(i + 1);
                 ui_.drawSmall(screen_, x + kTextLeft, cy, training[i], c.running ? bright : text);
                 if (!c.finished && !c.running)
-                    play_.buttons.push_back({x + 6, cy, w - 12, lh, "course" + std::to_string(i)});
+                    play_.buttons.push_back({{x + kRowInset, cy, w - 2 * kRowInset, lh}, "course" + std::to_string(i)});
             }
         } else if (play_.staffView && fieldWork_) {
             // The officers' cards: each one's own face, then rank
@@ -704,9 +749,9 @@ void MissionViewer::drawInterface() {
             // TRAINING, lit while a course is still to be had.
             const auto& courses = fieldWork_->courses();
             if (std::any_of(courses.begin(), courses.end(), [](const FieldWork::Course& c) { return !c.finished; })) {
-                const int bw = ui_.smallWidth("TRAINING") + 8, bx = x + w - bw - 8;
-                ui_.drawSmall(screen_, bx + 4, ty, "TRAINING", ui_.titleColor());
-                play_.buttons.push_back({bx, ty - 2, bw, lh + 4, "training"});
+                const int bw = ui_.smallWidth("TRAINING") + 2 * kButtonPad, bx = x + w - bw - 8;
+                ui_.drawSmall(screen_, bx + kButtonPad, ty, "TRAINING", ui_.titleColor());
+                play_.buttons.push_back({{bx, ty - kButtonRise, bw, lh + 2 * kButtonRise}, "training"});
             }
             for (size_t i = 0; i * 3 < cards.size(); ++i) {
                 const int cy = ty + lh * int(1 + i * 3);
@@ -716,7 +761,7 @@ void MissionViewer::drawInterface() {
                 for (int k = 0; k < 3; ++k)
                     ui_.drawSmall(screen_, x + 12 + lh * 3, cy + lh * k, cards[i * 3 + size_t(k)],
                                   int(i) == play_.pickedOfficer ? bright : k == 0 ? ui_.titleColor() : text);
-                play_.buttons.push_back({x + 6, cy, w - 12, lh * 3, "officer" + std::to_string(i)});
+                play_.buttons.push_back({{x + kRowInset, cy, w - 2 * kRowInset, lh * 3}, "officer" + std::to_string(i)});
             }
         } else if (picked) {
             // One object, a unit or a building: the game's panel, with its
@@ -730,26 +775,27 @@ void MissionViewer::drawInterface() {
                 if (entry < pending.size() &&
                     (info[i].rfind("BUILDING ", 0) == 0 || info[i].rfind("ENGINEERING ", 0) == 0))
                     play_.buttons.push_back(
-                        {x + 6, ty + lh * int(i), w - 12, lh, "cancel" + std::to_string(pending[entry++])});
+                        {{x + kRowInset, ty + lh * int(i), w - 2 * kRowInset, lh}, "cancel" + std::to_string(pending[entry++])});
             }
-            const int by = ty + lh * int(info.size()) + 2, bw = w - 20;
+            const int by = ty + lh * int(info.size()) + kHpBarGap, bw = w - 2 * kTextLeft;
             const float share = std::clamp(picked->hp / std::max(1.0f, picked->maxHp), 0.0f, 1.0f);
             const int full = int(float(bw) * share);
-            fillRect(screen_, x + kTextLeft, by, full, 4, share < 0.3f ? Color{230, 60, 70} : Color{60, 210, 70});
-            fillRect(screen_, x + kTextLeft + full, by, bw - full, 4, Color{40, 40, 50});
+            fillRect(screen_, x + kTextLeft, by, full, kHpBarH, share < 0.3f ? Color{230, 60, 70} : Color{60, 210, 70});
+            fillRect(screen_, x + kTextLeft + full, by, bw - full, kHpBarH, Color{40, 40, 50});
             if (play_.pendingOrder)
-                ui_.drawSmall(screen_, x + kTextLeft, by + 6, pendingOrderName(), bright);
-            // Its buttons, in a row (wrapping) under the bar.
-            int bx = x + kTextLeft, byy = by + 8;
+                ui_.drawSmall(screen_, x + kTextLeft, by + kHpBarH + kHpBarGap, pendingOrderName(), bright);
+            // Its buttons, in a row (wrapping) under the bar, a line over
+            // and under each.
+            int bx = x + kTextLeft, byy = by + kHpBarH + kHpBarGap + kButtonRise;
             for (const auto& [label, action] : actions) {
-                const int buttonW = ui_.smallWidth(label) + 8;
-                if (bx + buttonW > x + w - 6)
-                    bx = x + kTextLeft, byy += lh + 4;
-                fillRect(screen_, bx, byy - 2, buttonW, 1, text);
-                fillRect(screen_, bx, byy + lh + 1, buttonW, 1, text);
-                ui_.drawSmall(screen_, bx + 4, byy, label, bright);
-                play_.buttons.push_back({bx, byy - 2, buttonW, lh + 4, action});
-                bx += buttonW + 4;
+                const int buttonW = ui_.smallWidth(label) + 2 * kButtonPad;
+                if (bx + buttonW > x + w - kRowInset)
+                    bx = x + kTextLeft, byy += lh + 2 * kButtonRise;
+                fillRect(screen_, bx, byy - kButtonRise, buttonW, 1, text);
+                fillRect(screen_, bx, byy + lh + kButtonRise - 1, buttonW, 1, text);
+                ui_.drawSmall(screen_, bx + kButtonPad, byy, label, bright);
+                play_.buttons.push_back({{bx, byy - kButtonRise, buttonW, lh + 2 * kButtonRise}, action});
+                bx += buttonW + kButtonGap;
             }
         } else if (sel.size() > 1) {
             // MULTISELECTION (exe.md#the-multiselection): pages of 15, three
@@ -782,7 +828,7 @@ void MissionViewer::drawInterface() {
                 const int green = int(32 * std::clamp(m->hp / std::max(1.0f, m->maxHp), 0.0f, 1.0f));
                 fillRect(screen_, cx + 7, cy + 37, green, 3, Color{0, 255, 0});
                 fillRect(screen_, cx + 7 + green, cy + 37, 32 - green, 3, Color{255, 0, 0});
-                play_.buttons.push_back({cx, cy, kMultiCellW, kMultiCellH, "msel" + std::to_string(m->id)});
+                play_.buttons.push_back({{cx, cy, kMultiCellW, kMultiCellH}, "msel" + std::to_string(m->id)});
             }
             int by = gy + kMultiCellH * int((std::min(sel.size() - first, kMultiPage) + 2) / 3) + 2;
             if (play_.pendingOrder)
@@ -792,11 +838,11 @@ void MissionViewer::drawInterface() {
                      {"<", "msel-prev"}, {"DELETE", "msel-delete"}, {"INVERT", "msel-invert"}, {">", "msel-next"}}) {
                 const bool off = (action == "msel-prev" && play_.multiPage == 0) ||
                                  (action == "msel-next" && play_.multiPage + 1 >= pages);
-                const int bw = ui_.smallWidth(label) + 8;
-                ui_.drawSmall(screen_, bx + 4, by + 2, label, off ? text : bright);
+                const int bw = ui_.smallWidth(label) + 2 * kButtonPad;
+                ui_.drawSmall(screen_, bx + kButtonPad, by + kButtonRise, label, off ? text : bright);
                 if (!off)
-                    play_.buttons.push_back({bx, by, bw, lh + 4, action});
-                bx += bw + 4;
+                    play_.buttons.push_back({{bx, by, bw, lh + 2 * kButtonRise}, action});
+                bx += bw + kButtonGap;
             }
         } else {
             if (economy_) {
@@ -826,9 +872,9 @@ void MissionViewer::drawInterface() {
                 ty += lh * 2;
                 ui_.drawSmall(screen_, x + kTextLeft, ty, "JUMP TO", bright);
                 ty += lh;
-                const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0, icon = lh * kJumpRows - 2;
+                const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0, icon = lh * kJumpRows - kJumpGapY;
                 for (int i = 0; i < 10; ++i) {
-                    const int ix = x + kTextLeft + (i / 5) * (icon + 8), iy = ty + (i % 5) * (icon + 2);
+                    const int ix = x + kTextLeft + (i / 5) * (icon + kJumpGapX), iy = ty + (i % 5) * (icon + kJumpGapY);
                     int type = i < 5 ? kJumpIcons[race][i] : 0;
                     if (i >= 5)
                         if (const auto& g = world_->group(i - 4); !g.empty())
@@ -841,7 +887,7 @@ void MissionViewer::drawInterface() {
                               Color{uint8_t(text.r / 2), uint8_t(text.g / 2), uint8_t(text.b / 2)});
                     if (i >= 5 && !t)
                         ui_.drawSmall(screen_, ix + icon / 2 - 3, iy + icon / 2 - lh / 2, std::to_string(i - 4), text);
-                    play_.buttons.push_back({ix, iy, icon, icon, "jump" + std::to_string(i)});
+                    play_.buttons.push_back({{ix, iy, icon, icon}, "jump" + std::to_string(i)});
                 }
             }
         }
@@ -852,9 +898,9 @@ void MissionViewer::drawInterface() {
     // main view instead: drawPlay()); a line naming what's under the
     // pointer (else the view and zoom); COMMS, ALLY, ZOOM under it.
     {
-        const int x = screen_.w - sideW, w = sideW, h = kTricorderH + lh + 4, y = screen_.h - h;
+        const int x = screen_.w - sideW, w = sideW, h = kTricorderH + lh + 2 * kButtonRise, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
-        play_.panels.push_back({x, y, w, h, play_.buttons.size()});
+        play_.panels.push_back({{x, y, w, h}, play_.buttons.size()});
         const int mx = x + kPanelInset, my = y + kTricorderMapTop, mw = w - 2 * kPanelInset,
                   mh = h - kTricorderMapCut - 2 * lh;
         const int tiles = kTricorderTiles << tricorderZoom_;
@@ -888,27 +934,28 @@ void MissionViewer::drawInterface() {
                     fillRect(screen_, px, py, 2, 2, fill);
                 }
             // With the full-screen Tricorder up its line carries the compass.
-            ui_.drawSmall(screen_, x + kTextLeft, y + h - 14 - 2 * lh,
+            ui_.drawSmall(screen_, x + kTextLeft, y + h - kOverButtonRowFoot - 2 * lh,
                           play_.tricorderFull ? compassStrip() : tricorderReadout(relief), text);
         }
         int bx = x + kTextLeft;
+        const int by = y + h - kButtonRowFoot - lh;
         for (const auto& [label, action] : {std::pair{"COMMS", "tri-comms"}, std::pair{"ALLY", "tri-ally"},
                                             std::pair{"ZOOM", "tri-zoom"}}) {
-            const int bw = ui_.smallWidth(label) + 8;
-            ui_.drawSmall(screen_, bx + 4, y + h - 11 - lh, label,
+            const int bw = ui_.smallWidth(label) + 2 * kButtonPad;
+            ui_.drawSmall(screen_, bx + kButtonPad, by, label,
                           play_.allyOpen && std::string_view(action) == "tri-ally" ? bright : text);
-            play_.buttons.push_back({bx, y + h - 13 - lh, bw, lh + 4, action});
-            bx += bw + 4;
+            play_.buttons.push_back({{bx, by - kButtonRise, bw, lh + 2 * kButtonRise}, action});
+            bx += bw + kButtonGap;
         }
         // ALLY: a row for each other race in the mission, the player's
         // posture towards it; a click on one offers FRIENDLY, NEUTRAL,
         // HOSTILE.
         if (play_.allyOpen && world_) {
             const auto others = allyRaces();
-            const int ah = kPanelTitleH + int(others.size() + (play_.allyPick >= 0 ? 1 : 0)) * (lh + 2);
+            const int ah = kPanelTitleH + int(others.size() + (play_.allyPick >= 0 ? 1 : 0)) * (lh + kAllyRowGap);
             const int ay = y - ah;
             ui_.drawPanel(screen_, x, ay, w, ah, "ALLY");
-            play_.panels.push_back({x, ay, w, ah, play_.buttons.size()});
+            play_.panels.push_back({{x, ay, w, ah}, play_.buttons.size()});
             int ry = ay + kPanelFirstLine;
             for (int slot : others) {
                 const int st = world_->stance(playerSlot_, slot);
@@ -917,17 +964,19 @@ void MissionViewer::drawInterface() {
                 ui_.drawSmall(screen_, x + kTextLeft, ry, name, slot == play_.allyPick ? bright : text);
                 ui_.drawSmall(screen_, x + w - kPanelInset - ui_.smallWidth(word), ry, word,
                               st == 3 ? Color{255, 90, 70} : text);
-                play_.buttons.push_back({x + 6, ry - 1, w - 12, lh + 2, "ally-race" + std::to_string(slot)});
-                ry += lh + 2;
+                // (Each button its row: the line and half the gap each side.)
+                play_.buttons.push_back({{x + kRowInset, ry - kAllyRowGap / 2, w - 2 * kRowInset, lh + kAllyRowGap},
+                                         "ally-race" + std::to_string(slot)});
+                ry += lh + kAllyRowGap;
                 if (slot == play_.allyPick) {
-                    int ox = x + 14;
+                    int ox = x + kAllyIndent;
                     for (const auto& [label, v] : {std::pair{"FRIENDLY", 1}, std::pair{"NEUTRAL", 2}, std::pair{"HOSTILE", 3}}) {
-                        const int bw = ui_.smallWidth(label) + 6;
-                        ui_.drawSmall(screen_, ox + 3, ry, label, bright);
-                        play_.buttons.push_back({ox, ry - 1, bw, lh + 2, "ally-set" + std::to_string(v)});
-                        ox += bw + 4;
+                        const int bw = ui_.smallWidth(label) + 2 * kTightPad;
+                        ui_.drawSmall(screen_, ox + kTightPad, ry, label, bright);
+                        play_.buttons.push_back({{ox, ry - kAllyRowGap / 2, bw, lh + kAllyRowGap}, "ally-set" + std::to_string(v)});
+                        ox += bw + kButtonGap;
                     }
-                    ry += lh + 2;
+                    ry += lh + kAllyRowGap;
                 }
             }
         }
@@ -938,9 +987,9 @@ void MissionViewer::drawInterface() {
     // first / previous / next / last arrows, MISSION (the objectives) and
     // X (the panel away until the next message).
     if (!play_.commsClosed) {
-        const int w = kCommsW, h = kCommsH + lh + 4, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
+        const int w = kCommsW, h = kCommsH + lh + 2 * kButtonRise, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "COMMUNICATIONS");
-        play_.panels.push_back({x, y, w, h, play_.buttons.size()});
+        play_.panels.push_back({{x, y, w, h}, play_.buttons.size()});
         const int n = int(log_.size());
         const int shown = play_.commsShown < 0 || play_.commsShown >= n ? n - 1 : play_.commsShown;
         if (log_.empty()) {
@@ -954,27 +1003,27 @@ void MissionViewer::drawInterface() {
             const Texture* face = ui_.messageFace(messageOfficer(level.shortName, side, section));
             if (const Texture* p = face ? face : ui_.portraitFor(sender, natives))
                 ui_.drawPicture(screen_, *p, x + kTextLeft, y + 13, 44, 41);
-            int ty = y + 14;
-            ui_.drawSmall(screen_, x + 58, ty, upperCase(sender + ":"), text);
-            for (const std::string& l : ui_.wrapSmall(message, w - 70)) {
+            int ty = y + kCommsTop;
+            ui_.drawSmall(screen_, x + kCommsText, ty, upperCase(sender + ":"), text);
+            for (const std::string& l : ui_.wrapSmall(message, w - kCommsText - kPanelInset)) {
                 ty += lh;
-                if (ty > y + h - 14 - 2 * lh)
+                if (ty > y + h - kOverButtonRowFoot - 2 * lh)
                     break;
-                ui_.drawSmall(screen_, x + 58, ty, l, text);
+                ui_.drawSmall(screen_, x + kCommsText, ty, l, text);
             }
             const std::string counter = std::to_string(shown + 1) + "/" + std::to_string(n);
-            ui_.drawSmall(screen_, x + w - kPanelInset - ui_.smallWidth(counter), y + 14, counter, text);
+            ui_.drawSmall(screen_, x + w - kPanelInset - ui_.smallWidth(counter), y + kCommsTop, counter, text);
         }
         int bx = x + kTextLeft;
-        const int by = y + h - 11 - lh;
+        const int by = y + h - kButtonRowFoot - lh;
         for (const auto& [label, action] : {std::pair{"DELETE", "comms-delete"}, std::pair{"|<", "comms-first"},
                                             std::pair{"<", "comms-prev"}, std::pair{">", "comms-next"},
                                             std::pair{">|", "comms-last"}, std::pair{"MISSION", "comms-mission"},
                                             std::pair{"X", "comms-close"}}) {
-            const int bw = ui_.smallWidth(label) + 6;
-            ui_.drawSmall(screen_, bx + 3, by, label, bright);
-            play_.buttons.push_back({bx, by - 2, bw, lh + 4, action});
-            bx += bw + 3;
+            const int bw = ui_.smallWidth(label) + 2 * kTightPad;
+            ui_.drawSmall(screen_, bx + kTightPad, by, label, bright);
+            play_.buttons.push_back({{bx, by - kButtonRise, bw, lh + 2 * kButtonRise}, action});
+            bx += bw + kTightPad;
         }
     }
 
@@ -999,7 +1048,7 @@ void MissionViewer::drawInterface() {
         }
         const int h = kPanelTitleH + int(lines.size()) * lh;
         ui_.drawPanel(screen_, 0, 0, w, h, "COMMAND");
-        play_.panels.push_back({0, 0, w, h, play_.buttons.size()});
+        play_.panels.push_back({{0, 0, w, h}, play_.buttons.size()});
         for (size_t i = 0; i < lines.size(); ++i)
             ui_.drawSmall(screen_, kPanelInset, kPanelFirstLine + int(i) * lh, lines[i].first, lines[i].second);
     }
@@ -1009,7 +1058,7 @@ void MissionViewer::drawInterface() {
 int MissionViewer::menuLines(int lh) const {
     // The title, three icons, the hovered item's name, role and cost, the
     // arrows.
-    return 1 + (3 * (kMenuIcon + 4) + lh - 1) / lh + 2 + kMaterials + 1;
+    return 1 + (3 * (kMenuIcon + kMenuIconGap) + lh - 1) / lh + 2 + kMaterials + 1;
 }
 
 // The build and vehicle menus as the game's: three portraits a page (the
@@ -1055,7 +1104,7 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
     if (items.empty())
         ui_.drawSmall(screen_, x + kTextLeft, ty + lh, play_.vehicleMenu ? "NO VEHICLE YARD" : "NOTHING TO BUILD",
                       text);
-    int iy = ty + lh + 2;
+    int iy = ty + lh + kMenuTitleGap;
     int shown = -1; // the item at the foot
     for (int k = 0; k < 3; ++k) {
         const int i = play_.menuPage * 3 + k;
@@ -1066,7 +1115,7 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
         if (const Texture* t = ui_.objectPortrait(it.portrait))
             ui_.drawPicture(screen_, *t, ix, iy, kMenuIconW, kMenuIcon, true);
         const bool flash = play_.menuFlash.first == i && nowMs_ - play_.menuFlash.second < 300;
-        const Rect cell{ix, iy, w - 16, kMenuIcon}; // drawn, hovered and clicked
+        const Rect cell{ix, iy, w - kTextLeft - kRowInset, kMenuIcon}; // drawn, hovered and clicked
         const bool over = cell.contains(mouseX_, mouseY_);
         if (over)
             shown = i;
@@ -1074,15 +1123,15 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
         frameRect(screen_, ix - 1, iy - 1, kMenuIconW + 2, kMenuIcon + 2, frame);
         ui_.drawSmall(screen_, ix + 2, iy + 1, std::to_string((i + 1) % 10), bright);
         int ny = iy;
-        for (const std::string& l : ui_.wrapSmall(it.name, w - kMenuIconW - 26)) {
-            ui_.drawSmall(screen_, ix + kMenuIconW + 6, ny, l, !it.open ? dim : it.pays ? bright : text);
+        for (const std::string& l : ui_.wrapSmall(it.name, w - 2 * kTextLeft - kMenuIconW - kMenuNameGap)) {
+            ui_.drawSmall(screen_, ix + kMenuIconW + kMenuNameGap, ny, l, !it.open ? dim : it.pays ? bright : text);
             ny += lh;
         }
-        play_.buttons.push_back({cell.x, cell.y, cell.w, cell.h, "menu-item" + std::to_string(i)});
-        iy += kMenuIcon + 4;
+        play_.buttons.push_back({cell, "menu-item" + std::to_string(i)});
+        iy += kMenuIcon + kMenuIconGap;
     }
     // The foot: what's under the pointer, else the page's first.
-    int fy = ty + lh + 2 + 3 * (kMenuIcon + 4);
+    int fy = ty + lh + kMenuTitleGap + 3 * (kMenuIcon + kMenuIconGap);
     if (shown < 0 && play_.menuPage * 3 < int(items.size()))
         shown = play_.menuPage * 3;
     if (shown >= 0) {
@@ -1099,10 +1148,10 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
     // The arrows, the page, X.
     int bx = x + kTextLeft;
     for (const auto& [label, action] : {std::pair{"<", "menu-prev"}, std::pair{">", "menu-next"}, std::pair{"X", "menu-close"}}) {
-        const int bw = ui_.smallWidth(label) + 10;
-        ui_.drawSmall(screen_, bx + 5, fy, label, bright);
-        play_.buttons.push_back({bx, fy - 2, bw, lh + 4, action});
-        bx += bw + 6;
+        const int bw = ui_.smallWidth(label) + 2 * kArrowPad;
+        ui_.drawSmall(screen_, bx + kArrowPad, fy, label, bright);
+        play_.buttons.push_back({{bx, fy - kButtonRise, bw, lh + 2 * kButtonRise}, action});
+        bx += bw + kArrowGap;
     }
     ui_.drawSmall(screen_, bx + 4, fy, std::to_string(play_.menuPage + 1) + "/" + std::to_string(pages), text);
     // The yards' work: the side's orders, in work then waiting; a click on
@@ -1121,7 +1170,7 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
                                : "> " + name + " IN QUEUE",
                       asked ? bright : text);
         if (!j.asker && j.rollout < 0)
-            play_.buttons.push_back({x + 6, ly, w - 12, lh, "order" + std::to_string(j.id)});
+            play_.buttons.push_back({{x + kRowInset, ly, w - 2 * kRowInset, lh}, "order" + std::to_string(j.id)});
     }
 }
 

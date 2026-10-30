@@ -3,6 +3,7 @@
 
 #include "common/savestate.h"
 
+#include "common/bytes.h"
 #include "common/fs.h"
 
 #include <algorithm>
@@ -122,7 +123,7 @@ bool getU32(std::ifstream& in, uint32_t& v) {
     uint8_t b[4];
     if (!in.read(reinterpret_cast<char*>(b), 4))
         return false;
-    v = uint32_t(b[0]) | uint32_t(b[1]) << 8 | uint32_t(b[2]) << 16 | uint32_t(b[3]) << 24;
+    v = bytes::u32(b);
     return true;
 }
 

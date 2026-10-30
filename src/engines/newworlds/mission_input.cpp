@@ -632,7 +632,7 @@ int MissionViewer::panelAt(int x, int y) const {
     if (!interface_)
         return -1;
     for (size_t i = play_.panels.size(); i-- > 0;)
-        if (const PanelArea& p = play_.panels[i]; x >= p.x && y >= p.y && x < p.x + p.w && y < p.y + p.h)
+        if (play_.panels[i].at.contains(x, y))
             return int(i);
     return -1;
 }
@@ -645,7 +645,7 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
     const size_t first = panel < 0 ? 0 : play_.panels[size_t(panel)].firstButton;
     for (size_t i = play_.buttons.size(); i-- > first;) {
         const PanelButton& b = play_.buttons[i];
-        if (x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h)
+        if (!b.at.contains(x, y))
             continue;
         const bool entry = b.action.rfind("msel", 0) == 0 && b.action.size() > 4 && std::isdigit(uint8_t(b.action[4]));
         if (right && !entry)

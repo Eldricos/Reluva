@@ -953,14 +953,14 @@ private:
     };
     // Buttons drawn on the panels this frame: where, and what they do.
     struct PanelButton {
-        int x, y, w, h;
+        Rect at;
         std::string action;
     };
     // The panels drawn this frame, in order (each over those before): where,
     // and its first button in buttons (those after it, up to the next
     // panel's, are its own). A click inside one is the interface's.
     struct PanelArea {
-        int x, y, w, h;
+        Rect at;
         size_t firstButton;
     };
     struct Flash {

@@ -1383,7 +1383,8 @@ void Economy::dig(ColonyStructure& mine, std::array<int64_t, kOres>& into, std::
         it->second -= 1;
         if (!mineTake(mine, into)) {
             mine.exhausted = true;
-            out.push_back({"mine-exhausted", {}, mine.blockY * 8 + 4, mine.blockX * 8 + 4});
+            const auto [a, b] = mineReportPlace(mine);
+            out.push_back({"mine-exhausted", {}, a, b});
             break;
         }
     }

@@ -10,6 +10,18 @@
 
 namespace reluva::newworlds {
 
+namespace {
+
+// MISSION REPORT: in the screen's right half, kReportMargin in from its
+// sides, at most kReportW wide and at least kReportRight from the screen's
+// edge; a line and kReportFoot more under its lines.
+constexpr int kReportW = 300, kReportMargin = 10, kReportRight = 8, kReportFoot = 16;
+// CONTINUE: its label kContinuePadX and kContinuePadY in from the edges, the
+// button kContinueRight and kContinueFoot in from the screen's corner.
+constexpr int kContinuePadX = 8, kContinuePadY = 4, kContinueRight = 16, kContinueFoot = 12;
+
+} // namespace
+
 void MissionViewer::startFlow() {
     stopBriefing();
     stopPlay();
@@ -96,7 +108,7 @@ void MissionViewer::drawFlow() {
         // fail criterion that fired.
         std::vector<std::pair<std::string, Color>> lines;
         lines.push_back({"MISSION LOG", ui_.brightColor()});
-        const int w = std::min(300, screen_.w / 2 - 20);
+        const int w = std::min(kReportW, screen_.w / 2 - 2 * kReportMargin);
         if (!flowWon_ && run_ && run_->failedCriterion()) {
             const std::string* t = table_.find(run_->failedCriterion());
             for (const std::string& l :
@@ -113,18 +125,18 @@ void MissionViewer::drawFlow() {
                 for (const std::string& l : ui_.wrapSmall(line, w - 2 * kPanelInset))
                     lines.push_back({l, st == MissionRun::State::Complete ? ui_.brightColor() : ui_.textColor()});
             }
-        const int h = kPanelTitleH + int(lines.size()) * lh + lh + 16;
-        const int x = std::min(screen_.w / 2 + 10, screen_.w - w - 8), y = (screen_.h - h) / 2;
+        const int h = kPanelTitleH + int(lines.size()) * lh + lh + kReportFoot;
+        const int x = std::min(screen_.w / 2 + kReportMargin, screen_.w - w - kReportRight), y = (screen_.h - h) / 2;
         ui_.drawPanel(screen_, x, y, w, h, "MISSION REPORT");
         for (size_t i = 0; i < lines.size(); ++i)
             ui_.drawSmall(screen_, x + kPanelInset, y + kPanelFirstLine + int(i) * lh, lines[i].first, lines[i].second);
         // CONTINUE, bottom right.
         const std::string label = "CONTINUE";
-        const int bw = ui_.smallWidth(label) + 16, bh = lh + 8;
-        continue_ = {screen_.w - bw - 16, screen_.h - bh - 12, bw, bh};
+        const int bw = ui_.smallWidth(label) + 2 * kContinuePadX, bh = lh + 2 * kContinuePadY;
+        continue_ = {screen_.w - bw - kContinueRight, screen_.h - bh - kContinueFoot, bw, bh};
         fillRect(screen_, continue_.x, continue_.y, bw, bh, Color{10, 20, 40});
         frameRect(screen_, continue_.x, continue_.y, bw, bh, ui_.textColor());
-        ui_.drawSmall(screen_, continue_.x + 8, continue_.y + 4, label, ui_.brightColor());
+        ui_.drawSmall(screen_, continue_.x + kContinuePadX, continue_.y + kContinuePadY, label, ui_.brightColor());
         return;
     }
     // The loading boxes: the three emblems, and a box with the lines.
