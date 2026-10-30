@@ -3,6 +3,7 @@
 
 #include "engines/newworlds/ai_sides.h"
 
+#include "engines/newworlds/colony.h"
 #include "engines/newworlds/levels.h"
 #include "engines/newworlds/placement.h"
 #include "engines/newworlds/start_data.h"
@@ -22,23 +23,21 @@ bool isFactory(int type) { return type == 115 || type == 143 || type == 151 || t
 
 // How long a native factory is busy with one unit (exe.md#ai-colonies):
 // its build value in ticks at full speed, a tick to finish, then the roll
-// out through its dock (two clear checks, three times the lock-to-release
-// leg, the release-to-departure leg, each at least 10 ticks at the unit's
+// out through its dock as a yard's (Economy::rollOutTicks, at the unit's
 // dock speed), before it takes the next request. A Metar portal gives one
-// every 8-15 s, a Taubat hangar one every 8.7 s.
-double factorySeconds(int factory, int unit) {
+// every 8-15 s, a Taubat hangar one every 8.7 s. (Without the dock read,
+// its legs' lengths as the notes give them.)
+double factorySeconds(int factory, int unit, const Economy::DockPoints& dock) {
     const CombatType* t = combatType(unit);
     const bool metar = t && t->race == 'M';
     const bool native = metar || (t && t->race == 'T') || (unit >= 139 && unit <= 141);
     const int build = metar ? 16 : native ? 64 : 640;
-    const int speed = unit == 99 || unit == 203                                      ? 200
-                      : unit == 48 || unit == 105 || unit == 129 || unit == 205 ? 150
-                                                                                     : 100;
-    const auto [lock, depart] = factory == 201   ? std::pair{7838, 5373}
-                                : factory == 151 ? std::pair{3224, 4634}
-                                                 : std::pair{2530, 3200};
-    const int ticks = build + 1 + 2 + 3 * std::max(10, lock / speed) + std::max(10, depart / speed);
-    return ticks / 20.0;
+    const float speed = dockSpeed(unit);
+    const auto [lock, depart] = factory == 201   ? std::pair{7838.0f, 5373.0f}
+                                : factory == 151 ? std::pair{3224.0f, 4634.0f}
+                                                 : std::pair{2530.0f, 3200.0f};
+    const int out = dock.known ? Economy::rollOutTicks(dock, speed) : Economy::rollOutTicks(lock, depart, speed);
+    return (build + 1 + out) / kTicksPerSecond;
 }
 
 } // namespace
@@ -213,6 +212,7 @@ void AiSides::start() {
             c.economy->setFree(true);
             c.economy->setOfficers(int(officers(mission_, slot).size()));
         }
+    colonyDocks();
     for (const auto& [slot, race] : races_) {
         if (slot == player_)
             continue;
@@ -508,10 +508,10 @@ void AiSides::colonies(double seconds) {
             const CombatType* t = combatType(type);
             if (!t)
                 continue;
+            // Out of the yard's dock (as the natives' factories' units).
             float x = 0, y = 0;
-            for (const ColonyStructure& s : c.economy->structures())
-                if (s.id == yard)
-                    x = s.x, y = s.y - 1.2f * kTile;
+            if (const ColonyStructure* s = c.economy->structure(yard))
+                std::tie(x, y) = c.economy->rollOutSpot(*s);
             const auto [px, py] = openSpot(x, y);
             const int id = spawnObject(world_, slot, raceOf(slot), *t, px, py, {});
             // One no order asked for (a group gone meanwhile) parks at the
@@ -560,8 +560,8 @@ int AiSides::outstanding(int slot, int type) const {
 
 // The natives' factories: each idle one takes its side's oldest request,
 // builds it and rolls it out (factorySeconds), the unit out at the end,
-// where its dock leaves it (setDocks). A factory lost gives its unit back
-// to the queue.
+// where its dock leaves it (setDocks), as a yard's. A factory lost gives
+// its unit back to the queue.
 void AiSides::factories(double seconds) {
     for (auto it = factoryJobs_.begin(); it != factoryJobs_.end();) {
         const Unit* f = world_.unit(it->factory);
@@ -576,12 +576,8 @@ void AiSides::factories(double seconds) {
             continue;
         }
         if (const CombatType* t = combatType(it->type)) {
-            // Out at the dock's DEPARTURE point, from the building's
-            // origin as the landing pads' places are (buildings stand
-            // unturned: their heading is never applied).
-            float x = f->x, y = f->y - 1.2f * kTile;
-            if (const Economy::DockPoints d = docks_ ? docks_(f->kind.model) : Economy::DockPoints{}; d.known)
-                x = f->x + d.departure[0], y = f->y + d.departure[1];
+            // Out at the dock's DEPARTURE point.
+            const auto [x, y] = Economy::rollOutSpot(dockOf(f->kind.model), f->x, f->y);
             const auto [px, py] = openSpot(x, y);
             const int id = spawnObject(world_, it->slot, raceOf(it->slot), *t, px, py, {});
             deliver(it->slot, it->type, id);
@@ -594,9 +590,40 @@ void AiSides::factories(double seconds) {
             !isFactory(f.type) ||
             std::any_of(factoryJobs_.begin(), factoryJobs_.end(), [&](const FactoryJob& j) { return j.factory == f.id; }))
             continue;
-        factoryJobs_.push_back({f.id, f.slot, q->second.front(), factorySeconds(f.type, q->second.front())});
+        factoryJobs_.push_back(
+            {f.id, f.slot, q->second.front(), factorySeconds(f.type, q->second.front(), dockOf(f.kind.model))});
         q->second.pop_front();
     }
+}
+
+Economy::DockPoints AiSides::dockOf(const std::string& model) const {
+    return docks_ ? docks_(model) : Economy::DockPoints{};
+}
+
+void AiSides::setDocks(std::function<Economy::DockPoints(const std::string& model)> docks) {
+    docks_ = std::move(docks);
+    colonyDocks();
+}
+
+// The other colonies' economies' docks: their buildings', by their race's
+// models.
+void AiSides::colonyDocks() {
+    if (!docks_)
+        return;
+    for (auto& [slot, c] : colonies_)
+        c.economy->setDocks([docks = docks_, race = raceOf(slot)](const std::string& type) {
+            return docks(buildingModel(type, race));
+        });
+}
+
+std::vector<std::string> AiSides::dockModels() const {
+    std::vector<std::string> out = factoryModels();
+    for (const auto& [slot, c] : colonies_)
+        for (const BuildingType& b : buildingTypes())
+            if (std::string m = buildingModel(b.id, raceOf(slot));
+                !m.empty() && std::find(out.begin(), out.end(), m) == out.end())
+                out.push_back(std::move(m));
+    return out;
 }
 
 std::vector<std::string> AiSides::factoryModels() {

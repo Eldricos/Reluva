@@ -86,11 +86,9 @@ each building's add-ons as its own, as the game does: a second sickbay or
 processor is offered a full set of its own (the build menu fits one to the
 building selected if it can take it, else to the first of its kind still
 without it), and a building lost takes only its own add-ons with it.
-Reluva's refining stays colony-wide (one ore store, one processor's turn a
-tick), so the plants that count are those of the processor doing it: the
-first finished one with its crew. (Another processor's plants double
-nothing until it is that one; the game's processors each refine their
-own ore.) No AI colony orders add-ons.
+Reluva refines as the game does, each processor on its own (see
+[The economy](#the-economy)): a second processor's plants double what it
+refines from its own ore. No AI colony orders add-ons.
 
 ## Costs and prerequisites
 
@@ -405,7 +403,16 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   nitrium, dolamide into duranium**. A processor plant for a material
   doubles it. About 0.31 t a second of each at most - shown as 0.31 a
   second for the first four and 3.1 for nitrium and duranium (counted in
-  hundreds), as C5 measured.
+  hundreds), as C5 measured. **Each processor refines on its own**: its
+  own store of ore (what pods of ore brought it: each pod goes to the
+  first processor that takes it, built, crewed, with its worker bee and
+  fewer than 17 coming), its own turn round its slots, its own plants;
+  a processor lost takes its ore and goods with it. The refining step
+  asks for no crew, power or efficiency, so a processor whose crew has
+  gone still refines what it holds (it takes no more).
+  Reluva (`Economy::refineTick`): so; its goods packed into pods every 32
+  of its ticks (the computer's colonies, without bees, send ore straight
+  to the first processor with its crew, and goods straight to storage).
 - **Stock.** What the side's storage facilities hold between them (see
   [Stores](#stores)). The default starting
   stock is 500 / 1000 / 2300 / 500 / 4000 / 5000 (80 of the missions);
@@ -479,10 +486,17 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
     begins (before its starting housing). A restart begins again from what
     the mission it replaces began with; a savestate keeps that starting
     value, and a load restores it. U on the page (not while playing) puts
-    it back to 50; the window title shows it when it isn't 50. Reluva has
-    no debriefing world, so its copies of the colony's housing aren't
-    added. `reluva-tool play-check` and the tests start every mission at
-    50, as a fresh session does, so their runs stay the same.
+    it back to 50; the window title shows it when it isn't 50. The
+    debriefing's scene (phase 3) makes the mission's placements of phases
+    0 and 3 once more, and never takes them off: no mission places
+    housing in phase 3 (nor in 1 or 2), so it adds the mission's starting
+    housing (phase 0, the player's side) a third time, not what the
+    colony has at the end. Reluva has no debriefing world and adds that
+    as the mission ends (`Economy::debriefed`), past 90 into the bank;
+    whether quitting a mission still running shows the debriefing wasn't
+    traced, and Reluva adds it then too. `reluva-tool play-check` and the
+    tests start every mission at 50, as a fresh session does, so their
+    runs stay the same.
 - **Crew.** Each building has places for its staff and occupants; it works
   only with its staff in. The hub holds the colony's pool (150).
 
@@ -574,7 +588,8 @@ defensive artillery, ordered inside the hub's own block, never does
 while the hub stands; J2's Klingon defensive artillery is ordered onto
 the construction yard's tile and waits for as long as the yard stands.
 
-Reluva follows this (`placement.h`): the occupancy is read from what
+Reluva follows this (`placement.h`), and play-check counts such an
+order as waiting, not stuck: the occupancy is read from what
 stands, sites included (a building's cells free once it's gone; the
 game's freeing wasn't traced), and units' boxes are their positions.
 
@@ -689,7 +704,8 @@ transmission page 5 s, 2 s) and ends with a short silent one. The tables
 settle what the recordings couldn't: some clips are never played (F14013,
 K14009, K8006-K8008, J1F007-J1F010, J7F014), some twice (f14005, k14007,
 J4R011), and R8's, never recorded, is all there. Reluva plays the tables
-as they are (`briefing_data.cpp`, generated), the scenes' units flying
+as they are (`briefing_data.cpp`, generated; the Tricorders' scheme, zoom
+and view with each step, see [The Tricorder](#the-tricorder)), the scenes' units flying
 their paths from the first step that follows them, at the shuttles' 100 a
 tick (their models by race: `shuttle`, `kcs`, `rs`, likely).
 
@@ -767,7 +783,12 @@ ticks, in a square its turret's range across each way, for live, built,
 uncloaked objects it's hostile to. It takes the nearest in range (range
 plus the target's size), in its turret's arc and in sight; failing that,
 its turret follows the nearest in the square, ready. Whoever is shot at
-turns to the nearest attacker it can hit. A turret fires only when it's
+turns to the nearest attacker it can hit. Nothing in the choice weighs
+what a hit would do (0x5c2b80 compares only distance, range, arc and
+sight): a unit whose hits are cut to 0 (see Shields) fires on at the
+same target for as long as both stand. J4's Taubat tanks do so at the
+Federation hub: a pulse of 6, halved in the field to 3, / 5 for the
+hub's security officer (Gage, 1.0), is 0. A turret fires only when it's
 on its target that tick; it turns speeding up and then slowing down
 onto it, at 128 (yaw) or 64 (pitch) 65536ths of a turn a tick each tick,
 with no top speed: half a turn in about 32 ticks. Moving units fire.
@@ -1044,12 +1065,20 @@ Net" or "Mortar Grid" (the manual's names; the Federation's and
 Romulans' defensive weapons need none).
 
 **Rolling out.** The tick after the bar fills plays the ready sound;
-the vehicle then leaves through the yard's dock: a tick, three times the
-LOCK-RELEASE leg and the RELEASE-DEPARTURE leg at its speed: about 9.5 s
-for a tank from the Federation's yard (6.5 s a scout), 4 s from the
-Klingons', 7.3 s from the Romulans'. The vehicle is handed on as it
-starts out: to whoever asked for it (a building, for its worker bee),
-else by its class (bees and transports to the hub).
+the vehicle then leaves through the yard's dock, made inside it at LOCK:
+a tick, a clear check, three times the LOCK-RELEASE leg (across only at
+these level docks, the vehicle kept 50 above LOCK's height), a clear
+check and the climb to DEPARTURE, each leg its length over the
+vehicle's dock speed and at least 10 ticks. The dock speeds in play:
+construction bees 1000, cargo bees 600, worker bees 400, the ground
+scouts and the Klingons' disruptor tanks, battery and artillery and the
+Romulans' cloaked tank 150, the other vehicles 100. So about 9.6 s for
+a tank from the Federation's yard (6.5 s a scout), 4 s for a disruptor
+tank from the Klingons' (6 s their 100-speed types), 7.2 s for a tank
+from the Romulans', 2-2.6 s for a bee. Yards and the natives' factories
+roll out alike. The vehicle is handed on as it starts out: to whoever
+asked for it (a building, for its worker bee), else by its class (bees
+and transports to the hub).
 
 Reluva (`Economy::produce`): one list of the side's orders, a yard free
 taking one each tick (the game's at the events above: close enough), the
@@ -1062,7 +1091,13 @@ Two guesses: the vehicle half made goes with the yard deleted, so still
 counted in COLONY SIZE ([L] in the notes); one rolling out, handed on and
 in the dock, is killed with it. The vehicle menu lists the orders (those
 in work, then the player's waiting, as they'll be taken); a click on one,
-then another, cancels it.
+then another, cancels it. The roll-out (`Economy::rollOutTicks`, shared
+with the natives' factories and the other colonies' yards) is timed by
+the yard model's dock points at the vehicle's dock speed (`dockSpeed`),
+and the vehicle appears once it is through, at the dock's DEPARTURE
+point (`Economy::rollOutSpot`; a worker bee sets off from there); it
+isn't shown on its way out. Without the models (the tests) the times
+above, and the vehicle beside the yard.
 
 ### Research
 
@@ -1133,6 +1168,10 @@ How a side the computer plays builds and makes units:
   15.4 s by the unit's speed, a Taubat hangar (2530, about 3200) one every
   8.7 s, 151 (3224, 4634) one every 10.5 s. No cap on live units, no
   minimum gap; requests are served by priority, oldest first.
+  Reluva (`AiSides::factories`, `colonies`): the natives' factories and
+  the other colonies' yards time the roll-out from their models' dock
+  points and put the unit out at DEPARTURE when it is through, as the
+  player's yard (`Economy::rollOutTicks`, `rollOutSpot`).
   Without a yard or factory the request just waits; only the attack-group
   script objects beam units in. Requests have no limit and never time
   out, but an order has one group at a time, so a side's outstanding
@@ -1254,9 +1293,21 @@ classes compared without the view, the border a block of unsurveyed) and
 grid lines (each cell's top row and left column clear, the rest the
 class over a grid-coloured fill, in which plain ground in view shows
 whole). The Tricorder starts every mission in the ring; only briefing
-steps set another (16 steps set the grid, mostly relief views, none the
-dot), for both Tricorders at once. The relief view of the briefings is
-drawn with the same class tiles on the ground.
+steps set another (16 steps set the grid, all relief views, none the
+dot), for both Tricorders at once. Each step sets the Tricorders' zoom,
+scheme and view (its 60 bytes at +0x24, +0x28, +0x2c): X2 in all but
+F2009 (X4); the grid in 16 relief steps (F1012, F2008, F14010, J4R007,
+J6F008, J8F010 ...), each in Relief orbit; Relief orbit in 20 more
+relief steps, Starship in J1F019 and J1F020, Relief in the rest. The
+briefing and the mission are separate worlds, each made with Tricorders
+of its own, so nothing a briefing step set carries into play: it starts
+in the ring, Relief, X2 [M: the mission's world is built afresh; that
+its Tricorders take no setting from the briefing's wasn't traced
+further]. The relief view of the briefings is drawn with the same class
+tiles on the ground. Reluva: each briefing step sets the scheme, zoom
+and view (`briefing_data.cpp`); play starts from the ring, Relief, X2.
+Ground and relief steps also show the small Tricorder's dialog in the
+game (other views hide it) [M]; Reluva's briefing doesn't draw it yet.
 
 Its line names what's under the pointer: an object, by the player's
 posture to its side (Friendly, Neutral, Hostile) and its class
@@ -1680,8 +1731,10 @@ into the hub and 42 out. Only one vehicle uses a dock at a time, coming
 or going; others wait where they are (a bee hovers), those leaving
 first. So four construction bees leave the hub about six seconds apart.
 Reluva reads the points from each building's model (`MissionSim::
-useModels`) and keeps each dock to one vehicle at a time; without the
-models (the tests) a dock takes 20 ticks each way.
+useModels`), for the player's colony, the other colonies (by their
+race's models) and the natives' factories, and keeps each dock to one
+vehicle at a time; without the models (the tests) a dock takes 20 ticks
+each way.
 
 
 ### Repairs
@@ -1722,7 +1775,21 @@ shield field of its own side (fog channel 5), then divided by
 quarter less), field or not. Nothing drains: the generator's power
 buffer isn't touched, and the halving has no limit. Bees, unarmed APCs,
 large craft and the tractor and anomaly devices always take the whole
-hit, as does another side's unit in the field.
+hit, as does another side's unit in the field. There's no minimum: a
+hit can do nothing at all, and the shooter isn't told (see Targets).
+
+**Where officers start.** Mission set-up (0x583658, after the
+placements) puts each officer, in the list's order, into the first of
+its side's objects of their start type; with none, into whatever the
+officer before went into (the variable isn't cleared), the first
+officer falling back on the head of another side list (likely the
+hub). So J4's Gage (security centre, which J4 hasn't) sits in the hub,
+as Kellerman went there. Reluva puts every officer whose building is
+missing in the hub: the same for most, but where the officer before
+went into a vehicle yard (J3, J4, J6, J8, F12, F14, K7, K8, K14, R14:
+the doctors and scientists after the yard's engineer) the game seats
+them in the yard instead. Reluva doesn't follow that yet; it shows on
+the STAFF cards and in who dies with the yard.
 
 - **Shield generators** (21, 29, 69) pick their field each tick from
   their efficiency: above 0.6 the 3 x 3 blocks round them, above 0.2 a

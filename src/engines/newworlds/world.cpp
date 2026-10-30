@@ -866,12 +866,22 @@ bool World::turnTurret(Unit& u, float want) {
     return false;
 }
 
-void World::fire(Unit& u, Unit& t) {
-    // Each shot: its damage times the shooter's security skill + 1
-    // (artillery's as it is).
+// Each shot: its damage times the shooter's security skill + 1
+// (artillery's as it is).
+float World::shotDamage(const Unit& u) const {
     float damage = float(u.weapon.damage * std::max(1, u.weapon.guns));
     if (u.weapon.kind != WeaponKind::Artillery && marksmanship_)
         damage = std::trunc(damage * (marksmanship_(u) + 1));
+    return damage;
+}
+
+float World::hitDamage(const Unit& u, const Unit& t) const {
+    const float damage = shotDamage(u);
+    return damage_ ? damage_(t, damage) : damage;
+}
+
+void World::fire(Unit& u, Unit& t) {
+    const float damage = shotDamage(u);
     // Aimed ahead of the target, standing or moving: where its last
     // tick's movement takes it in the time a shot at the turret's speed
     // takes to get there (one step, as the game's).

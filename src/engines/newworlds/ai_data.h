@@ -73,6 +73,11 @@ struct CombatType {
     int mask;
 };
 const CombatType* combatType(int id);
+// Its flight and dock speed (exe.md#docking), world units a tick, as the
+// game sets it at start-up: the legs through a building's dock (a
+// vehicle a yard or factory rolls out, a bee docking) take their length
+// over it. Bees 400-1000, most vehicles 100, the quick ones 150-200.
+float dockSpeed(int type);
 
 struct SideInfo {
     const char* mission;

@@ -76,6 +76,7 @@ std::vector<BriefingStep> briefingScript(std::string_view shortName, char side, 
             step.minimum = r->minimum * kScriptSecond;
             step.scene = r->scene;
             step.scheme = r->scheme;
+            step.zoom = r->zoom, step.tricorderView = r->tricorderView;
             out.push_back(std::move(step));
         }
         return out;

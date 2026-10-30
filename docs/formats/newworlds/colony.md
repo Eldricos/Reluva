@@ -207,7 +207,8 @@ metamodels list `BAY_0`-`BAY_5` places), which is why an upgrade can be
 selected on its own. Reluva still draws an upgrade on its base's spot.
 Each building's add-ons are its own (exe.md#upgrades-and-add-ons): a
 second sickbay or resource processor takes its own wards or plants, which
-stand on its spot and go with it; ordered from the build menu, an add-on
+stand on its spot and go with it (each processor refines its own ore, so
+its plants double what it makes); ordered from the build menu, an add-on
 goes on the selected building if it can take it, else on the first of its
 kind still without it.
 

@@ -179,6 +179,9 @@ private:
     void runTransports(double dt);
     void sightings(std::vector<ScriptEvent>& happened);
     void watchUnits();
+    // Why u's hits do t no harm by the game's own rules (empty: they do
+    // some, so firing without effect is Reluva's fault).
+    std::string harmlessBy(const Unit& u, const Unit& t) const;
     void note(const std::string& line);
 
     std::string mission_;

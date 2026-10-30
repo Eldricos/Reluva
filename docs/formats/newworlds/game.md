@@ -172,7 +172,8 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   Bees go home to the first hub made that isn't dying; a building lost
   takes those docked in it, kills those out near it (1.5 x its radius)
   and lets the rest go to another hub or a building asking (killed if
-  none). The processor refines a quarter tonne a tick, in
+  none). Each processor refines its own ore (what its pods brought it)
+  with its own plants, a quarter tonne a tick, in
   turn per ore, one for one: dilithium, talgonite, silicon, kelbonite,
   magnesite, dolamide into dilithium, polycomp, thermoconc, trans al,
   nitrium, duranium; every 32 ticks it packs its goods into pods once
@@ -378,8 +379,9 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   which pays again; with no yard the orders wait; a yard puts up to
   300 power a tick from its buffer, times its efficiency (0.8 without an
   officer, 1 with one of skill 0.5), into the build value × 300, then the
-  vehicle rolls out beside it (8 s) - bees into the hub. Officers posted
-  in a building raise its efficiency.
+  vehicle rolls out through its dock (about 4-10 s by the yard and the
+  vehicle's dock speed) and appears at the dock's departure point - bees
+  into the hub. Officers posted in a building raise its efficiency.
 - **Defences**: the shield generator, defensive weapon and defensive
   artillery, with the executable's costs, prerequisites and power
   (64000 buffer, 550 intake; 640 a tick for the generator, 160 for the
@@ -476,9 +478,9 @@ kept apart from the game's behaviour:
 | Goods from the processor to storage | sent straight to the first storage facility every 32 ticks | the game packs them into pods that bees carry |
 | Costs, prerequisites | per side, upgrades included | the executable (exe.md#costs-and-prerequisites) |
 | Power | buffers, intake and use a tick per building; hub 500, generators 500 (Romulan 1000) a tick at 1.2 efficiency; 640000 reserve; warned below 75 % | the executable (exe.md#the-economy) |
-| Capacity | starts at 50, at most 90; accommodation +5, farms +10 | the executable |
+| Capacity | starts at 50, at most 90; accommodation +5, farms +10; carried from mission to mission on the page, with the mission's starting housing added once more as it ends (the game's debriefing scene) | the executable |
 | Mining | the 7 x 7 blocks round a mine, a tonne a take, 2 t a second carried by the bees | the executable; the carrying rate measured in C7 |
-| Refining | a quarter tonne a tick in turn per ore, ore kind k into material k | the executable |
+| Refining | each processor its own ore, a quarter tonne a tick in turn per ore, ore kind k into material k, doubled by its own plant | the executable |
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
 | Bees docked in a building destroyed | deleted, not killed: still counted in COLONY SIZE | the executable: the count drops only as an object dies, and the docked ones are deleted (one step inferred; not seen in a recording) |
 | A vehicle half built in a yard destroyed | deleted with it, still counted in COLONY SIZE; one rolling out killed | Reluva's reading: the game makes it inside the yard as the job starts; its fate with the yard wasn't traced |

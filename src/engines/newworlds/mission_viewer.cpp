@@ -270,7 +270,12 @@ bool MissionViewer::hubPosition(float& x, float& y) const {
 // scouts, as F1 and R1 start with four vehicles of one kind), the game's
 // camera over it, the interface up.
 void MissionViewer::startPlay() {
-    map_.setTricorderScheme(0); // play draws the ring hatch (the game's setup)
+    // Play's Tricorders are new ones (the game makes the mission's world
+    // afresh, its Tricorders with it): whatever the briefing's steps set,
+    // the ring hatch, Relief, X2.
+    map_.setTricorderScheme(0);
+    tricorderZoom_ = 1;
+    tricorderView_ = 1;
     if (!hasMap_ || running_)
         return;
     const Level& level = missions_[size_t(current_)];
@@ -343,9 +348,10 @@ void MissionViewer::stopPlay() {
         return;
     playing_ = false;
     // The capacity the player's colony has as the mission ends, won, lost
-    // or left, is the next one's (the game never resets it).
+    // or left, is the next one's (the game never resets it), with what the
+    // debriefing's scene adds: the mission's starting housing once more.
     if (economy_)
-        carried_ = economy_->carried();
+        carried_ = economy_->debriefed();
     map_.stopFollowing();
     if (mixer_)
         mixer_->stop(stingHandle_), mixer_->stop(buildingClipHandle_);

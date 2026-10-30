@@ -1033,7 +1033,8 @@ private:
     int tricorderZoom_ = 1;             // 0 X4 (16 tiles across), 1 X2 (the start), 2 X1
     // The Tricorder's view: 0 Starship, 1 Relief (play's), 2 Relief orbit,
     // 3 Relief fixed (exe.md#the-tricorder). Only a briefing step sets
-    // another in the game; play keeps Relief.
+    // another in the game (with the zoom and scheme); play starts afresh in
+    // Relief.
     int tricorderView_ = 1;
     int sideW_ = 120;                   // the right-hand panels' width, as last drawn
     // The other sides, and combat: each colony building's object in the

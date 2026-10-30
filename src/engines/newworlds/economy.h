@@ -181,6 +181,15 @@ public:
     int capacity() const { return capacity_; }
     int capacityBank() const { return capBank_; } // housing's banked over 90
     CarriedCapacity carried() const { return {capacity_, capBank_}; }
+    // What a session carries on to the next mission once this one is over
+    // (exe.md#the-economy): the debriefing's scene makes the mission's
+    // starting placements again, so their housing is added once more on
+    // top of the colony's capacity as it ends (past 90 into the bank), and
+    // never taken off. (The game's debriefing scene places the records of
+    // the briefing-less phases 0 and 3; no mission has housing in phase 3,
+    // so it is the starting colony's housing, not what the colony has at
+    // the end.)
+    CarriedCapacity debriefed() const;
     void setVehicles(int n) { vehicles_ = n; }
     // Power: what generators give a tick, what buildings ask a tick, the
     // share granted (DEMAND MET), and the reserve (0-1).
@@ -190,8 +199,9 @@ public:
     float consumption() const { return consumption_; } // the share of what's made that was drawn
     float reserve() const { return float(reserve_ / kReserveCap); }
     const std::vector<ColonyStructure>& structures() const { return structures_; }
-    // Raw ore waiting at the processor, in tonnes, by ore kind - 1.
-    std::array<float, kOres> oreStock() const;
+    // Raw ore waiting at the processors (all of them, or the one given),
+    // in tonnes, by ore kind - 1.
+    std::array<float, kOres> oreStock(int processor = 0) const;
 
     // An AI side's colony (exe.md#ai-colonies): what it builds and the
     // vehicles its yards make cost it nothing, and its build orders don't
@@ -465,6 +475,21 @@ public:
     int dockIn(const ColonyStructure& s, float speed) const;
     // (An unarmed APC stops at RELEASE: toDeparture false.)
     int dockOut(const ColonyStructure& s, float speed, bool toDeparture = true) const;
+    // A vehicle (or bee) a yard or a natives' factory made, rolling out
+    // through the building's dock (exe.md#vehicle-production): a tick's
+    // wait, a clear check, the release leg LOCK to RELEASE three times
+    // over, another check, RELEASE to DEPARTURE; each leg its length over
+    // the vehicle's dock speed, at least 10 ticks. At a level dock the
+    // release leg counts across only, and the last leg climbs from just
+    // above LOCK's height. In ticks; the legs' lengths given (a dock not
+    // read) or from the dock.
+    static int rollOutTicks(float lockToRelease, float releaseToDeparture, float speed);
+    static int rollOutTicks(const DockPoints& d, float speed);
+    // Where it comes out: the dock's DEPARTURE point, from the building's
+    // middle (buildings stand unturned); without a dock, beside it on the
+    // south.
+    static std::pair<float, float> rollOutSpot(const DockPoints& d, float x, float y);
+    std::pair<float, float> rollOutSpot(const ColonyStructure& s) const { return rollOutSpot(dockOf(s), s.x, s.y); }
     const ColonyStructure* structure(int id) const;
     // A mine's, processor's or storage facility's yard (exe.md#bees): its
     // 16 places, an L along the outer edges of the quarter block its dock
@@ -568,15 +593,14 @@ private:
     char side_;
     int powerClass(std::string_view type) const;
     std::vector<Store> stores_;
-    Units refined_{}; // at the processor, waiting to go to storage
     int capacity_, capBank_ = 0, vehicles_ = 0;
     int phantoms_ = 0; // deleted without dying, still in COLONY SIZE
+    int startHousing_ = 0; // what the starting colony's housing adds (once)
     ColonyMap map_;
     std::vector<ColonyStructure> structures_;
-    std::array<int64_t, kOres> ore_{}; // raw ore at the processor, game units
     std::map<std::pair<int, int>, int> dug_; // blocks' amounts taken so far
     std::vector<std::pair<int, double>> mineCarry_; // per mine id: tonnes owed by the bees
-    int oreCycle_ = 0, refineSlot_ = 0;
+    int oreCycle_ = 0;
     double tickClock_ = 0, clock_ = 0, lastPowerWarning_ = -1e9;
     double reserve_ = kReserveCap;
     float requested_ = 0, met_ = 1, consumption_ = 0;
@@ -627,13 +651,24 @@ private:
     std::vector<Pod> pods_;
     // Each mine, processor, storage facility and yard's worker bee (its
     // id; 0 none), cargo bee, store of dug ore (a mine's) and its request
-    // for a worker bee (the order's id; 0 none).
+    // for a worker bee (the order's id; 0 none); a processor's own store
+    // too (exe.md#the-economy): its raw ore and refined goods (game
+    // units) and its turn round its 16 store slots.
     struct Depot {
         int worker = 0, cargo = 0;
         std::array<int64_t, kMaterials> dug{};
         int request = 0;
-        friend void syncState(save::Serializer& s, Depot& v) { s(v.worker)(v.cargo)(v.dug)(v.request); }
+        std::array<int64_t, kOres> ore{};
+        Units goods{};
+        int turn = 0;
+        friend void syncState(save::Serializer& s, Depot& v) {
+            s(v.worker)(v.cargo)(v.dug)(v.request)(v.ore)(v.goods)(v.turn);
+        }
     };
+    // The processor the computer's colonies (no bees) send their ore
+    // straight to: the first a pod would go to (nullptr none).
+    const ColonyStructure* oreTaker() const;
+    void refine(const ColonyStructure& processor, Depot& d); // one processor's tick
     std::map<int, Depot> depots_;
 };
 
