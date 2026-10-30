@@ -14,11 +14,17 @@ namespace reluva {
 
 // INI-style settings file. The [reluva] section holds global settings; every
 // other section is a game target (one installed game the user added).
+// Values are UTF-8; one with spaces at either end, a line break or a
+// leading quote is written quoted ("...", with \\ \" \n \r \t escapes)
+// and read back as it was. Unquoted values are read as they stand.
 class Config {
 public:
     static constexpr const char* kGlobalSection = "reluva";
 
+    // A missing file is a fresh config. One that exists but can't be read
+    // is an error, and save() then refuses to write over it.
     Error load(const std::filesystem::path& path);
+    // Replaces the file whole (written beside it, then moved over it).
     Error save() const;
 
     std::string get(const std::string& section, const std::string& key,
@@ -31,6 +37,7 @@ public:
 
 private:
     std::filesystem::path path_;
+    bool unreadable_ = false; // load() found a file it couldn't read: keep it
     std::map<std::string, std::map<std::string, std::string>> sections_;
 };
 

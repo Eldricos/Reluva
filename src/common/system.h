@@ -30,6 +30,11 @@ public:
     // --- Input --------------------------------------------------------------
     // Returns false when no more events are pending.
     virtual bool pollEvent(Event& event) = 0;
+    // Text input (TextInput events: typed characters after the keyboard
+    // layout, dead keys and input methods), off until started. KeyDown and
+    // KeyUp come as well either way.
+    virtual void startTextInput() {}
+    virtual void stopTextInput() {}
 
     // --- Time ---------------------------------------------------------------
     virtual uint64_t getMillis() const = 0;

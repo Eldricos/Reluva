@@ -10,6 +10,7 @@
 
 #include "common/types.h"
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -20,6 +21,7 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <unordered_map>
 #include <utility>
@@ -68,11 +70,16 @@ public:
     const std::vector<uint8_t>& bytes() const { return bytes_; }
     std::vector<uint8_t> take() { return std::move(bytes_); }
 
-    // Raw little-endian bytes of an arithmetic value.
+    // Raw little-endian bytes of one arithmetic value (swapped on a
+    // big-endian host).
     void raw(void* p, size_t n);
+    // `n` bytes as they are, never swapped (a string's, a byte list's).
+    void blob(void* p, size_t n);
     // A container's length: on loading, checked against what's left (each
     // element takes at least `minBytes`).
     uint32_t count(size_t n, size_t minBytes = 1);
+    // Bytes a loader has yet to read.
+    size_t remaining() const { return saving_ ? 0 : bytes_.size() - pos_; }
 
 private:
     Serializer(bool saving, std::vector<uint8_t> bytes) : saving_(saving), bytes_(std::move(bytes)) {}
@@ -101,6 +108,34 @@ template <class T> struct IsSet : std::false_type {};
 template <class K, class C, class A> struct IsSet<std::set<K, C, A>> : std::true_type {};
 template <class T> struct IsUnique : std::false_type {};
 template <class T> struct IsUnique<std::unique_ptr<T>> : std::true_type {};
+
+// The fewest bytes sync() writes for a T (0 when it can't tell: an
+// engine's own type), so a loader can check a count against what's left.
+template <class T> constexpr size_t minBytes() {
+    if constexpr (std::is_same_v<T, bool>)
+        return 1;
+    else if constexpr (std::is_arithmetic_v<T>)
+        return sizeof(T);
+    else if constexpr (std::is_enum_v<T>)
+        return sizeof(std::underlying_type_t<T>);
+    else if constexpr (std::is_same_v<T, std::string> || IsVector<T>::value || IsDeque<T>::value ||
+                       IsMap<T>::value || IsSet<T>::value)
+        return 4;
+    else if constexpr (std::is_array_v<T>)
+        return std::extent_v<T> * minBytes<std::remove_extent_t<T>>();
+    else if constexpr (IsArray<T>::value)
+        return std::tuple_size_v<T> * minBytes<typename T::value_type>();
+    else if constexpr (IsOptional<T>::value || IsUnique<T>::value)
+        return 1;
+    else if constexpr (IsPair<T>::value)
+        return minBytes<std::remove_const_t<typename T::first_type>>() + minBytes<typename T::second_type>();
+    else
+        return 0;
+}
+
+// Bytes copied as they are: one-byte numbers (not bool, which is checked).
+template <class T>
+constexpr bool kIsByte = std::is_arithmetic_v<T> && sizeof(T) == 1 && !std::is_same_v<T, bool>;
 } // namespace detail
 
 template <class T> void sync(Serializer& s, T& v) {
@@ -115,6 +150,8 @@ template <class T> void sync(Serializer& s, T& v) {
     } else if constexpr (std::is_arithmetic_v<T>) {
         s.raw(&v, sizeof v);
     } else if constexpr (std::is_enum_v<T>) {
+        // Not checked: an enum read from a save may hold any value of its
+        // type; use syncEnum() where one out of range would do harm.
         auto u = static_cast<std::underlying_type_t<T>>(v);
         s.raw(&u, sizeof u);
         v = static_cast<T>(u);
@@ -123,7 +160,7 @@ template <class T> void sync(Serializer& s, T& v) {
         if (s.loading())
             v.assign(n, '\0');
         if (n)
-            s.raw(v.data(), n);
+            s.blob(v.data(), n);
     } else if constexpr (std::is_array_v<T>) {
         for (auto& e : v)
             sync(s, e);
@@ -131,20 +168,38 @@ template <class T> void sync(Serializer& s, T& v) {
         for (auto& e : v)
             sync(s, e);
     } else if constexpr (detail::IsVector<T>::value || detail::IsDeque<T>::value) {
-        const uint32_t n = s.count(v.size());
-        if (s.loading()) {
-            v.clear();
-            v.resize(n);
-        }
-        if constexpr (std::is_same_v<T, std::vector<bool>>) {
-            for (size_t i = 0; i < v.size(); ++i) {
-                bool b = v[i];
-                sync(s, b);
-                v[i] = b;
+        using E = typename T::value_type;
+        const uint32_t n = s.count(v.size(), detail::minBytes<E>());
+        if constexpr (detail::IsVector<T>::value && detail::kIsByte<E>) {
+            // Bytes: the count was checked against what's left.
+            if (s.loading())
+                v.assign(n, E{});
+            if (n)
+                s.blob(v.data(), n);
+        } else if (s.saving()) {
+            if constexpr (std::is_same_v<T, std::vector<bool>>) {
+                for (bool e : v)
+                    sync(s, e);
+            } else {
+                for (auto& e : v)
+                    sync(s, e);
             }
         } else {
-            for (auto& e : v)
-                sync(s, e);
+            // Grown as the elements are read, so a count that the bytes
+            // can't back fails before it costs memory.
+            v.clear();
+            if constexpr (detail::IsVector<T>::value) // (never more than the bytes left)
+                v.reserve(std::min<size_t>(n, s.remaining() / std::max(sizeof(E), detail::minBytes<E>())));
+            for (uint32_t i = 0; i < n && s.ok(); ++i) {
+                if constexpr (std::is_same_v<T, std::vector<bool>>) {
+                    bool b = false;
+                    sync(s, b);
+                    v.push_back(b);
+                } else {
+                    v.emplace_back();
+                    sync(s, v.back());
+                }
+            }
         }
     } else if constexpr (detail::IsOptional<T>::value) {
         bool has = v.has_value();
@@ -164,7 +219,8 @@ template <class T> void sync(Serializer& s, T& v) {
         sync(s, v.first);
         sync(s, v.second);
     } else if constexpr (detail::IsMap<T>::value) {
-        const uint32_t n = s.count(v.size(), 2);
+        const uint32_t n =
+            s.count(v.size(), detail::minBytes<typename T::key_type>() + detail::minBytes<typename T::mapped_type>());
         if (s.saving()) {
             for (auto& [k, val] : v) {
                 auto key = k;
@@ -180,7 +236,7 @@ template <class T> void sync(Serializer& s, T& v) {
             }
         }
     } else if constexpr (detail::IsSet<T>::value) {
-        const uint32_t n = s.count(v.size());
+        const uint32_t n = s.count(v.size(), detail::minBytes<typename T::key_type>());
         if (s.saving()) {
             for (auto k : v)
                 sync(s, k);
@@ -225,6 +281,22 @@ template <class T, class Table> void syncIndex(Serializer& s, const T*& p, const
             else
                 p = &table[size_t(index)];
         }
+    }
+}
+
+// An enum that must be one of its first values, 0 .. `last` (a state
+// switched on, an index into a table): a loader fails on any other.
+template <class E> void syncEnum(Serializer& s, E& v, E last) {
+    static_assert(std::is_enum_v<E>);
+    using U = std::underlying_type_t<E>;
+    U u = static_cast<U>(v);
+    s(u);
+    if (s.loading()) {
+        if (std::cmp_less(u, 0) || u > static_cast<U>(last)) {
+            s.fail("a value out of range");
+            u = U(0);
+        }
+        v = static_cast<E>(u);
     }
 }
 

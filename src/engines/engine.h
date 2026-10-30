@@ -23,6 +23,8 @@ struct GameTarget {
     std::string description;
     std::filesystem::path path; // game data directory
     int loadSlot = 0;            // a savestate to load once the game is up (0 none)
+    std::string language;        // the detected variant's ("en", "de", ...; empty if unknown)
+    std::string platform;        // ("windows", ...)
 };
 
 // A running game. Created by its MetaEngine, run once, then destroyed.

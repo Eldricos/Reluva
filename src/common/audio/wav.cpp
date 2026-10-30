@@ -97,6 +97,10 @@ Error decodeWav(const std::vector<uint8_t>& d, Sound& out) {
             data = body, dataSize = avail;
         else if (std::memcmp(d.data() + p, "fact", 4) == 0 && avail >= 4)
             factFrames = u32(d, body);
+        // (A chunk running to the end, or past it, is the last: a size near
+        // SIZE_MAX would otherwise wrap `p` round to the start.)
+        if (size >= d.size() - body)
+            break;
         p = body + size + (size & 1);
     }
     if (!fmt || fmtSize < 16)

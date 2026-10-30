@@ -20,6 +20,9 @@ namespace reluva {
 class SdlSystem;
 class SlotBrowser;
 
+// A configured game, as its section of the config describes it.
+GameTarget targetFromConfig(const Config& config, const std::string& name);
+
 // The game list UI, drawn with Dear ImGui on the SDL renderer.
 class Launcher {
 public:
@@ -38,8 +41,16 @@ private:
     void drawUi(std::optional<GameTarget>& launch, bool& quit);
     void handlePickedFolder();
     void addGame(const DetectedGame& game, const std::string& path);
-    GameTarget targetFromConfig(const std::string& name) const;
+    GameTarget targetFromConfig(const std::string& name) const { return reluva::targetFromConfig(config_, name); }
 
+    // The folder dialog answers on another thread, perhaps after the
+    // launcher is gone: it writes to this, which it shares.
+    struct PickState {
+        std::mutex mutex;
+        std::optional<std::string> folder; // UTF-8
+        std::optional<std::string> error;
+        std::atomic<bool> inProgress{false};
+    };
     static void pickFolderCallback(void* userdata, const char* const* files, int filter);
 
     void drawLoad(std::optional<GameTarget>& launch);
@@ -52,13 +63,9 @@ private:
     std::string selected_;
     std::string status_;
 
-    // The folder dialog answers on another thread.
-    std::mutex pickMutex_;
-    std::optional<std::string> pickedFolder_;
-    std::optional<std::string> pickError_;
-    std::atomic<bool> pickInProgress_{false};
+    std::shared_ptr<PickState> pick_ = std::make_shared<PickState>();
 
-    // Folder with several matches, waiting for the user to choose one.
+    // Folder (UTF-8) with several matches, waiting for the user to choose one.
     std::string pendingPath_;
     std::vector<DetectedGame> pendingChoices_;
 };

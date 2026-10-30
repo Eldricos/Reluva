@@ -4,6 +4,7 @@
 #include "launcher/game_menu.h"
 
 #include "backends/sdl3/sdl_system.h"
+#include "common/fs.h"
 
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
@@ -45,7 +46,7 @@ std::string slotLabel(const save::Slot& s) {
 } // namespace
 
 std::filesystem::path saveFolder(const std::filesystem::path& root, const std::string& target) {
-    return root / target;
+    return root / fs::fromUtf8(target);
 }
 
 void SlotBrowser::clear() {
@@ -197,14 +198,16 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
     SlotBrowser browser(renderer);
     const std::filesystem::path folder = saveFolder(root_, target_.target);
     int selected = 0;
+    int newSlot = 0; // the Save page's empty slot (again after a save or a delete)
     std::string message, description;
     bool askOverwrite = false, askDelete = false;
     auto enter = [&](Page p) {
         page = p;
         browser.refresh(folder);
         askOverwrite = askDelete = false;
+        newSlot = p == Page::Save ? save::freeSlot(folder) : 0;
         if (p == Page::Save) {
-            selected = save::freeSlot(folder);
+            selected = newSlot;
             description = engine_ ? engine_->stateDescription() : "";
             if (description.empty())
                 description = target_.description;
@@ -299,7 +302,6 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
             const bool saving = page == Page::Save;
             const float footer = ImGui::GetFrameHeightWithSpacing() * (saving ? 3.2f : 2.2f);
             ImGui::BeginGroup();
-            const int newSlot = saving ? save::freeSlot(folder) : 0;
             const int picked = browser.draw(selected, newSlot, ImGui::GetContentRegionAvail().y - footer);
             ImGui::EndGroup();
             ImGui::SameLine();
@@ -318,6 +320,10 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
             auto act = [&] {
                 const Error e = saving ? save(selected, description) : load(selected);
                 if (e) {
+                    if (saving) {
+                        browser.refresh(folder);
+                        newSlot = save::freeSlot(folder);
+                    }
                     message = e.message;
                     showProblem = true;
                 } else {
@@ -370,6 +376,7 @@ EventType GameMenu::loop(Page page, const std::string& problem) {
                     askDelete = false;
                     ImGui::CloseCurrentPopup();
                     browser.refresh(folder);
+                    newSlot = save::freeSlot(folder);
                 }
                 ImGui::SameLine();
                 if (ImGui::Button("No")) {

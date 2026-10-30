@@ -18,10 +18,41 @@ std::string toLower(std::string_view s) {
     return out;
 }
 
+stdfs::path fromUtf8(std::string_view utf8) { return stdfs::path(std::u8string(utf8.begin(), utf8.end())); }
+
+std::string toUtf8(const stdfs::path& path) {
+    const std::u8string u = path.u8string();
+    return std::string(u.begin(), u.end());
+}
+
+Error replaceFile(const stdfs::path& file, std::string_view contents) {
+    stdfs::path temp = file;
+    temp += ".tmp";
+    std::error_code ec;
+    {
+        std::ofstream out(temp, std::ios::binary | std::ios::trunc);
+        if (!out)
+            return Error::fail("can't write " + toUtf8(temp));
+        out.write(contents.data(), std::streamsize(contents.size()));
+        if (!out.flush()) {
+            out.close();
+            stdfs::remove(temp, ec);
+            return Error::fail("can't write " + toUtf8(temp));
+        }
+    }
+    stdfs::rename(temp, file, ec); // replaces `file` (on Windows too)
+    if (ec) {
+        const std::string why = ec.message();
+        stdfs::remove(temp, ec);
+        return Error::fail("can't save to " + toUtf8(file) + ": " + why);
+    }
+    return Error::success();
+}
+
 static std::optional<stdfs::path> findEntry(const stdfs::path& dir, const std::string& lowerName) {
     std::error_code ec;
     for (stdfs::directory_iterator it(dir, ec), end; !ec && it != end; it.increment(ec)) {
-        if (toLower(it->path().filename().string()) == lowerName)
+        if (toLower(toUtf8(it->path().filename())) == lowerName)
             return it->path();
     }
     return std::nullopt;

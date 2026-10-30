@@ -3,7 +3,10 @@
 
 #include "common/savestate.h"
 
+#include "common/fs.h"
+
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cstdio>
 #include <fstream>
@@ -27,6 +30,21 @@ void Serializer::raw(void* p, size_t n) {
     std::memcpy(b, bytes_.data() + pos_, n);
     if constexpr (std::endian::native == std::endian::big)
         std::reverse(b, b + n);
+    pos_ += n;
+}
+
+void Serializer::blob(void* p, size_t n) {
+    auto* b = static_cast<uint8_t*>(p);
+    if (saving_) {
+        bytes_.insert(bytes_.end(), b, b + n);
+        return;
+    }
+    if (!ok() || bytes_.size() - pos_ < n) {
+        fail("the state ends early");
+        std::memset(b, 0, n);
+        return;
+    }
+    std::memcpy(b, bytes_.data() + pos_, n);
     pos_ += n;
 }
 
@@ -70,17 +88,16 @@ namespace {
 constexpr char kMagic[4] = {'R', 'L', 'V', 'S'};
 
 uint32_t crc32(const std::vector<uint8_t>& d) {
-    static uint32_t table[256];
-    static bool built = false;
-    if (!built) {
+    static const std::array<uint32_t, 256> table = [] {
+        std::array<uint32_t, 256> t{};
         for (uint32_t i = 0; i < 256; ++i) {
             uint32_t c = i;
             for (int k = 0; k < 8; ++k)
                 c = c & 1 ? 0xEDB88320u ^ (c >> 1) : c >> 1;
-            table[i] = c;
+            t[i] = c;
         }
-        built = true;
-    }
+        return t;
+    }();
     uint32_t c = 0xFFFFFFFFu;
     for (uint8_t b : d)
         c = table[(c ^ b) & 0xFF] ^ (c >> 8);
@@ -96,9 +113,9 @@ void syncHeader(Serializer& s, Header& h) {
     }
 }
 
-void putU32(std::ofstream& out, uint32_t v) {
-    const uint8_t b[4] = {uint8_t(v), uint8_t(v >> 8), uint8_t(v >> 16), uint8_t(v >> 24)};
-    out.write(reinterpret_cast<const char*>(b), 4);
+void putU32(std::string& out, uint32_t v) {
+    const char b[4] = {char(v), char(v >> 8), char(v >> 16), char(v >> 24)};
+    out.append(b, 4);
 }
 
 bool getU32(std::ifstream& in, uint32_t& v) {
@@ -113,7 +130,7 @@ bool getU32(std::ifstream& in, uint32_t& v) {
 Error openFile(const std::filesystem::path& file, std::ifstream& in, Header& header) {
     in.open(file, std::ios::binary);
     if (!in)
-        return Error::fail("can't open " + file.string());
+        return Error::fail("can't open " + fs::toUtf8(file));
     char magic[4];
     uint32_t format = 0, size = 0;
     if (!in.read(magic, 4) || std::memcmp(magic, kMagic, 4) != 0)
@@ -143,27 +160,16 @@ Error writeFile(const std::filesystem::path& file, const Header& header, const s
     Serializer s = Serializer::saver();
     Header h = header;
     syncHeader(s, h);
+    std::string out(kMagic, 4);
+    out.reserve(16 + s.bytes().size() + state.size());
+    putU32(out, kFormatVersion);
+    putU32(out, uint32_t(s.bytes().size()));
+    out.append(reinterpret_cast<const char*>(s.bytes().data()), s.bytes().size());
+    putU32(out, uint32_t(state.size()));
+    out.append(reinterpret_cast<const char*>(state.data()), state.size());
+    putU32(out, crc32(state));
     // Written beside it first, so a failed save leaves the old one.
-    std::filesystem::path temp = file;
-    temp += ".tmp";
-    {
-        std::ofstream out(temp, std::ios::binary | std::ios::trunc);
-        if (!out)
-            return Error::fail("can't write " + temp.string());
-        out.write(kMagic, 4);
-        putU32(out, kFormatVersion);
-        putU32(out, uint32_t(s.bytes().size()));
-        out.write(reinterpret_cast<const char*>(s.bytes().data()), std::streamsize(s.bytes().size()));
-        putU32(out, uint32_t(state.size()));
-        out.write(reinterpret_cast<const char*>(state.data()), std::streamsize(state.size()));
-        putU32(out, crc32(state));
-        if (!out.flush())
-            return Error::fail("can't write " + temp.string());
-    }
-    std::filesystem::rename(temp, file, ec);
-    if (ec)
-        return Error::fail("can't save to " + file.string() + ": " + ec.message());
-    return Error::success();
+    return fs::replaceFile(file, out);
 }
 
 Error readHeader(const std::filesystem::path& file, Header& header) {

@@ -17,6 +17,7 @@
 #include "common/video/bink.h"
 #include "common/savestate.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <vector>
 #include <optional>
@@ -24,6 +25,7 @@
 #include <cstring>
 #include <memory>
 #include <fstream>
+#include <iterator>
 #include <string>
 
 using namespace reluva;
@@ -74,6 +76,22 @@ static void testFsAndDetection(const std::filesystem::path& tmp) {
     CHECK(results.size() == 1);
     CHECK(!results.empty() && results[0].gameId == "good");
 
+    // UTF-8 names through paths and back (what SDL and the config hold).
+    const std::string cafe = "Caf\xc3\xa9 \xe2\x82\xac";
+    const std::filesystem::path dir = tmp / fs::fromUtf8(cafe);
+    std::filesystem::create_directories(dir);
+    { std::ofstream(dir / "X.BIN") << "x"; }
+    CHECK(fs::toUtf8(dir.filename()) == cafe);
+    CHECK(fs::findFile(tmp, cafe + "/x.bin").has_value());
+    CHECK(fs::toUtf8(fs::fromUtf8("a/b")) == "a/b");
+    // replaceFile: a new file, then over it; nothing left beside it.
+    CHECK(!fs::replaceFile(dir / "r.txt", "one"));
+    CHECK(!fs::replaceFile(dir / "r.txt", "two\n"));
+    std::ifstream in(dir / "r.txt", std::ios::binary);
+    std::string got((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+    CHECK(got == "two\n" && !std::filesystem::exists(dir / "r.txt.tmp"));
+    CHECK(bool(fs::replaceFile(tmp / "missing" / "r.txt", "x")));
+
     std::filesystem::remove_all(tmp);
 }
 
@@ -88,10 +106,38 @@ static void testConfig(const std::filesystem::path& tmp) {
         CHECK(!c.save());
     }
     Config c;
-    c.load(path);
+    CHECK(!c.load(path));
     CHECK(c.get("foo", "path") == "/games/foo bar");
     CHECK(c.targets().size() == 1);
     CHECK(c.get("foo", "missing", "dflt") == "dflt");
+
+    // Values that wouldn't read back as written are quoted; the rest, and
+    // files from before, read as they stand.
+    const std::map<std::string, std::string> odd = {
+        {"spaces", "  C:\\Games\\New Worlds  "}, {"lines", "one\ntwo\r\n"}, {"quoted", "\"hi\" \\"},
+        {"plain", "C:\\Games\\x \"y\""}, {"empty", ""}, {"tab", "\tx"}, {"utf8", "Caf\xc3\xa9"}};
+    for (const auto& [k, v] : odd)
+        c.set("foo", k, v);
+    CHECK(!c.save());
+    Config d;
+    CHECK(!d.load(path));
+    for (const auto& [k, v] : odd)
+        CHECK(d.get("foo", k, "?") == v);
+    CHECK(!std::filesystem::exists(tmp / "test.ini.tmp"));
+    {
+        std::ofstream(path) << "[old]\r\npath = C:\\Games\\Old \r\nname=\"x\\ny\"\r\n";
+    }
+    CHECK(!d.load(path) && d.get("old", "path") == "C:\\Games\\Old" && d.get("old", "name") == "x\ny");
+
+    // One that's there but can't be read isn't saved over.
+    const auto unreadable = tmp / "dir.ini";
+    std::filesystem::create_directories(unreadable);
+    Config u;
+    CHECK(bool(u.load(unreadable)));
+    u.set("foo", "path", "x");
+    CHECK(bool(u.save()) && std::filesystem::is_directory(unreadable));
+    Config fresh;
+    CHECK(!fresh.load(tmp / "none.ini") && fresh.targets().empty());
     std::filesystem::remove_all(tmp);
 }
 
@@ -143,6 +189,11 @@ static void testWav() {
     Sound pcm;
     CHECK(!decodeWav(encodePcmWav(s), pcm));
     CHECK(pcm.format == 1 && pcm.rate == 22050 && pcm.samples == s.samples);
+    // A chunk claiming nearly 4 GB ends the walk (it doesn't wrap round).
+    std::vector<uint8_t> big(b.begin(), b.begin() + 40);
+    tag("junk"), put32(b, 0xFFFFFFF0u);
+    big.insert(big.end(), b.end() - 8, b.end());
+    CHECK(bool(decodeWav(big, s)));
     b.resize(20);
     CHECK(bool(decodeWav(b, s))); // cut inside the fmt chunk
 }
@@ -224,6 +275,21 @@ static void testMixer() {
     m.finishStream(st);
     m.mix(out.data(), 2);
     CHECK(out[0] == 500 && out[2] == 0 && !m.isPlaying(st));
+    // Across chunks, resampled, the played ones let go: the ramp goes on.
+    const SoundHandle ramp = m.playStream(11025, 1, SoundType::Music);
+    bool smooth = true;
+    int16_t next = 0;
+    for (int k = 0; k < 500; ++k) {
+        const int16_t chunk[3] = {int16_t(next), int16_t(next + 2), int16_t(next + 4)};
+        next = int16_t(next + 6);
+        m.append(ramp, chunk, 3);
+        std::vector<int16_t> o(12);
+        m.mix(o.data(), 6); // 3 frames' worth at twice the rate
+        for (int i = 0; i < 6; ++i) // (the last holds: the frame after isn't there yet)
+            smooth = smooth && o[i * 2] == int16_t(6 * k + std::min(i, 4));
+    }
+    CHECK(smooth && m.position(ramp) == 1500.0);
+    m.stopAll();
     // Nothing to play.
     CHECK(m.play(nullptr, SoundType::Effects) == kNoSound && m.play(make(22050, 1, {}), SoundType::Effects) == kNoSound);
 }
@@ -273,6 +339,44 @@ static void testSavestate(const std::filesystem::path& tmp) {
     std::vector<int> v;
     huge(v);
     CHECK(!huge.ok() && v.empty());
+    // A count each element can't have its bytes for (an int takes 4).
+    save::Serializer few = save::Serializer::loader({3, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8});
+    few(v);
+    CHECK(!few.ok() && v.empty());
+    // One that the bytes could back if elements were a byte each: grown as
+    // they're read, not all at once (a Thing takes 14 here).
+    std::vector<uint8_t> zeros(1 << 20);
+    zeros[0] = 0xFF, zeros[1] = 0xFF, zeros[2] = 0x0F;
+    save::Serializer many = save::Serializer::loader(zeros);
+    many(things2);
+    CHECK(!many.ok() && things2.size() <= (1 << 20) / 14 && things2.capacity() < 200000);
+
+    // Strings and byte lists are their bytes in order, numbers little-
+    // endian, on any host (the files are the same everywhere).
+    save::Serializer bytes = save::Serializer::saver();
+    std::string abc = "abc";
+    std::vector<uint8_t> blob = {9, 8};
+    uint16_t word = 0x0102;
+    bytes(abc)(blob)(word);
+    CHECK((bytes.bytes() == std::vector<uint8_t>{3, 0, 0, 0, 'a', 'b', 'c', 2, 0, 0, 0, 9, 8, 2, 1}));
+    std::string abc2;
+    std::vector<uint8_t> blob2;
+    uint16_t word2 = 0;
+    save::Serializer bytesIn = save::Serializer::loader(bytes.bytes());
+    bytesIn(abc2)(blob2)(word2);
+    CHECK(bytesIn.ok() && bytesIn.atEnd() && abc2 == abc && blob2 == blob && word2 == word);
+
+    // A checked enum: one past the last refused.
+    save::Serializer kinds = save::Serializer::saver();
+    savetest::Kind kind = savetest::Kind::B;
+    save::syncEnum(kinds, kind, savetest::Kind::B);
+    kind = savetest::Kind::A;
+    save::Serializer kindIn = save::Serializer::loader(kinds.bytes());
+    save::syncEnum(kindIn, kind, savetest::Kind::B);
+    CHECK(kindIn.ok() && kind == savetest::Kind::B);
+    save::Serializer kindBad = save::Serializer::loader(kinds.bytes());
+    save::syncEnum(kindBad, kind, savetest::Kind::A);
+    CHECK(!kindBad.ok() && kind == savetest::Kind::A);
 
     // Files: the header alone, or with the state; a damaged one refused.
     const auto dir = tmp / "saves";

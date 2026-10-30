@@ -3,7 +3,9 @@
 
 // Testbed: a built-in "game" that exercises the System interface (palette
 // graphics, input, timing, audio) so the backend can be checked without any
-// game data. Esc returns to the launcher, Space toggles a test tone. It
+// game data. Esc returns to the launcher, Space toggles a test tone, F2
+// toggles text input. The title shows what the game holds down (keys,
+// mouse buttons: all let go after the Reluva menu) and what was typed. It
 // has savestates (the animation's time, the tone, the crosshair), to try
 // the Reluva menu (Ctrl+F5) without a game.
 
@@ -11,6 +13,8 @@
 
 #include <atomic>
 #include <cmath>
+#include <set>
+#include <string>
 
 namespace reluva {
 
@@ -27,7 +31,6 @@ public:
     Error run() override {
         if (Error err = sys_.initGraphics(kWidth, kHeight, PixelFormat::CLUT8))
             return err;
-        sys_.setWindowTitle("Reluva - Testbed (Esc: back, Space: tone)");
         screen_.create(kWidth, kHeight, PixelFormat::CLUT8);
 
         const int rate = sys_.audioRate();
@@ -58,26 +61,49 @@ public:
                     running = false;
                     break;
                 case EventType::KeyDown:
+                    held_.insert(ev.key);
                     if (ev.key == key::Escape)
                         running = false;
                     else if (ev.key == key::Space && !ev.repeat)
                         toneOn_ = !toneOn_;
+                    else if (ev.key == key::F1 + 1 && !ev.repeat) {
+                        typing_ = !typing_;
+                        typing_ ? sys_.startTextInput() : sys_.stopTextInput();
+                    }
                     break;
+                case EventType::KeyUp:
+                    held_.erase(ev.key);
+                    break;
+                case EventType::MouseDown:
+                case EventType::MouseUp:
+                    if (const int bit = 1 << int(ev.button); ev.type == EventType::MouseDown)
+                        buttons_ |= bit;
+                    else
+                        buttons_ &= ~bit;
+                    [[fallthrough]];
                 case EventType::MouseMove:
                     mouseX_ = ev.mouseX;
                     mouseY_ = ev.mouseY;
+                    break;
+                case EventType::TextInput:
+                    typed_ += ev.text;
+                    while (typed_.size() > 24 || (!typed_.empty() && (typed_[0] & 0xC0) == 0x80))
+                        typed_.erase(0, 1); // the last few characters
                     break;
                 default:
                     break;
                 }
             }
 
+            showTitle();
             const uint64_t t = sys_.getMillis() - start_;
             drawFrame(t);
             sys_.updateScreen(screen_);
             sys_.delayMillis(1); // vsync paces the loop; this just yields
         }
 
+        if (typing_)
+            sys_.stopTextInput();
         sys_.stopAudio();
         return Error::success();
     }
@@ -108,6 +134,18 @@ public:
     }
 
 private:
+    void showTitle() {
+        int buttons = 0;
+        for (int b = 0; b < 4; ++b)
+            buttons += (buttons_ >> b) & 1;
+        std::string title = "Reluva - Testbed (Esc: back, Space: tone, F2: type) - held: " +
+                            std::to_string(held_.size()) + " keys, " + std::to_string(buttons) + " buttons";
+        if (typing_)
+            title += " - typed: " + typed_;
+        if (title != title_)
+            sys_.setWindowTitle(title_ = title);
+    }
+
     void drawFrame(uint64_t t) {
         // Static plasma pattern in indices 0-254; animation comes purely from
         // palette cycling, the way many games of the era did it.
@@ -151,6 +189,10 @@ private:
     Surface screen_;
     Surface plasma_;
     int mouseX_ = kWidth / 2, mouseY_ = kHeight / 2;
+    std::set<uint32_t> held_; // keys down, as the events say
+    int buttons_ = 0;         // mouse buttons down, a bit each
+    bool typing_ = false;
+    std::string typed_, title_;
     uint64_t start_ = 0;
     std::atomic<bool> toneOn_{false};
     double phase_ = 0; // audio thread only

@@ -4,6 +4,7 @@
 #include "launcher/launcher.h"
 
 #include "backends/sdl3/sdl_system.h"
+#include "common/fs.h"
 #include "engines/registry.h"
 #include "launcher/game_menu.h"
 
@@ -12,6 +13,17 @@
 #include <imgui_impl_sdlrenderer3.h>
 
 namespace reluva {
+
+GameTarget targetFromConfig(const Config& config, const std::string& name) {
+    return GameTarget{name,
+                      config.get(name, "engine"),
+                      config.get(name, "gameid"),
+                      config.get(name, "description", name),
+                      fs::fromUtf8(config.get(name, "path")),
+                      0,
+                      config.get(name, "language"),
+                      config.get(name, "platform")};
+}
 
 Launcher::Launcher(SdlSystem& system, Config& config, std::filesystem::path saveRoot)
     : sys_(system), config_(config), saveRoot_(std::move(saveRoot)) {
@@ -141,25 +153,28 @@ void Launcher::drawUi(std::optional<GameTarget>& launch, bool& quit) {
     ImGui::EndDisabled();
     drawLoad(launch);
 
-    ImGui::BeginDisabled(pickInProgress_);
+    ImGui::BeginDisabled(pick_->inProgress);
     if (ImGui::Button("Add Game...", bsize)) {
-        pickInProgress_ = true;
-        SDL_ShowOpenFolderDialog(pickFolderCallback, this, sys_.window(), nullptr, false);
+        pick_->inProgress = true;
+        SDL_ShowOpenFolderDialog(pickFolderCallback, new std::shared_ptr<PickState>(pick_), sys_.window(), nullptr,
+                                 false);
     }
     ImGui::EndDisabled();
 
     ImGui::BeginDisabled(!haveSelection);
     if (ImGui::Button("Remove", bsize)) {
         config_.removeSection(selected_);
-        config_.save();
-        status_ = "Removed " + selected_;
+        if (Error err = config_.save())
+            status_ = err.message;
+        else
+            status_ = "Removed " + selected_;
         selected_.clear();
     }
     ImGui::EndDisabled();
 
     ImGui::Spacing();
     if (ImGui::Button("Run Testbed", bsize))
-        launch = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}, 0};
+        launch = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}, 0, {}, {}};
 
     ImGui::Spacing();
     if (ImGui::Button("Quit", bsize))
@@ -236,30 +251,32 @@ void Launcher::drawLoad(std::optional<GameTarget>& launch) {
 }
 
 void SDLCALL Launcher::pickFolderCallback(void* userdata, const char* const* files, int) {
-    auto* self = static_cast<Launcher*>(userdata);
+    // Called once: the reference handed over with the dialog ends here.
+    const std::unique_ptr<std::shared_ptr<PickState>> owner(static_cast<std::shared_ptr<PickState>*>(userdata));
+    PickState& pick = **owner;
     {
-        std::lock_guard lock(self->pickMutex_);
+        std::lock_guard lock(pick.mutex);
         if (!files)
-            self->pickError_ = std::string("Folder dialog failed: ") + SDL_GetError();
+            pick.error = std::string("Folder dialog failed: ") + SDL_GetError();
         else if (files[0])
-            self->pickedFolder_ = files[0];
+            pick.folder = files[0]; // SDL's strings are UTF-8
     }
-    self->pickInProgress_ = false;
+    pick.inProgress = false;
 }
 
 void Launcher::handlePickedFolder() {
     std::optional<std::string> folder, error;
     {
-        std::lock_guard lock(pickMutex_);
-        folder.swap(pickedFolder_);
-        error.swap(pickError_);
+        std::lock_guard lock(pick_->mutex);
+        folder.swap(pick_->folder);
+        error.swap(pick_->error);
     }
     if (error)
         status_ = *error;
     if (!folder)
         return;
 
-    auto found = detectGames(*folder);
+    auto found = detectGames(fs::fromUtf8(*folder));
     if (found.empty()) {
         status_ = "No supported game found in " + *folder;
     } else if (found.size() == 1) {
@@ -286,11 +303,6 @@ void Launcher::addGame(const DetectedGame& game, const std::string& path) {
     else
         status_ = "Added " + game.description;
     selected_ = name;
-}
-
-GameTarget Launcher::targetFromConfig(const std::string& name) const {
-    return GameTarget{name, config_.get(name, "engine"), config_.get(name, "gameid"),
-                      config_.get(name, "description", name), config_.get(name, "path"), 0};
 }
 
 } // namespace reluva

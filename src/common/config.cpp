@@ -3,6 +3,8 @@
 
 #include "common/config.h"
 
+#include "common/fs.h"
+
 #include <fstream>
 
 namespace reluva {
@@ -16,13 +18,58 @@ static std::string trim(const std::string& s) {
     return s.substr(b, e - b + 1);
 }
 
+// A value as written: quoted and escaped when it wouldn't read back as it
+// is (spaces at either end, line breaks or other control characters, a
+// leading quote).
+static std::string quote(const std::string& v) {
+    bool plain = v.empty() || (v.front() != ' ' && v.front() != '\t' && v.front() != '"' && v.back() != ' ' &&
+                               v.back() != '\t');
+    for (unsigned char c : v)
+        plain = plain && c >= 0x20 && c != 0x7f;
+    if (plain)
+        return v;
+    std::string out = "\"";
+    for (char c : v) {
+        switch (c) {
+        case '\\': out += "\\\\"; break;
+        case '"': out += "\\\""; break;
+        case '\n': out += "\\n"; break;
+        case '\r': out += "\\r"; break;
+        case '\t': out += "\\t"; break;
+        default: out += c; break;
+        }
+    }
+    return out + '"';
+}
+
+static std::string unquote(const std::string& v) {
+    if (v.size() < 2 || v.front() != '"' || v.back() != '"')
+        return v; // as written by hand, or before values were quoted
+    std::string out;
+    for (size_t i = 1; i + 1 < v.size(); ++i) {
+        char c = v[i];
+        if (c == '\\' && i + 2 < v.size()) {
+            c = v[++i];
+            c = c == 'n' ? '\n' : c == 'r' ? '\r' : c == 't' ? '\t' : c;
+        }
+        out += c;
+    }
+    return out;
+}
+
 Error Config::load(const std::filesystem::path& path) {
     path_ = path;
     sections_.clear();
+    unreadable_ = false;
 
-    std::ifstream in(path);
-    if (!in)
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec) && !ec)
         return Error::success(); // a missing file just means a fresh config
+    std::ifstream in(path, std::ios::binary);
+    if (ec || !in || !std::filesystem::is_regular_file(path, ec)) {
+        unreadable_ = true;
+        return Error::fail("Can't read " + fs::toUtf8(path) + ": settings won't be saved over it");
+    }
 
     std::string line, section;
     while (std::getline(in, line)) {
@@ -37,22 +84,28 @@ Error Config::load(const std::filesystem::path& path) {
         size_t eq = line.find('=');
         if (eq == std::string::npos || section.empty())
             continue;
-        sections_[section][trim(line.substr(0, eq))] = trim(line.substr(eq + 1));
+        sections_[section][trim(line.substr(0, eq))] = unquote(trim(line.substr(eq + 1)));
+    }
+    if (in.bad()) {
+        unreadable_ = true;
+        return Error::fail("Error reading " + fs::toUtf8(path) + ": settings won't be saved over it");
     }
     return Error::success();
 }
 
 Error Config::save() const {
-    std::ofstream out(path_, std::ios::trunc);
-    if (!out)
-        return Error::fail("Cannot write " + path_.string());
+    if (unreadable_)
+        return Error::fail("Not saving settings over " + fs::toUtf8(path_) + ", which couldn't be read");
+    std::string out;
     for (const auto& [name, values] : sections_) {
-        out << '[' << name << "]\n";
+        out += '[' + name + "]\n";
         for (const auto& [k, v] : values)
-            out << k << '=' << v << '\n';
-        out << '\n';
+            out += k + '=' + quote(v) + '\n';
+        out += '\n';
     }
-    return out ? Error::success() : Error::fail("Error writing " + path_.string());
+    if (Error e = fs::replaceFile(path_, out))
+        return Error::fail("Can't save settings: " + e.message);
+    return Error::success();
 }
 
 std::string Config::get(const std::string& section, const std::string& key,

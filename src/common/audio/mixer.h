@@ -41,7 +41,9 @@ public:
                      bool loop = false);
     // A stream: a sound fed as it's made. It plays what it has been given
     // (silent while it waits for more) and ends once finished and played
-    // out. `samples` are interleaved, `count` of them.
+    // out. `samples` are interleaved, `count` of them, whole frames (a
+    // stray sample at the end is dropped). What has been played is let go,
+    // so a stream can run for as long as it's fed.
     SoundHandle playStream(int rate, int channels, SoundType type, int volume = kMaxVolume);
     void append(SoundHandle stream, const int16_t* samples, size_t count);
     void finishStream(SoundHandle stream);
@@ -67,16 +69,27 @@ public:
     void mix(int16_t* out, int frames);
 
 private:
+    // A stream's samples, in the chunks append() was given. The lock is
+    // held only to move chunks in and out: append() copies the samples
+    // before taking it and frees what mix() has played after.
+    struct Stream {
+        std::vector<std::vector<int16_t>> chunks; // from `head` on, not yet played out
+        size_t head = 0;
+        size_t first = 0;  // the frame chunks[head] starts with
+        size_t frames = 0; // every frame given so far
+        std::vector<std::vector<int16_t>> spent; // played, for append() to free
+    };
     struct Channel {
         SoundHandle handle;
-        std::shared_ptr<const Sound> sound;
+        std::shared_ptr<const Sound> sound; // null for a stream
         SoundType type;
         int volume, pan;
         bool loop;
-        double position = 0; // in the sound's frames
+        int rate, channels;
+        double position = 0; // in the sound's frames (a stream's from its start)
         bool done = false;
-        std::shared_ptr<Sound> stream; // a stream's own sound (the same as `sound`)
-        bool open = false;             // a stream still being fed
+        std::unique_ptr<Stream> stream; // a stream's samples
+        bool open = false;              // a stream still being fed
     };
     Channel* find(SoundHandle handle);
     const Channel* find(SoundHandle handle) const;

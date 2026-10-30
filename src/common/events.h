@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 namespace reluva {
 
@@ -59,6 +60,7 @@ enum class EventType {
     MouseWheel,
     FocusLost,         // the window lost the keyboard focus
     FocusGained,
+    TextInput,         // text typed, while System::startTextInput() is on
 };
 
 enum class MouseButton { None, Left, Right, Middle };
@@ -68,10 +70,15 @@ struct Event {
     uint32_t key = key::Unknown; // KeyDown/KeyUp
     uint16_t mods = 0;           // KeyDown/KeyUp, and the mouse events (keymod bits)
     bool repeat = false;         // KeyDown auto-repeat
-    int mouseX = 0, mouseY = 0;  // mouse events, in game framebuffer pixels
+    // Mouse events, in game framebuffer pixels: always inside the frame.
+    // A pointer in the bars around it (a window of another shape) is
+    // clamped to the frame's nearest pixel and flagged `outside`.
+    int mouseX = 0, mouseY = 0;
+    bool outside = false;
     MouseButton button = MouseButton::None;
     int clicks = 0;              // MouseDown/MouseUp: 1, or 2 for a double click, ...
     int wheelY = 0;
+    std::string text;            // TextInput: what was typed, UTF-8 (one or more characters)
 };
 
 } // namespace reluva

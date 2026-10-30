@@ -48,9 +48,10 @@ Little-endian throughout:
 | u32 + bytes | the engine's state |
 | u32 | CRC-32 of the state |
 
-Strings and lists are a u32 count and their contents. A file is written
-beside the old one first and then moved over it, so a failed save leaves
-the old one. The header can be read alone (for the lists).
+Strings and lists are a u32 count and their contents (a string's bytes,
+and a byte list's, as they are; numbers little-endian on any host). A
+file is written beside the old one first and then moved over it, so a
+failed save leaves the old one. The header can be read alone (for the lists).
 
 ## For an engine
 
@@ -80,8 +81,13 @@ handles. A struct gives a `syncState(save::Serializer&, T&)` (a friend
 function beside its fields is easiest), and `s(a)(b)(c)` syncs fields in
 turn. `save::syncIndex` saves a pointer into a table the engine rebuilds
 (the game's data) as its index. A loader that runs out of bytes, or reads
-a count longer than what's left, fails instead of reading past the end;
-check `s.ok()`.
+a count longer than what's left (each element taking at least the bytes
+its type is written in), fails instead of reading past the end; check
+`s.ok()`. Lists are grown as their elements are read, so a damaged count
+costs memory only for the elements really there. An enum is read as any
+value of its type: where one out of range would do harm (a `switch`, an
+index), sync it with `save::syncEnum(s, v, Last)`, which fails a load
+whose value isn't 0 .. `Last`, or check it after loading.
 
 The menu calls them from inside `System::pollEvent()`, between the
 engine's frames, so the engine's own loop needs nothing new. A load

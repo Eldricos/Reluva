@@ -23,24 +23,26 @@ using namespace reluva;
 static std::filesystem::path configPath() {
     std::filesystem::path dir = ".";
     if (char* pref = SDL_GetPrefPath("reluva", "reluva")) {
-        dir = pref;
+        dir = fs::fromUtf8(pref); // SDL's strings are UTF-8
         SDL_free(pref);
     }
     return dir / "reluva.ini";
 }
 
 // `reluva --hash <file>...` prints detection signatures for building tables.
+// (SDL_main hands over the arguments as UTF-8, on Windows too.)
 static int printHashes(int argc, char** argv) {
     for (int i = 2; i < argc; ++i) {
+        const std::filesystem::path file = fs::fromUtf8(argv[i]);
         std::error_code ec;
-        auto size = std::filesystem::file_size(argv[i], ec);
-        auto md5 = fs::md5File(argv[i], kDetectionHashBytes);
+        auto size = std::filesystem::file_size(file, ec);
+        auto md5 = fs::md5File(file, kDetectionHashBytes);
         if (ec || !md5) {
             std::fprintf(stderr, "%s: cannot read\n", argv[i]);
             continue;
         }
-        std::printf("{\"%s\", \"%s\", %llu},\n", std::filesystem::path(argv[i]).filename().string().c_str(),
-                    md5->c_str(), static_cast<unsigned long long>(size));
+        std::printf("{\"%s\", \"%s\", %llu},\n", fs::toUtf8(file.filename()).c_str(), md5->c_str(),
+                    static_cast<unsigned long long>(size));
     }
     return 0;
 }
@@ -56,8 +58,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
+    // A config that can't be read is left alone (and not saved over).
     Config config;
-    config.load(configPath());
+    const Error configError = config.load(configPath());
+    if (configError)
+        SDL_Log("%s", configError.message.c_str());
 
     // `reluva <target> [--load <slot>]` starts a configured game (or
     // "testbed") directly, loading a savestate if asked, and exits when it
@@ -66,10 +71,9 @@ int main(int argc, char** argv) {
     if (argc >= 2) {
         std::string name = argv[1];
         if (name == "testbed")
-            direct = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}, 0};
+            direct = GameTarget{"testbed", "testbed", "testbed", "Testbed", {}, 0, {}, {}};
         else if (config.hasSection(name) && name != Config::kGlobalSection)
-            direct = GameTarget{name, config.get(name, "engine"), config.get(name, "gameid"),
-                                config.get(name, "description", name), config.get(name, "path"), 0};
+            direct = targetFromConfig(config, name);
         else {
             std::fprintf(stderr, "Unknown target '%s'\n", name.c_str());
             return 1;
@@ -81,6 +85,8 @@ int main(int argc, char** argv) {
     // Savestates live beside the settings, a folder per game.
     const std::filesystem::path saves = configPath().parent_path() / "saves";
     Launcher launcher(system, config, saves);
+    if (configError)
+        launcher.setStatus(configError.message);
     GameMenu menu(system, saves);
     while (auto target = direct ? direct : launcher.run()) {
         const MetaEngine* meta = findEngine(target->engineId);
