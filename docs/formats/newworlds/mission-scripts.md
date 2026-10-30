@@ -120,3 +120,11 @@ seconds after a report), the steps let time pass first, one timer at a
 time, until it's on; not past the mission failing. **Z** stops.
 `reluva-tool script-check` walks each mission the same way, noting the
 seconds of timers run before an event.
+
+**Order.** The rules an event matches are worked out before any of them
+runs: a handler armed by one of them hears the next such event, not this
+one, wherever it stands in the file (and one disarmed by an earlier
+handler of the same event doesn't run). Timers due at the same time fire
+one at a time, soonest first: one a handler stops doesn't fire, one it
+restarts waits its new time. The script runs in the simulation's fixed 50
+ms ticks (16 to a script second), whatever the frame rate.

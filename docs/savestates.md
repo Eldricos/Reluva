@@ -121,6 +121,11 @@ Two checks keep that true as the code changes:
   through into a second run and checks both end the same. All 59
   mission-and-side runs pass at 600 seconds.
 
+A save also records a hash of the mission's script, and is refused if the
+script has changed since (a rule moved or edited, even with the same count).
+The simulation runs in fixed 50 ms ticks, so a save plays on the same at
+any frame rate.
+
 A field added to the simulation without being added to its `syncState`
 shows up there as a difference, if it changes how the mission plays. When
 the layout changes, raise `kStateVersion` in `newworlds.cpp`.

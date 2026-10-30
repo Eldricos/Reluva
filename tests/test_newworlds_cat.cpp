@@ -1798,7 +1798,7 @@ void testBees() {
         CHECK(std::count_if(m.bees().begin(), m.bees().end(), [](const Economy::Bee& b) { return b.worker; }) == 4);
         CHECK(m.order("mining-station", 2.5f * 16384, 3.5f * 16384, 5, 7));
         CHECK(built(m, 100) == 1); // 22 s out, 60 s building
-        built(m, 45);
+        built(m, 45 + 185);        // (its crew walk over from the hub first: 185 s)
         const bool parked = std::any_of(m.pods().begin(), m.pods().end(), [](const Economy::Pod& p) {
             return p.state == Economy::Pod::Parked && !p.refined;
         });
@@ -1927,9 +1927,9 @@ void testStoresAndRazing() {
     for (const ColonyStructure& c : e.structures())
         if (c.id == bay)
             crew = c.crew;
-    CHECK(crew > 0 && e.dead() == 0);
+    CHECK(crew > 0 && e.dead() == 1); // (the first storage facility's crew, lost with it)
     e.remove(bay);
-    CHECK(e.dead() == crew);
+    CHECK(e.dead() == 1 + crew);
 }
 
 // Projectiles (exe.md#sides-and-combat): a disruptor bolt flies 5400
@@ -3028,6 +3028,319 @@ void testSaveState() {
     }
 }
 
+// The interpreter's order (mission_script.h): timers due together fire one
+// at a time, soonest first, each seeing what the last did; a handler armed
+// during an event hears the next one, whichever comes first in the file; a
+// save of an edited script is refused; a loop of signals is cut off.
+void testScriptOrder() {
+    std::vector<MissionScript> s;
+    CHECK(!parseMissionScripts("mission T F\non start\n  timer a 1\n  timer b 2\n  timer c 2\n"
+                               "on timer a\n  stop b\n  timer c 5\n  say command \"a\"\n"
+                               "every timer b\n  say command \"b\"\nevery timer c\n  say command \"c\"\n",
+                               s));
+    MissionRun t(s[0], nullptr);
+    t.fire({"start", {}});
+    auto out = t.advance(2 * kScriptSecond); // all three due
+    CHECK(out.size() == 1 && out[0].text == "a"); // b stopped, c started again
+    CHECK(std::abs(t.nextTimer() - 5 * kScriptSecond) < 1e-9);
+    out = t.advance(5 * kScriptSecond);
+    CHECK(out.size() == 1 && out[0].text == "c" && t.nextTimer() < 0);
+    // A timer of 0 its handler restarts fires once a call, not for ever.
+    CHECK(!parseMissionScripts("mission T F\non start\n  timer z 0\nevery timer z\n  timer z 0\n"
+                               "  say command \"z\"\n",
+                               s));
+    MissionRun zero(s[0], nullptr);
+    zero.fire({"start", {}});
+    CHECK(zero.advance(0.05).size() == 1 && zero.advance(0.05).size() == 1);
+    // Armed during the event: the next such event, in either order.
+    for (const char* text : {"mission T F\nobjective 1\nevery key a\n  arm late\non key a as late dormant\n"
+                             "  complete 1\n",
+                             "mission T F\nobjective 1\non key a as late dormant\n  complete 1\nevery key a\n"
+                             "  arm late\n"}) {
+        CHECK(!parseMissionScripts(text, s));
+        MissionRun r(s[0], nullptr);
+        r.fire({"key", {"a"}});
+        CHECK(r.objectiveState(1) == MissionRun::State::Incomplete);
+        r.fire({"key", {"a"}});
+        CHECK(r.objectiveState(1) == MissionRun::State::Complete);
+    }
+    // One switched off by an earlier handler of the same event doesn't run.
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\non key a\n  disarm b\non key a as b\n  complete 1\n", s));
+    MissionRun off(s[0], nullptr);
+    off.fire({"key", {"a"}});
+    CHECK(off.objectiveState(1) == MissionRun::State::Incomplete);
+    // The same number of rules, another action: the save isn't taken.
+    std::vector<MissionScript> s1, s2;
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\non key a\n  complete 1\n", s1));
+    CHECK(!parseMissionScripts("mission T F\nobjective 1\non key b\n  complete 1\n", s2));
+    MissionRun saved(s1[0], nullptr), same(s1[0], nullptr), edited(s2[0], nullptr);
+    save::Serializer out1 = save::Serializer::saver();
+    saved.syncState(out1);
+    const std::vector<uint8_t> bytes = out1.take();
+    save::Serializer in1 = save::Serializer::loader(bytes), in2 = save::Serializer::loader(bytes);
+    same.syncState(in1);
+    edited.syncState(in2);
+    CHECK(in1.ok() && in1.atEnd() && !in2.ok() && in2.error().find("changed") != std::string::npos);
+    // Signals raising each other: cut off, and counted.
+    CHECK(!parseMissionScripts("mission T F\nevery signal ping\n  signal ping\n", s));
+    MissionRun loop(s[0], nullptr);
+    loop.fire({"signal", {"ping"}});
+    CHECK(loop.droppedEvents() == 1 && !loop.finished());
+}
+
+// The simulation runs in fixed ticks (mission_sim.h): moved on a frame at
+// a time or a tenth of a second at a time, a mission ends up the same.
+void testFixedTicks() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int bx, int by) { return (bx + by) % 9 == 0 ? 1 : 0; };
+    map.depositAmount = [](int, int) { return 500; };
+    auto state = [](MissionSim& sim) {
+        save::Serializer s = save::Serializer::saver();
+        sim.syncState(s);
+        return s.take();
+    };
+    for (const auto& [mission, side] : {std::pair{"F1", 'F'}, std::pair{"K1", 'K'}}) {
+        const std::vector<ColonyBuilding> colony = MissionSim::placedColony(mission, side);
+        MissionSim tenths(mission, side, t, map, 64, 64, colony), frames(mission, side, t, map, 64, 64, colony);
+        constexpr int kSeconds = 150;
+        for (int i = 0; i < kSeconds * 10; ++i)
+            tenths.advance(0.1);
+        for (int i = 0; i < kSeconds * 60; ++i)
+            frames.advance(1.0 / 60);
+        CHECK(std::abs(tenths.clock() - kSeconds) < 1e-9 && tenths.clock() == frames.clock());
+        CHECK(tenths.world().tick() == kSeconds * 20 && frames.world().tick() == kSeconds * 20);
+        CHECK(state(tenths) == state(frames));
+        CHECK(tenths.world().units().size() == frames.world().units().size());
+    }
+}
+
+// The colony economy's fixes: razing a block with people housed, rides
+// from a building razed, a yard's jobs when it's lost, the shortage
+// throttle and the worker bee asked again, a second processor, the size
+// limit on building orders, crewless mines and processors, the storage
+// facility's type, people on their way to a building lost, and life
+// support without a hub.
+void testEconomyFixes() {
+    auto run = [](Economy& e, double seconds) {
+        std::vector<ScriptEvent> all;
+        for (double t = 0; t < seconds - 1e-9; t += 0.05)
+            for (ScriptEvent& x : e.advance(0.05))
+                all.push_back(std::move(x));
+        return all;
+    };
+    const Stock rich{5000, 10000, 23000, 5000, 40000, 50000};
+    ColonyMap bare;
+    bare.depositKind = [](int, int) { return 0; };
+    bare.depositAmount = [](int, int) { return 0; };
+    // A block razed sends its pool out too (to the hub's, which has room),
+    // isn't filled again, and its people don't die with it.
+    {
+        Economy e('F', rich, 50, bare);
+        e.setOfficers(0);
+        const int hub = e.addBuilt("colony-hub", 0, 0);
+        const int acc = e.addBuilt("accommodation", 20000, 0);
+        CHECK(e.structure(acc)->pool == 150 && e.structure(hub)->pool == 0);
+        CHECK(e.raze(acc) && e.structure(acc)->pool == 0 && e.walking() >= 150 && e.people() == 150);
+        run(e, 21);
+        CHECK(e.structure(hub)->pool >= 150 && e.structure(acc)->pool == 0 && e.structure(acc)->coming.empty());
+        CHECK(e.evacuated(acc));
+        e.remove(acc);
+        CHECK(e.dead() == 0 && e.people() == 150);
+    }
+    // With transports they ride out; the block stands till they're aboard.
+    {
+        Economy e('F', rich, 50, bare);
+        e.setOfficers(0);
+        e.addBuilt("colony-hub", 0, 0);
+        const int acc = e.addBuilt("accommodation", 20000, 0);
+        e.setTransports(true);
+        CHECK(e.raze(acc));
+        int out = 0;
+        for (const Economy::Ride& r : e.rides())
+            out += r.from == acc && r.toPool ? r.people : 0;
+        CHECK(out == 150);
+        run(e, 1);
+        CHECK(!e.evacuated(acc));
+        std::vector<int> ids;
+        for (const Economy::Ride& r : e.rides())
+            ids.push_back(r.id);
+        for (int id : ids)
+            e.rideLoaded(id);
+        run(e, 0.3);
+        CHECK(e.evacuated(acc));
+        for (int id : ids)
+            e.rideDelivered(id);
+        e.remove(acc);
+        CHECK(e.dead() == 0 && e.people() == 150 && e.hub()->pool == 150);
+    }
+    // A ride from a building razed before it set off: its destination's
+    // coming loses it and the crew is asked for again.
+    {
+        Economy e('F', rich, 50, bare);
+        e.setOfficers(0);
+        e.addBuilt("colony-hub", 0, 0);
+        const int acc = e.addBuilt("accommodation", 20000, 0);
+        const int bay = e.addBuilt("sickbay", 0, 20000);
+        e.setTransports(true);
+        e.setCrewTarget(bay, 0); // (riding back to the hub)
+        e.setCrewTarget(bay, 1); // (from the block, by ride)
+        CHECK(e.structure(bay)->coming.size() == 1);
+        e.raze(acc);
+        CHECK(e.structure(bay)->coming.empty() && e.structure(bay)->wanted == 1);
+        std::vector<int> ids;
+        for (const Economy::Ride& r : e.rides())
+            ids.push_back(r.id);
+        for (int id : ids)
+            e.rideDelivered(id);
+        CHECK(e.structure(bay)->coming.size() == 1 && e.structure(bay)->wanted == 0); // from the hub now
+    }
+    // A yard's jobs: lost, to another yard; with none, their cost back; a
+    // yard razed hands on its work but rolls its last vehicle out first.
+    {
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        const int y1 = e.addBuilt("vehicle-yard", 0, 20000);
+        const int y2 = e.addBuilt("vehicle-yard", 20000, 20000);
+        const Stock had = e.stock();
+        CHECK(e.orderVehicle(*vehicleType(56)) && e.vehicleJobs()[0].yard == y1);
+        e.remove(y1);
+        CHECK(e.vehicleJobs().size() == 1 && e.vehicleJobs()[0].yard == y2);
+        e.remove(y2);
+        CHECK(e.vehicleJobs().empty() && e.stock() == had);
+        const int y3 = e.addBuilt("vehicle-yard", 40000, 20000);
+        CHECK(e.orderVehicle(*vehicleType(56)) && e.raze(y3) && e.vehicleJobs().empty());
+        run(e, 0.5);
+        CHECK(e.evacuated(y3));
+        e.remove(y3);
+        const int y4 = e.addBuilt("vehicle-yard", 60000, 20000);
+        CHECK(e.orderVehicle(*vehicleType(97))); // (a scout: no work, rolling out at once)
+        run(e, 0.1);
+        CHECK(e.raze(y4) && e.vehicleJobs().size() == 1);
+        run(e, 1);
+        CHECK(!e.evacuated(y4));
+        run(e, 6);
+        CHECK(e.takeVehicles().size() == 1 && e.evacuated(y4));
+    }
+    // A building without a worker bee asks each tick while the yard can't
+    // pay, reported at most every 600 ms; the bee it gets lost, it asks
+    // again.
+    {
+        Economy e('F', {}, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.addBuilt("vehicle-yard", 40000, 0);
+        e.setBees(4, 2, 0);
+        e.addBuilt("resource-processor", 0, 20000);
+        const auto told = run(e, 20);
+        const auto shorts = std::count_if(told.begin(), told.end(), [](const ScriptEvent& x) { return x.kind == "short-resources"; });
+        CHECK(shorts >= 32 && shorts <= 34);
+        Economy b('F', rich, 50, bare);
+        b.setBees(0, 0, 0); // (before the colony: no free worker bees)
+        b.addBuilt("colony-hub", 0, 0);
+        b.addBuilt("construction-yard", 20000, 0);
+        b.addBuilt("vehicle-yard", 40000, 0);
+        const int proc = b.addBuilt("resource-processor", 0, 20000);
+        run(b, 0.1);
+        CHECK(b.vehicleJobs().size() == 1 && b.vehicleJobs()[0].type == 12);
+        run(b, 10);
+        CHECK(b.takeVehicles().size() == 1 && b.vehicleJobs().empty());
+        b.setBees(0, 0, 1);
+        run(b, 1);
+        CHECK(std::any_of(b.bees().begin(), b.bees().end(), [&](const Economy::Bee& x) { return x.worker && x.site == proc; }));
+        b.setBees(0, 0, 0); // lost
+        run(b, 0.1);
+        CHECK(b.vehicleJobs().size() == 1);
+    }
+    // Ore and goods at the processors go only with the last.
+    ColonyMap ore;
+    ore.depositKind = [](int bx, int by) { return bx == 1 && by == 1 ? 2 : 0; };
+    ore.depositAmount = [](int, int) { return 300; };
+    auto oreTotal = [](const Economy& e) {
+        const auto s = e.oreStock();
+        return std::accumulate(s.begin(), s.end(), 0.0f);
+    };
+    {
+        Economy e('F', rich, 50, ore);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 0, 0);
+        const int p1 = e.addBuilt("resource-processor", 0, 0);
+        const int p2 = e.addBuilt("resource-processor", 0, 0);
+        e.addBuilt("mining-station", 1.5f * 16384, 1.5f * 16384);
+        run(e, 5);
+        const float held = oreTotal(e);
+        CHECK(held > 0);
+        e.remove(p1);
+        CHECK(oreTotal(e) == held);
+        e.remove(p2);
+        CHECK(oreTotal(e) == 0);
+    }
+    // Neither a mine nor the processor works without crew.
+    {
+        Economy e('F', rich, 50, ore);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 0, 0);
+        const int proc = e.addBuilt("resource-processor", 0, 0);
+        const int mine = e.addBuilt("mining-station", 1.5f * 16384, 1.5f * 16384);
+        e.setCrewTarget(proc, 0);
+        const Stock had = e.stock();
+        run(e, 10);
+        const float dug = oreTotal(e);
+        CHECK(dug > 15 && e.stock() == had); // dug, nothing refined
+        e.setCrewTarget(mine, 0);
+        run(e, 5);
+        CHECK(oreTotal(e) == dug);
+    }
+    // Building orders wait for room in the colony (not upgrades).
+    {
+        Economy e('F', rich, 3, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.addBuilt("power-generator", 40000, 0);
+        CHECK(e.colonySize() == 3 && !e.order("power-generator", 60000, 0, 0, 0));
+        CHECK(e.order("construction-yard-upgrade", 20000, 0, 0, 0));
+    }
+    // The storage facility: a type of its own, not in the build menu, with
+    // its buffer, crew and officer.
+    {
+        const BuildingType* t = buildingType("storage-facility");
+        CHECK(t && !t->orderable && t->crewSlots == 1 && t->speciality == 8 && t->bufferCap > 0);
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        const int sf = e.addBuilt("storage-facility", 20000, 0);
+        CHECK(t && !e.available(*t) && e.efficiency(*e.structure(sf)) > 0 && e.structure(sf)->crew == 1);
+        CHECK(e.colonySize() == 2 && e.stock() == rich);
+    }
+    // People on their way to a building destroyed go back to the hub.
+    {
+        Economy e('F', rich, 50, bare);
+        e.setOfficers(0);
+        const int hub = e.addBuilt("colony-hub", 0, 0);
+        const int bay = e.addBuilt("sickbay", 0, 20000);
+        e.setCrewTarget(bay, 0);
+        e.setCrewTarget(bay, 1);
+        CHECK(e.structure(bay)->coming.size() == 1 && e.structure(hub)->pool == 149);
+        e.remove(bay);
+        CHECK(e.dead() == 0 && e.people() == 150);
+        run(e, 21);
+        CHECK(e.structure(hub)->pool == 150);
+    }
+    // Life support: nothing drawn once the hub is gone.
+    {
+        Economy e('F', rich, 50, bare);
+        const int hub = e.addBuilt("colony-hub", 0, 0);
+        run(e, 1);
+        CHECK(e.lifeSupportPower() > 0);
+        e.remove(hub);
+        run(e, 1);
+        CHECK(e.lifeSupportPower() == 0);
+    }
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -3074,6 +3387,9 @@ int main() {
     testProjectiles();
     testModelTextures();
     testRasterizer();
+    testEconomyFixes();
+    testScriptOrder();
+    testFixedTicks();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

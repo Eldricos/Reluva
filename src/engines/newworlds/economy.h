@@ -189,12 +189,15 @@ public:
     // Stock given (or taken, negative) by the mission, in panel units;
     // never below nothing.
     void give(int material, int amount);
-    // A building destroyed: it no longer counts, works or draws power.
+    // A building destroyed: it no longer counts, works or draws power. Its
+    // people die with it; those on their way to it go back to the hub; a
+    // vehicle yard's jobs go to another yard, or are dropped and paid back.
     void remove(int id);
     // Demolishing (exe.md#demolishing): whether a building may be razed
     // (built, not the hub or a storage facility, not already evacuating);
     // the order: half its type's cost back at once (upgrades not), its
-    // crew sent out. Once it's empty (evacuated()), it's destroyed.
+    // crew and the people housed in it sent out, a yard's work not yet
+    // done handed on. Once it's empty (evacuated()), it's destroyed.
     // A defensive turret's shot: power taken from its buffer, if it holds
     // that much (exe.md#sides-and-combat); false, and nothing taken, if not.
     bool spend(int structure, float power);
@@ -472,9 +475,21 @@ private:
     std::vector<Ride> rides_;
     int nextRide_ = 1;
     void addRides(int from, int to, int people, bool toPool, bool listed, double wait = 0);
+    // A ride ended: gone, with its place in its destination's coming; the
+    // destination asks for its crew again (after its people are set down,
+    // if they were). Its people, for the caller to put somewhere.
+    int endRide(int ride, bool delivered);
+    // A vehicle yard's jobs handed on (it lost or razed): to another of the
+    // side's finished yards, else dropped and their cost put back.
+    void handOffJobs(int yard, bool rollingOut);
+    // A shortage line (short-resources and its officer's report), at most
+    // once every 600 ms each (exe.md#stores).
+    void shortage(int line);
     const ColonyStructure* pad() const;
     ColonyStructure* structureById(int id);
-    double lastCrewWarning_ = -1e9;
+    // When each shortage line was last reported: manufacture (001),
+    // construction (002), an upgrade (003) delayed.
+    std::array<double, 3> lastShortage_{-1e9, -1e9, -1e9};
     int nextId_ = 1;
     std::function<DockPoints(const std::string&)> docks_;
     mutable std::map<std::string, DockPoints> dockCache_;
@@ -499,7 +514,6 @@ private:
         friend void syncState(save::Serializer& s, Depot& v) { s(v.worker)(v.cargo)(v.dug)(v.asked); }
     };
     std::map<int, Depot> depots_;
-    int shipClock_ = 0;
 };
 
 } // namespace reluva::newworlds
