@@ -535,7 +535,7 @@ void MissionViewer::update(uint64_t nowMs) {
         // the map is drawn anew when what it shows changed, the panels
         // when the mission moved on.)
         const double clock = sim_->clock();
-        sim_->advance(dt);
+        sim_->advance(dt, [this] { noteBees(); });
         const bool advanced = sim_->clock() != clock;
         // The pointer on the screen's outermost pixels scrolls the
         // isometric cameras that way, speeding up 80 a tick to 6400.
@@ -566,10 +566,9 @@ void MissionViewer::update(uint64_t nowMs) {
             play_.shownOthers = std::move(others);
             showColony();
         }
-        // What moves is drawn on its way between ticks (drawnAt), so as
+        // What moves is drawn on its way between ticks (drawnAt; the bees
+        // from where noteBees found them as the last tick began), so as
         // time passes; under the full-screen Tricorder only as ticks run.
-        if (advanced)
-            noteBees();
         if (advanced || (dt > 0 && !play_.tricorderFull))
             showUnits();
         if (advanced)

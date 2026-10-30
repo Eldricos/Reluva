@@ -243,15 +243,15 @@ MissionViewer::Pose MissionViewer::drawnAt(const Unit& u) const {
             turn(u.lastTurretYaw, u.turretYaw)};
 }
 
-// As a tick runs: the bees as the tick before left them become where
-// they're drawn from.
+// As each tick begins: the bees as the tick before left them become where
+// they're drawn from (with several ticks in a frame, so from where the
+// last began, as the units' last poses are).
 void MissionViewer::noteBees() {
-    play_.beesBefore = std::move(play_.beesNoted);
-    play_.beesNoted.clear();
+    play_.beesBefore.clear();
     if (economy_)
         for (const Economy::Bee& b : economy_->bees())
             if (beeShown(b))
-                play_.beesNoted[b.id] = {b.x, b.y, b.heading, beeLift(b)};
+                play_.beesBefore[b.id] = {b.x, b.y, b.heading, beeLift(b)};
 }
 
 void MissionViewer::showUnits() {

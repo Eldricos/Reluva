@@ -424,8 +424,13 @@ void MissionViewer::drawBackdrop(BriefingView view) {
         }
         break;
     case BriefingView::StarSystem:
-        for (int i = 0; i < 400; ++i)
-            plot(screen_, int(rnd() % unsigned(w)), int(rnd() % unsigned(h)), 90, 90, 110);
+        for (int i = 0; i < 400; ++i) {
+            // Drawn into locals so every compiler gets the same stars
+            // (the order of a call's arguments is unspecified): y first,
+            // as GCC drew them.
+            const int y = int(rnd() % unsigned(h)), x = int(rnd() % unsigned(w));
+            plot(screen_, x, y, 90, 90, 110);
+        }
         for (int i = 0; i < 7; ++i) {
             const int cx = int(rnd() % unsigned(w)), cy = int(rnd() % unsigned(h)), r = 2 + int(rnd() % 5);
             const uint8_t cr = uint8_t(rnd() % 256), cg = uint8_t(rnd() % 256), cb = uint8_t(rnd() % 256);

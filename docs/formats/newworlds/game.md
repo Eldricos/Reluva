@@ -32,7 +32,7 @@ As the first tutorial teaches them:
 | Y | the selected armed vehicles drive back to the rally point |
 | Alt + S, M, E, then a click on a target | a science, medical or engineering scan by the selected scouts and science vehicles |
 | Alt + C, then a click on a building | the selected armed APCs capture it |
-| V, then 1-9, 0 | the vehicles the yards can make, and their work; a number orders one |
+| V, then 1-9, 0 | the vehicles the yards can make, and the side's orders (in work, then waiting); a number orders one; a click on an order, then a second, cancels it (the cost back if a yard had started on it) |
 | A, G, S, T, P | all the colony's APCs, ground scouts, science vehicles, tanks, photon artillery selected |
 | Shift or Ctrl + B / V | the camera to the next of the colony's buildings / fighting vehicles |
 | C | the colony's details (the hub's INFO page); a click on a construction in its queue, then YES, cancels it with the full cost back (at most 10 constructions ordered at once) |
@@ -164,9 +164,14 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   building with more than one coming gets a cargo bee, which brings two
   a trip (the Klingons' and Romulans' one of their bigger pods) and
   empties them into its store. Every mine, processor and
-  storage facility has a worker bee: those standing at the start get one
-  free, a later one takes a spare from the hub or has the vehicle yard
-  make one. The processor refines a quarter tonne a tick, in
+  storage facility, and each yard, has a worker bee: those standing at
+  the start get one free, a later one asks for one: a spare from the hub
+  if there is one (the oldest asking first), else a vehicle yard makes it
+  for that building, before the player's orders and at any colony size.
+  Bees go home to the first hub made that isn't dying; a building lost
+  takes those docked in it, kills those out near it (1.5 x its radius)
+  and lets the rest go to another hub or a building asking (killed if
+  none). The processor refines a quarter tonne a tick, in
   turn per ore, one for one: dilithium, talgonite, silicon, kelbonite,
   magnesite, dolamide into dilithium, polycomp, thermoconc, trans al,
   nitrium, duranium; every 32 ticks it packs its goods into pods once
@@ -364,7 +369,12 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
 - **Vehicles** as the executable makes them ([exe.md](exe.md#vehicle-production)):
   U lists the side's vehicles whose yard, upgrades and labs stand (the
   labs are in the build menu once the science station is up); an order
-  takes the cost and queues at the least busy yard; a yard puts up to
+  joins the side's one list (no yard's own queue): a yard free, crewed
+  and not razed takes the waiting order of the highest priority (a
+  building's worker bee before the player's), oldest first, that its
+  store can pay for, and pays as it starts; a yard lost loses its job,
+  unpaid back, the order waiting again in its place for the next yard,
+  which pays again; with no yard the orders wait; a yard puts up to
   300 power a tick from its buffer, times its efficiency (0.8 without an
   officer, 1 with one of skill 0.5), into the build value × 300, then the
   vehicle rolls out beside it (8 s) - bees into the hub. Officers posted
@@ -469,6 +479,10 @@ kept apart from the game's behaviour:
 | Mining | the 7 x 7 blocks round a mine, a tonne a take, 2 t a second carried by the bees | the executable; the carrying rate measured in C7 |
 | Refining | a quarter tonne a tick in turn per ore, ore kind k into material k | the executable |
 | Colony size | the colony's buildings and vehicles (no growth of its own) | the executable |
+| Bees docked in a building destroyed | deleted, not killed: still counted in COLONY SIZE | the executable: the count drops only as an object dies, and the docked ones are deleted (one step inferred; not seen in a recording) |
+| A vehicle half built in a yard destroyed | deleted with it, still counted in COLONY SIZE; one rolling out killed | Reluva's reading: the game makes it inside the yard as the job starts; its fate with the yard wasn't traced |
+| A yard razed with a job in work | keeps it (no crew: paused) and isn't held up by it; the order waits again once the yard is gone | Reluva's: the game keeps the job at the yard until it dies; whether it holds up the evacuation wasn't traced |
+| Yards taking orders | each tick a yard is free | the game offers the waiting orders as a yard frees, a new one stands or crew arrives |
 | Warnings | once a minute while they hold | K2's power messages a minute apart; C8's exactly 60 s |
 | Combat | hit points, damage, range, reload, magazine per type | the executable (exe.md#vehicles-and-turrets) |
 | A phaser pulse's speed | 2500 units a tick | the game's is its beam model's length a tick (not read from the models yet) |

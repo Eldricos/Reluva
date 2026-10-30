@@ -185,6 +185,15 @@ public:
     explicit World(Terrain terrain);
 
     const Terrain& terrain() const { return terrain_; }
+    // What findPath, canStep and passable read is the terrain alone (its
+    // tile classes and heightAt, which must give the same height for a
+    // point while the world has it): no units, buildings or sites. What's
+    // worked out from it is kept (steps_, regions_ below; AiSides' noWay_
+    // too), keyed by pathGeneration(), which changes whenever what they
+    // read does: only through setTerrain. Anything findPath comes to read
+    // besides must bump it too (pathInputsChanged) when it changes.
+    void setTerrain(Terrain terrain);
+    uint32_t pathGeneration() const { return pathGeneration_; }
     bool passable(int tx, int ty) const;
     int tick() const { return tick_; } // combat ticks so far
     const std::vector<Projectile>& projectiles() const { return projectiles_; }
@@ -314,9 +323,9 @@ private:
     // each id's place in units_ (-1 none), for unit()'s lookups;
     std::vector<int> index_;
     void reindex();
-    // and, made as needed (the terrain never changes), each tile's steps
-    // out (bit k: canStep the k-th way, kStepWays' order; bit 8: worked
-    // out) and the regions searches found closed (what a search from any
+    // and, made as needed from the terrain alone (dropped by setTerrain),
+    // each tile's steps out (bit k: canStep the k-th way, kStepWays'
+    // order; bit 8: worked out) and the regions searches found closed (what a search from any
     // tile of one reaches is the region: index into regionTiles_, -1 none
     // known), so findPath can tell a goal it can't reach and, if the start
     // is then the nearest it gets, give up without searching again (as a
@@ -325,6 +334,8 @@ private:
     mutable std::vector<float> centres_; // each tile's middle's height (steps_' bit 9: known)
     mutable std::vector<int> regions_;
     mutable std::vector<std::vector<int>> regionTiles_; // each region's tiles, in order
+    uint32_t pathGeneration_ = 0; // bumped as what paths are made from changes
+    void pathInputsChanged();     // (and the lookups above dropped)
     uint8_t stepsAt(size_t tile) const;
     bool stepUncached(int tx, int ty, int dx, int dy) const;
     std::vector<std::pair<float, Unit*>> candidates_; // combatTick's targets to try, nearest first

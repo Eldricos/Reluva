@@ -2205,8 +2205,10 @@ void testVehicleProduction() {
     CHECK(e.vehicleAvailable(*apc) && !e.vehicleAvailable(*tank) && !e.vehicleAvailable(*vehicleType(10)));
     // The armed transport: 240 x 300 units at 300 a tick and efficiency
     // 0.8 (no officer): 300 ticks, 15 s, then 9.5 s rolling out.
-    CHECK(e.orderVehicle(*apc) && e.stock()[Duranium] == 4970);
-    CHECK(run(e, 24).empty());
+    // Paid as the yard starts on it (the next tick), not as it's ordered.
+    CHECK(e.orderVehicle(*apc) && e.stock()[Duranium] == 5000);
+    CHECK(run(e, 0.25).empty() && e.stock()[Duranium] == 4970);
+    CHECK(run(e, 23.75).empty());
     auto out = run(e, 1);
     CHECK(out.size() == 1 && out[0].first == 56 && out[0].second == yard);
     // The panels' figures: the colony's consumption, each consumer's supply.
@@ -3312,26 +3314,23 @@ void testEconomyFixes() {
             e.rideDelivered(id);
         CHECK(e.structure(bay)->coming.size() == 1 && e.structure(bay)->wanted == 0); // from the hub now
     }
-    // A yard's jobs: lost, to another yard; with none, their cost back; a
-    // yard razed hands on its work but rolls its last vehicle out first.
+    // A yard razed keeps its job (waiting for crew that won't come) and
+    // isn't held up by it; one rolling out holds it up until it's out.
     {
         Economy e('F', rich, 50, bare);
         e.addBuilt("colony-hub", 0, 0);
         e.addBuilt("construction-yard", 20000, 0);
-        const int y1 = e.addBuilt("vehicle-yard", 0, 20000);
-        const int y2 = e.addBuilt("vehicle-yard", 20000, 20000);
-        const Stock had = e.stock();
-        CHECK(e.orderVehicle(*vehicleType(56)) && e.vehicleJobs()[0].yard == y1);
-        e.remove(y1);
-        CHECK(e.vehicleJobs().size() == 1 && e.vehicleJobs()[0].yard == y2);
-        e.remove(y2);
-        CHECK(e.vehicleJobs().empty() && e.stock() == had);
         const int y3 = e.addBuilt("vehicle-yard", 40000, 20000);
-        CHECK(e.orderVehicle(*vehicleType(56)) && e.raze(y3) && e.vehicleJobs().empty());
+        CHECK(e.orderVehicle(*vehicleType(56)));
+        run(e, 0.1);
+        CHECK(e.vehicleJobs().size() == 1 && e.vehicleJobs()[0].yard == y3);
+        CHECK(e.raze(y3) && e.vehicleJobs().size() == 1);
         run(e, 0.5);
         CHECK(e.evacuated(y3));
         e.remove(y3);
+        CHECK(e.vehicleJobs().size() == 1 && e.vehicleJobs()[0].yard == 0); // waiting again
         const int y4 = e.addBuilt("vehicle-yard", 60000, 20000);
+        CHECK(e.cancelVehicle(e.vehicleJobs()[0].id));
         CHECK(e.orderVehicle(*vehicleType(97))); // (a scout: no work, rolling out at once)
         run(e, 0.1);
         CHECK(e.raze(y4) && e.vehicleJobs().size() == 1);
@@ -3340,9 +3339,9 @@ void testEconomyFixes() {
         run(e, 6);
         CHECK(e.takeVehicles().size() == 1 && e.evacuated(y4));
     }
-    // A building without a worker bee asks each tick while the yard can't
-    // pay, reported at most every 600 ms; the bee it gets lost, it asks
-    // again.
+    // A building without a worker bee asks for one (priority 2, once),
+    // reported at most every 600 ms while the yard can't pay; the bee the
+    // yard makes is the economy's own and goes straight to it.
     {
         Economy e('F', {}, 50, bare);
         e.addBuilt("colony-hub", 0, 0);
@@ -3353,22 +3352,22 @@ void testEconomyFixes() {
         const auto told = run(e, 20);
         const auto shorts = std::count_if(told.begin(), told.end(), [](const ScriptEvent& x) { return x.kind == "short-resources"; });
         CHECK(shorts >= 32 && shorts <= 34);
+        CHECK(e.vehicleJobs().size() == 1 && e.vehicleJobs()[0].yard == 0);
         Economy b('F', rich, 50, bare);
         b.setBees(0, 0, 0); // (before the colony: no free worker bees)
         b.addBuilt("colony-hub", 0, 0);
         b.addBuilt("construction-yard", 20000, 0);
         b.addBuilt("vehicle-yard", 40000, 0);
         const int proc = b.addBuilt("resource-processor", 0, 20000);
+        // (The yards ask too, being the same kind of agent.)
         run(b, 0.1);
-        CHECK(b.vehicleJobs().size() == 1 && b.vehicleJobs()[0].type == 12);
-        run(b, 10);
-        CHECK(b.takeVehicles().size() == 1 && b.vehicleJobs().empty());
-        b.setBees(0, 0, 1);
-        run(b, 1);
+        CHECK(b.vehicleJobs().size() == 3 && b.vehicleJobs()[2].type == 12 && b.vehicleJobs()[2].priority == 2 &&
+              b.vehicleJobs()[2].asker == proc);
+        run(b, 31);
+        CHECK(b.takeVehicles().empty() && b.vehicleJobs().empty());
         CHECK(std::any_of(b.bees().begin(), b.bees().end(), [&](const Economy::Bee& x) { return x.worker && x.site == proc; }));
-        b.setBees(0, 0, 0); // lost
-        run(b, 0.1);
-        CHECK(b.vehicleJobs().size() == 1);
+        b.setBees(0, 0, 0); // (the counts given later leave worker bees be)
+        CHECK(std::count_if(b.bees().begin(), b.bees().end(), [](const Economy::Bee& x) { return x.worker; }) == 3);
     }
     // Ore and goods at the processors go only with the last.
     ColonyMap ore;
@@ -3776,9 +3775,11 @@ void testMineStopsOnQueuedPods() {
 }
 
 // Bees docked inside a building lost go with it (exe.md#bees): a hub's
-// at home, a mine's or storage facility's worker bee in its dock; those
-// out are let go. A lost worker bee comes off the starting buildings'
-// free ones first, else off the hub's counts, which the caller takes.
+// at home, a mine's or storage facility's worker bee in its dock, still
+// counted in COLONY SIZE; those out within 1.5 x its radius are killed,
+// those further off let go (to a request or another hub). The caller takes
+// the construction and cargo bees off its counts; worker bees are the
+// economy's own.
 void testBeesLostWithBuildings() {
     ColonyMap none;
     none.depositKind = [](int, int) { return 0; };
@@ -3789,9 +3790,9 @@ void testBeesLostWithBuildings() {
             ++n[b.worker ? 2 : b.cargo ? 1 : 0];
         return n;
     };
-    // The hub: its bees at home go, the four construction bees out to a
-    // site survive, and setBees (given the old counts until the losses
-    // are taken) doesn't make them again.
+    // The hub: its bees at home go (still in COLONY SIZE), the four
+    // construction bees out to a site survive, and setBees (given the old
+    // counts until the losses are taken) doesn't make them again.
     {
         Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, none);
         const int hub = e.addBuilt("colony-hub", 0, 0);
@@ -3799,19 +3800,20 @@ void testBeesLostWithBuildings() {
         CHECK(e.order("construction-yard", 30000, 0, 0, 0));
         e.advance(2);
         CHECK(std::count_if(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return !b.home; }) == 4);
+        const int size = e.colonySize();
         e.remove(hub);
         CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
+        CHECK(e.colonySize() == size - 1 + 7); // (the hub gone; its 7 bees deleted, not killed)
         CHECK(std::none_of(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return b.home || b.docking; }));
         e.setBees(6, 2, 3);
         CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
-        CHECK((e.takeLostBees() == std::array<int, 3>{2, 2, 3}));
+        CHECK((e.takeLostBees() == std::array<int, 3>{2, 2, 0}));
         CHECK((e.takeLostBees() == std::array<int, 3>{}));
         e.setBees(4, 0, 0); // the caller's counts, less the losses
         CHECK((kinds(e) == std::array<int, 3>{4, 0, 0}));
     }
-    // A storage facility's worker bee docked in it: one of the free ones
-    // the starting buildings were given (so not off the hub's counts); a
-    // second one's, from the hub, is.
+    // A storage facility's worker bee docked in it, the free one it was
+    // given or one from the hub alike, goes with it.
     {
         Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, none);
         e.addBuilt("colony-hub", 0, 0);
@@ -3828,6 +3830,7 @@ void testBeesLostWithBuildings() {
         for (double s = 0; s < 60 && !(docked(first) && docked(second)); s += 0.05)
             e.advance(0.05);
         CHECK(docked(first) && docked(second));
+        CHECK(e.vehicleJobs().empty()); // (the second's from the hub: no yard asked)
         e.remove(first);
         CHECK(kinds(e)[2] == 1);
         CHECK((e.takeLostBees() == std::array<int, 3>{}));
@@ -3837,15 +3840,20 @@ void testBeesLostWithBuildings() {
         CHECK(kinds(e)[2] == 0);
         e.setBees(0, 0, 1);
         CHECK(kinds(e)[2] == 0);
-        CHECK((e.takeLostBees() == std::array<int, 3>{0, 0, 1}));
     }
     // One out on the map with a pod (the mine's worker bee setting it down
-    // on its yard) is let go, not lost.
-    {
+    // on its yard): killed within 1.5 x the mine's radius (6000 without a
+    // model), let go further off (here a radius of 100).
+    for (const float radius : {0.0f, 100.0f}) {
         ColonyMap ore;
         ore.depositKind = [](int bx, int by) { return bx == 2 && by == 3 ? 5 : 0; };
         ore.depositAmount = [](int bx, int by) { return bx == 2 && by == 3 ? 300 : 0; };
         Economy e('F', {5000, 5000, 5000, 5000, 5000, 5000}, 50, ore);
+        e.setDocks([radius](const std::string&) {
+            Economy::DockPoints d;
+            d.radius = radius;
+            return d;
+        });
         e.addBuilt("colony-hub", 0, 0);
         e.addBuilt("resource-processor", 20000, 20000);
         const int mine = e.addBuilt("mining-station", 2.5f * 16384, 3.5f * 16384);
@@ -3854,13 +3862,178 @@ void testBeesLostWithBuildings() {
         for (double s = 0; s < 900 && !bee; s += 0.05) {
             e.advance(0.05);
             for (const Economy::Bee& b : e.bees())
-                if (b.worker && b.site == mine && !b.pods.empty() && b.flight > 0)
+                if (b.worker && b.site == mine && !b.pods.empty() && b.flight > 0 && b.flown > 2)
                     bee = b.id;
         }
         CHECK(bee != 0);
+        const int size = e.colonySize();
         e.remove(mine);
-        CHECK(std::any_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) { return b.id == bee && !b.site; }));
-        CHECK(kinds(e)[2] == 2 && (e.takeLostBees() == std::array<int, 3>{}));
+        const bool kept = std::any_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) { return b.id == bee && !b.site; });
+        CHECK(kept == (radius > 0) && kinds(e)[2] == (radius > 0 ? 2 : 1));
+        CHECK(e.colonySize() == size - 1 && (e.takeLostBees() == std::array<int, 3>{}));
+    }
+}
+
+// The yards' orders (exe.md#vehicle-production, #bees): one list for the
+// side, each yard taking one job, the highest priority first (a
+// building's worker bee, 2, before the player's orders, 1), oldest first;
+// paid as a yard starts on it. A yard lost loses its job, unpaid back, the
+// order waiting again in its place, paid again by the next yard; with no
+// yard left the orders wait. A cancel gives back what was paid. Bees go
+// home to the first hub made that takes them.
+void testYardOrders() {
+    ColonyMap bare;
+    bare.depositKind = [](int, int) { return 0; };
+    bare.depositAmount = [](int, int) { return 0; };
+    const Stock rich{5000, 10000, 23000, 5000, 40000, 50000};
+    auto run = [](Economy& e, double seconds) {
+        std::vector<std::pair<int, int>> out;
+        for (double t = 0; t < seconds - 1e-9; t += 0.05) {
+            e.advance(0.05);
+            for (const auto& v : e.takeVehicles())
+                out.push_back(v);
+        }
+        return out;
+    };
+    const VehicleType& apc = *vehicleType(56); // 240 x 300 units: 15 s, then 9.5 s out
+    auto jobs = [](const Economy& e) { return e.vehicleJobs(); };
+    // A building's worker bee comes before the player's waiting order, made
+    // for it and sent straight to it, whatever the colony's size.
+    {
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        const int yard = e.addBuilt("vehicle-yard", 0, 20000);
+        e.addBuilt("storage-facility", -20000, 0);
+        e.setBees(4, 0, 0); // (the yards and storage their free worker bees)
+        CHECK(e.orderVehicle(apc) && e.orderVehicle(apc));
+        CHECK(e.stock()[Transalumin] == 5000); // nothing paid yet
+        run(e, 0.1);
+        CHECK(jobs(e).size() == 2 && jobs(e)[0].yard == yard && jobs(e)[1].yard == 0);
+        CHECK(e.stock()[Transalumin] == 4999 && e.stock()[Duranium] == 49970); // the first paid as it starts
+        const int proc = e.addBuilt("resource-processor", 20000, 20000); // no worker bee in the hub
+        run(e, 0.1);
+        CHECK(jobs(e).size() == 3 && jobs(e)[2].asker == proc && jobs(e)[2].priority == 2 && jobs(e)[2].yard == 0);
+        run(e, 25); // (the list keeps its order: the second order, then the bee)
+        CHECK(jobs(e).size() == 2 && jobs(e)[0].type == 56 && jobs(e)[0].yard == 0 && jobs(e)[1].type == 12 &&
+              jobs(e)[1].yard == yard);
+        const size_t workers = e.bees().size();
+        for (int i = 0; i < 300 && e.bees().size() == workers; ++i)
+            run(e, 0.05);
+        run(e, 0.05); // (the yard free again the tick after)
+        bool bound = true;
+        for (const Economy::Bee& b : e.bees())
+            bound &= !b.worker || b.site != 0; // (never the hub's: straight to the processor)
+        CHECK(e.bees().size() == workers + 1 && bound && e.bees().back().site == proc);
+        CHECK(jobs(e).size() == 1 && jobs(e)[0].type == 56 && jobs(e)[0].yard == yard);
+        // At the size limit the player can't order, but a building's
+        // worker bee is still made.
+        Economy f('F', rich, 4, bare);
+        f.addBuilt("colony-hub", 0, 0);
+        f.addBuilt("construction-yard", 20000, 0);
+        f.addBuilt("vehicle-yard", 0, 20000);
+        f.addBuilt("storage-facility", -20000, 0);
+        f.setBees(4, 0, 0);
+        const int fp = f.addBuilt("resource-processor", 20000, 20000);
+        CHECK(!f.orderVehicle(apc));
+        run(f, 12);
+        CHECK(std::any_of(f.bees().begin(), f.bees().end(), [&](const Economy::Bee& b) { return b.worker && b.site == fp; }));
+    }
+    // A yard lost mid-job: its order back where it was, before one given
+    // since, nothing paid back; the next yard free starts it again and
+    // pays again. The vehicle half made still counts in COLONY SIZE.
+    {
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        const int y1 = e.addBuilt("vehicle-yard", 0, 20000);
+        const int y2 = e.addBuilt("vehicle-yard", 20000, 20000);
+        e.addBuilt("storage-facility", -20000, 0);
+        e.setBees(4, 0, 0);
+        CHECK(e.orderVehicle(apc) && e.orderVehicle(apc));
+        run(e, 5);
+        CHECK(jobs(e).size() == 2 && jobs(e)[0].yard == y1 && jobs(e)[1].yard == y2);
+        const int first = jobs(e)[0].id;
+        const Stock paid = e.stock();
+        CHECK(paid[Transalumin] == 4998);
+        const int size = e.colonySize();
+        e.remove(y1);
+        CHECK(jobs(e)[0].id == first && jobs(e)[0].yard == 0 && jobs(e)[0].work == jobs(e)[0].total);
+        // (The yard gone, its job no longer at a yard; the vehicle half made
+        // and the yard's own worker bee docked in it deleted, not killed.)
+        CHECK(e.stock() == paid && e.colonySize() == size - 1 - 1 + 2);
+        CHECK(e.orderVehicle(apc));
+        run(e, 15);
+        CHECK(jobs(e).size() == 3 && jobs(e)[0].yard == 0); // y2 still busy
+        run(e, 10);
+        CHECK(jobs(e).size() == 2 && jobs(e)[0].id == first && jobs(e)[0].yard == y2 && jobs(e)[1].yard == 0);
+        CHECK(e.stock()[Transalumin] == 4997);
+    }
+    // No yard left: the orders wait, not dropped nor paid back, for the
+    // next yard.
+    {
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        const int y = e.addBuilt("vehicle-yard", 0, 20000);
+        e.addBuilt("storage-facility", -20000, 0);
+        e.setBees(4, 0, 0);
+        CHECK(e.orderVehicle(apc));
+        run(e, 1);
+        e.remove(y);
+        CHECK(!e.orderVehicle(apc)); // (no yard to order of)
+        run(e, 30);
+        CHECK(jobs(e).size() == 1 && jobs(e)[0].yard == 0 && e.stock()[Transalumin] == 4999);
+        // (The new yard's own worker bee first: it asks too.)
+        const int y2 = e.addBuilt("vehicle-yard", 20000, 20000);
+        run(e, 0.1);
+        CHECK(jobs(e).size() == 2 && jobs(e)[0].yard == 0 && jobs(e)[1].asker == y2 && jobs(e)[1].yard == y2);
+        run(e, 10);
+        CHECK(jobs(e).size() == 1 && jobs(e)[0].yard == y2 && e.stock()[Transalumin] == 4997);
+    }
+    // A cancel: a waiting order costs nothing, one started gives its whole
+    // cost back; not one rolling out, nor a building's worker bee.
+    {
+        Economy e('F', rich, 50, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.addBuilt("vehicle-yard", 0, 20000);
+        e.addBuilt("storage-facility", -20000, 0);
+        e.setBees(4, 0, 0);
+        const Stock before = e.stock();
+        CHECK(e.orderVehicle(apc) && e.orderVehicle(apc));
+        run(e, 1);
+        const Stock paid = e.stock();
+        CHECK(paid != before);
+        CHECK(e.cancelVehicle(jobs(e)[1].id) && e.stock() == paid);
+        CHECK(e.cancelVehicle(jobs(e)[0].id) && e.stock() == before && jobs(e).empty());
+        CHECK(e.orderVehicle(*vehicleType(97))); // (a scout: no work, rolling out at once)
+        run(e, 0.1);
+        CHECK(jobs(e).size() == 1 && jobs(e)[0].rollout >= 0 && !e.cancelVehicle(jobs(e)[0].id));
+        e.addBuilt("resource-processor", 20000, 20000);
+        run(e, 0.1);
+        CHECK(jobs(e).size() == 2 && jobs(e)[1].asker && !e.cancelVehicle(jobs(e)[1].id));
+    }
+    // Two hubs: the bees home in the first leave from it, and go home to
+    // the second while the first is dying (no hit points left).
+    {
+        Economy e('F', rich, 50, bare);
+        const int h1 = e.addBuilt("colony-hub", 0, 0);
+        const int h2 = e.addBuilt("colony-hub", 40000, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.setBees(4, 0, 0);
+        CHECK(e.hub() && e.hub()->id == h1);
+        CHECK(std::all_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) { return b.hub == h1 || !b.home; }));
+        e.setHealth(h1, 0);
+        CHECK(e.hub() && e.hub()->id == h2);
+        CHECK(e.order("power-generator", 20000, 20000, 0, 0));
+        run(e, 1);
+        CHECK(std::count_if(e.bees().begin(), e.bees().end(), [](const Economy::Bee& b) { return !b.cargo && !b.worker && !b.home; }) == 4);
+        run(e, 120);
+        CHECK(e.has("power-generator"));
+        CHECK(std::all_of(e.bees().begin(), e.bees().end(), [&](const Economy::Bee& b) {
+            return b.worker || (b.home && b.hub == h2);
+        }));
     }
 }
 
@@ -4039,6 +4212,25 @@ void testWorldPathCaches() {
         }
     }
     CHECK(stuck > 0);
+    // What's worked out goes with the terrain it came from: a unit in the
+    // pit finds no way out (and, from where it ends, no way again, the
+    // region known), then the pit opened (a new pathGeneration) finds one,
+    // as a world that only ever had the opened terrain does.
+    World changing(t);
+    const float px = 4.5f * kTile, py = 4.5f * kTile, gx = 20.5f * kTile, gy = 4.5f * kTile;
+    const auto inPit = changing.findPath(px, py, gx, gy);
+    CHECK(!inPit.empty() && inPit.back().first < 7 * kTile);
+    const auto [sx, sy] = inPit.back();
+    CHECK(changing.findPath(sx, sy, gx, gy).empty());
+    Terrain opened = t;
+    for (int x = 7; x <= 21; ++x)
+        opened.moveClass[size_t(4 * t.width + x)] = 1;
+    const uint32_t before = changing.pathGeneration();
+    changing.setTerrain(opened);
+    CHECK(changing.pathGeneration() != before);
+    const auto wayOut = changing.findPath(sx, sy, gx, gy);
+    CHECK(!wayOut.empty() && wayOut.back().first > 20 * kTile && wayOut == World(opened).findPath(sx, sy, gx, gy));
+    CHECK(changing.canStep(6, 4, 1, 0) && !World(t).canStep(6, 4, 1, 0));
     // The id index: through adding, removing and a save loaded.
     std::vector<int> ids;
     for (int i = 0; i < 8; ++i)
@@ -4096,6 +4288,14 @@ void testDrawnBetweenTicks() {
     sim.advance(0.05);
     v = w.unit(u);
     CHECK(v->lastY == y && v->lastHeading == v->heading);
+    // Several ticks in one call (a slow frame): beforeTick runs before
+    // each, so what it notes last (as the screen notes the bees) is where
+    // the last tick began, as the units' last poses are.
+    int calls = 0;
+    float noted = 0;
+    sim.advance(0.1, [&] { ++calls, noted = w.unit(u)->y; });
+    v = w.unit(u);
+    CHECK(calls == 2 && sim.tickShare() == 0 && noted == v->lastY && v->y > noted && noted > y);
 }
 
 // Power short (exe.md#the-economy): class 1 (vehicle yard, transporter pad,
@@ -4265,6 +4465,7 @@ int main() {
     testKlingonPods();
     testMineStopsOnQueuedPods();
     testBeesLostWithBuildings();
+    testYardOrders();
     testRivalPowerGenerator();
     testLookupsAndCaches();
     testWorldPathCaches();

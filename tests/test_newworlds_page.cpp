@@ -284,13 +284,19 @@ std::vector<std::string> run(const Options& o) {
         keyEv('c');
         frames(2);
         for (int i = 0; i < 30; ++i) {
-            click(470 + rnd(170), rnd(300));
+            // Drawn into locals, last argument first: the order GCC
+            // evaluated the arguments in when the golden was made.
+            const int py = rnd(300), px = 470 + rnd(170);
+            click(px, py);
             frames(1, 50);
         }
         point(std::string(tag) + "-panels");
         keyEv(key::Tab);
         frames(2);
-        click(100 + rnd(440), 40 + rnd(400));
+        {
+            const int ty = 40 + rnd(400), tx = 100 + rnd(440);
+            click(tx, ty);
+        }
         frames(2);
         point(std::string(tag) + "-tricorder");
         keyEv(key::Tab);
@@ -321,8 +327,9 @@ std::vector<std::string> run(const Options& o) {
             if (r < 25) {
                 mouse(EventType::MouseMove, x, y);
             } else if (r < 45) {
-                click(x, y, rnd(4) ? MouseButton::Left : MouseButton::Right, rnd(5) ? 1 : 2,
-                      rnd(12) ? 0 : keymod::Ctrl);
+                const int ctrl = rnd(12), clicks = rnd(5), button = rnd(4);
+                click(x, y, button ? MouseButton::Left : MouseButton::Right, clicks ? 1 : 2,
+                      ctrl ? 0 : keymod::Ctrl);
             } else if (r < 50) {
                 // A box.
                 const int x2 = x + rnd(200) - 100, y2 = y + rnd(200) - 100;
@@ -340,9 +347,11 @@ std::vector<std::string> run(const Options& o) {
                 mouse(EventType::MouseDown, gx, gy, MouseButton::Left, 2);
                 mouse(EventType::MouseUp, gx, gy, MouseButton::Left, 2);
                 frameStep(30);
-                mouse(EventType::MouseMove, 400 + rnd(140), 300 + rnd(180));
+                const int my = 300 + rnd(180), mx = 400 + rnd(140);
+                mouse(EventType::MouseMove, mx, my);
                 frameStep(30);
-                click(420 + rnd(110), 320 + rnd(160));
+                const int cy = 320 + rnd(160), cx = 420 + rnd(110);
+                click(cx, cy);
             } else if (r < 95) {
                 static const uint32_t kKeys[] = {
                     'b', 'v', 'r', 'c', 'a', 'g', 's', 't', 'p', '1', '2', '3', '4', '5', '0', '6', '7', '8', '9',
@@ -390,7 +399,8 @@ std::vector<std::string> run(const Options& o) {
                     }
                 }
             }
-            frames(1 + rnd(3), 20 + rnd(80));
+            const int stepMs = 20 + rnd(80), count = 1 + rnd(3);
+            frames(count, stepMs);
             if (a == kActions / 2)
                 point(std::string(tag) + "-mid");
         }

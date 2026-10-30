@@ -702,6 +702,14 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
             play_.menuPage += b.action == "menu-next" ? 1 : -1;
         } else if (b.action == "menu-close") {
             play_.buildMenu = play_.vehicleMenu = false;
+        } else if (b.action.rfind("order", 0) == 0 && economy_) {
+            // A vehicle order on the yards' list: asked, then cancelled
+            // (the whole cost back if a yard had started on it).
+            const int order = std::atoi(b.action.c_str() + 5);
+            if (play_.orderAsked == order)
+                economy_->cancelVehicle(order), play_.orderAsked = 0;
+            else
+                play_.orderAsked = order;
         } else if (b.action.rfind("comms-", 0) == 0) {
             const int n = int(log_.size());
             const int shown = play_.commsShown < 0 || play_.commsShown >= n ? n - 1 : play_.commsShown;

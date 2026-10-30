@@ -776,10 +776,12 @@ void AiSides::steer(Running& r) {
         const auto [tx, ty] = spread(n, wx, wy);
         if (std::hypot(u.x - tx, u.y - ty) > kSpacing) {
             // No way there from here last time: none now either (the path
-            // would come back empty again), so only what moveTo() does
-            // besides.
+            // would come back empty again, the ground the same), so only
+            // what moveTo() does besides.
             const std::array<float, 4> from{u.x, u.y, tx, ty};
-            if (auto it = noWay_.find(id); it != noWay_.end() && it->second == from && !u.flies && !u.building) {
+            if (auto it = noWay_.find(id); it != noWay_.end() && it->second.from == from &&
+                                           it->second.pathGeneration == world_.pathGeneration() && !u.flies &&
+                                           !u.building) {
                 u.ordered = false;
                 u.target = 0;
                 u.firing = false;
@@ -787,7 +789,7 @@ void AiSides::steer(Running& r) {
             }
             world_.moveTo(id, tx, ty);
             if (!u.moving() && !u.flies && !u.building)
-                noWay_[id] = from;
+                noWay_[id] = {from, world_.pathGeneration()};
             else
                 noWay_.erase(id);
         }

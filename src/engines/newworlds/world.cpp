@@ -81,6 +81,19 @@ UnitKind groundScout(char side) {
 
 World::World(Terrain terrain) : terrain_(std::move(terrain)) {}
 
+void World::setTerrain(Terrain terrain) {
+    terrain_ = std::move(terrain);
+    pathInputsChanged();
+}
+
+void World::pathInputsChanged() {
+    ++pathGeneration_;
+    steps_.clear();
+    centres_.clear();
+    regions_.clear();
+    regionTiles_.clear();
+}
+
 bool World::passable(int tx, int ty) const {
     if (tx < 0 || ty < 0 || tx >= terrain_.width || ty >= terrain_.height)
         return false;

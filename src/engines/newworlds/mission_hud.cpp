@@ -17,6 +17,23 @@ namespace reluva::newworlds {
 
 namespace {
 
+// The vehicle menu's list of the side's orders (exe.md#vehicle-production:
+// one list for all the yards): those in work at a yard first, in the
+// list's order, then the player's waiting, as the yards will take them
+// (the highest priority first, the oldest first within it). A building's
+// request for a worker bee has no entry until a yard starts on it.
+std::vector<const Economy::VehicleJob*> ordersShown(const Economy& e) {
+    std::vector<const Economy::VehicleJob*> out;
+    for (const Economy::VehicleJob& j : e.vehicleJobs())
+        if (j.yard)
+            out.push_back(&j);
+    for (int priority = 2; priority >= 0; --priority)
+        for (const Economy::VehicleJob& j : e.vehicleJobs())
+            if (!j.yard && !j.asker && j.priority == priority)
+                out.push_back(&j);
+    return out;
+}
+
 // A type's small portrait (gui.md#pictures), by the game's type id.
 const char* portraitOf(int type) {
     static const std::pair<int, const char*> kPortraits[] = {
@@ -312,6 +329,11 @@ std::vector<std::string> MissionViewer::objectPanel(const Unit& u) const {
             out.push_back("POOL " + std::to_string(c->pool));
     }
     auto bees = [&](const char* kind) {
+        // (The worker bees the side's, wherever they are: the economy's
+        // own, the buildings' too; exe.md#bees.)
+        if (std::string_view(kind) == "worker-bee")
+            return std::to_string(std::count_if(economy_->bees().begin(), economy_->bees().end(),
+                                                [](const Economy::Bee& b) { return b.worker; }));
         auto it = beesHoused().find(kind);
         return std::to_string(it == beesHoused().end() ? 0 : it->second);
     };
@@ -576,7 +598,7 @@ void MissionViewer::drawInterface() {
         const auto menu = play_.buildMenu ? buildMenu() : std::vector<const BuildingType*>{};
         const auto offered = play_.researchMenu && research_ ? research_->offered() : std::vector<size_t>{};
         const auto vehicles = play_.vehicleMenu && economy_ ? vehicleMenu() : std::vector<const VehicleType*>{};
-        const size_t jobs = play_.vehicleMenu && economy_ ? economy_->vehicleJobs().size() : 0;
+        const size_t jobs = play_.vehicleMenu && economy_ ? ordersShown(*economy_).size() : 0;
         const Unit* picked = play_.selectedBuilding && world_ ? world_->unit(play_.selectedBuilding) : nullptr;
         if (!picked && world_ && world_->selection().size() == 1 && !play_.buildMenu && !play_.researchMenu &&
             !play_.vehicleMenu)
@@ -1083,13 +1105,23 @@ void MissionViewer::drawMenu(int x, int ty, int w, const std::vector<const Vehic
         bx += bw + 6;
     }
     ui_.drawSmall(screen_, bx + 4, fy, std::to_string(play_.menuPage + 1) + "/" + std::to_string(pages), text);
-    // The yards' work.
-    for (size_t i = 0; play_.vehicleMenu && economy_ && i < jobs && i < 4; ++i) {
-        const Economy::VehicleJob& j = economy_->vehicleJobs()[i];
+    // The yards' work: the side's orders, in work then waiting; a click on
+    // one of the player's (not yet rolling out) asks, a second cancels it.
+    const auto orders = play_.vehicleMenu && economy_ ? ordersShown(*economy_) : std::vector<const Economy::VehicleJob*>{};
+    for (size_t i = 0; i < orders.size() && i < jobs && i < 4; ++i) {
+        const Economy::VehicleJob& j = *orders[i];
         const VehicleType* v = vehicleType(j.type);
         const int pct = j.total > 0 ? int(100 - std::max(0.0, j.work) * 100 / j.total) : 100;
-        ui_.drawSmall(screen_, x + kTextLeft, fy + lh * int(i + 1),
-                      std::string("> ") + (v ? v->panel : "?") + " " + std::to_string(pct) + "%", text);
+        const int ly = fy + lh * int(i + 1);
+        const std::string name = v ? v->panel : "?";
+        const bool asked = play_.orderAsked == j.id;
+        ui_.drawSmall(screen_, x + kTextLeft, ly,
+                      asked     ? "CANCEL " + name + "?"
+                      : j.yard ? "> " + name + " " + std::to_string(pct) + "%"
+                               : "> " + name + " IN QUEUE",
+                      asked ? bright : text);
+        if (!j.asker && j.rollout < 0)
+            play_.buttons.push_back({x + 6, ly, w - 12, lh, "order" + std::to_string(j.id)});
     }
 }
 

@@ -756,9 +756,9 @@ private:
     bool visible(const Unit& u) const;
     // What moves is drawn between ticks (mission_sim.h's tickShare): a
     // unit as far from where the last tick found it to where it is (its
-    // place, heading and turret); a bee from where it was drawn as the
-    // tick before last ended (by id: x, y, heading, lift), noted as each
-    // tick runs.
+    // place, heading and turret); a bee from where it was as the last
+    // tick began (by id: x, y, heading, lift), noted as each tick begins
+    // (MissionSim::advance's beforeTick).
     struct Pose {
         float x, y, heading, turretYaw;
     };
@@ -991,6 +991,7 @@ private:
         int selectedBuilding = 0;          // a building selected (its unit id), its details in NEW WORLDS
         int razeAsked = 0;                 // DEMOLISH pressed: the building asked about (yes / no)
         int cancelAsked = 0;               // a site or upgrade picked on the colony's details (yes / no)
+        int orderAsked = 0;                // a vehicle order picked on the yards' list (a second click cancels it)
         int cancelFrom = 0;                // the building whose details it was picked on (the hub)
         bool colonyDetails = false;        // the hub's INFO: the colony's details instead of the hub's
         bool staffView = false;            // the STAFF panel: the officers' cards
@@ -1003,7 +1004,7 @@ private:
         std::array<int, 2> playbookAt{};   // its column's top-left
         int multiPage = 0;
         std::set<int> multiTicked;
-        std::map<int, std::array<float, 4>> beesBefore, beesNoted;
+        std::map<int, std::array<float, 4>> beesBefore;
         std::array<int, 5> jumpedTo{};     // JUMP TO: each class's object the camera went to last
         int cycledBuilding = 0, cycledVehicle = 0; // Shift+B / Shift+V: where the camera went last
         int followed = 0;                  // the object F1's camera follows

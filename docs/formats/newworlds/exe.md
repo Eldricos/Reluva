@@ -420,8 +420,10 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
   Neither power nor crew enters into it.
 - **Vehicles.** The vehicle yard's work for a vehicle is its build value x
   300 power units; each tick it draws up to 300 from its buffer times its
-  efficiency. It stops below 0.2 efficiency and restarts above 0.35. It
-  can't build while the colony is at its capacity.
+  efficiency. It stops below 0.2 efficiency and restarts above 0.35. The
+  player's order buttons are off while the colony is at its capacity; the
+  yard itself doesn't look at it (a worker bee a building asks for is
+  built at the limit).
 - **Power.** Each side has a pool with a reserve of 640000 (the panel's
   RESERVE % is reserve / 6400). Each tick generators add their output x
   efficiency, once built (the reserve full, the rest is lost); buildings
@@ -989,9 +991,25 @@ double click on a card takes F1's camera to whatever holds them.
 
 ### Vehicle production
 
-A vehicle yard makes one vehicle at a time. An order takes the cost at
-once and needs the colony below its size limit (the yard's button is off
-at the limit). The job is the type's **build value × 300** units of
+A vehicle yard makes one vehicle at a time. There is no queue per yard:
+the side has one list of requests (its production ministry's), the
+player's orders at priority 1, the worker bees its buildings ask for at
+2, oldest first. An order needs the colony below its size limit (the
+yard's button is off at the limit) and binds to no yard. A yard that
+frees (finished, crewed, not dying; a new yard, one finishing a job, one
+getting its crew) takes the waiting request of the highest priority, the
+oldest of it, that it accepts: its store (the side's first storage
+facility's) must cover the cost, but COLONY SIZE isn't looked at. The
+cost is taken when the yard **starts** the job, and the vehicle is made
+then, inside the yard (so it counts in COLONY SIZE from then). Power or
+crew lost only pause the job, which keeps its progress. A yard destroyed
+loses the job's progress, pays nothing back, and its request opens again
+in its old place in the list (so it's the next taken); the next yard
+starts it from nothing and pays again. With no yard left the requests
+wait. The player cancelling a job in work gets the whole cost back; one
+not yet started was never paid. (FUN_005f16f0, FUN_005f1880,
+FUN_005f05b0, FUN_005f0760, FUN_006013a0, FUN_005e4d60.) The construction
+yard does no jobs. The job is the type's **build value × 300** units of
 power; each tick a running yard takes up to 300 from its power buffer
 and puts that times its **efficiency** into the job. Efficiency is
 0.4 × (health + power fill + officer) × crew: health 1 above 75 % of
@@ -1028,7 +1046,22 @@ Romulans' defensive weapons need none).
 the vehicle then leaves through the yard's dock: a tick, three times the
 LOCK-RELEASE leg and the RELEASE-DEPARTURE leg at its speed: about 9.5 s
 for a tank from the Federation's yard (6.5 s a scout), 4 s from the
-Klingons', 7.3 s from the Romulans'.
+Klingons', 7.3 s from the Romulans'. The vehicle is handed on as it
+starts out: to whoever asked for it (a building, for its worker bee),
+else by its class (bees and transports to the hub).
+
+Reluva (`Economy::produce`): one list of the side's orders, a yard free
+taking one each tick (the game's at the events above: close enough), the
+building's worker bees before the player's orders; paid at the start,
+"manufacture delayed" reported once when an order is given that the
+store can't pay now and, at most every 600 ms, while a building's worker
+bee waits for it. A yard razed keeps its job, waiting for crew that won't
+come, and isn't held up by it; destroyed, the order waits again as above.
+Two guesses: the vehicle half made goes with the yard deleted, so still
+counted in COLONY SIZE ([L] in the notes); one rolling out, handed on and
+in the dock, is killed with it. The vehicle menu lists the orders (those
+in work, then the player's waiting, as they'll be taken); a click on one,
+then another, cancels it.
 
 ### Research
 
@@ -1459,13 +1492,31 @@ hub's pool after 55-65 s, about 19 s more a block each way.
 
 ### Bees
 
-- **Where they are.** A side's bees belong to its hub (the vehicle pool's
-  only garages are hubs). A bee docked there is off the map: not drawn,
-  not hit. It's out only with a job, or on its way home. On a human side
-  the vehicle yard builds worker bees when asked for one; construction
-  and cargo bees are never made on demand, the jobs wait for one that's
-  free. Bees can't be hit (their hit points are set out of reach at
-  start-up).
+- **Where they are.** A side's bees belong to its hubs (the vehicle
+  pool's only garages are hubs), but to no hub in particular: an idle bee
+  goes home to the first hub made that is crewed and not dying or
+  evacuating, whichever it came from (no nearness, no room limit). A bee
+  docked there is off the map: not drawn, not hit. It's out only with a
+  job, or on its way home. On a human side the vehicle yard builds worker
+  bees when asked for one; construction and cargo bees are never made on
+  demand, the jobs wait for one that's free. Bees can't be hit (their hit
+  points are set out of reach at start-up).
+- **Requests.** A request records who asked, who took it on (a hub's
+  garage or a yard), its priority and the count owed. A unit handed back
+  goes to the request its hander took on, else the oldest open request
+  for its type (whoever asked), else the first hub that will house it,
+  else it stays with the hander; with no hander it's killed. Garages and
+  yards are asked in the order they were made.
+- **Worker bees.** Each mine, processor, storage facility and yard (the
+  same kind of agent) that comes into use without one asks for a worker
+  bee, at priority 2, and again if it loses its own. A hub's (one on its
+  way in first, else one docked) answers; else a vehicle yard makes one,
+  before any of the player's orders and whatever COLONY SIZE, and sends
+  it straight to that building (1 T trans al, taken as it starts). A
+  building's own worker bee, the free one it got standing at the start
+  or one from the hub, is an ordinary worker bee, its own only by the
+  building's record of it: the hub panel's WORKBEE counts every worker
+  bee of the side.
 - **Flying.** Bees fly straight (no paths), a timed flight speeding up and
   slowing down, of distance / speed ticks and at least 10: 150 units a
   tick for construction and cargo bees, 200 for worker bees; construction
@@ -1511,16 +1562,28 @@ hub's pool after 55-65 s, about 19 s more a block each way.
   30-tick lift, a 50-tick climb). It never docks there: the building's
   worker bee takes each pod in (out of its dock, to the pod, a tick, back
   in; the pod's contents go into the store and the pod is gone). Lost bees are asked
-  for again. A building lost takes the vehicles docked inside it with it
-  (off the map: a hub's bees at home, a mine's, processor's or storage
-  facility's worker bee in its dock); none is made again in their place
-  (the building that would ask for its worker bee is gone; a cargo bee
-  asked for again is one that's free), so the side has that many fewer. Its bees out on the map, and a building razed
-  (which waits for its bees to leave), let them go; what happens to
-  the pods they carry wasn't traced, so in Reluva its worker bee's pod
-  goes with it, as those waiting on its yard and in its store do, and
-  its cargo bee sets its pods down where it is for the next taker. While
-  the starting colony is set up, pods arrive at once.
+  for again. Bees are lost only with the building whose lists hold them
+  (a hub its docked bees and those coming home; a mine, processor,
+  storage facility or yard its worker and cargo bee): docked inside, off
+  the map, they're deleted with it (not killed: COLONY SIZE, lowered only
+  as an object dies, keeps them [M]); out on the map within 1.5 x its
+  model's radius they're killed; further off they're let go with no
+  hander, to the oldest request for one or the first hub that takes them,
+  and killed if none will. None is made again in their place (the
+  building's own requests go with it), so the side has that many fewer.
+  A building razed (which waits for its bees to leave) lets them go;
+  what happens to the pods they carry wasn't traced, so in Reluva its
+  worker bee's pod goes with it, as those waiting on its yard and in its
+  store do, and its cargo bee sets its pods down where it is for the
+  next taker; a bee killed takes its pods with it. While the starting
+  colony is set up, pods arrive at once.
+- Reluva (`Economy::assignWorkerBees`, `loseBees`, `hub`): as above; an
+  idle worker bee, coming home or docked, goes to the oldest request not
+  yet started at a yard (one a yard has started on waits for that yard's
+  bee: the game's second copy of it, in the pool's list, isn't kept);
+  the radius is the building's model's (6000 without one); a hub dying
+  is one with no hit points left (the hub needs no crew, so is always
+  crewed).
 - Not found: the number of tiles each building's model gives (so the
   build times; the training missions' timings stand in, with four bees).
 

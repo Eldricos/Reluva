@@ -60,6 +60,8 @@ constexpr int kShortestFlight = 10;
 constexpr float kBeeSpot = 2000;
 constexpr int kBeesASite = 4;
 constexpr int kDockTicks = 20;
+// A building's radius without its model (as the shots' size, game.md).
+constexpr float kDefaultRadius = 6000;
 // How often the processor sends its goods to storage (ticks).
 constexpr int kShipEvery = 32;
 // Pods (exe.md#bees): how many a mine lets wait before it stops; a
@@ -588,7 +590,9 @@ std::array<float, kOres> Economy::oreStock() const {
 }
 
 int Economy::colonySize() const {
-    int n = vehicles_;
+    // (A vehicle a yard has started on is made then, inside the yard.)
+    int n = vehicles_ + phantoms_ +
+            int(std::count_if(jobs_.begin(), jobs_.end(), [](const VehicleJob& j) { return j.yard != 0; }));
     for (const ColonyStructure& s : structures_)
         if (const BuildingType* t = buildingType(s.type); !t || t->upgradeOf.empty())
             ++n; // (the storage facility, not in the build menu, too)
@@ -771,77 +775,48 @@ bool Economy::orderVehicle(const VehicleType& v) {
     if (free_ ? v.side != side_ : !vehicleAvailable(v))
         return false;
     // The yard's button is off while the colony is at its size limit.
-    if (!free_ && colonySize() + int(jobs_.size()) >= capacity_)
+    if (!free_ && colonySize() >= capacity_)
         return false;
-    // Paid from the first storage facility's store alone.
-    Store* store = yardStore();
-    for (int m = 0; m < kMaterials && !free_; ++m)
-        if (!store || store->units[size_t(m)] < int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m)) {
-            shortage(1); // vehicle manufacture delayed
-            return false;
-        }
-    // The yard with the least work queued (not one being razed).
-    int yard = 0;
-    double least = 1e30;
-    for (const ColonyStructure& s : structures_)
-        if (s.type == "vehicle-yard" && s.progress >= 1 && !s.evacuating) {
-            double queued = 0;
-            for (const VehicleJob& j : jobs_)
-                if (j.yard == s.id)
-                    queued += j.work + 1;
-            if (queued < least)
-                least = queued, yard = s.id;
-        }
-    if (!yard)
+    // A vehicle yard standing to take it (once ordered, it waits for one
+    // whatever becomes of them).
+    if (std::none_of(structures_.begin(), structures_.end(), [](const ColonyStructure& s) {
+            return s.type == "vehicle-yard" && s.progress >= 1 && !s.evacuating;
+        }))
         return false;
-    for (int m = 0; m < kMaterials && !free_; ++m)
-        store->units[size_t(m)] -= int64_t(v.cost[size_t(m)]) * unitsPerMaterial(m);
-    for (const ColonyStructure& s : structures_)
-        if (s.id == yard && s.crew < 1)
-            pendingShort_.push_back({"short-crew", {}}), pendingShort_.push_back({"officer", {"001"}});
+    // Paid as a yard starts on it, from the first storage facility's store
+    // alone: the colony is told now if that can't pay, and the order waits.
+    if (!free_ && !yardPays(v.cost))
+        shortage(1); // vehicle manufacture delayed
+    if (!free_ && std::none_of(structures_.begin(), structures_.end(), [](const ColonyStructure& s) {
+            return s.type == "vehicle-yard" && s.progress >= 1 && !s.evacuating && s.crew >= 1;
+        }))
+        pendingShort_.push_back({"short-crew", {}}), pendingShort_.push_back({"officer", {"001"}});
     const double work = double(v.value) * kWorkPerValue;
-    jobs_.push_back({v.type, yard, work, work, -1});
+    VehicleJob j;
+    j.id = nextOrder_++;
+    j.type = v.type, j.priority = 1, j.work = work, j.total = work, j.cost = v.cost;
+    jobs_.push_back(j);
     return true;
 }
 
-// A yard's jobs handed on: those not yet rolling out (and, the yard lost,
-// those too) start again at the back of another of the side's
-// finished yards' queue (what was made of them went with the yard, so
-// from nothing; Reluva's choice, the game's not traced); with none, they
-// are dropped and their cost goes back to the yards' store, as a deleted
-// order's (exe.md#stores). A worker bee's dropped, the buildings without
-// one ask again.
-void Economy::handOffJobs(int yard, bool rollingOut) {
-    std::vector<VehicleJob> moved;
-    for (auto j = jobs_.begin(); j != jobs_.end();) {
-        if (j->yard != yard || (!rollingOut && j->rollout >= 0)) {
-            ++j;
-            continue;
-        }
-        int to = 0;
-        double least = 1e30;
-        for (const ColonyStructure& s : structures_)
-            if (s.type == "vehicle-yard" && s.id != yard && s.progress >= 1 && !s.evacuating) {
-                double queued = 0;
-                for (const VehicleJob& o : jobs_)
-                    if (o.yard == s.id)
-                        queued += o.work + 1;
-                if (queued < least)
-                    least = queued, to = s.id;
-            }
-        if (to) {
-            moved.push_back({j->type, to, j->total, j->total, -1});
-        } else if (const VehicleType* v = vehicleType(j->type)) {
-            if (Store* st = free_ ? nullptr : yardStore())
-                for (int m = 0; m < kMaterials; ++m)
-                    st->units[size_t(m)] += int64_t(v->cost[size_t(m)]) * unitsPerMaterial(m);
-            if (workerBeeType(v->type))
-                for (auto& [id, d] : depots_)
-                    d.asked = false;
-        }
-        j = jobs_.erase(j);
-    }
-    jobs_.insert(jobs_.end(), moved.begin(), moved.end());
+bool Economy::yardPays(const Stock& cost) const {
+    const Store* store = stores_.empty() ? nullptr : &stores_.front();
+    for (int m = 0; m < kMaterials; ++m)
+        if (!store || store->units[size_t(m)] < int64_t(cost[size_t(m)]) * unitsPerMaterial(m))
+            return false;
+    return true;
+}
+
+bool Economy::cancelVehicle(int order) {
+    const auto j = std::find_if(jobs_.begin(), jobs_.end(), [&](const VehicleJob& o) { return o.id == order; });
+    if (j == jobs_.end() || j->asker || j->rollout >= 0)
+        return false;
+    // Started: the vehicle half made is gone and the whole cost back.
+    if (j->yard && !free_ && !stores_.empty())
+        for (int m = 0; m < kMaterials; ++m)
+            stores_.front().units[size_t(m)] += int64_t(j->cost[size_t(m)]) * unitsPerMaterial(m);
+    jobs_.erase(j);
+    return true;
 }
 
 void Economy::shortage(int line) {
@@ -1137,18 +1112,49 @@ float Economy::efficiency(const ColonyStructure& s) const {
     return 0.4f * (health + fill + officer) * crewShare(s);
 }
 
+// Vehicle production (exe.md#vehicle-production): each yard free takes an
+// order, then each yard's job goes on.
 void Economy::produce(std::vector<ScriptEvent>& out) {
-    std::set<int> busy;
+    // A yard free (finished, not razed, its crew in, no job) takes the
+    // waiting order of the highest priority, the oldest of it, that its
+    // store can pay for, and pays for it as it starts (the game offers
+    // the waiting ones as a yard frees; Reluva each tick). A worker bee
+    // it can't pay for is reported, at most every 600 ms (each building
+    // asks each time it thinks); an order the player gave waits silently.
+    for (const ColonyStructure& s : structures_) {
+        const BuildingType* t = buildingType(s.type);
+        if (s.type != "vehicle-yard" || s.progress < 1 || s.evacuating || !t || s.crew < std::max(1, t->required) ||
+            std::any_of(jobs_.begin(), jobs_.end(), [&](const VehicleJob& j) { return j.yard == s.id; }))
+            continue;
+        VehicleJob* take = nullptr;
+        bool unpaid = false;
+        for (int priority = 2; priority >= 0 && !take; --priority)
+            for (VehicleJob& j : jobs_)
+                if (!j.yard && j.priority == priority) {
+                    if (!free_ && !yardPays(j.cost)) {
+                        unpaid |= j.asker != 0;
+                        continue;
+                    }
+                    take = &j;
+                    break;
+                }
+        if (!take) {
+            if (unpaid)
+                shortage(1); // vehicle manufacture delayed
+            continue;
+        }
+        for (int m = 0; m < kMaterials && !free_; ++m)
+            stores_.front().units[size_t(m)] -= int64_t(take->cost[size_t(m)]) * unitsPerMaterial(m);
+        take->yard = s.id, take->work = take->total, take->rollout = -1;
+    }
+    std::vector<std::pair<int, int>> madeWorkers; // bee, asker
     for (VehicleJob& j : jobs_) {
-        if (busy.count(j.yard))
-            continue; // one at a time per yard
-        busy.insert(j.yard);
-        ColonyStructure* s = structureById(j.yard);
+        ColonyStructure* s = j.yard ? structureById(j.yard) : nullptr;
         if (!s)
             continue;
-        // No crew, no work (the colony told, as the game's, when it's
-        // ordered); a vehicle rolling out goes on without (a razed yard's
-        // last, its crew gone).
+        // No crew, no work (it waits, keeping what it's done); a vehicle
+        // rolling out goes on without (a razed yard's last, its crew
+        // gone).
         if (s->crew < 1 && j.rollout < 0)
             continue;
         if (j.work > 0) {
@@ -1171,14 +1177,29 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
             j.rollout = rolloutSeconds(side_, j.type);
         j.rollout -= 1 / kTicksPerSecond;
         if (j.rollout <= 0) {
-            finished_.push_back({j.type, j.yard});
             if (const VehicleType* v = vehicleType(j.type))
                 out.push_back({"vehicle-built", {v->panel}});
             out.push_back({"officer", {"005"}}); // a vehicle finished
+            // A worker bee, with bees: the economy's own, straight to the
+            // building that asked for it (exe.md#bees); an order's to the
+            // oldest building waiting for one, else home.
+            if (beesModelled_ && workerBeeType(j.type)) {
+                Bee b;
+                b.id = nextBee_++;
+                b.worker = true, b.home = false;
+                b.x = s->x, b.y = s->y;
+                bees_.push_back(b);
+                madeWorkers.push_back({b.id, j.asker});
+            } else {
+                finished_.push_back({j.type, j.yard});
+            }
             j.type = -1;
         }
     }
     jobs_.erase(std::remove_if(jobs_.begin(), jobs_.end(), [](const VehicleJob& j) { return j.type < 0; }), jobs_.end());
+    for (const auto& [bee, asker] : madeWorkers)
+        if (Bee* b = beeById(bee))
+            bindWorker(*b, asker);
 }
 
 bool Economy::mineTake(ColonyStructure& mine, std::array<int64_t, kOres>& into) {
@@ -1471,48 +1492,38 @@ void Economy::remove(int id) {
             it = stores_.erase(it);
         else
             (it->structure == id ? it->gone = true : false), ++it;
-    // The bees docked inside it go with it (exe.md#bees): a hub's, home in
-    // it, and its own worker bee waiting in its dock (a yard's too). Those
-    // out on the map, or still on their way in, are let go where they are.
-    // None is made again in its place (the building that would ask for
-    // its worker bee is gone; a cargo bee asked for again is a free one):
-    // the colony has one fewer of each (takeLostBees). A lost worker bee comes off those the
-    // starting buildings were given free while any are left.
-    if (const ColonyStructure* self = structure(id)) {
-        const ColonyStructure* h = hub();
-        const bool isHub = h && h->id == id;
-        const float x = self->x, y = self->y;
-        for (auto it = bees_.begin(); it != bees_.end();) {
-            const bool inside = isHub ? it->home
-                                      : it->worker && it->site == id && it->flight == 0 && it->dock == 0 &&
-                                            it->pods.empty() && std::hypot(it->x - x, it->y - y) < 1;
-            if (!inside) {
-                if (isHub && it->docking)
-                    it->docking = false, it->dock = 0; // (no dock to finish going in through)
-                ++it;
-                continue;
-            }
-            const int kind = it->worker ? 2 : it->cargo ? 1 : 0;
-            if (kind == 2 && freeWorkers_ > 0)
-                --freeWorkers_;
-            else
-                ++lostBees_[size_t(kind)];
-            it = bees_.erase(it);
-        }
-    }
-    // Its pods waiting go with it; those bound for it look again. Its
-    // bees out let go of what they carry.
-    for (Bee& b : bees_)
-        if ((b.cargo || b.worker) && b.site == id)
-            releaseBee(b, id);
+    if (const ColonyStructure* self = structure(id))
+        loseBees(*self);
     depots_.erase(id);
+    // Its pods waiting go with it; those bound for it look again.
     pods_.erase(std::remove_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.origin == id && p.state != Pod::Aboard; }),
                 pods_.end());
     for (Pod& p : pods_)
         if (p.dest == id)
             p.dest = 0;
-    // Its vehicle jobs go to another yard, or are given up.
-    handOffJobs(id, true);
+    // A yard's job (exe.md#vehicle-production): what it had made goes with
+    // it (deleted, so still in COLONY SIZE), nothing is paid back, and the
+    // order waits again where it was in the list, the next to be taken, to
+    // be paid for again; a vehicle rolling out (handed on already, in its
+    // dock) is killed with it. With no yard left the orders wait. Its own
+    // request for a worker bee goes (one a yard has started on goes on,
+    // its bee to whoever wants one next).
+    for (auto j = jobs_.begin(); j != jobs_.end();) {
+        if (j->yard == id && j->rollout >= 0) {
+            j = jobs_.erase(j);
+            continue;
+        }
+        if (j->yard == id)
+            j->yard = 0, j->work = j->total, ++phantoms_;
+        if (j->asker == id && !j->yard) {
+            j = jobs_.erase(j);
+            continue;
+        }
+        if (j->asker == id)
+            j->asker = 0;
+        ++j;
+    }
+    yardRunning_.erase(id);
     // Its people waiting for a ride out die with it; rides to it set their
     // people down at the hub instead.
     std::vector<int> aboard;
@@ -1552,24 +1563,23 @@ void Economy::remove(int id) {
 void Economy::setBees(int construction, int cargo, int worker) {
     const bool first = !beesModelled_;
     beesModelled_ = true;
-    // 0 construction, 1 cargo, 2 worker bees.
+    // 0 construction, 1 cargo, 2 worker bees (those the mission houses:
+    // the economy's own from then on).
     auto kindOf = [](const Bee& b) { return b.worker ? 2 : b.cargo ? 1 : 0; };
-    for (int kind = 0; kind < 3; ++kind) {
-        // (The worker bees the starting buildings were given free come on
-        // top of those the colony asks for.)
+    const ColonyStructure* h = hub();
+    for (int kind = 0; kind < (first ? 3 : 2); ++kind) {
         // (Less those lost with a building that the caller hasn't taken
         // off its counts yet.)
-        const int want = std::max(0, (kind == 0 ? construction : kind == 1 ? cargo : worker + freeWorkers_) -
-                                         lostBees_[size_t(kind)]);
+        const int want = std::max(0, (kind == 0 ? construction : kind == 1 ? cargo : worker) - lostBees_[size_t(kind)]);
         int have = 0;
         for (const Bee& b : bees_)
-            have += kindOf(b) == kind && !(b.worker && first);
+            have += kindOf(b) == kind;
         for (; have < want; ++have) {
             Bee b;
             b.id = nextBee_++;
             b.cargo = kind == 1, b.worker = kind == 2;
-            if (const ColonyStructure* h = hub())
-                b.x = h->x, b.y = h->y;
+            if (h)
+                b.x = h->x, b.y = h->y, b.hub = h->id;
             bees_.push_back(b);
         }
         // Fewer (lost): those at home go first.
@@ -1582,7 +1592,8 @@ void Economy::setBees(int construction, int cargo, int worker) {
     }
     // The buildings standing at the start get a worker bee each, free: the
     // mines, processors and storage facilities, and the yards too (the
-    // game makes them the same kind of agent; exe.md#the-economy).
+    // game makes them the same kind of agent; exe.md#the-economy). It's
+    // an ordinary worker bee, theirs only by their record of it.
     if (first)
         for (const ColonyStructure& s : structures_)
             if (s.progress >= 1 && (s.type == "mining-station" || s.type == "resource-processor" ||
@@ -1593,9 +1604,7 @@ void Economy::setBees(int construction, int cargo, int worker) {
                 b.worker = true, b.home = false;
                 b.x = s.x, b.y = s.y, b.site = s.id;
                 bees_.push_back(b);
-                ++freeWorkers_;
-                if (s.type != "vehicle-yard" && s.type != "construction-yard")
-                    depots_[s.id].worker = b.id;
+                depots_[s.id].worker = b.id;
             }
 }
 
@@ -1804,34 +1813,98 @@ void Economy::podTick() {
                     p.x = b.x, p.y = b.y;
 }
 
-// Worker bees for the buildings that handle pods (not one being razed: the
-// game's searches pass it over, exe.md#demolishing).
+// Worker bees (exe.md#bees): each mine, processor, storage facility and
+// yard finished without one (not one being razed: the game's searches
+// pass it over, exe.md#demolishing) asks for one, at priority 2, once; an
+// idle one (on its way home first, then those docked in the hub) goes to
+// the oldest request not yet started at a yard, which is then withdrawn;
+// else a vehicle yard makes one for it (produce), with no thought for
+// COLONY SIZE.
 void Economy::assignWorkerBees() {
     for (const ColonyStructure& s : structures_) {
         if (s.progress < 1 || s.evacuating ||
-            (s.type != "mining-station" && s.type != "resource-processor" && s.type != "storage-facility"))
+            (s.type != "mining-station" && s.type != "resource-processor" && s.type != "storage-facility" &&
+             s.type != "vehicle-yard" && s.type != "construction-yard"))
             continue;
         Depot& d = depots_[s.id];
         if (const Bee* w = beeById(d.worker); !w || w->site != s.id)
             d.worker = 0;
-        if (d.worker)
+        if (std::none_of(jobs_.begin(), jobs_.end(), [&](const VehicleJob& j) { return j.id == d.request; }))
+            d.request = 0;
+        if (d.worker || d.request)
             continue;
-        for (Bee& b : bees_)
-            if (b.worker && !b.site && b.flight == 0) {
-                b.site = s.id, d.worker = b.id;
-                d.asked = false; // (so it asks again if this one's lost)
-                flyWorker(b, s.x, s.y);
-                break;
-            }
-        // None spare: one asked of the vehicle yard (the game's builds it;
-        // each refusal reported, at most every 600 ms).
-        if (!d.worker && !d.asked && !free_)
-            for (const VehicleType& v : vehicleTypes())
-                if (v.side == side_ && workerBeeType(v.type) && vehicleAvailable(v) && orderVehicle(v)) {
-                    d.asked = true;
-                    break;
-                }
+        const VehicleType* v = vehicleType(workerType());
+        if (!v)
+            continue;
+        VehicleJob j;
+        j.id = d.request = nextOrder_++;
+        j.type = v->type, j.priority = 2, j.asker = s.id, j.cost = v->cost;
+        j.work = j.total = double(v->value) * kWorkPerValue;
+        jobs_.push_back(j);
     }
+    for (bool docked : {false, true})
+        for (Bee& b : bees_) {
+            if (!b.worker || b.site || b.home != docked || (!docked && b.dock > 0))
+                continue;
+            const int asker = workerWanted();
+            if (!asker)
+                return;
+            bindWorker(b, asker);
+        }
+}
+
+// The building of the oldest request for a worker bee not yet started at a
+// yard that can take one now (0: none).
+int Economy::workerWanted() const {
+    for (const VehicleJob& j : jobs_) {
+        if (!j.asker || j.yard)
+            continue;
+        const ColonyStructure* s = structure(j.asker);
+        const auto d = depots_.find(j.asker);
+        const bool has = d != depots_.end() && d->second.worker &&
+                         std::any_of(bees_.begin(), bees_.end(), [&](const Bee& b) {
+                             return b.id == d->second.worker && b.site == j.asker;
+                         });
+        if (s && s->progress >= 1 && !s->evacuating && d != depots_.end() && !has)
+            return j.asker;
+    }
+    return 0;
+}
+
+int Economy::workerType() const {
+    for (const VehicleType& v : vehicleTypes())
+        if (v.side == side_ && workerBeeType(v.type))
+            return v.type;
+    return 0;
+}
+
+// A worker bee handed to a building: its own (its request, if not yet
+// started, withdrawn), flying to it; one that has one already, or can't
+// take one, lets it go again.
+void Economy::bindWorker(Bee& b, int building) {
+    const ColonyStructure* s = building ? structure(building) : nullptr;
+    const auto d = s ? depots_.find(building) : depots_.end();
+    const Bee* has = d != depots_.end() ? beeById(d->second.worker) : nullptr;
+    if (!s || s->progress < 1 || s->evacuating || d == depots_.end() || (has && has != &b && has->site == building)) {
+        freeWorker(b);
+        return;
+    }
+    if (const int request = std::exchange(d->second.request, 0))
+        jobs_.erase(std::remove_if(jobs_.begin(), jobs_.end(),
+                                   [&](const VehicleJob& j) { return j.id == request && !j.yard; }),
+                    jobs_.end());
+    d->second.worker = b.id;
+    b.site = building, b.inside = false;
+    flyWorker(b, s->x, s->y);
+}
+
+// A worker bee let go: to the oldest building still waiting for one (its
+// request not started at a yard), else home (beeTick sends it; without a
+// hub it stays where it is).
+void Economy::freeWorker(Bee& b) {
+    b.site = 0, b.inside = false;
+    if (const int asker = workerWanted())
+        bindWorker(b, asker);
 }
 
 // A worker bee's turn, not flying or docking (exe.md#bees): docked in its
@@ -2018,18 +2091,28 @@ int Economy::beesAt(int site) const {
                              [&](const Bee& b) { return !b.cargo && !b.worker && b.site == site && b.working; }));
 }
 
-const ColonyStructure* Economy::hub() const {
+const ColonyStructure* Economy::hub() const { return hubBut(0); }
+
+// The first hub made that takes bees (exe.md#bees: the vehicle pool's
+// garages in the order they were made, each taking a bee while its hub is
+// finished, crewed and not dying or razed; no nearness, no room limit).
+const ColonyStructure* Economy::hubBut(int id) const {
     for (const ColonyStructure& s : structures_)
-        if (s.type == "colony-hub" && s.progress >= 1)
-            return &s;
+        if (s.type == "colony-hub" && s.progress >= 1 && s.id != id && !s.evacuating && s.health > 0) {
+            const BuildingType* t = buildingType(s.type);
+            if (!t || s.crew >= t->required)
+                return &s;
+        }
     return nullptr;
 }
 
 void Economy::fly(Bee& b, float x, float y) {
-    const ColonyStructure* h = b.home ? hub() : nullptr;
+    const ColonyStructure* h = b.home ? structure(b.hub) : nullptr;
+    if (b.home && !h)
+        h = hub();
     if (h)
         b.x = h->x, b.y = h->y; // out of the hub
-    b.home = false, b.working = false, b.docking = false;
+    b.home = false, b.working = false, b.docking = false, b.hub = 0;
     b.fromX = b.x, b.fromY = b.y, b.toX = x, b.toY = y;
     b.flown = 0;
     b.flight = std::max(kShortestFlight, int(std::hypot(x - b.x, y - b.y) / (b.cargo ? kCargoSpeed : kBeeSpeed)));
@@ -2069,7 +2152,7 @@ void Economy::beeTick() {
         // Home: in through the hub's dock, in its turn.
         auto dockHome = [&] {
             b.dock = dockTurn(h->id, dockIn(*h, b.worker ? kWorkerSpeed : b.cargo ? kCargoSpeed : kBeeSpeed));
-            b.docking = true;
+            b.docking = true, b.hub = h->id;
         };
         if (b.cargo || b.worker) {
             if (!b.site && h && std::hypot(b.x - h->x, b.y - h->y) < 1)
@@ -2108,10 +2191,12 @@ void Economy::beeTick() {
         }
     }
     podTick();
-    // Idle ones home.
+    // Idle ones home: to the first hub that takes them.
     for (Bee& b : bees_)
-        if (!b.site && !b.home && !b.docking && b.flight == 0 && b.dock == 0 && h)
+        if (!b.site && !b.home && !b.docking && b.flight == 0 && b.dock == 0 && h) {
             fly(b, h->x, h->y);
+            b.hub = h->id;
+        }
 }
 
 bool Economy::spend(int structure, float power) {
@@ -2181,9 +2266,9 @@ bool Economy::raze(int structure) {
             const int id = s.id, housed = s.pool;
             const float x = s.x, y = s.y;
             s.crew = 0, s.target = 0, s.pool = 0;
-            // Its jobs still in work go to another yard (its crew gone, they
-            // couldn't finish here).
-            handOffJobs(id, false);
+            // A yard's job in work stays with it, waiting for crew that
+            // won't come, until it's gone (then its order waits again;
+            // exe.md#vehicle-production, the game's own not traced).
             for (int r : unsent)
                 leaving += endRide(r, false);
             // With transports, an unarmed APC comes for them and takes them
@@ -2224,6 +2309,67 @@ bool Economy::raze(int structure) {
     return true;
 }
 
+// A building's bees as it's destroyed (exe.md#bees): a hub's docked in it
+// and coming home to it, a mine's, processor's, storage facility's or
+// yard's own worker and cargo bee. Those docked inside are deleted with it
+// (not killed, so still counted in COLONY SIZE: the game's count drops
+// only as one dies); those on the map within 1.5 x its radius are killed;
+// those further off are let go, to a request for one or another hub, and
+// killed if neither will have them. What they carry goes with them.
+void Economy::loseBees(const ColonyStructure& s) {
+    const bool isHub = s.type == "colony-hub";
+    const float reach = 1.5f * (dockOf(s).radius > 0 ? dockOf(s).radius : kDefaultRadius);
+    std::vector<int> freed;
+    for (auto it = bees_.begin(); it != bees_.end();) {
+        bool docked = false, out = false;
+        if (isHub) {
+            docked = it->home && it->hub == s.id;
+            out = !it->home && !it->site && it->hub == s.id; // on its way home to it
+        } else if ((it->worker || it->cargo) && it->site == s.id) {
+            docked = it->worker && it->inside && it->flight == 0 && it->dock == 0;
+            out = !docked;
+        }
+        if (!docked && !out) {
+            ++it;
+            continue;
+        }
+        if (!docked && std::hypot(it->x - s.x, it->y - s.y) > reach && (wanted(*it) || hubBut(s.id))) {
+            freed.push_back(it->id);
+            ++it;
+            continue;
+        }
+        phantoms_ += docked;
+        if (!it->worker)
+            ++lostBees_[size_t(it->cargo ? 1 : 0)];
+        for (int pod : it->pods)
+            pods_.erase(std::remove_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.id == pod; }), pods_.end());
+        it = bees_.erase(it);
+    }
+    for (int id : freed)
+        if (Bee* b = beeById(id)) {
+            releaseBee(*b, s.id);
+            b->home = b->docking = false, b->flight = b->dock = b->hub = 0;
+            if (b->worker)
+                freeWorker(*b);
+        }
+}
+
+bool Economy::wanted(const Bee& b) const {
+    if (b.worker)
+        return workerWanted() != 0;
+    if (b.cargo)
+        return std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
+            const auto d = depots_.find(s.id);
+            return d != depots_.end() && !d->second.cargo &&
+                   std::count_if(pods_.begin(), pods_.end(), [&](const Pod& p) { return p.dest == s.id; }) >= kCargoAsk;
+        });
+    return std::any_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
+        return s.progress < 1 && std::count_if(bees_.begin(), bees_.end(), [&](const Bee& o) {
+                                     return !o.cargo && !o.worker && o.site == s.id;
+                                 }) < kBeesASite;
+    });
+}
+
 // A bee let go by its building (the game's pods in transit there weren't
 // traced; Reluva's): a worker bee's pod, out from its store or in to it,
 // goes with the building, as the pods waiting on its yard do; a cargo
@@ -2257,8 +2403,8 @@ bool Economy::evacuated(int structure) const {
             if (!s.evacuating || s.crew > 0 || s.pool > 0 || !s.coming.empty() || s.evacTicks < kEvacTicks)
                 return false;
             // A yard's vehicle still rolling out (exe.md#demolishing: its
-            // jobs finish first).
-            if (std::any_of(jobs_.begin(), jobs_.end(), [&](const VehicleJob& j) { return j.yard == s.id; }))
+            // jobs finish first; one not yet rolling out doesn't hold it up).
+            if (std::any_of(jobs_.begin(), jobs_.end(), [&](const VehicleJob& j) { return j.yard == s.id && j.rollout >= 0; }))
                 return false;
             // Its people still to be taken out.
             if (std::any_of(rides_.begin(), rides_.end(), [&](const Ride& r) { return r.from == s.id && !r.loaded; }))
@@ -2271,8 +2417,8 @@ bool Economy::evacuated(int structure) const {
 }
 
 void Economy::syncState(save::Serializer& s) {
-    s(stores_)(refined_)(capacity_)(capBank_)(freeWorkers_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
-    s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_);
+    s(stores_)(refined_)(capacity_)(capBank_)(phantoms_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
+    s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_)(nextOrder_);
     s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
     s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastShortage_)(nextId_)(dockFree_);
     s(beeClock_)(free_)(beesModelled_)(bees_)(nextBee_)(nextPod_)(pods_)(depots_)(lostBees_);

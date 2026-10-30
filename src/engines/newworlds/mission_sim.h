@@ -17,6 +17,7 @@
 #include "engines/newworlds/script_effects.h"
 #include "engines/newworlds/world.h"
 
+#include <functional>
 #include <map>
 #include <memory>
 #include <set>
@@ -72,8 +73,10 @@ public:
     // economy, field work, effects, script, all a tick at a time), the
     // part of a tick left over carried to the next call: the same run
     // whatever steps it's given (the screen's frames, play-check's
-    // seconds).
-    void advance(double seconds);
+    // seconds). beforeTick, if given, is called just before each tick
+    // runs (the screen notes there where things are drawn from: with
+    // several ticks in one call, what the last of them started from).
+    void advance(double seconds, const std::function<void()>& beforeTick = {});
     double clock() const { return clock_; }
     // How far time is into the next tick (0 to 1): the screen draws what
     // moves that far between where the last tick found it and where it is.

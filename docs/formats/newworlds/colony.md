@@ -224,6 +224,17 @@ Most Klingon buildings have a texture number the name rule can't fill
 ([geo.md](geo.md#textures)), so a face of each (often its top) shows
 untextured.
 
+## Worker bees at the start
+
+Each mine, processor, storage facility, vehicle yard and construction
+yard standing at the start gets a worker bee of its own, free, which
+counts in COLONY SIZE ([exe.md](exe.md#the-economy)); the worker bees the
+mission places start in the hub. They are all the same kind of object: a
+building's is its own only by its record of it, and the hub's WORKBEE
+counts them all. One of these buildings put up later asks for a worker
+bee: a spare from the hub, else one a vehicle yard makes for it first,
+before the player's orders ([exe.md](exe.md#bees)).
+
 ## Reluva's layout
 
 The missions page (**C** shows or hides the colony, **V** looks at it) lays

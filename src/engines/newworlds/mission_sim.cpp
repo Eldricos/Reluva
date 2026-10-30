@@ -484,7 +484,7 @@ void MissionSim::note(const std::string& line) {
     log_.push_back(at + line);
 }
 
-void MissionSim::advance(double seconds) {
+void MissionSim::advance(double seconds, const std::function<void()>& beforeTick) {
     // Whole ticks, the rest kept for the next call: a run is the same
     // whether it's moved on a frame (1/60 s) or a second at a time.
     pending_ += std::max(seconds, 0.0);
@@ -492,6 +492,8 @@ void MissionSim::advance(double seconds) {
         pending_ = std::max(pending_ - kTick, 0.0);
         if (pending_ < 1e-9) // (a frame's rounding: 3 x 1/60 s is a tick)
             pending_ = 0;
+        if (beforeTick)
+            beforeTick();
         step();
     }
 }
@@ -735,6 +737,8 @@ void MissionSim::useModels(const Archives& archives) {
             if (const CatEntry* e = !haveMdl ? a->find(mdlName) : nullptr; e && !a->read(*e, data))
                 haveMdl = !parseMdl(data, mdl);
         }
+        if (haveGeo)
+            d.radius = geo.radius; // (its bees lost within 1.5 times it, exe.md#bees)
         if (!haveGeo || !haveMdl)
             return d;
         auto point = [&](const char* name, std::array<float, 3>& out) {

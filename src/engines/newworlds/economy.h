@@ -166,9 +166,11 @@ public:
     // colony has one, the mission's stock waits for it, counted.)
     Stock stock() const;
     Stock storeOf(int structure) const; // a storage facility's own
-    // COLONY SIZE: the colony's buildings and vehicles, and the most it
-    // may have (50 at the start, raised by housing as it's placed, never
-    // past 90).
+    // COLONY SIZE: the colony's buildings and vehicles (a vehicle a yard
+    // has started on too, and what was deleted without dying: bees docked
+    // in a building destroyed, a vehicle half built in a yard destroyed;
+    // exe.md#bees), and the most it may have (50 at the start, raised by
+    // housing as it's placed, never past 90).
     int colonySize() const;
     int capacity() const { return capacity_; }
     int capacityBank() const { return capBank_; } // housing's banked over 90
@@ -216,15 +218,21 @@ public:
     // never below nothing.
     void give(int material, int amount);
     // A building destroyed: it no longer counts, works or draws power. Its
-    // people die with it, and the bees docked inside it; those on their
-    // way to it go back to the hub; a vehicle yard's jobs go to another
-    // yard, or are dropped and paid back.
+    // people die with it; those on their way to it go back to the hub.
+    // Its bees (a hub's docked and coming home, a mine's, processor's,
+    // storage facility's or yard's own worker and cargo bee): those docked
+    // inside are gone (still counted in COLONY SIZE), those out within
+    // 1.5 x its radius killed, those further off go to a request for one or
+    // another hub, else are killed (exe.md#bees). A vehicle yard's job is
+    // lost, unpaid back, and its order waits again in its place in the
+    // list; a vehicle rolling out is lost with it. Its own requests go.
     void remove(int id);
     // Demolishing (exe.md#demolishing): whether a building may be razed
     // (built, not the hub or a storage facility, not already evacuating);
     // the order: half its type's cost back at once (upgrades not), its
-    // crew and the people housed in it sent out, a yard's work not yet
-    // done handed on. Once it's empty (evacuated()), it's destroyed.
+    // crew and the people housed in it sent out (a yard's job waits with
+    // it, paused, until it's gone). Once it's empty (evacuated()), it's
+    // destroyed.
     // A defensive turret's shot: power taken from its buffer, if it holds
     // that much (exe.md#sides-and-combat); false, and nothing taken, if not.
     bool spend(int structure, float power);
@@ -238,23 +246,41 @@ public:
     int pendingBuilds() const;
     bool evacuated(int structure) const;
 
-    // Vehicles: the side's that the menu offers now (their yard and what
-    // they need standing), and an order for one (the cost taken at once;
-    // false, and the colony told, if it can't be paid; false if the colony
-    // is at its size limit). The yard's work is shown as 0-1.
+    // Vehicles (exe.md#vehicle-production): the side's that the menu
+    // offers now (their yard and what they need standing), and an order
+    // for one: false if no vehicle yard stands or the colony is at its
+    // size limit; else it joins the side's one list of orders (the
+    // colony told if the store can't pay for it now). The orders bind to
+    // no yard: a yard free (finished, crewed, not razed) takes the waiting
+    // order of the highest priority, oldest first, that its store (the
+    // first storage facility's) can pay for, and pays for it as it starts.
+    // A building's worker bee (priority 2) comes before the player's
+    // orders (1).
     std::vector<const VehicleType*> vehicleMenu() const;
     bool vehicleAvailable(const VehicleType& v) const;
     bool orderVehicle(const VehicleType& v);
     struct VehicleJob {
-        int type;
-        int yard;          // the vehicle yard's structure id
-        double work;       // power units still to put in
-        double total;
-        double rollout = 0; // seconds left rolling out, once done
-        friend void syncState(save::Serializer& s, VehicleJob& v) { s(v.type)(v.yard)(v.work)(v.total)(v.rollout); }
+        int id = 0;
+        int type = 0;
+        int priority = 1;  // 2 a building's worker bee, 1 an order
+        int asker = 0;     // the building whose worker bee it is (0: an order)
+        int yard = 0;      // the vehicle yard working it (0: waiting)
+        double work = 0;   // power units still to put in
+        double total = 0;
+        double rollout = -1; // seconds left rolling out, once done (-1 not yet)
+        Stock cost{};        // paid as a yard starts on it
+        friend void syncState(save::Serializer& s, VehicleJob& v) {
+            s(v.id)(v.type)(v.priority)(v.asker)(v.yard)(v.work)(v.total)(v.rollout)(v.cost);
+        }
     };
+    // The orders, oldest first: waiting, in work, rolling out.
     const std::vector<VehicleJob>& vehicleJobs() const { return jobs_; }
-    // Vehicles finished since last asked: type id and the yard's id.
+    // An order cancelled (the player's; not one rolling out): one started
+    // gives its whole cost back, one waiting cost nothing yet.
+    bool cancelVehicle(int order);
+    // Vehicles finished since last asked: type id and the yard's id (not
+    // the worker bees, with bees: the economy's own, bound for the
+    // building that asked or the hub).
     std::vector<std::pair<int, int>> takeVehicles();
     // Whether a vehicle yard is working (between its start and stop
     // efficiencies, as it was); its panel shows SUSPENDED when not.
@@ -311,9 +337,14 @@ public:
     // at each; a mine with none serving it sends nothing. Bees fly
     // straight, 150 units a tick, a flight at least 10 ticks.
     void setBees(int construction, int cargo, int worker = 0);
-    // Bees lost with a building they were docked in since last asked
-    // (construction, cargo, worker: to come off the counts setBees is
-    // given; until they're taken, setBees leaves them out itself).
+    // (Worker bees are the economy's own after the first call: those it's
+    // given then start in the hub, each mine, processor, storage facility
+    // and yard standing gets one free, and later ones are asked of the
+    // vehicle yards; the counts given later leave them be.)
+    // Construction and cargo bees lost with a building since last asked
+    // (construction, cargo, worker (always 0): to come off the counts
+    // setBees is given; until they're taken, setBees leaves them out
+    // itself).
     std::array<int, 3> takeLostBees();
 
     // The colony's transports (exe.md#transports), once switched on (the
@@ -343,7 +374,8 @@ public:
     // thermoconc (1600 of nitrium and duranium) before the mission's stock
     // goes in, so that stock arrives on top (exe.md#stores).
     void startingYardStock();
-    // The colony's finished hub, if it has one.
+    // The colony's hub its bees go home to (exe.md#bees): the first
+    // finished that is crewed, not razed and not dying, if any.
     const ColonyStructure* hub() const;
     const std::vector<Ride>& rides() const { return rides_; }
     void rideLoaded(int ride);
@@ -364,6 +396,7 @@ public:
         bool inside = false;  // a worker bee: docked in its building
         bool docking = false; // going into the hub (home when its dock is done)
         int fetching = 0;     // a worker bee: the pod on its yard it's on its way to take in
+        int hub = 0;          // the hub it's docked in, or flying home to (0 none)
         int retries = 0;      // a cargo bee: checks spent waiting for a second pod
         float fromX = 0, fromY = 0, toX = 0, toY = 0;
         int flown = 0, flight = 0; // ticks: 0 flight when not flying
@@ -371,7 +404,7 @@ public:
         friend void syncState(save::Serializer& s, Bee& v) {
             s(v.id)(v.cargo)(v.worker)(v.home)(v.x)(v.y)(v.heading)(v.site)(v.spot)(v.working)(v.loaded)(v.dock)
              (v.inside)(v.docking)(v.fetching)(v.retries)(v.fromX)(v.fromY)(v.toX)(v.toY)(v.flown)(v.flight)
-             (v.pods);
+             (v.pods)(v.hub);
         }
     };
     const std::vector<Bee>& bees() const { return bees_; }
@@ -417,6 +450,7 @@ public:
     struct DockPoints {
         bool known = false, vertical = false;
         std::array<float, 3> arrival{}, capture{}, lock{}, release{}, departure{};
+        float radius = 0; // the model's bounds radius (0 unknown)
     };
     void setDocks(std::function<DockPoints(const std::string& type)> docks) {
         docks_ = std::move(docks);
@@ -479,6 +513,26 @@ private:
     // A worker or cargo bee let go by its building (razed or gone), and
     // what it carries: see the definition.
     void releaseBee(Bee& b, int structure);
+    // A worker bee handed to a building (its own from then on), or let go:
+    // to the oldest request waiting for one, else home (it stays where it
+    // is without a hub).
+    void bindWorker(Bee& b, int building);
+    void freeWorker(Bee& b);
+    // The building of the oldest request for a worker bee not yet started
+    // at a yard that can take one now (0: none).
+    int workerWanted() const;
+    // Whether something waits for a bee of its kind (a site short of
+    // construction bees, a building for a cargo bee, a worker bee asked
+    // for and not yet started at a yard).
+    bool wanted(const Bee& b) const;
+    // A building's bees as it's destroyed (exe.md#bees).
+    void loseBees(const ColonyStructure& s);
+    // The side's worker bee type (12, 11, 92).
+    int workerType() const;
+    // Whether the yards' store can pay so much.
+    bool yardPays(const Stock& cost) const;
+    // The hub its bees would go home to, but one.
+    const ColonyStructure* hubBut(int id) const;
     int64_t podSize() const { return side_ == 'F' ? 80000 : 160000; }
     // A cargo bee's bays: the Federation's two, the Klingons' and Romulans'
     // one (so every cargo bee carries 160 T a trip). The worker bee's two
@@ -509,7 +563,8 @@ private:
     int powerClass(std::string_view type) const;
     std::vector<Store> stores_;
     Units refined_{}; // at the processor, waiting to go to storage
-    int capacity_, capBank_ = 0, freeWorkers_ = 0, vehicles_ = 0;
+    int capacity_, capBank_ = 0, vehicles_ = 0;
+    int phantoms_ = 0; // deleted without dying, still in COLONY SIZE
     ColonyMap map_;
     std::vector<ColonyStructure> structures_;
     std::array<int64_t, kOres> ore_{}; // raw ore at the processor, game units
@@ -521,6 +576,7 @@ private:
     float requested_ = 0, met_ = 1, consumption_ = 0;
     std::vector<ScriptEvent> pendingShort_;
     std::vector<VehicleJob> jobs_;
+    int nextOrder_ = 1;
     std::vector<std::pair<int, int>> finished_;
     std::map<int, float> officers_;
     std::map<int, bool> yardRunning_;
@@ -539,9 +595,6 @@ private:
     // destination asks for its crew again (after its people are set down,
     // if they were). Its people, for the caller to put somewhere.
     int endRide(int ride, bool delivered);
-    // A vehicle yard's jobs handed on (it lost or razed): to another of the
-    // side's finished yards, else dropped and their cost put back.
-    void handOffJobs(int yard, bool rollingOut);
     // A shortage line (short-resources and its officer's report), at most
     // once every 600 ms each (exe.md#stores).
     void shortage(int line);
@@ -566,14 +619,14 @@ private:
     std::array<int, 3> lostBees_{}; // lost with their building, not yet taken: construction, cargo, worker
     int nextBee_ = 1, nextPod_ = 1;
     std::vector<Pod> pods_;
-    // Each mine, processor and storage facility's worker bee (its id; 0
-    // none), cargo bee, store of dug ore (a mine's) and whether a worker
-    // bee has been asked of the yard.
+    // Each mine, processor, storage facility and yard's worker bee (its
+    // id; 0 none), cargo bee, store of dug ore (a mine's) and its request
+    // for a worker bee (the order's id; 0 none).
     struct Depot {
         int worker = 0, cargo = 0;
         std::array<int64_t, kMaterials> dug{};
-        bool asked = false;
-        friend void syncState(save::Serializer& s, Depot& v) { s(v.worker)(v.cargo)(v.dug)(v.asked); }
+        int request = 0;
+        friend void syncState(save::Serializer& s, Depot& v) { s(v.worker)(v.cargo)(v.dug)(v.request); }
     };
     std::map<int, Depot> depots_;
 };

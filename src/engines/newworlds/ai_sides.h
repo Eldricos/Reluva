@@ -231,8 +231,13 @@ private:
     std::map<int, int> observedSize_, observedTotal_;
     // Units steer() last sent somewhere with no way there (an empty path),
     // from where and to where: from the same spot to the same place
-    // findPath() gives the same again (not saved).
-    std::map<int, std::array<float, 4>> noWay_;
+    // findPath() gives the same again (not saved) while what it reads is
+    // the same (World::pathGeneration, kept with each).
+    struct NoWay {
+        std::array<float, 4> from;
+        uint32_t pathGeneration;
+    };
+    std::map<int, NoWay> noWay_;
     double clock_ = 0;
     int ticks_ = 0;        // the game's ticks so far (20 a second)
     double tickRest_ = 0;  // and a part of one, carried
