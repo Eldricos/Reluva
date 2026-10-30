@@ -7,6 +7,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(RELUVA_USE_SYSTEM_SDL "Use an installed SDL3 instead of building it" OFF)
 option(RELUVA_BUILD_TESTS "Build unit tests" ON)
+option(RELUVA_FUZZ "Build the libFuzzer targets in tests/fuzz (clang; everything built with ASan and UBSan)" OFF)
 
 include(FetchContent)
 
@@ -41,6 +42,15 @@ add_library(imgui STATIC
     ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp)
 target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR} ${imgui_SOURCE_DIR}/backends)
 target_link_libraries(imgui PUBLIC SDL3::SDL3)
+
+# --- Fuzzing: the code the fuzz targets reach instrumented (tests/fuzz) --------
+if(RELUVA_FUZZ)
+    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        message(FATAL_ERROR "RELUVA_FUZZ needs clang (libFuzzer)")
+    endif()
+    add_compile_options(-fsanitize=fuzzer-no-link,address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address,undefined)
+endif()
 
 # --- Warnings -----------------------------------------------------------------
 add_library(reluva_warnings INTERFACE)
@@ -158,4 +168,14 @@ if(RELUVA_BUILD_TESTS)
     add_executable(reluva_newworlds_tests tests/test_newworlds_cat.cpp)
     target_link_libraries(reluva_newworlds_tests PRIVATE reluva_engines reluva_warnings)
     add_test(NAME newworlds_cat COMMAND reluva_newworlds_tests)
+
+    # The missions page over the real game (skipped without it: see the file).
+    add_executable(reluva_newworlds_page_tests tests/test_newworlds_page.cpp)
+    target_link_libraries(reluva_newworlds_page_tests PRIVATE reluva_engines reluva_warnings)
+    target_compile_definitions(reluva_newworlds_page_tests PRIVATE
+        RELUVA_PAGE_GOLDEN="${CMAKE_CURRENT_SOURCE_DIR}/tests/data/newworlds_page.golden")
+    add_test(NAME newworlds_page COMMAND reluva_newworlds_page_tests)
+endif()
+if(RELUVA_BUILD_TESTS OR RELUVA_FUZZ)
+    add_subdirectory(tests/fuzz) # the fuzz targets, and their corpora replayed as a test
 endif()

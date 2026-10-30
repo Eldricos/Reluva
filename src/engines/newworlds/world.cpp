@@ -1030,9 +1030,19 @@ void World::flyProjectiles() {
 
 void World::syncState(save::Serializer& s) {
     s(stances_)(events_)(projectiles_)(tickClock_)(tick_)(units_)(groups_)(nextId_);
-    if (s.loading())
+    if (s.loading()) {
+        // Every id one handed out before (the index has a place for each
+        // up to the next; a damaged save's mustn't make it huge).
+        if (nextId_ < 1 || nextId_ > kMaxIds)
+            s.fail("a unit count out of range");
+        for (const Unit& u : units_)
+            if (u.id < 1 || u.id >= nextId_)
+                s.fail("a unit id out of range");
+        if (!s.ok())
+            units_.clear(), nextId_ = 1;
         for (Unit& u : units_)
             u.lastHeading = u.heading, u.lastTurretYaw = u.turretYaw;
+    }
     reindex();
 }
 

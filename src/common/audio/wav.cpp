@@ -149,8 +149,8 @@ std::vector<uint8_t> encodePcmWav(const Sound& s) {
     put16(1);
     put16(uint32_t(s.channels));
     put32(uint32_t(s.rate));
-    put32(uint32_t(s.rate * s.channels * 2));
-    put16(uint32_t(s.channels * 2));
+    put32(uint32_t(s.rate) * uint32_t(s.channels) * 2); // (unsigned: any rate a file gave)
+    put16(uint32_t(s.channels) * 2);
     put16(16);
     b.insert(b.end(), {'d', 'a', 't', 'a'});
     put32(bytes);

@@ -159,11 +159,14 @@ public:
         // Effect: one of the game's script effects (sender = the action:
         // top-up, damage, beam-up, spawn, move, meteors, storm, infect,
         // cure; text = its arguments).
-        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock, Research, Effect } kind;
+        enum Kind { Message, Completed, Revealed, Won, Lost, Failing, Stance, Ai, Stock, Research, Effect } kind = Message;
         std::string sender, text; // a message
         uint32_t objective = 0;    // Completed, Revealed, Lost: the string id
         std::string clip;          // a message's voice clip (a media stem), if any
-        friend void syncState(save::Serializer& s, Output& v) { s(v.kind)(v.sender)(v.text)(v.objective)(v.clip); }
+        friend void syncState(save::Serializer& s, Output& v) {
+            save::syncEnum(s, v.kind, Effect);
+            s(v.sender)(v.text)(v.objective)(v.clip);
+        }
     };
     enum class State { Incomplete, Complete, Hidden };
 

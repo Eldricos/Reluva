@@ -105,6 +105,13 @@ public:
     // its own (true if one was ordered); the vehicle, made, is handed over
     // with delivered().
     void setPlayerYards(std::function<bool(int type)> order) { playerYards_ = std::move(order); }
+    // The natives' factories' docks (exe.md#docking), by model, read with
+    // the models (MissionSim::useModels): the unit a factory makes rolls
+    // out to the dock's DEPARTURE point. Without them, 1.2 tiles south.
+    void setDocks(std::function<Economy::DockPoints(const std::string& model)> docks) { docks_ = std::move(docks); }
+    // The models of the natives' factories (a Taubat hangar's
+    // geo/bad/tw.geo), whose docks those are.
+    static std::vector<std::string> factoryModels();
     // A vehicle the player's yard made: to the oldest of the player's
     // groups waiting for one of its type (false if none is).
     bool delivered(int type, int id) { return deliver(player_, type, id); }
@@ -208,6 +215,7 @@ private:
     ColonyMap ground_;
     std::function<bool(int slot, int bx, int by)> seen_;
     std::function<bool(int type)> playerYards_;
+    std::function<Economy::DockPoints(const std::string& model)> docks_;
     std::map<std::string, int> counts_;
     // What observe() counted from, as it was last time (not saved: made
     // again on the first observe() after a load): while no unit's counted

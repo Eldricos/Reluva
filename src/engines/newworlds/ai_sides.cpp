@@ -559,8 +559,9 @@ int AiSides::outstanding(int slot, int type) const {
 }
 
 // The natives' factories: each idle one takes its side's oldest request,
-// builds it and rolls it out (factorySeconds), the unit out at the end. A
-// factory lost gives its unit back to the queue.
+// builds it and rolls it out (factorySeconds), the unit out at the end,
+// where its dock leaves it (setDocks). A factory lost gives its unit back
+// to the queue.
 void AiSides::factories(double seconds) {
     for (auto it = factoryJobs_.begin(); it != factoryJobs_.end();) {
         const Unit* f = world_.unit(it->factory);
@@ -575,7 +576,13 @@ void AiSides::factories(double seconds) {
             continue;
         }
         if (const CombatType* t = combatType(it->type)) {
-            const auto [px, py] = openSpot(f->x, f->y - 1.2f * kTile);
+            // Out at the dock's DEPARTURE point, from the building's
+            // origin as the landing pads' places are (buildings stand
+            // unturned: their heading is never applied).
+            float x = f->x, y = f->y - 1.2f * kTile;
+            if (const Economy::DockPoints d = docks_ ? docks_(f->kind.model) : Economy::DockPoints{}; d.known)
+                x = f->x + d.departure[0], y = f->y + d.departure[1];
+            const auto [px, py] = openSpot(x, y);
             const int id = spawnObject(world_, it->slot, raceOf(it->slot), *t, px, py, {});
             deliver(it->slot, it->type, id);
         }
@@ -590,6 +597,15 @@ void AiSides::factories(double seconds) {
         factoryJobs_.push_back({f.id, f.slot, q->second.front(), factorySeconds(f.type, q->second.front())});
         q->second.pop_front();
     }
+}
+
+std::vector<std::string> AiSides::factoryModels() {
+    std::vector<std::string> out;
+    for (int type : {115, 143, 151, 201})
+        if (const CombatType* t = combatType(type);
+            t && *t->model && std::find(out.begin(), out.end(), t->model) == out.end())
+            out.push_back(t->model);
+    return out;
 }
 
 bool AiSides::order(const std::string& side, const std::string& text) {

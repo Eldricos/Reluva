@@ -56,9 +56,14 @@ public:
     // A load that failed once syncState() had begun reading (its error,
     // a damaged save, bytes left over): the state may be half-read, so the
     // engine puts itself somewhere sound (its menu, the mission from its
-    // start) and returns true, or returns false if it can't, and the menu
-    // then offers only another load, the launcher or quitting.
-    virtual bool loadFailed() { return false; }
+    // start) and returns true, saying in `done` what it did if the error
+    // doesn't already ("The mission starts over."; the menu shows it after
+    // the error), or returns false if it can't, and the menu then offers
+    // only another load, the launcher or quitting.
+    virtual bool loadFailed(std::string& done) {
+        (void)done;
+        return false;
+    }
 };
 
 // Static description of an engine: its name, how to recognise its games,

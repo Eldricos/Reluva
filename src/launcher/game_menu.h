@@ -62,7 +62,9 @@ public:
     EventType loadAtStart(int slot);
 
     // Saves to / loads from a slot; the error says why not. A load that
-    // fails once the engine has begun reading calls its loadFailed().
+    // fails once the engine has begun reading calls its loadFailed(), and
+    // its error then goes on to say what the engine did about it (or that
+    // it couldn't).
     Error save(int slot, const std::string& description);
     Error load(int slot);
 

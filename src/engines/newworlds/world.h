@@ -172,7 +172,8 @@ struct WorldEvent {
     WeaponKind weapon = WeaponKind::None;
     Unit what;
     friend void syncState(save::Serializer& s, WorldEvent& v) {
-        s(v.kind)(v.from)(v.to)(v.fromSlot)(v.toSlot)(v.x0)(v.y0)(v.x1)(v.y1)(v.weapon)(v.what);
+        save::syncEnum(s, v.kind, Moved);
+        s(v.from)(v.to)(v.fromSlot)(v.toSlot)(v.x0)(v.y0)(v.x1)(v.y1)(v.weapon)(v.what);
     }
 };
 
@@ -307,6 +308,7 @@ private:
     std::vector<Unit> units_;
     std::array<std::vector<int>, 10> groups_;
     int nextId_ = 1;
+    static constexpr int kMaxIds = 1 << 22; // a save's most (its index then 16 MB)
 
     // Derived, never saved (made again as needed, and on load):
     // each id's place in units_ (-1 none), for unit()'s lookups;

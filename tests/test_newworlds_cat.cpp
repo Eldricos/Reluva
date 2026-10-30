@@ -3999,6 +3999,115 @@ void testDrawnBetweenTicks() {
     CHECK(v->lastY == y && v->lastHeading == v->heading);
 }
 
+// Power short (exe.md#the-economy): class 1 (vehicle yard, transporter pad,
+// sickbay, shield generator, both turrets) is served whole first, class 2
+// (security center; the Federation's storage facility, the others'
+// processor) shares what's left in proportion, class 3 gets what's left
+// after that. And life support, before them all: the pool credited grant x
+// 16.384 x the hub's efficiency, so the whole request fills it exactly; the
+// power it took read afresh each tick (none once the hub is gone).
+void testPowerClassesAndLifeSupport() {
+    auto run = [](Economy& e, double seconds) {
+        for (double t = 0; t < seconds - 1e-9; t += 0.05)
+            e.advance(0.05);
+    };
+    const Stock rich{5000, 10000, 23000, 5000, 40000, 50000};
+    ColonyMap bare;
+    bare.depositKind = [](int, int) { return 0; };
+    bare.depositAmount = [](int, int) { return 0; };
+    const char* first[] = {"vehicle-yard", "transporter-pad", "sickbay", "shield-generator", "defensive-weapon",
+                           "defensive-artillery"};
+    for (char side : {'F', 'K'}) {
+        Economy e(side, rich, 90, bare);
+        e.addBuilt("colony-hub", 0, 0);
+        // 2200 a tick: after life support's 183, enough for class 1's 1520
+        // and part of class 2's, once the reserve has run dry.
+        for (int i = 0; i < 3; ++i)
+            e.addBuilt("power-generator", 20000.0f * float(i + 1), 0);
+        std::map<std::string, int> ids;
+        float y = 20000;
+        for (const char* t : first)
+            ids[t] = e.addBuilt(t, 0, y += 20000);
+        for (const char* t : {"security-center", "storage-facility", "resource-processor", "science-station"})
+            ids[t] = e.addBuilt(t, 40000, y += 20000);
+        e.addBuilt("science-station", 60000, y);
+        if (side == 'K') // (its processor asks less than a storage facility)
+            e.addBuilt("security-center", 80000, y);
+        run(e, 120);
+        CHECK(e.reserve() < 0.01f && e.demandMet() < 0.9f);
+        auto got = [&](const char* t) { return e.structure(ids[t])->supply; };
+        for (const char* t : first)
+            CHECK(got(t) == 1);
+        const char* second = side == 'F' ? "storage-facility" : "resource-processor";
+        const char* third = side == 'F' ? "resource-processor" : "storage-facility";
+        CHECK(got("security-center") > 0.05f && got("security-center") < 0.95f);
+        CHECK(std::abs(got(second) - got("security-center")) < 0.01f);
+        CHECK(got(third) < 0.05f && got("science-station") < 0.05f);
+    }
+    // Life support: 150 people use 2400 a tick; the hub (0.8, no officer)
+    // asks 2400 / 16.384 / 0.8 = 183.1 and that fills the pool to the top.
+    {
+        Economy e('F', rich, 50, bare);
+        const int hub = e.addBuilt("colony-hub", 0, 0);
+        const int gen = e.addBuilt("power-generator", 20000, 0);
+        run(e, 1);
+        CHECK(std::abs(e.efficiency(*e.structure(hub)) - 0.8f) < 1e-6f);
+        CHECK(std::abs(e.lifeSupportPower() - 2400 / 16.384f / 0.8f) < 0.01f);
+        CHECK(e.lifeSupport() == 1 && e.lifeDemandMet() == 1);
+        // With an officer (1.2) it asks less, and still fills it.
+        e.setOfficer(hub, 1);
+        run(e, 1);
+        CHECK(std::abs(e.lifeSupportPower() - 2400 / 16.384f / 1.2f) < 0.01f && e.lifeSupport() == 1);
+        // The hub gone: nothing drawn, and nothing of it in the
+        // generator's consumption.
+        e.remove(hub);
+        run(e, 0.05);
+        CHECK(e.lifeSupportPower() == 0 && e.consumption() == 0 && e.structure(gen));
+    }
+}
+
+// A native factory's unit rolls out where its dock leaves it: F1's Taubat,
+// their vehicles gone, ask their hangars (tw.geo: DEPARTURE 5617 out
+// along -y) for their patrols' units.
+void testFactoryRollOut() {
+    CHECK(AiSides::factoryModels() == (std::vector<std::string>{"geo/bad/tw.geo", "geo/bad/mport.geo"}));
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    World w(t);
+    AiSides ai("F1", 0, w);
+    std::vector<std::string> asked;
+    ai.setDocks([&](const std::string& model) {
+        asked.push_back(model);
+        Economy::DockPoints d;
+        d.known = model == "geo/bad/tw.geo";
+        d.departure = {70, -5617, 2002};
+        return d;
+    });
+    ai.start();
+    std::vector<int> gone;
+    std::vector<std::pair<float, float>> hangars;
+    for (const Unit& u : w.units())
+        if (u.slot == 3 && !u.building)
+            gone.push_back(u.id);
+        else if (u.slot == 3 && u.type == 115)
+            hangars.push_back({u.x, u.y});
+    for (int id : gone)
+        w.remove(id);
+    CHECK(!hangars.empty());
+    int made = 0, atDock = 0;
+    for (int i = 0; i < 600 && !made; ++i) {
+        ai.advance(0.05);
+        for (const Unit& u : w.units())
+            if (u.slot == 3 && !u.building) {
+                ++made;
+                for (const auto& [hx, hy] : hangars)
+                    atDock += std::hypot(u.x - (hx + 70), u.y - (hy - 5617)) < 1;
+            }
+    }
+    CHECK(made > 0 && atDock == made && !asked.empty() && asked[0] == "geo/bad/tw.geo");
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -4060,6 +4169,8 @@ int main() {
     testLookupsAndCaches();
     testWorldPathCaches();
     testDrawnBetweenTicks();
+    testPowerClassesAndLifeSupport();
+    testFactoryRollOut();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

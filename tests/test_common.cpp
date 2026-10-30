@@ -396,6 +396,11 @@ static void testSavestate(const std::filesystem::path& tmp) {
     save::Header back;
     std::vector<uint8_t> state;
     CHECK(save::readFile(save::slotPath(dir, 1), back, state).ok && state == out.bytes() && back.stateVersion == 3);
+    // Bytes appended after the check: refused.
+    std::filesystem::copy_file(save::slotPath(dir, 1), save::slotPath(dir, 6));
+    std::ofstream(save::slotPath(dir, 6), std::ios::binary | std::ios::app) << "xx";
+    CHECK(!save::readFile(save::slotPath(dir, 6), back, state).ok);
+    std::filesystem::remove(save::slotPath(dir, 6));
     {
         std::fstream f(save::slotPath(dir, 1), std::ios::in | std::ios::out | std::ios::binary);
         f.seekp(-6, std::ios::end);

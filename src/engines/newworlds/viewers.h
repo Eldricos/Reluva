@@ -667,8 +667,9 @@ public:
     std::string stateDescription() const;
     Error syncState(save::Serializer& s);
     // The mission being played from its start again (a load that failed
-    // after it began putting the play back); nothing if none is.
-    void restartPlay();
+    // after it began putting the play back); false, doing nothing, if none
+    // is.
+    bool restartPlay();
     // A race's campaign just won (its last mission's report closed): the
     // side, once ('F', 'K', 'R'; 0 none), for its movie.
     char takeCampaignWon() {
@@ -676,6 +677,14 @@ public:
         campaignWon_ = 0;
         return s;
     }
+    // For the page's regression test (tests/test_newworlds_page.cpp): the
+    // missions in the page's order, the one shown, play's pause and quit
+    // box, and its random picks (the units' voices) seeded.
+    const Level& mission(size_t i) const { return missions_[i]; }
+    int shown() const { return current_; }
+    bool paused() const { return play_.paused; }
+    bool quitAsked() const { return play_.quitAsked; }
+    void seed(uint32_t s) { rng_.seed(s); }
 
 private:
     char campaignWon_ = 0;

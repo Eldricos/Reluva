@@ -259,10 +259,11 @@ public:
     }
     // A load the menu found wrong after the mission took it (bytes left
     // over): the mission starts over. One that failed in syncState() has
-    // already put the page right (the mission restarted, or none played).
-    bool loadFailed() override {
-        if (missions_ && !syncFailed_)
-            missions_->restartPlay();
+    // already put the page right (the mission restarted, or none played)
+    // and said so.
+    bool loadFailed(std::string& done) override {
+        if (missions_ && !syncFailed_ && missions_->restartPlay())
+            done = "The mission starts over.";
         syncFailed_ = false;
         return true;
     }

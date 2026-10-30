@@ -61,7 +61,8 @@ public:
     // each model's bounds radius, read from the archives; 0.9 of it for a
     // vehicle (half for types 117, 261, 264), times its type's scale for a
     // building. Without this, fixed sizes. All of it is read here (the
-    // docks too), so the archives needn't outlive the sim.
+    // docks too, the colony's buildings' and the natives' factories'), so
+    // the archives needn't outlive the sim.
     void useModels(const Archives& archives);
 
     // Moves time on in the game's fixed ticks of 50 ms (world, AI,

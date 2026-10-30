@@ -69,9 +69,11 @@ Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
     // Bounds: u32 last face's part, u32 ?, u32 part count, u32 attachment
     // count, then centre x, y and radius.
     if (!r.has(p, 28) || r.u32(p) != out.faces.back().part || r.u32(p + 8) != partCount)
-        return Error::fail("no bounds block after the faces at " + hex(p) + " (" + std::to_string(r.u32(p)) +
-                           ", " + std::to_string(r.u32(p + 4)) + ", " + std::to_string(r.u32(p + 8)) + ", " +
-                           std::to_string(r.u32(p + 12)) + "; " + std::to_string(partCount) + " parts)");
+        return Error::fail("no bounds block after the faces at " + hex(p) + " (" +
+                           std::to_string(bytes::u32Or0(r.d, p)) + ", " + std::to_string(bytes::u32Or0(r.d, p + 4)) +
+                           ", " + std::to_string(bytes::u32Or0(r.d, p + 8)) + ", " +
+                           std::to_string(bytes::u32Or0(r.d, p + 12)) + "; " + std::to_string(partCount) +
+                           " parts)"); // (what there is of it: the file may end inside it)
     out.centreX = r.f32(p + 16);
     out.centreY = r.f32(p + 20);
     out.radius = r.f32(p + 24);

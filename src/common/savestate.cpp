@@ -189,6 +189,10 @@ Error readFile(const std::filesystem::path& file, Header& header, std::vector<ui
     state.resize(size);
     if (!in.read(reinterpret_cast<char*>(state.data()), size) || !getU32(in, crc) || crc != crc32(state))
         return Error::fail("a damaged savestate (its check doesn't match)");
+    // Nothing may follow the check: bytes after it mean the file isn't
+    // the one that was written.
+    if (in.peek() != std::char_traits<char>::eof())
+        return Error::fail("a damaged savestate (it goes on past its end)");
     return Error::success();
 }
 

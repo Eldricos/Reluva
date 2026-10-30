@@ -35,6 +35,8 @@ bool parseLine(std::string_view line, Level& out) {
         if (!std::isdigit(static_cast<unsigned char>(c)))
             return false;
         n = n * 10 + (c - '0');
+        if (n > 999) // (no mission has more than 6)
+            return false;
     }
     out = Level{std::string(name), n, std::string(trim(line.substr(b + 1))), false};
     return true;

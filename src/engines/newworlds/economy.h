@@ -375,7 +375,9 @@ public:
         int slot = -1;            // its place there (-1 none)
         bool inbound = false;     // aboard a worker bee taking it in to its building
         friend void syncState(save::Serializer& s, Pod& v) {
-            s(v.id)(v.load)(v.refined)(v.origin)(v.dest)(v.state)(v.x)(v.y)(v.pad)(v.slot)(v.inbound);
+            s(v.id)(v.load)(v.refined)(v.origin)(v.dest);
+            save::syncEnum(s, v.state, Aboard);
+            s(v.x)(v.y)(v.pad)(v.slot)(v.inbound);
         }
     };
     const std::vector<Pod>& pods() const { return pods_; }

@@ -781,7 +781,7 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
     else if (hasMap_)
         t += "; no colony site known";
     if (playing_ && world_)
-        t += "; playing: " + std::to_string(world_->selection().size()) + " selected (F3 or Escape: stop)";
+        t += "; playing: " + std::to_string(world_->selection().size()) + " selected (F1-F3: cameras, Escape: leave)";
     if (playing_ && economy_)
         t += "; power " + std::to_string(int(economy_->powerSupply())) + "/" +
              std::to_string(int(economy_->powerDemand())) + " (B: build)";
@@ -1028,13 +1028,14 @@ Error MissionViewer::syncState(save::Serializer& s) {
     return Error::success();
 }
 
-void MissionViewer::restartPlay() {
+bool MissionViewer::restartPlay() {
     if (!playing_)
-        return;
+        return false;
     stopPlay();
     startPlay();
     flowWon_ = false;
     dirty_ = true;
+    return playing_;
 }
 
 } // namespace reluva::newworlds

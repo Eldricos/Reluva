@@ -718,9 +718,8 @@ void MissionSim::useModels(const Archives& archives) {
     // may go before it does (the callbacks below own what they use).
     // Each building's dock (exe.md#docking): its model's dock points, by
     // the .mdl's names for the .geo's attachments.
-    auto dockOf = [&archives, side = side_](const std::string& type) {
+    auto dockAt = [&archives](const std::string& geoName) {
         Economy::DockPoints d;
-        const std::string geoName = buildingModel(type, side);
         if (geoName.rfind("geo/", 0) != 0)
             return d;
         const std::string mdlName = "mdl/" + geoName.substr(4, geoName.size() - 8) + ".mdl";
@@ -753,6 +752,7 @@ void MissionSim::useModels(const Archives& archives) {
         d.vertical = d.known && std::abs(dz) >= std::cos(10 * 3.14159265f / 180) * std::hypot(std::hypot(dx, dy), dz);
         return d;
     };
+    auto dockOf = [&dockAt, side = side_](const std::string& type) { return dockAt(buildingModel(type, side)); };
     auto docks = std::make_shared<std::map<std::string, Economy::DockPoints>>();
     for (const BuildingType& b : buildingTypes())
         (*docks)[b.id] = dockOf(b.id);
@@ -762,6 +762,14 @@ void MissionSim::useModels(const Archives& archives) {
     economy_->setDocks([docks](const std::string& type) {
         const auto it = docks->find(type);
         return it == docks->end() ? Economy::DockPoints{} : it->second;
+    });
+    // The natives' factories', by model.
+    auto factoryDocks = std::make_shared<std::map<std::string, Economy::DockPoints>>();
+    for (const std::string& model : AiSides::factoryModels())
+        (*factoryDocks)[model] = dockAt(model);
+    ai_->setDocks([factoryDocks](const std::string& model) {
+        const auto it = factoryDocks->find(model);
+        return it == factoryDocks->end() ? Economy::DockPoints{} : it->second;
     });
     // Each model's bounds radius, by name, from the first archive that
     // has it.

@@ -140,9 +140,13 @@ public:
 private:
     struct ScanOrder {
         int target;
-        Kind kind;
+        Kind kind = Science;
         int ticks = 0; // in range, scanning, in a row
-        friend void syncState(save::Serializer& s, ScanOrder& v) { s(v.target)(v.kind)(v.ticks); }
+        friend void syncState(save::Serializer& s, ScanOrder& v) {
+            s(v.target);
+            save::syncEnum(s, v.kind, Engineering);
+            s(v.ticks);
+        }
     };
     struct CaptureOrder {
         int target;

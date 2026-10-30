@@ -10,14 +10,6 @@
 
 namespace reluva::newworlds {
 
-namespace {
-
-// How long a hit object stays among Space's alerts (Reluva's: the game's 41
-// Tricorder redraws).
-constexpr int kAlertTicks = 41;
-
-} // namespace
-
 void MissionViewer::selectUnits(const std::vector<int>& ids) {
     world_->select(ids);
     play_.selectedBuilding = play_.razeAsked = play_.cancelAsked = play_.cancelFrom = 0;

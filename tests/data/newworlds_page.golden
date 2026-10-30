@@ -1,0 +1,41 @@
+# The New Worlds missions page's run (tests/test_newworlds_page.cpp): each point's name,
+# frame and hash of every frame so far. Rewrite with reluva_newworlds_page_tests --update.
+page 3 040dc5bf54d33e5e
+page-interface 15 72bbafdce55b47e5
+pages 117 ab7681222af3497e
+F1-briefing 160 43b708efcb670913
+F1-script 206 5684cfafdb196661
+F1-play 209 60fa2f634a1321bf
+F1-panels 241 b060d3cf114abc0a
+F1-tricorder 245 14405c2878c20824
+F1-mid 361 8317fbe40c515bce
+F1-end 00 467 c1e86a35c34e5c59
+K2-briefing 514 f76c69d132a37940
+K2-script 560 56f51fbc8a5b86b9
+K2-play 625 5ed0d2c713ca0653
+K2-panels 657 b19ab19b841f7c6d
+K2-tricorder 661 4f9613f3f8dc3d17
+K2-mid 803 d6a9d1ff7525397a
+K2-end 00 918 0a7800fb7e8a8087
+R8-briefing 972 17571e7aeb5e03b5
+R8-script 1018 2a9aa7e93b5edb10
+R8-play 1021 e99accb892f37889
+R8-panels 1053 f4de7dab2b9cd8a5
+R8-tricorder 1057 5593d8c3ebd3667c
+R8-mid 1167 03799ec6e0fbab2e
+R8-end 00 1286 90543152822ebf74
+J1-briefing 1363 f4f4b0aa14547ee8
+J1-script 1409 5398fb4c7b45a2bf
+J1-play 1474 c3ca281bac1e77e1
+J1-panels 1506 1b2aa861cd5402ae
+J1-tricorder 1510 480551ba5ad85490
+J1-mid 1633 5fe1dbf1dd4ab864
+J1-end 00 1742 29083b728fc23af9
+C4-briefing 1810 a59a8887b816795f
+C4-script 1856 7bfc4ebdd5ab51e6
+C4-play 1859 2824634958f35a22
+C4-panels 1891 284fb3edeb745ce4
+C4-tricorder 1895 3747fd6a6f1c0185
+C4-mid 2027 c3d9264f4b32eb41
+C4-end 00 2140 4e601d6d375569e3
+done 2141 fc2d3971c6195614

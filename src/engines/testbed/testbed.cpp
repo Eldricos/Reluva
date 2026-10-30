@@ -126,10 +126,11 @@ public:
         return Error::success();
     }
     // A load gone wrong: the testbed as it starts.
-    bool loadFailed() override {
+    bool loadFailed(std::string& done) override {
         start_ = sys_.getMillis();
         toneOn_ = false;
         mouseX_ = kWidth / 2, mouseY_ = kHeight / 2;
+        done = "The testbed starts over.";
         return true;
     }
 

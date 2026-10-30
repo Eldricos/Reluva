@@ -163,8 +163,9 @@ Error GameMenu::load(int slot) {
         return Error::fail(why);
     save::Header h;
     std::vector<uint8_t> bytes;
+    // (The file's errors read "a damaged savestate".)
     if (Error e = save::readFile(save::slotPath(saveFolder(root_, target_.target), slot), h, bytes))
-        return e;
+        return Error::fail("Can't load it: " + e.message + ". Nothing was loaded.");
     if (h.engineId != target_.engineId || h.gameId != target_.gameId)
         return Error::fail("This save is from another game (" + h.gameId + ").");
     if (h.stateVersion != engine_->stateVersion())
@@ -178,7 +179,16 @@ Error GameMenu::load(int slot) {
         e = Error::fail("The save has more in it than this version reads.");
     // Past this point the game holds what was read: on a failure it must
     // put itself right, or it can't be played or saved until a load works.
-    broken_ = !e.ok && !engine_->loadFailed();
+    // The message then says which.
+    broken_ = false;
+    if (!e.ok) {
+        std::string done;
+        broken_ = !engine_->loadFailed(done);
+        if (broken_)
+            done = kBroken;
+        if (!done.empty())
+            e.message += (e.message.empty() || e.message.back() == '.' ? " " : ". ") + done;
+    }
     return e;
 }
 

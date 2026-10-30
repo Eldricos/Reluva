@@ -18,8 +18,9 @@ game's behaviour.
   description and date. **Load** (or a double click) puts the game back as
   it was and closes the menu. A save that turns out damaged part way
   through leaves the game somewhere sound (New Worlds starts the mission
-  over); if the game can't manage that, Resume and Save stay greyed out
-  until another save loads.
+  over), and the menu's message says so after what was wrong; if the game
+  can't manage that, the message says that instead, and Resume and Save
+  stay greyed out until another save loads.
 - The launcher's **Load...** button lists the selected game's saves and
   starts the game from one. `reluva <target> --load <slot>` does the same
   from the command line.
@@ -70,9 +71,11 @@ An engine opts in through five virtual functions in `Engine`
   reading: its own error, the serializer not `ok()` after it, or bytes
   left over (`!atEnd()`). The state may be half-read; the engine puts
   itself somewhere sound (its menu, the mission from its start) and
-  returns true. False (the default) says it can't: the menu then won't
-  resume or save until a load succeeds, offering only Load, Return to
-  Launcher and Quit.
+  returns true, setting `done` to what it did ("The mission starts
+  over.") unless its own error already said; the menu shows that after
+  the error. False (the default) says it can't: the menu then says so,
+  and won't resume or save until a load succeeds, offering only Load,
+  Return to Launcher and Quit.
 
 `save::Serializer` (`src/common/savestate.h`) handles numbers, enums,
 strings and the standard containers (vector, deque, array, map,
@@ -107,9 +110,10 @@ effects, the mission script's state, and the missions page's messages,
 camera and Cadet mode. Its random numbers are seeded counters, saved with
 the rest, so a mission loaded carries on exactly as it would have. A load
 that fails once the mission has started (a damaged save, bytes left over)
-starts that mission over from its beginning, as whom it was saved; one
-that fails before (a mission or map the game doesn't have) leaves the
-game as it was, or the missions page with nothing playing.
+starts that mission over from its beginning, as whom it was saved, and
+the menu's message ends "The mission starts over."; one that fails before
+(a mission or map the game doesn't have) leaves the game as it was, or the
+missions page with nothing playing.
 
 Two checks keep that true as the code changes:
 
