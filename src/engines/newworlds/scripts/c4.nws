@@ -1,0 +1,56 @@
+# --- C4 as F ----------------------------------------
+# C4 "Building" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
+# game's own graph (S/ghidra/scripts_out/C4.json). All lines come from Command, without
+# voice clips. Upgrades by Reluva's names: construction-yard-upgrade / -advanced are the
+# improved and advanced yard (types 161, 162); the resource processor's plants, one a
+# material (the game's types 166 and 167 by turns: its monitors count three of each).
+mission C4 F
+site colony 88 415
+objective 25
+
+# --- Opening instructions ---
+on start
+  timer intro-1 2
+  timer intro-2 15
+on timer intro-1
+  say command "To check your objectives, press Mission on this window to open Command."
+on timer intro-2
+  say command "Choose the construction yard in the Build menu on the right, or press B. Put the hologram down beside the hub and click when it goes green."
+
+# --- Construction yard, then the resource processor ---
+on built construction-yard
+  say command "With the construction yard working, the Build menu offers more buildings. Put a resource processor next to the storage facility."
+on built resource-processor
+  say command "Select the resource processor, go to the next page of the menu with the arrow, and order every upgrade it offers."
+
+# --- The first two plants, then hub and yard upgrades open the rest ---
+on built-all dilithium-plant polycomp-plant
+  say command "Upgrade the colony hub the same way, and when that's done, the construction yard too."
+on built construction-yard-upgrade
+  say command "The resource processor has two new upgrades. The last two need a second upgrade of both the hub and the yard."
+on built construction-yard-advanced
+  say command "The resource processor's last two upgrades can now be built. Build them both to finish this tutorial."
+
+# --- All six plants: the objective ---
+on built-all dilithium-plant polycomp-plant thermoconc-plant transalumin-plant nitrium-plant duranium-plant
+  say command "Your resource processor has every upgrade now. Keep in mind that new buildings and upgrades appear only as you improve your hub and your construction yard."
+  complete 25
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "Tutorial 1 is complete. Stand by while tutorial 2 loads."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 26 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The plant counts are exact (the game fires when exactly 1, then exactly 3, of each
+#   plant type stand); built-all means "at least".

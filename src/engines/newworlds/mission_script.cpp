@@ -117,10 +117,104 @@ std::string badEvent(const ScriptEvent& e) {
     return {};
 }
 
+// The actions a handler can take: what each does when it runs (the kind
+// of thing, as MissionRun::run carries it out), and the arguments it
+// takes (fits: whether they're right, given the script; usage: how they
+// should be).
+enum class Op {
+    Say, Complete, Reveal, Win, Lose, Timer, Research, Stop, Switch, Fail, Signal, Random, Stance, Ai, Stock, Effect
+};
+using Args = std::vector<std::string>;
+struct Verb {
+    const char* verb;
+    Op op;
+    bool (*fits)(const Args& a, const MissionScript& m);
+    const char* usage;
+};
+bool isInt(const std::string& s) {
+    int n;
+    return toInt(s, n);
+}
+bool one(const Args& a, const MissionScript&) { return a.size() == 1; }
+bool objectiveId(const Args& a, const MissionScript&) { return a.size() == 1 && isInt(a[0]); }
+bool none(const Args& a, const MissionScript&) { return a.empty(); }
+bool stock(const Args& a, const MissionScript&) { return a.size() == 2 && isInt(a[1]); }
+bool zone(const Args& a, const MissionScript& m) { return !a.empty() && m.zones.count(a[0]); }
+constexpr Verb kVerbs[] = {
+    {"say", Op::Say, [](const Args& a, const MissionScript&) { return a.size() == 2 || a.size() == 3; },
+     "say <sender> \"text\" [clip]"},
+    {"complete", Op::Complete, objectiveId, "complete <objective id>"},
+    {"reveal", Op::Reveal, objectiveId, "reveal <objective id>"},
+    {"win", Op::Win, [](const Args&, const MissionScript&) { return true; }, "win"},
+    {"lose", Op::Lose, objectiveId, "lose <objective id>"},
+    {"timer", Op::Timer, [](const Args& a, const MissionScript&) { return a.size() == 2 && isInt(a[1]); },
+     "timer <name> <seconds>"},
+    {"research", Op::Research, one, "research <name>"},
+    {"stop", Op::Stop, one, "stop <name>"},
+    {"arm", Op::Switch, one, "arm <label>"},
+    {"disarm", Op::Switch, one, "disarm <label>"},
+    {"fail", Op::Fail,
+     [](const Args& a, const MissionScript&) {
+         return !a.empty() && a.size() <= 2 && isInt(a[0]) && (a.size() == 1 || isInt(a[1]));
+     },
+     "fail <objective id> [seconds]"},
+    {"signal", Op::Signal, one, "signal <name>"},
+    {"random", Op::Random, [](const Args& a, const MissionScript&) { return !a.empty(); }, "random <signal>..."},
+    {"hostile", Op::Stance, one, "hostile <side>"},
+    {"neutral", Op::Stance, one, "neutral <side>"},
+    {"allied", Op::Stance, one, "allied <side>"},
+    {"ai", Op::Ai, [](const Args& a, const MissionScript&) { return a.size() >= 2; }, "ai <side> <order>"},
+    {"give", Op::Stock, stock, "give <material> <amount>"},
+    {"take", Op::Stock, stock, "take <material> <amount>"},
+    {"top-up", Op::Effect,
+     [](const Args& a, const MissionScript&) {
+         return (a.size() == 1 && a[0] == "off") || (!a.empty() && a.size() % 2 == 0);
+     },
+     "top-up <material> <amount>... | top-up off"},
+    {"damage", Op::Effect,
+     [](const Args& a, const MissionScript&) {
+         return a.size() >= 2 && a.size() <= 3 && (a[1] == "all" || isInt(a[1]));
+     },
+     "damage <group> <percent>|all [<side>]"},
+    {"beam-up", Op::Effect, one, "beam-up <group>"},
+    {"spawn", Op::Effect,
+     [](const Args& a, const MissionScript&) {
+         return a.size() >= 5 && a.size() <= 6 && isInt(a[2]) && isInt(a[3]) && isInt(a[4]);
+     },
+     "spawn <side> <type> <count> <a> <b> [<group>]"},
+    {"move", Op::Effect,
+     [](const Args& a, const MissionScript&) {
+         const bool loop = !a.empty() && a.back() == "loop";
+         return a.size() >= 3 && (a.size() - 1 - (loop ? 1 : 0)) % 2 == 0;
+     },
+     "move <group> <a> <b>... [loop]"},
+    {"meteors", Op::Effect,
+     [](const Args& a, const MissionScript& m) {
+         char* end = nullptr;
+         return zone(a, m) && a.size() == 2 && (a[1] == "off" || (std::strtod(a[1].c_str(), &end) > 0 && !*end));
+     },
+     "meteors <zone> <seconds>|off"},
+    {"storm", Op::Effect, zone, "storm <zone>"},
+    {"infect", Op::Effect, none, "infect"},
+    {"cure", Op::Effect, none, "cure"},
+};
+
+const Verb* findVerb(const std::string& verb) {
+    for (const Verb& v : kVerbs)
+        if (verb == v.verb)
+            return &v;
+    return nullptr;
+}
+
 } // namespace
 
-Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out) {
+Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out, std::string_view file) {
     out.clear();
+    // "scripts/c4.nws:23: why"
+    const std::string where = file.empty() ? std::string("mission script") : std::string(file);
+    auto at = [&](int line, const std::string& why) {
+        return Error::fail(where + ":" + std::to_string(line) + ": " + why);
+    };
     int lineNo = 0;
     std::vector<std::string> t;
     while (!text.empty()) {
@@ -128,9 +222,7 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
         const size_t nl = text.find('\n');
         const std::string_view line = text.substr(0, nl);
         text = nl == std::string_view::npos ? std::string_view() : text.substr(nl + 1);
-        auto fail = [&](const std::string& why) {
-            return Error::fail("mission script line " + std::to_string(lineNo) + ": " + why);
-        };
+        auto fail = [&](const std::string& why) { return at(lineNo, why); };
         if (!tokenize(line, t))
             return fail("unterminated string");
         if (t.empty())
@@ -142,6 +234,7 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
             out.push_back({});
             out.back().mission = t[1];
             out.back().side = char(std::toupper(static_cast<unsigned char>(t[2][0])));
+            out.back().file = file;
             continue;
         }
         if (out.empty())
@@ -150,7 +243,7 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
         if (indented) {
             if (m.handlers.empty())
                 return fail("an action outside an on/every block");
-            m.handlers.back().actions.push_back({t[0], {t.begin() + 1, t.end()}});
+            m.handlers.back().actions.push_back({t[0], {t.begin() + 1, t.end()}, lineNo});
             continue;
         }
         if (t[0] == "site") {
@@ -197,7 +290,7 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
                 if (t.size() < 3 || !toInt(t[1], id))
                     return fail("expected: " + t[0] + " <string id> <event>...");
                 h.event = {t[2], {t.begin() + 3, t.end()}};
-                h.actions.push_back({t[0], {t[1]}});
+                h.actions.push_back({t[0], {t[1]}, lineNo});
             } else {
                 if (t.size() < 2)
                     return fail("expected an event");
@@ -215,73 +308,14 @@ Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out
     for (const MissionScript& m : out)
         for (const MissionScript::Handler& h : m.handlers)
             for (const MissionScript::Action& a : h.actions) {
-                const auto bad = [&](const std::string& why) {
-                    return Error::fail("mission " + m.mission + " line " + std::to_string(h.line) + ": " + why);
-                };
-                int n;
-                if (a.verb == "say") {
-                    if (a.args.size() != 2 && a.args.size() != 3)
-                        return bad("expected: say <sender> \"text\" [clip]");
-                } else if (a.verb == "complete" || a.verb == "reveal" || a.verb == "lose") {
-                    if (a.args.size() != 1 || !toInt(a.args[0], n))
-                        return bad("expected: " + a.verb + " <objective id>");
-                } else if (a.verb == "timer") {
-                    if (a.args.size() != 2 || !toInt(a.args[1], n))
-                        return bad("expected: timer <name> <seconds>");
-                } else if (a.verb == "fail") {
-                    if (a.args.empty() || a.args.size() > 2 || !toInt(a.args[0], n) ||
-                        (a.args.size() == 2 && !toInt(a.args[1], n)))
-                        return bad("expected: fail <objective id> [seconds]");
-                } else if (a.verb == "arm" || a.verb == "disarm") {
-                    if (a.args.size() != 1)
-                        return bad("expected: " + a.verb + " <label>");
-                    if (std::none_of(m.handlers.begin(), m.handlers.end(),
-                                     [&](const MissionScript::Handler& o) { return o.label == a.args[0]; }))
-                        return bad("no handler labelled " + a.args[0]);
-                } else if (a.verb == "research" || a.verb == "stop" || a.verb == "signal") {
-                    if (a.args.size() != 1)
-                        return bad("expected: " + a.verb + " <name>");
-                } else if (a.verb == "random") {
-                    if (a.args.empty())
-                        return bad("expected: random <signal>...");
-                } else if (a.verb == "hostile" || a.verb == "neutral" || a.verb == "allied") {
-                    if (a.args.size() != 1)
-                        return bad("expected: " + a.verb + " <side>");
-                } else if (a.verb == "ai") {
-                    if (a.args.size() < 2)
-                        return bad("expected: ai <side> <order>");
-                } else if (a.verb == "give" || a.verb == "take") {
-                    if (a.args.size() != 2 || !toInt(a.args[1], n))
-                        return bad("expected: " + a.verb + " <material> <amount>");
-                } else if (a.verb == "top-up") {
-                    if (!(a.args.size() == 1 && a.args[0] == "off") && (a.args.empty() || a.args.size() % 2 != 0))
-                        return bad("expected: top-up <material> <amount>... | top-up off");
-                } else if (a.verb == "damage") {
-                    if (a.args.size() < 2 || a.args.size() > 3 || (a.args[1] != "all" && !toInt(a.args[1], n)))
-                        return bad("expected: damage <group> <percent>|all [<side>]");
-                } else if (a.verb == "beam-up") {
-                    if (a.args.size() != 1)
-                        return bad("expected: beam-up <group>");
-                } else if (a.verb == "spawn") {
-                    if (a.args.size() < 5 || a.args.size() > 6 || !toInt(a.args[2], n) || !toInt(a.args[3], n) ||
-                        !toInt(a.args[4], n))
-                        return bad("expected: spawn <side> <type> <count> <a> <b> [<group>]");
-                } else if (a.verb == "move") {
-                    const bool loop = !a.args.empty() && a.args.back() == "loop";
-                    if (a.args.size() < 3 || (a.args.size() - 1 - (loop ? 1 : 0)) % 2 != 0)
-                        return bad("expected: move <group> <a> <b>... [loop]");
-                } else if (a.verb == "meteors" || a.verb == "storm") {
-                    char* end = nullptr;
-                    if (a.args.empty() || !m.zones.count(a.args[0]) ||
-                        (a.verb == "meteors" && (a.args.size() != 2 ||
-                                                 (a.args[1] != "off" && (std::strtod(a.args[1].c_str(), &end) <= 0 || *end)))))
-                        return bad("expected: " + a.verb + " <zone>" + (a.verb == "meteors" ? " <seconds>|off" : ""));
-                } else if (a.verb == "infect" || a.verb == "cure") {
-                    if (!a.args.empty())
-                        return bad("expected: " + a.verb);
-                } else if (a.verb != "win") {
-                    return bad("unknown action " + a.verb);
-                }
+                const Verb* v = findVerb(a.verb);
+                if (!v)
+                    return at(a.line, "unknown action " + a.verb);
+                if (!v->fits(a.args, m))
+                    return at(a.line, std::string("expected: ") + v->usage);
+                const auto labelled = [&](const MissionScript::Handler& o) { return o.label == a.args[0]; };
+                if (v->op == Op::Switch && std::none_of(m.handlers.begin(), m.handlers.end(), labelled))
+                    return at(a.line, "no handler labelled " + a.args[0]);
             }
     return Error::success();
 }
@@ -453,36 +487,51 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
     for (const MissionScript::Action& a : h.actions) {
         if (finished())
             break;
-        if (a.verb == "say") {
+        const Verb* v = findVerb(a.verb);
+        if (!v)
+            continue;
+        switch (v->op) {
+        case Op::Say: {
             const char* section = sectionName(a.args[0]);
             out.push_back({Output::Message, section ? section : a.args[0], expand(a.args[1], ev), 0,
                            a.args.size() > 2 ? a.args[2] : std::string()});
-        } else if (a.verb == "complete") {
+            break;
+        }
+        case Op::Complete: {
             const uint32_t id = uint32_t(std::atoi(a.args[0].c_str()));
             if (completed_.insert(id).second) {
                 revealed_.insert(id);
                 out.push_back({Output::Completed, {}, {}, id, {}});
                 follow.push_back({"completed", {a.args[0]}});
             }
-        } else if (a.verb == "reveal") {
+            break;
+        }
+        case Op::Reveal: {
             const uint32_t id = uint32_t(std::atoi(a.args[0].c_str()));
             if (revealed_.insert(id).second)
                 out.push_back({Output::Revealed, {}, {}, id, {}});
-        } else if (a.verb == "win") {
+            break;
+        }
+        case Op::Win:
             won_ = true;
             out.push_back({Output::Won, {}, {}, 0, {}});
-        } else if (a.verb == "lose") {
+            break;
+        case Op::Lose:
             lost_ = true;
             failId_ = uint32_t(std::atoi(a.args[0].c_str()));
             out.push_back({Output::Lost, {}, {}, failId_, {}});
-        } else if (a.verb == "timer") {
+            break;
+        case Op::Timer:
             timers_[a.args[0]] = std::atof(a.args[1].c_str()) * kScriptSecond;
-        } else if (a.verb == "research") {
+            break;
+        case Op::Research:
             out.push_back({Output::Research, {}, a.args[0], 0, {}});
             follow.push_back({"research-available", {a.args[0]}});
-        } else if (a.verb == "stop") {
+            break;
+        case Op::Stop:
             timers_.erase(a.args[0]);
-        } else if (a.verb == "arm" || a.verb == "disarm") {
+            break;
+        case Op::Switch:
             for (Rule& r : rules_)
                 if (r.handler->label == a.args[0]) {
                     const bool was = r.armed;
@@ -492,7 +541,8 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
                     if (r.armed && !was)
                         armedNow.push_back(&r);
                 }
-        } else if (a.verb == "fail") {
+            break;
+        case Op::Fail:
             // Failing: lost when the delay runs out (the game says why, then
             // that the mission has failed, then ends it).
             if (!failing_) {
@@ -501,27 +551,34 @@ void MissionRun::run(const MissionScript::Handler& h, const ScriptEvent& ev, std
                 timers_[kFailTimer] = (a.args.size() > 1 ? std::atof(a.args[1].c_str()) : 20.0) * kScriptSecond;
                 out.push_back({Output::Failing, {}, {}, failId_, {}});
             }
-        } else if (a.verb == "signal") {
+            break;
+        case Op::Signal:
             follow.push_back({"signal", {a.args[0]}});
-        } else if (a.verb == "random") {
+            break;
+        case Op::Random:
             random_ = random_ * 1664525u + 1013904223u;
             follow.push_back({"signal", {a.args[(random_ >> 16) % a.args.size()]}});
-        } else if (a.verb == "hostile" || a.verb == "neutral" || a.verb == "allied") {
+            break;
+        case Op::Stance:
             out.push_back({Output::Stance, a.args[0], a.verb, 0, {}});
-        } else if (a.verb == "ai") {
+            break;
+        case Op::Ai: {
             std::string order;
             for (size_t i = 1; i < a.args.size(); ++i)
                 order += (i > 1 ? " " : "") + a.args[i];
             out.push_back({Output::Ai, a.args[0], order, 0, {}});
-        } else if (a.verb == "give" || a.verb == "take") {
+            break;
+        }
+        case Op::Stock:
             out.push_back({Output::Stock, a.verb, a.args[0] + " " + a.args[1], 0, {}});
-        } else if (a.verb == "top-up" || a.verb == "damage" || a.verb == "beam-up" || a.verb == "spawn" ||
-                   a.verb == "move" || a.verb == "meteors" || a.verb == "storm" || a.verb == "infect" ||
-                   a.verb == "cure") {
+            break;
+        case Op::Effect: {
             std::string text;
             for (size_t i = 0; i < a.args.size(); ++i)
                 text += (i ? " " : "") + a.args[i];
             out.push_back({Output::Effect, a.verb, text, 0, {}});
+            break;
+        }
         }
     }
     for (const ScriptEvent& f : follow) {

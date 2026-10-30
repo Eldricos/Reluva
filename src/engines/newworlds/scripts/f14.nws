@@ -1,0 +1,95 @@
+# --- F14 as F ----------------------------------------
+# F14 as the Federation, rewritten from the game's own graph (STNW.exe dump F14.json, slot 0,
+# with the Taubat (3) and Metar (5) objects that act on the Federation).
+mission F14 F
+site metar-core 386 285
+objective 13
+objective 15
+
+# --- Taubat raids from 30 s, every 30 s; Metar raids from 120 s, every 100 s (one of eight at
+# --- random each); set Metar assaults at 60, 180 and 300 s, and on the device at 360 s ---------
+on start
+  timer tau-raids 30
+  timer met-raids 120
+  timer met-assault-1 60
+  timer met-assault-2 180
+  timer met-assault-3 300
+  timer met-cfd-attack 360
+every timer tau-raids
+  random tau-raid-1 tau-raid-2 tau-raid-3 tau-raid-4 tau-raid-5 tau-raid-6 tau-raid-7 tau-raid-8
+  timer tau-raids 30
+every signal tau-raid-1
+  ai taubat tau-assault-fed-random1
+every signal tau-raid-2
+  ai taubat tau-assault-fed-random2
+every signal tau-raid-3
+  ai taubat tau-assault-fed-random3
+every signal tau-raid-4
+  ai taubat tau-assault-fed-random4
+every signal tau-raid-5
+  ai taubat tau-assault-fed-random5
+every signal tau-raid-6
+  ai taubat tau-assault-fed-random6
+every signal tau-raid-7
+  ai taubat tau-assault-fed-random7
+every signal tau-raid-8
+  ai taubat tau-assault-fed-random8
+every timer met-raids
+  random met-raid-1 met-raid-2 met-raid-3 met-raid-4 met-raid-5 met-raid-6 met-raid-7 met-raid-8
+  timer met-raids 100
+every signal met-raid-1
+  ai metar met-assault-fed-random1
+every signal met-raid-2
+  ai metar met-assault-fed-random2
+every signal met-raid-3
+  ai metar met-assault-fed-random3
+every signal met-raid-4
+  ai metar met-assault-fed-random4
+every signal met-raid-5
+  ai metar met-assault-fed-random5
+every signal met-raid-6
+  ai metar met-assault-fed-random6
+every signal met-raid-7
+  ai metar met-assault-fed-random7
+every signal met-raid-8
+  ai metar met-assault-fed-random8
+on timer met-assault-1
+  ai metar met-assault-federation-1
+on timer met-assault-2
+  ai metar met-assault-federation-2
+on timer met-assault-3
+  ai metar met-assault-federation-3
+on timer met-cfd-attack
+  ai metar metar-attack-on-cfd
+
+# --- Objectives 13 and 15: scan the Metar core --------------------------------------------------
+on cell-scanned metar-core
+  say science "Sir, these readings are strange... Hold on! They resemble the signals the anomaly generator gave off."
+  complete 13
+  complete 15
+  timer pass-message 10
+  timer pass 20
+
+# --- The pass: a message at 10 s, the win at 20 s --------------------------------------------------
+on timer pass-message
+  say intelligence "All objectives met. Well done."
+on timer pass
+  win
+
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on destroyed colony-hub
+  fail 14 20
+  say intelligence "The Federation hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 16 20
+  say security "The Metar have wrecked the containment field device."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "We have not met our objectives."
+
+# Not expressible yet:
+# - The pass and fail messages and the hub and device lines go to all three empires' mail.
+# - The Federation has a "dummy" research topic that nothing makes available.

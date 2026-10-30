@@ -1,0 +1,114 @@
+# --- C9 as F ----------------------------------------
+# C9 "Bonus Federation Mission" (Federation, slot 0; map demo1, colony at 120:359, a
+# Romulan colony at 312:295). Rewritten from the game's own graph
+# (S/ghidra/scripts_out/C9.json). Orion pirates (slot 5) come in waves every 3 minutes
+# for half an hour, from two points in the south (434:301 and 434:373); the mission is
+# won once the last wave is beaten. The Federation starts friendly to everyone but the
+# Orions.
+mission C9 F
+site colony 120 359
+site romulan-colony 312 295
+zone orion-approach 240 311 280 371   # between the colonies
+objective 60
+
+# --- The Romulan colony is hit first: a cut-off call for help ---
+on start
+  timer romulan-hub-hit 70
+  timer mine1-hit 90
+  timer mine2-hit 110
+on timer romulan-hub-hit
+  damage rom-colony-hub 80      # the Romulan hub loses 80 % of its strength
+  timer romulan-call 1
+  timer comms-lost 13
+  timer invasion-warning 19
+on timer romulan-call
+  say "Incoming Romulan transmission" "Imperator Travore calling the Federation colony. A large band of Orion pirates is attacking us, and our tactical computer predicts that your colony and ours will both fall unless we can arrange a tempor-"
+on timer comms-lost
+  say communications "The transmission has broken off, sir. Either their communications are down, or..."
+on timer invasion-warning
+  say security "Massive energy signatures, north of us. Orions in such numbers can only be invading!"
+
+# --- Our two mines are hit too ---
+on timer mine1-hit
+  damage mine1 80               # Mine1 at 268:363
+on timer mine2-hit
+  damage mine2 80               # Mine2 at 256:299
+
+# --- The Orions near the colonies: their demand ---
+on inside orion orion-approach
+  say "Incoming transmission" "Federation colony: give yourselves up now and spare your colonists a battle you can't win."
+
+# --- The Orion waves (each order beams in its own group at 434:301 or 434:373) ---
+on start
+  ai orion orion-attack2        # 2 units from 434:373 at once
+  timer orion-first-group 7
+  timer orion-wave-1 180
+  timer orion-wave-2 360
+  timer orion-wave-3 540
+  timer orion-wave-4 720
+  timer orion-wave-5 900
+  timer orion-wave-6 1080
+  timer orion-wave-7 1260
+  timer orion-wave-8 1440
+  timer orion-wave-9 1620
+  timer orion-wave-10 1800
+on timer orion-first-group
+  ai orion orion-attack1        # 2 units from 434:301
+on timer orion-wave-1
+  ai orion orion-attack1a       # 2 units from each point
+  ai orion orion-attack2a
+on timer orion-wave-2
+  ai orion orion-attack1b       # 4 from each
+  ai orion orion-attack2b
+on timer orion-wave-3
+  ai orion orion-attack1c
+  ai orion orion-attack2c
+on timer orion-wave-4
+  ai orion orion-attack1d
+  ai orion orion-attack2d
+on timer orion-wave-5
+  ai orion orion-attack1e       # 6 from each
+  ai orion orion-attack2e
+on timer orion-wave-6
+  ai orion orion-attack1f
+  ai orion orion-attack2f
+on timer orion-wave-7
+  ai orion orion-attack1g
+  ai orion orion-attack2g
+on timer orion-wave-8
+  ai orion orion-attack1h       # 8 from each
+  ai orion orion-attack2h
+on timer orion-wave-9
+  ai orion orion-attack1i
+  ai orion orion-attack2i
+on timer orion-wave-10
+  ai orion orion-attack1j
+  ai orion orion-attack2j
+
+# --- The last wave (orion-attack2j: its units carry the order's name) hit: that wakes the
+# watch for the last Orion; when none is left, Starfleet's message and the objective ---
+on destroyed orion-attack2j
+  arm orions-gone
+on count orion-pirate == 0 as orions-gone dormant
+  say "Incoming transmission from Starfleet" "Commander, an Orion vessel above Lanus II was intercepted by the USS Latrides and destroyed, and the others have withdrawn. It appears you made it through; your actions earn Starfleet's commendation."
+  complete 60
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "All objectives complete. Well done."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 61 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The game wakes the "no Orion left" watch as group 2j beams in (its attack group's
+#   Go_Active); here it wakes at the group's first loss, so that a count still at 0 from
+#   the waves before isn't taken for the end before the group has landed.

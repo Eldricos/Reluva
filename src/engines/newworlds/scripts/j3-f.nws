@@ -1,0 +1,342 @@
+# --- J3 as F ----------------------------------------
+# J3 "The Mask Slips", played as the Federation (slot 0).
+# Rewritten from the game's own mission graph (scripts_out/J3.json).
+mission J3 F
+site federation-colony 96 231
+site workshops 168 239          # the eight Taubat workshops (Raid_Building_One..Eight), 152-184:223-255
+site metar-scan-building 176 239   # the "major building of the ruined city": the Metar colony core
+objective 13
+objective 14 hidden
+
+# --- Greetings --------------------------------------------------------------
+# (the colony's commodity top-up runs from the start with an empty bundle: nothing to write)
+on start
+  timer taubat-plea 5
+  timer caution 15
+  timer kli-assault-federation 80
+  timer kli-raids-on-fed 360
+  timer kli-heavy-raids-on-fed 540
+  timer rom-raids-on-fed 360
+  timer rom-heavy-raids-on-fed 540
+  timer kli-scouts 60
+  timer rom-scouts 60
+on timer taubat-plea
+  say "Incoming message" "Friends, help us! Invaders are marching over our world, and darkness comes with them."
+on timer caution
+  say operations "Sir, it seems the Klingons and Romulans came here looking for trouble. Let's stay on guard."
+
+# --- The other sides' attacks on the colony -------------------------------
+# Two Klingon assaults at 80 s; Klingon and Romulan raids every 120 s from
+# 360 s, heavier ones every 120 s from 540 s; a scout every 60 s from each;
+# and the Romulans turn on us once the Klingon colony is wiped out.
+on timer kli-assault-federation
+  ai klingon kli-federation-assault-one
+  ai klingon kli-federation-assault-two
+every timer kli-raids-on-fed
+  random kli-assault-fed-random1 kli-assault-fed-random2 kli-assault-fed-random3 kli-assault-fed-random1 kli-assault-fed-random2 kli-assault-fed-random3 kli-assault-fed-random2 kli-assault-fed-random3
+  timer kli-raids-on-fed 120
+every signal kli-assault-fed-random1
+  ai klingon kli-assault-fed-random1
+every signal kli-assault-fed-random2
+  ai klingon kli-assault-fed-random2
+every signal kli-assault-fed-random3
+  ai klingon kli-assault-fed-random3
+every timer kli-heavy-raids-on-fed
+  random kli-assault-fed-random1a kli-assault-fed-random2a kli-assault-fed-random3a kli-assault-fed-random4a kli-assault-fed-random1a kli-assault-fed-random2a kli-assault-fed-random3a kli-assault-fed-random4a
+  timer kli-heavy-raids-on-fed 120
+every signal kli-assault-fed-random1a
+  ai klingon kli-assault-fed-random1a
+every signal kli-assault-fed-random2a
+  ai klingon kli-assault-fed-random2a
+every signal kli-assault-fed-random3a
+  ai klingon kli-assault-fed-random3a
+every signal kli-assault-fed-random4a
+  ai klingon kli-assault-fed-random4a
+every timer rom-raids-on-fed
+  random rom-assault-fed-random4 rom-assault-fed-random5 rom-assault-fed-random6 rom-assault-fed-random4 rom-assault-fed-random5 rom-assault-fed-random6 rom-assault-fed-random5 rom-assault-fed-random6
+  timer rom-raids-on-fed 120
+every signal rom-assault-fed-random4
+  ai romulan rom-assault-fed-random4
+every signal rom-assault-fed-random5
+  ai romulan rom-assault-fed-random5
+every signal rom-assault-fed-random6
+  ai romulan rom-assault-fed-random6
+every timer rom-heavy-raids-on-fed
+  random rom-assault-fed-random5a rom-assault-fed-random6a rom-assault-fed-random7a rom-assault-fed-random8a rom-assault-fed-random5a rom-assault-fed-random6a rom-assault-fed-random7a rom-assault-fed-random8a
+  timer rom-heavy-raids-on-fed 120
+every signal rom-assault-fed-random5a
+  ai romulan rom-assault-fed-random5a
+every signal rom-assault-fed-random6a
+  ai romulan rom-assault-fed-random6a
+every signal rom-assault-fed-random7a
+  ai romulan rom-assault-fed-random7a
+every signal rom-assault-fed-random8a
+  ai romulan rom-assault-fed-random8a
+every timer kli-scouts
+  random kli-scout-fed-random1 kli-scout-fed-random2 kli-scout-fed-random3 kli-scout-fed-random4 kli-scout-rom-random5 kli-scout-rom-random6 kli-scout-rom-random7 kli-scout-rom-random8
+  timer kli-scouts 60
+every signal kli-scout-fed-random1
+  ai klingon kli-scout-fed-random1
+every signal kli-scout-fed-random2
+  ai klingon kli-scout-fed-random2
+every signal kli-scout-fed-random3
+  ai klingon kli-scout-fed-random3
+every signal kli-scout-fed-random4
+  ai klingon kli-scout-fed-random4
+every signal kli-scout-rom-random5
+  ai klingon kli-scout-rom-random5
+every signal kli-scout-rom-random6
+  ai klingon kli-scout-rom-random6
+every signal kli-scout-rom-random7
+  ai klingon kli-scout-rom-random7
+every signal kli-scout-rom-random8
+  ai klingon kli-scout-rom-random8
+every timer rom-scouts
+  random rom-scout-kli-random1 rom-scout-kli-random2 rom-scout-kli-random3 rom-scout-kli-random4 rom-scout-fed-random5 rom-scout-fed-random6 rom-scout-fed-random7 rom-scout-fed-random8
+  timer rom-scouts 60
+every signal rom-scout-kli-random1
+  ai romulan rom-scout-kli-random1
+every signal rom-scout-kli-random2
+  ai romulan rom-scout-kli-random2
+every signal rom-scout-kli-random3
+  ai romulan rom-scout-kli-random3
+every signal rom-scout-kli-random4
+  ai romulan rom-scout-kli-random4
+every signal rom-scout-fed-random5
+  ai romulan rom-scout-fed-random5
+every signal rom-scout-fed-random6
+  ai romulan rom-scout-fed-random6
+every signal rom-scout-fed-random7
+  ai romulan rom-scout-fed-random7
+every signal rom-scout-fed-random8
+  ai romulan rom-scout-fed-random8
+# (Four "none left" watches: three on the Klingons' small buildings, one on
+# their large ones; all four must report.)
+on count klingon-small-buildings <= 0
+  signal kli-colony-down
+on count klingon-large-buildings <= 0
+  signal kli-colony-down
+on signal kli-colony-down*2
+  ai romulan rom-federation-assault-one
+  ai romulan rom-federation-assault-two
+
+# --- Objective 13: scan three of the Taubat workshops ----------------------
+# Each scan must hold 5 s to start and 30 s more to count. Each of the eight
+# workshops (raid-building-one .. -eight) has its own watch.
+every scan-started science raid-building-one
+  signal workshop-scan-on
+every scan-started science raid-building-two
+  signal workshop-scan-on
+every scan-started science raid-building-three
+  signal workshop-scan-on
+every scan-started science raid-building-four
+  signal workshop-scan-on
+every scan-started science raid-building-five
+  signal workshop-scan-on
+every scan-started science raid-building-six
+  signal workshop-scan-on
+every scan-started science raid-building-seven
+  signal workshop-scan-on
+every scan-started science raid-building-eight
+  signal workshop-scan-on
+every scan-lost science raid-building-one
+  signal workshop-scan-off
+every scan-lost science raid-building-two
+  signal workshop-scan-off
+every scan-lost science raid-building-three
+  signal workshop-scan-off
+every scan-lost science raid-building-four
+  signal workshop-scan-off
+every scan-lost science raid-building-five
+  signal workshop-scan-off
+every scan-lost science raid-building-six
+  signal workshop-scan-off
+every scan-lost science raid-building-seven
+  signal workshop-scan-off
+every scan-lost science raid-building-eight
+  signal workshop-scan-off
+every scanned science raid-building-one
+  signal workshop-scanned
+every scanned science raid-building-two
+  signal workshop-scanned
+every scanned science raid-building-three
+  signal workshop-scanned
+every scanned science raid-building-four
+  signal workshop-scanned
+every scanned science raid-building-five
+  signal workshop-scanned
+every scanned science raid-building-six
+  signal workshop-scanned
+every scanned science raid-building-seven
+  signal workshop-scanned
+every scanned science raid-building-eight
+  signal workshop-scanned
+every signal workshop-scan-on
+  say science "Scanners running now, sir."
+every signal workshop-scan-off
+  say science "The scan has dropped out, sir. It needs another attempt."
+every signal workshop-scanned
+  say science "Scan of the Taubat hangar complete, sir."
+on scanned science raid-building-one     # any three of the eight
+on scanned science raid-building-two
+on scanned science raid-building-three
+on signal workshop-scanned*3
+  say science "The Taubat hangar scans are complete."
+  complete 13
+  reveal 14
+  signal survive-step
+  signal pass-step
+# A workshop a rival got first is lost to us: beaten (a rival finished during
+# our scan) or futile (our scan finished after a rival's); six is fail 18.
+# The Klingons' destroy watch succeeds whenever a workshop falls, whoever
+# destroys it; the Romulans' capture watch only for a human player.
+every beaten raid-building-one
+  signal workshop-lost
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
+  signal workshop-lost
+on signal workshop-lost*6
+  fail 18 10
+  say operations "Too many hangars have been destroyed or captured. We can't complete the mission."
+
+# --- Objective 14: scan the major building of the ruined city -------------
+# Held 10 s to start, 60 s more to finish. It wakes the Metar.
+every scan-started science metar-scan-building
+  say science "Scanners running now, sir."
+every scan-lost science metar-scan-building
+  say science "The scan has dropped out, sir. It needs another attempt."
+on scanned science metar-scan-building as fed-core-scan
+  say science "Sir, the scan of the ruined city's main building is done."
+  reveal 14
+  complete 14
+  signal pass-step
+  signal metar-wake
+  disarm core-watch   # once scanned, its destruction no longer fails us
+
+# --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
+every scanned-by klingon metar-scan-building
+  signal metar-wake
+every scanned-by romulan metar-scan-building
+  signal metar-wake
+every count metar-portal == 2   # one of the three portals destroyed
+  timer portal-surge 5
+  timer portal-wake 10
+on timer portal-surge
+  say operations "An alien structure is down, and surges of power are running through the planet's core."
+on timer portal-wake
+  signal metar-wake
+on signal metar-wake
+  timer taubat-turn 5
+  timer metar-stirs 10
+  timer metar-lifeforms 25
+  timer metar-outposts 30
+  timer metar-raids-on-fed 60
+  timer tau-raids-on-fed 20
+  signal survive-step
+on timer taubat-turn
+  say intelligence "Sir, the Taubat are now hostile to us. We must strike back!"
+  hostile taubat
+on timer metar-stirs
+  say "Incoming message" "See: the Metar sleep no more. Their eyes will turn on you!"
+on timer metar-lifeforms
+  say operations "Sir, many unknown life forms detected, with energy readings off the scale!"
+on timer metar-outposts
+  say operations "Our other outposts report the aliens coming up all over the planet and doing heavy damage."
+every timer metar-raids-on-fed
+  random metar-bur-protect metar-bur-fed-one metar-bur-fed-two metar-nak-fed-one metar-nak-fed-two metar-dea-fed-one metar-dea-fed-two metar-nak-fed-one
+  timer metar-raids-on-fed 60
+every signal metar-bur-protect
+  ai metar metar-bur-protect
+every signal metar-bur-fed-one
+  ai metar metar-bur-fed-one
+every signal metar-bur-fed-two
+  ai metar metar-bur-fed-two
+every signal metar-nak-fed-one
+  ai metar metar-nak-fed-one
+every signal metar-nak-fed-two
+  ai metar metar-nak-fed-two
+every signal metar-dea-fed-one
+  ai metar metar-dea-fed-one
+every signal metar-dea-fed-two
+  ai metar metar-dea-fed-two
+every timer tau-raids-on-fed
+  random fed-assualt-random-one fed-assualt-random-two federation-assualt-one federation-assualt-two fed-assualt-random-one fed-assualt-random-two federation-assualt-one federation-assualt-two
+  timer tau-raids-on-fed 20
+every signal fed-assualt-random-one
+  ai taubat fed-assualt-random-one
+every signal fed-assualt-random-two
+  ai taubat fed-assualt-random-two
+every signal federation-assualt-one
+  ai taubat federation-assualt-one
+every signal federation-assualt-two
+  ai taubat federation-assualt-two
+
+# --- Hold out for the rescue: after objective 13 and the Metar's waking -----
+on signal survive-step*2
+  timer explorer-diverted 15
+  timer explorer-in-orbit 500
+  timer randall-1 510
+  timer randall-2 1000
+on timer explorer-diverted
+  say "Message from Starfleet" "We're re-routing the USS Explorer to your planet. Withdraw to the colony and defend it until she arrives to pick you up. Good luck."
+on timer explorer-in-orbit
+  say communications "Sir, the USS Explorer is in orbit! A transmission is coming in now..."
+on timer randall-1
+  say "Message from Captain Randall" "Commander, we pushed the engines to breaking point to reach you, and it paid off. Something is jamming our transporters; we'll get you aboard the moment we can."
+on timer randall-2
+  say "Message from Captain Randall" "Those creatures emit a strange two-phase harmonic, but our engineer has found a fix. Prepare to beam up..."
+  signal pass-step
+
+# --- Mission pass: objectives 13 and 14 and the rescue, then 10 s ------------
+on signal pass-step*3
+  timer pass 10
+on timer pass
+  win
+
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 16 10
+  say intelligence "The Federation colony hub has been destroyed."
+# The Metar core destroyed before we scanned it (fail 17); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 17 10
+  say operations "The ruined city's main building is gone. Our mission can't succeed now."
+
+# Not expressible yet:
+# - scanned-by <side> metar-scan-building never fires: the computer's sides
+#   never scan (and the Romulans never capture a workshop).
+# - The jnt03fed table's string 15 (scan the structures around the city) is
+#   not an objective in the game's graph, so it's left out.
+# - The Federation's own AI orders (colony guard, assault on the Romulans at
+#   80 s, raids and scouts, an assault on the Klingons when the Romulan colony
+#   is gone) only run when the side isn't played.

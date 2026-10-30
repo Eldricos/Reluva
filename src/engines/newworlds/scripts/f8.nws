@@ -1,0 +1,143 @@
+# --- F8 as F ----------------------------------------
+# F8 as the Federation, rewritten from the game's own graph (STNW.exe dump F8.json, slot 0,
+# with the Hubrin (4) and Metar (5) objects that act against the Federation).
+mission F8 F
+zone romulan-pad 424 352 432 356
+zone tractor-site 301 339 317 356
+zone colony 416 272 440 296
+site hubrin-drop-west 358 337
+site hubrin-drop-east 362 353
+objective 13
+objective 15
+
+# --- Hubrin and Metar raids: from 240 s, every 120 s each picks one of eight at random -------
+on start
+  timer hubrin-guard 1
+  timer hubrin-raids 240
+  timer metar-raids 240
+on timer hubrin-guard
+  ai hubrin hbr-colony-protection-group-1
+  ai hubrin hbr-colony-protection-group-2
+every timer hubrin-raids
+  random hbr-raid-1 hbr-raid-2 hbr-raid-3 hbr-raid-4 hbr-raid-5 hbr-raid-6 hbr-raid-7 hbr-raid-8
+  timer hubrin-raids 120
+# each Hubrin raid's order beams its two or three units in at one of the two drop points
+every signal hbr-raid-1
+  ai hubrin hubrin-assault-fed-random1
+every signal hbr-raid-2
+  ai hubrin hubrin-assault-fed-random2
+every signal hbr-raid-3
+  ai hubrin hubrin-assault-fed-random3
+every signal hbr-raid-4
+  ai hubrin hubrin-assault-fed-random4
+every signal hbr-raid-5
+  ai hubrin hubrin-assault-fed-random5
+every signal hbr-raid-6
+  ai hubrin hubrin-assault-fed-random6
+every signal hbr-raid-7
+  ai hubrin hubrin-assault-fed-random7
+every signal hbr-raid-8
+  ai hubrin hubrin-assault-fed-random8
+every timer metar-raids
+  random met-raid-1 met-raid-2 met-raid-3 met-raid-4 met-raid-5 met-raid-6 met-raid-7 met-raid-8
+  timer metar-raids 120
+every signal met-raid-1
+  ai metar met-assault-fed-random1
+every signal met-raid-2
+  ai metar met-assault-fed-random2
+every signal met-raid-3
+  ai metar met-assault-fed-random3
+every signal met-raid-4
+  ai metar met-assault-fed-random4
+every signal met-raid-5
+  ai metar met-assault-fed-random5
+every signal met-raid-6
+  ai metar met-assault-fed-random6
+every signal met-raid-7
+  ai metar met-assault-fed-random7
+every signal met-raid-8
+  ai metar met-assault-fed-random8
+
+# --- The Romulan trade delegation: our units reach their pad --------------------------------
+on inside ours romulan-pad
+  spawn us cloaked-tank 3 421 349
+  say command "The Romulans have beamed down cloaked tanks and handed them over to us."
+
+# --- Objective 13: escort the tractor home ----------------------------------------------------
+# fighting units reach the tractor: it sets off, and the Hubrin and Metar sentries stand down
+on inside ours tractor-site
+  say command "The tractor is on its way, with its escort."
+  ai federation tractor-controller
+  arm tractor-route
+  ai metar abort met-sentry-lob-1 met-sentry-lob-2 met-sentry-lob-3 met-sentry-lob-4 met-sentry-lob-5 met-sentry-lob-6 met-sentry-lob-7 met-sentry-lob-8
+  ai hubrin abort hbr-sentry-lob-1 hbr-sentry-lob-2 hbr-sentry-lob-3 hbr-sentry-lob-4 hbr-sentry-lob-5 hbr-sentry-lob-6 hbr-sentry-lob-7 hbr-sentry-lob-8
+# the tractor leaves the site: the natives go for the colony (both watches sleep until the escort comes)
+on outside escort-tractor tractor-site as tractor-route dormant
+  say command "Odd movements among the Hubrin and Metar units."
+  ai metar met-assault-fed-colony-lob-1
+  ai metar met-assault-fed-colony-lob-2
+  ai metar met-assault-fed-colony-lob-3
+  ai hubrin hbr-assault-fed-colony-lob-1
+  ai hubrin hbr-assault-fed-colony-lob-2
+  ai hubrin hbr-assault-fed-colony-lob-3
+  timer route-advice 20
+  timer assault-warning 90
+on timer route-advice
+  say command "The tractor has been told to keep clear of the Hubrin base."
+on timer assault-warning
+  say command "There are reports that hostile units may be closing on the colony."
+on inside escort-tractor colony as tractor-route dormant
+  say command "The tractor is inside the colony. Preparing to beam it up."
+  timer beam-up 50
+on timer beam-up
+  say command "Getting a transporter lock on it now."
+  disarm tractor-fail
+  beam-up escort-tractor
+# the tractor's group gone from the map: objective 13, the report 1 s later
+on beamed-up escort-tractor
+  complete 13
+  signal objective
+  research dormant-metar-research
+  timer recovered 1
+on timer recovered
+  say command "The dormant Metar has been recovered."
+
+# --- Objective 15: research the dormant Metar --------------------------------------------------
+on researched dormant-metar-research
+  timer metar-report-1 15
+  timer metar-report-2 20
+on timer metar-report-1
+  say science "The research on the dormant Metar is finished. The data shows a biological flux."
+on timer metar-report-2
+  say science "This creature seems to live in two states: a physical body here, and pure energy in subspace. That could account for its enormous strength."
+  complete 15
+  signal objective
+
+# --- The pass: two objectives, a message at 15 s, the win at 20 s ------------------------------
+on signal objective*2
+  timer pass-message 15
+  timer pass 20
+on timer pass-message
+  say command "The primary objectives are complete. Well done."
+on timer pass
+  win
+
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+# the tractor is watched until the transporter locks on
+on destroyed escort-tractor as tractor-fail
+  fail 14 20
+  say command "The dormant Metar leader has been destroyed. The mission has failed."
+  signal failing
+on destroyed colony-hub
+  fail 16 20
+  say command "Our colony hub is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
+
+# Not expressible yet:
+# - The escort detector at the tractor site counts only fighting units (unit class 256);
+#   written as any of ours.
+# - The Romulan slot holds only a dummy object.

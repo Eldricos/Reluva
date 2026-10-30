@@ -1,0 +1,151 @@
+# --- J4 as F ----------------------------------------
+# J4, played as the Federation (slot 0).
+# Rewritten from the game's own mission graph (scripts_out/J4.json).
+mission J4 F
+site federation-colony 178 325
+zone old-klingon-colony 234 186 262 206
+site klingon-science-station 258 189   # group ~Kli Sci Blk, where the hostages are
+site science-block 274 101             # group ~Fed Sci Blk, with the computer cores
+objective 12
+objective 13
+
+# --- The other sides' attacks on the colony -------------------------------
+# A Taubat strike at 10 s; three Klingon assaults at 300 s; Romulan, Taubat
+# and Metar raids every 120 s from 300 s; and a Taubat strike on whichever
+# empire first moves units into the old Klingon colony.
+on start
+  timer taubat-strike 10
+  timer kli-assault-federation 300
+  timer rom-raids-on-fed 300
+  timer tau-raids-on-fed 300
+  timer metar-raids-on-fed 300
+on timer taubat-strike
+  ai taubat taubat-sat-fed-colony-assault-2
+on timer kli-assault-federation
+  ai klingon kli-assault-federation-1
+  ai klingon kli-assault-federation-2
+  ai klingon kli-assault-federation-3
+every timer rom-raids-on-fed
+  random rom-assault-fed-random1 rom-assault-fed-random2 rom-assault-fed-random3 rom-assault-fed-random4 rom-assault-fed-random5 rom-assault-fed-random6 rom-assault-fed-random7 rom-assault-fed-random8
+  timer rom-raids-on-fed 120
+every signal rom-assault-fed-random1
+  ai romulan rom-assault-fed-random1
+every signal rom-assault-fed-random2
+  ai romulan rom-assault-fed-random2
+every signal rom-assault-fed-random3
+  ai romulan rom-assault-fed-random3
+every signal rom-assault-fed-random4
+  ai romulan rom-assault-fed-random4
+every signal rom-assault-fed-random5
+  ai romulan rom-assault-fed-random5
+every signal rom-assault-fed-random6
+  ai romulan rom-assault-fed-random6
+every signal rom-assault-fed-random7
+  ai romulan rom-assault-fed-random7
+every signal rom-assault-fed-random8
+  ai romulan rom-assault-fed-random8
+every timer tau-raids-on-fed
+  random taubat-assault-fed-random1 taubat-assault-fed-random2 taubat-assault-fed-random3 taubat-assault-fed-random4 taubat-assault-fed-random5 taubat-assault-fed-random6 taubat-assault-fed-random7 taubat-assault-fed-random8
+  timer tau-raids-on-fed 120
+every signal taubat-assault-fed-random1
+  ai taubat taubat-assault-fed-random1
+every signal taubat-assault-fed-random2
+  ai taubat taubat-assault-fed-random2
+every signal taubat-assault-fed-random3
+  ai taubat taubat-assault-fed-random3
+every signal taubat-assault-fed-random4
+  ai taubat taubat-assault-fed-random4
+every signal taubat-assault-fed-random5
+  ai taubat taubat-assault-fed-random5
+every signal taubat-assault-fed-random6
+  ai taubat taubat-assault-fed-random6
+every signal taubat-assault-fed-random7
+  ai taubat taubat-assault-fed-random7
+every signal taubat-assault-fed-random8
+  ai taubat taubat-assault-fed-random8
+every timer metar-raids-on-fed
+  random metar-assault-fed-random1 metar-assault-fed-random2 metar-assault-fed-random3 metar-assault-fed-random4 metar-assault-fed-random5 metar-assault-fed-random6 metar-assault-fed-random7 metar-assault-fed-random8
+  timer metar-raids-on-fed 120
+every signal metar-assault-fed-random1
+  ai metar metar-assault-fed-random1
+every signal metar-assault-fed-random2
+  ai metar metar-assault-fed-random2
+every signal metar-assault-fed-random3
+  ai metar metar-assault-fed-random3
+every signal metar-assault-fed-random4
+  ai metar metar-assault-fed-random4
+every signal metar-assault-fed-random5
+  ai metar metar-assault-fed-random5
+every signal metar-assault-fed-random6
+  ai metar metar-assault-fed-random6
+every signal metar-assault-fed-random7
+  ai metar metar-assault-fed-random7
+every signal metar-assault-fed-random8
+  ai metar metar-assault-fed-random8
+on inside ours old-klingon-colony
+  ai taubat taubat-sat-fed-colony-assault
+on inside klingon old-klingon-colony
+  ai taubat taubat-sat-kli-colony-assault
+on inside romulan old-klingon-colony
+  ai taubat taubat-sat-rom-colony-assault
+
+# --- Objective 12: hold the Klingon science station to find the hostages ----
+# Held 2 s to start the search, 20 s more to finish it.
+on entered klingon-science-station
+  say intelligence "We're inside, sir. Searching the building."
+on capture-lost klingon-science-station
+  say intelligence "The building has been abandoned before the search was finished."
+on captured klingon-science-station
+  say intelligence "We have the hostages, sir. Beaming them out now."
+  complete 12
+  timer objective-1-notice 5
+on timer objective-1-notice
+  say command "Primary objective 1 achieved."
+# (Fail 15: a rival taking the station during our search; nothing in the
+# mission ever sends that, so it can't happen.)
+fail 15 beaten klingon-science-station
+  say intelligence "The hostages are dead. The mission has failed."
+  signal failing
+
+# --- Objective 13: recover the computer cores from our science block ---------
+# Held 1 s to start, 10 s more to finish.
+on entered science-block
+  say intelligence "We're inside, sir. Unplugging the computer core now."
+on capture-lost science-block
+  say intelligence "The building has been abandoned before the core was out."
+on captured science-block
+  say intelligence "The core is unplugged, sir. Beaming it up now."
+  complete 13
+  timer objective-2-notice 5
+on timer objective-2-notice
+  say command "Primary objective 2 achieved."
+# (Fail 16: likewise never sent in the game.)
+fail 16 beaten science-block
+  say intelligence "The computer core is lost. The mission has failed."
+  signal failing
+
+# --- Mission pass: both objectives, a line at 10 s, the win at 20 s --------
+on all-completed
+  timer pass-notice 10
+  timer pass 20
+on timer pass-notice
+  say intelligence "Mission accomplished for the Federation."
+on timer pass
+  win
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 14 count colony-hub == 0
+  say intelligence "The Federation colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
+  say intelligence "The Federation is unable to finish its mission."
+
+# Not expressible yet:
+# - Both rescues' "beaten" outcomes carry fails 15 and 16, but no object sends
+#   the rivals' claim (the J4 raids don't hand off), so the game never fails
+#   them; written on the buildings' names, not the raid labels (kli-sci-blk,
+#   fed-sci-blk), so Reluva's hand-off can't fire them either.
+# - The Federation's own AI orders (colony guard, refugee APC, random raids on
+#   the Romulans from 360 s) only run when the side isn't played.

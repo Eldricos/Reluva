@@ -1,0 +1,16 @@
+# --- Rules every mission shares (seen in every recording) -------------------
+mission generic F
+every built *
+  say engineering "{1} finished."
+every mine-exhausted
+  say engineering "The mine at {a}, {b} has run out of minerals."
+every power-low
+  say operations "Not enough power: systems are shutting down. Build more generators."
+every short-resources
+  say operations "Construction held up: not enough resources. Build mines and a resource processor."
+every short-crew
+  say operations "Production held up: not enough crew. Build accommodation and a transporter pad."
+every hub-destroyed *
+  say intelligence "The {1} colony hub has been destroyed."
+every side-failed *
+  say intelligence "The {1} side can no longer complete its mission."

@@ -1,0 +1,179 @@
+# --- C11 as R ----------------------------------------
+# C11 "Bonus Romulan Mission" (Romulan, slot 2; map f1, colony at 184:183). Rewritten
+# from the game's own graph (S/ghidra/scripts_out/C11.json). Two escape pods of the
+# Babarakka lie on the map (Klingon slot 1): the Federation ambassador's (124:291), taken
+# by the Hubrin (fortress 292:419, slot 4), and the Klingon ambassador's (320:47), held at
+# the Taubat temple (440:231, slot 3, with Orion help). Narok's deadline is an hour.
+# Handlers are in the order the recording met them (play-c11.md).
+mission C11 R
+site colony 184 183
+site fed-pod 124 291
+site kli-pod 320 47
+site hubrin-fortress 292 419
+site temple 440 231
+zone taubat-trail 272 155 304 215
+objective 81
+objective 82
+objective 83 hidden
+objective 84 hidden
+objective 85 hidden
+
+# --- Narok's orders and the deadline ---
+on start
+  timer intro 2
+  timer deadline 3600
+on timer intro
+  say "Incoming message from Narok" "Move fast, Commander: Federation and Klingon ships will soon arrive to look for their missing men."
+# Out of time: Narok's verdict at once, the failure 10 s later, over at 20 s.
+on timer deadline
+  fail 87 20
+  say "Incoming transmission from Narok" "Commander, you have not succeeded. Ships of the Federation and the Klingons now orbit Junil IV, and the Senate disowns everything done there: officially, neither you nor your crew exists."
+  timer fail-message 10
+
+# --- Any of our units inside the rectangle south of the colony sets off Orion-Taubat
+# raids, every 60 s ---
+on inside ours taubat-trail
+  timer orion-raid 60
+every timer orion-raid
+  random ori-raid-1 ori-raid-2 ori-raid-3 ori-raid-4
+  timer orion-raid 60
+every signal ori-raid-1
+  ai taubat ori-assault-rom-random1
+every signal ori-raid-2
+  ai taubat ori-assault-rom-random2
+every signal ori-raid-3
+  ai taubat ori-assault-rom-random3
+every signal ori-raid-4
+  ai taubat ori-assault-rom-random4
+
+# --- The Klingon pod: a science scan (2 s to start, held 20 s) ---
+on seen kli-pod
+  say operations "We've found a pod, Commander. I suggest a science scan."
+every scan-started science kli-pod
+  say science "The Klingon ambassador isn't here, Commander, but the area is full of energy traces matching Orion and Taubat units."
+every scan-lost science kli-pod
+  say science "We couldn't finish the scan; we'll have to try again."
+on scanned science kli-pod
+  say "Incoming transmission from Narok" "Locate him, Commander, or Junil IV becomes your permanent home."
+  complete 82
+  reveal 84
+  signal objective-met
+
+# --- The Federation pod: a medical scan (2 s to start, held 20 s) ---
+on seen fed-pod
+  say operations "An escape pod from the Babarakka has turned up. Scanning it medically should reveal its occupant."
+every scan-started medical fed-pod
+  say medical "The pod is empty, but cell traces show a human was aboard. There are strong bi-phasic traces too, with the Hubrin's signature."
+every scan-lost medical fed-pod
+  say medical "We couldn't finish the scan; we'll have to try again."
+on scanned medical fed-pod
+  say "Incoming transmission from Narok" "So the Hubrin got there first; no matter. Find their fortress and bargain for the ambassador's release. Be quick, Commander: time is running out."
+  complete 81
+  reveal 83
+  signal objective-met
+
+# --- The temple: a medical scan locks on to the Klingon ambassador ---
+on seen temple
+  say operations "Sir, medically scanning the temple should let our transporter lock onto the ambassador."
+every scan-started medical temple
+  say operations "Locking on to the ambassador. Stand by..."
+every scan-lost medical temple
+  say operations "The ambassador has slipped out of our transporter lock. Another scan is required."
+on scanned medical temple
+  timer ambassador-aboard 1
+  timer narok-crush 5
+on timer ambassador-aboard
+  say operations "The ambassador is in our hands!"
+  complete 84
+  signal objective-met
+on timer narok-crush
+  say "Incoming transmission from Narok" "Let these pitiful curs learn what the Star Empire's power truly means. Leave nothing of them standing!"
+  reveal 85
+
+# --- The Orion-Taubat colony razed: temple, houses, hangars and guns all gone ---
+on count taubat-temple == 0
+  signal taubat-kind-gone
+on count taubat-house == 0
+  signal taubat-kind-gone
+on count taubat-hangar == 0
+  signal taubat-kind-gone
+on count taubat-gun == 0
+  signal taubat-kind-gone
+on signal taubat-kind-gone*4
+  say "Incoming transmission from Narok" "Well done, Commander. Have the ambassador ready to be collected: my ship reaches orbit in a few hours, and your new posting will follow."
+  complete 85
+  signal objective-met
+
+# --- The Hubrin refuse; Narok wants them and the Federation ambassador dead ---
+on seen hubrin-fortress
+  timer hubrin-1 1
+  timer hubrin-2 5
+  timer hubrin-3 10
+  timer hubrin-4 25
+  timer hubrin-5 40
+  timer hubrin-6 45
+on timer hubrin-1
+  say communications "We've found the Hubrin. Their fortress stands on what is left of a Metar hive. They're hailing us..."
+on timer hubrin-2
+  say "Transmission from Hubrin" "Stranger, why do you come near?"
+on timer hubrin-3
+  say "Incoming transmission from Narok" "Surrender the Federation fugitive to us. That deceiver will pay the Empire of Romulus for what he has done."
+on timer hubrin-4
+  say "Transmission from Hubrin" "We think this is untrue. The human will go back to his own people, under Hubrin protection."
+on timer hubrin-5
+  say communications "Commander, the Hubrin have stopped answering."
+on timer hubrin-6
+  say "Incoming transmission from Narok" "Insolent wretches! Commander, see that the ambassador dies, that the Hubrin are exterminated and that the fortress they cherish is reduced to rubble. Fear of us is a lesson they will learn!"
+  hostile hubrin
+  hostile metar
+  timer hubrin-raid 60
+# (each raid order beams its own 3 or 2 Hubrin in near the fortress, at 322:449 or
+# 330:437)
+every timer hubrin-raid
+  random hbr-raid-1 hbr-raid-2 hbr-raid-3 hbr-raid-4
+  timer hubrin-raid 60
+every signal hbr-raid-1
+  ai hubrin hbr-assault-rom-random1
+every signal hbr-raid-2
+  ai hubrin hbr-assault-rom-random2
+every signal hbr-raid-3
+  ai hubrin hbr-assault-rom-random3
+every signal hbr-raid-4
+  ai hubrin hbr-assault-rom-random4
+on count hubrin-fortress == 0
+  say "Incoming transmission from Narok" "Excellent. The Federation's lackey burns on a pyre he built himself."
+  complete 83
+  signal objective-met
+
+# --- All five objectives: the pass ---
+on signal objective-met*5
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "All objectives complete. Well done."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s;
+# the deadline uses the same closing line) ---
+on destroyed colony-hub
+  fail 86 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The postures: Narok's last line also turns the Hubrin (slot 4) and the Metar guns
+#   (slot 5) hostile to the Romulans; `hostile <side>` only changes the Romulans' own
+#   stance.
+# - The Hubrin raiders' spawners make them slot 5's units (the Metar guns' slot), not
+#   the Hubrin's; the orders here beam them in for the Hubrin.
+# - Scans: the game's conditions are the weak medical / weak science scan flags (4, 5),
+#   2 s to start and 20 s to hold; each start or loss re-sends its line (the 1 s timers
+#   in front of the lines are folded in). The "start" lines already give the findings.
+# - The deadline timer keeps running after the pass (the pass ends the mission first).
+# - Both fails share one closing relay: only the first runs the 10 s line and the end
+#   (Reluva's `fail` ignores the second too, but its `timer fail-message` restarts the
+#   10 s line's timer if the second cause comes within those 10 s).
+# - The Taubat and the Hubrin also run patrol orders the game starts by itself.

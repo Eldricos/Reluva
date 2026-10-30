@@ -1,0 +1,179 @@
+# --- K1 as K ----------------------------------------
+# K1 as the Klingons, rewritten from the game's own mission graph (Klingon slot,
+# plus the Taubat and Hubrin slots' monitors that report to the Klingons).
+mission K1 K
+site landing 176 87
+site fortress 192 171
+site lookout-one 240 151
+site lookout-two 268 91
+site temple 368 111
+site hangar 368 119
+objective 15
+objective 17
+objective 19 hidden
+objective 20
+objective 24 optional
+
+# Opening: the Taubat guard their colony at once; their raids start after 6 minutes.
+on start
+  timer taubat-guard 16
+  timer taubat-raids 360
+on timer taubat-guard
+  ai taubat taubat-colony-protection-one
+  ai taubat taubat-colony-protection-two
+on seen landing
+  say operations "Taal welcomes you, commander. Serving your house is an honour."
+
+# Objective 15: the first vehicle yard, construction yard, generator, processor and mine.
+on built-all vehicle-yard construction-yard power-generator resource-processor mining-station
+  say engineering "Every building we needed is up, sir."
+  complete 15
+  signal objective
+
+# Objective 17: hub and yard upgrades, an arsenal (security-center) and a disruptor turret (defensive-weapon).
+on built-all colony-hub-upgrade construction-yard-upgrade security-center defensive-weapon
+  say engineering "The colony's defences are in place, sir."
+  complete 17
+  signal objective
+
+# Finding the fortress or any Taubat site; the first one found sets the Taubat on us.
+on seen fortress
+  say intelligence "We've found the antiproton source at 200:170: some kind of floating structure. A science scan would give us research data."
+  signal taubat-alerted
+on seen temple
+  say intelligence "The Taubat temple is at 372:107."
+  signal taubat-alerted
+on seen hangar
+  say intelligence "The Taubat vehicle factory is at 372:115."
+  signal taubat-alerted
+on seen lookout-one
+  say intelligence "A Taubat lookout post at 271:89."
+  signal taubat-alerted
+on seen lookout-two
+  say intelligence "A Taubat lookout post at 242:149."
+  signal taubat-alerted
+on signal taubat-alerted
+  say "Incoming message" "Defilers! You trespass on our holy places. We will throw you off our land!"
+  ai taubat taubat-klingon-colony-assault-three
+  timer taubat-attack-1 30
+  timer taubat-attack-2 45
+on timer taubat-attack-1
+  reveal 19
+  say operations "We will not stand for this. They must be wiped out."
+  ai taubat taubat-klingon-colony-assault-one
+on timer taubat-attack-2
+  ai taubat taubat-klingon-colony-assault-two
+
+# Objective 20: scan the Hubrin fortress (an ordinary scan is not enough), then research it.
+on scan-started science fortress
+  say science "Scan under way."
+on scan-lost science fortress
+  say science "We lost the scan. Try again."
+on scanned science fortress
+  say science "Scan done, but the readings are unclear. Someone expert has to scan it properly."
+on scan-started strong-science fortress
+  say science "Scan under way."
+on scan-lost strong-science fortress
+  say science "We lost the scan. Try again."
+on scanned strong-science fortress
+  say science "Scan done. The results have to be researched back at the colony hub."
+  research fortress-research-topic
+on researched fortress-research-topic
+  say science "Study of the fortress: it seems to have housed an ancient people who called themselves the Hubrin."
+  complete 20
+  signal objective
+
+# Objective 19: houses and lookouts, the vehicle factory, then every Taubat vehicle.
+on count taubat-house == 0
+  say intelligence "The Taubat lookouts and dwellings are destroyed."
+  signal taubat-down
+on destroyed taubat-hangar
+  timer hangar-gone 10
+on timer hangar-gone
+  say intelligence "The Taubat vehicle factory is gone. Now make sure none of their vehicles survive!"
+  arm taubat-tanks
+  signal taubat-down
+# the vehicle count is only watched once the factory watch has seen it gone for 10 s
+on count taubat-fighting-units <= 0 as taubat-tanks dormant
+  say intelligence "Every Taubat vehicle is destroyed."
+  signal taubat-down
+on signal taubat-down*3
+  say intelligence "The Taubat won't trouble us much any more."
+  complete 19
+  signal objective
+
+# Optional objective 24: hold the temple 10 s; its transporter sends minerals home.
+on entered taubat-temple
+  say security "The temple is ours. Switching on its mineral transporter."
+every capture-lost taubat-temple
+  say security "The temple has slipped from our grip. Send reinforcements to take it back."
+on held taubat-temple 10
+  say engineering "The minerals have reached our base. We should pull out of the temple and destroy it."
+  complete 24
+  give polycomposite 100
+  give transaluminium 100
+  give duranium 1000
+on destroyed taubat-temple
+  timer temple-gone 10
+on timer temple-gone
+  say intelligence "The Taubat temple is destroyed."
+
+# Mission pass: four objective events (15, 17, 20, 19), message at 10 s, win at 20 s.
+on signal objective*4
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say operations "Every objective is met. Well done."
+on timer pass
+  win
+
+# Mission fail: the colony hub lost. Message now, verdict at 10 s, the end at 20 s.
+on count colony-hub == 0
+  fail 25 20
+  say operations "The colony hub is destroyed. The mission has failed."
+  timer fail-message 10
+on timer fail-message
+  say operations "We have not achieved our objectives."
+
+# Taubat raids: from 6 minutes, one of eight assaults every 4 minutes.
+every timer taubat-raids
+  random raid-1 raid-2 raid-3 raid-4 raid-5 raid-6 raid-7 raid-8
+  timer taubat-raids 240
+every signal raid-1
+  ai taubat tau-assault-kli-random1
+every signal raid-2
+  ai taubat tau-assault-kli-random2
+every signal raid-3
+  ai taubat tau-assault-kli-random3
+every signal raid-4
+  ai taubat tau-assault-kli-random4
+every signal raid-5
+  ai taubat tau-assault-kli-random5
+every signal raid-6
+  ai taubat tau-assault-kli-random6
+every signal raid-7
+  ai taubat tau-assault-kli-random7
+every signal raid-8
+  ai taubat tau-assault-kli-random8
+
+# Scans that find nothing.
+every scanned-nothing science
+  say science "Ordinary science scans show nothing unusual, sir."
+every scanned-nothing strong-science
+  say science "A detailed scan, but everything is as expected."
+every scanned-nothing medical
+  say medical "Medical scans find nothing abnormal."
+every scanned-nothing strong-medical
+  say medical "Full diagnostics: nothing of interest here."
+every scanned-nothing engineering
+  say engineering "Structures and systems are within normal limits."
+every scanned-nothing strong-engineering
+  say engineering "Nothing here is worth our attention."
+
+# Not expressible yet:
+# - "Scan again" lines for the fortress (weak: send Rok; strong: we already have the data)
+#   hang off the raids' futile output, which nothing in K1 triggers: they never play.
+# - The fail criterion goes to (the game's line), a name the game doesn't know, so
+#   fail 25 is never ticked; the mission still ends 20 s after the hub is lost.
+# - The briefing (phase 2): the shuttle flight over the map and the briefing units (left out).
+# - The Taubat's ten unnamed patrols run from the start (AI orders without a script).

@@ -1,0 +1,334 @@
+# --- J3 as R ----------------------------------------
+# J3 "The Mask Slips", played as the Romulans (slot 2).
+# Rewritten from the game's own mission graph (scripts_out/J3.json).
+mission J3 R
+site romulan-colony 144 295
+site workshops 168 239          # the eight Taubat workshops (Raid_Building_One..Eight), 152-184:223-255
+site metar-scan-building 176 239   # the harmonic charge's focal point: the Metar colony core
+objective 11
+objective 12 hidden
+
+# --- Greeting ---------------------------------------------------------------
+on start
+  timer greeting 10
+  timer fed-assault-romulans 80
+  timer fed-raids-on-rom 420
+  timer fed-heavy-raids-on-rom 600
+  timer kli-raids-on-rom 420
+  timer kli-heavy-raids-on-rom 600
+  timer fed-scouts 60
+  timer kli-scouts 60
+  timer tau-raids-on-rom 180
+on timer greeting
+  say operations "Sir, the Taubat are getting busier: several units are heading in from the north."
+
+# --- The other sides' attacks on the colony -------------------------------
+# Two Federation assaults at 80 s; Federation and Klingon raids every 180 s
+# from 420 s, heavier ones every 180 s from 600 s; a scout every 60 s from
+# each; Taubat raids every 180 s from the start; and the Klingons turn on us
+# once the Federation colony is wiped out.
+on timer fed-assault-romulans
+  ai federation fed-romulan-assault-one
+  ai federation fed-romulan-assault-two
+every timer fed-raids-on-rom
+  random fed-assault-rom-random4 fed-assault-rom-random5 fed-assault-rom-random6 fed-assault-rom-random4 fed-assault-rom-random5 fed-assault-rom-random6 fed-assault-rom-random5 fed-assault-rom-random6
+  timer fed-raids-on-rom 180
+every signal fed-assault-rom-random4
+  ai federation fed-assault-rom-random4
+every signal fed-assault-rom-random5
+  ai federation fed-assault-rom-random5
+every signal fed-assault-rom-random6
+  ai federation fed-assault-rom-random6
+every timer fed-heavy-raids-on-rom
+  random fed-assault-rom-random5a fed-assault-rom-random6a fed-assault-rom-random7a fed-assault-rom-random8a fed-assault-rom-random5a fed-assault-rom-random6a fed-assault-rom-random7a fed-assault-rom-random8a
+  timer fed-heavy-raids-on-rom 180
+every signal fed-assault-rom-random5a
+  ai federation fed-assault-rom-random5a
+every signal fed-assault-rom-random6a
+  ai federation fed-assault-rom-random6a
+every signal fed-assault-rom-random7a
+  ai federation fed-assault-rom-random7a
+every signal fed-assault-rom-random8a
+  ai federation fed-assault-rom-random8a
+every timer kli-raids-on-rom
+  random kli-assault-rom-random4 kli-assault-rom-random5 kli-assault-rom-random6 kli-assault-rom-random4 kli-assault-rom-random5 kli-assault-rom-random6 kli-assault-rom-random5 kli-assault-rom-random6
+  timer kli-raids-on-rom 180
+every signal kli-assault-rom-random4
+  ai klingon kli-assault-rom-random4
+every signal kli-assault-rom-random5
+  ai klingon kli-assault-rom-random5
+every signal kli-assault-rom-random6
+  ai klingon kli-assault-rom-random6
+every timer kli-heavy-raids-on-rom
+  random kli-assault-rom-random5a kli-assault-rom-random6a kli-assault-rom-random7a kli-assault-rom-random8a kli-assault-rom-random5a kli-assault-rom-random6a kli-assault-rom-random7a kli-assault-rom-random8a
+  timer kli-heavy-raids-on-rom 180
+every signal kli-assault-rom-random5a
+  ai klingon kli-assault-rom-random5a
+every signal kli-assault-rom-random6a
+  ai klingon kli-assault-rom-random6a
+every signal kli-assault-rom-random7a
+  ai klingon kli-assault-rom-random7a
+every signal kli-assault-rom-random8a
+  ai klingon kli-assault-rom-random8a
+every timer fed-scouts
+  random fed-scout-kli-random1 fed-scout-kli-random2 fed-scout-kli-random3 fed-scout-kli-random4 fed-scout-rom-random5 fed-scout-rom-random6 fed-scout-rom-random7 fed-scout-rom-random8
+  timer fed-scouts 60
+every signal fed-scout-kli-random1
+  ai federation fed-scout-kli-random1
+every signal fed-scout-kli-random2
+  ai federation fed-scout-kli-random2
+every signal fed-scout-kli-random3
+  ai federation fed-scout-kli-random3
+every signal fed-scout-kli-random4
+  ai federation fed-scout-kli-random4
+every signal fed-scout-rom-random5
+  ai federation fed-scout-rom-random5
+every signal fed-scout-rom-random6
+  ai federation fed-scout-rom-random6
+every signal fed-scout-rom-random7
+  ai federation fed-scout-rom-random7
+every signal fed-scout-rom-random8
+  ai federation fed-scout-rom-random8
+every timer kli-scouts
+  random kli-scout-fed-random1 kli-scout-fed-random2 kli-scout-fed-random3 kli-scout-fed-random4 kli-scout-rom-random5 kli-scout-rom-random6 kli-scout-rom-random7 kli-scout-rom-random8
+  timer kli-scouts 60
+every signal kli-scout-fed-random1
+  ai klingon kli-scout-fed-random1
+every signal kli-scout-fed-random2
+  ai klingon kli-scout-fed-random2
+every signal kli-scout-fed-random3
+  ai klingon kli-scout-fed-random3
+every signal kli-scout-fed-random4
+  ai klingon kli-scout-fed-random4
+every signal kli-scout-rom-random5
+  ai klingon kli-scout-rom-random5
+every signal kli-scout-rom-random6
+  ai klingon kli-scout-rom-random6
+every signal kli-scout-rom-random7
+  ai klingon kli-scout-rom-random7
+every signal kli-scout-rom-random8
+  ai klingon kli-scout-rom-random8
+every timer tau-raids-on-rom
+  random rom-assualt-random-one rom-assualt-random-two romulan-assualt-one romulan-assualt-two rom-assualt-random-one rom-assualt-random-two romulan-assualt-one romulan-assualt-two
+  timer tau-raids-on-rom 180
+every signal rom-assualt-random-one
+  ai taubat rom-assualt-random-one
+every signal rom-assualt-random-two
+  ai taubat rom-assualt-random-two
+every signal romulan-assualt-one
+  ai taubat romulan-assualt-one
+every signal romulan-assualt-two
+  ai taubat romulan-assualt-two
+# (Four "none left" watches: three on the Federation's small buildings, one on
+# their large ones; all four must report.)
+on count federation-small-buildings <= 0
+  signal fed-colony-down
+on count federation-large-buildings <= 0
+  signal fed-colony-down
+on signal fed-colony-down*2
+  ai klingon kli-romulan-assault-one
+  ai klingon kli-romulan-assault-two
+
+# --- Objective 11: capture three of the Taubat workshops ------------------
+# Hold one 5 s to start the infiltration, 30 s more to take it. Each of the
+# eight workshops (raid-building-one .. -eight) has its own watch.
+every entered raid-building-one
+  signal workshop-entered
+every entered raid-building-two
+  signal workshop-entered
+every entered raid-building-three
+  signal workshop-entered
+every entered raid-building-four
+  signal workshop-entered
+every entered raid-building-five
+  signal workshop-entered
+every entered raid-building-six
+  signal workshop-entered
+every entered raid-building-seven
+  signal workshop-entered
+every entered raid-building-eight
+  signal workshop-entered
+every capture-lost raid-building-one
+  signal workshop-capture-lost
+every capture-lost raid-building-two
+  signal workshop-capture-lost
+every capture-lost raid-building-three
+  signal workshop-capture-lost
+every capture-lost raid-building-four
+  signal workshop-capture-lost
+every capture-lost raid-building-five
+  signal workshop-capture-lost
+every capture-lost raid-building-six
+  signal workshop-capture-lost
+every capture-lost raid-building-seven
+  signal workshop-capture-lost
+every capture-lost raid-building-eight
+  signal workshop-capture-lost
+every captured raid-building-one
+  signal workshop-captured
+every captured raid-building-two
+  signal workshop-captured
+every captured raid-building-three
+  signal workshop-captured
+every captured raid-building-four
+  signal workshop-captured
+every captured raid-building-five
+  signal workshop-captured
+every captured raid-building-six
+  signal workshop-captured
+every captured raid-building-seven
+  signal workshop-captured
+every captured raid-building-eight
+  signal workshop-captured
+every signal workshop-entered
+  say operations "Infiltration teams are going in. Stand by..."
+every signal workshop-capture-lost
+  say engineering "We lost the capture. Try again."
+every signal workshop-captured
+  say operations "Sir, our troops now hold a Taubat workshop."
+on captured raid-building-one     # any three of the eight
+on captured raid-building-two
+on captured raid-building-three
+on signal workshop-captured*3
+  say engineering "Sir, the harmonic generators are cut off, but a cascade discharge has begun and nothing can halt it now."
+  complete 11
+  reveal 12
+  signal survive-step
+  signal pass-step
+# A workshop a rival got first is lost to us: beaten (a rival finished during
+# our capture) or futile (ours finished after a rival's); six is fail 15.
+# The Klingons' destroy watch succeeds whenever a workshop falls, whoever
+# destroys it; the Federation's scan watch only for a human player.
+every beaten raid-building-one
+  signal workshop-lost
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
+  signal workshop-lost
+on signal workshop-lost*6
+  fail 15 10
+  say operations "Too few hangars were taken in time. We can't complete the mission."
+
+# --- Objective 12: scan the focal point of the harmonic charge ------------
+# Held 10 s to start, 60 s more to finish. It wakes the Metar.
+every scan-started science metar-scan-building
+  say science "Scanners running now, sir."
+every scan-lost science metar-scan-building
+  say science "The scan has dropped out, sir. It needs another attempt."
+on scanned science metar-scan-building as rom-core-scan
+  say science "Confirmed: this is where the harmonic field is focused... Wait! The energy is off the scale, and harmonic fissures are opening everywhere!"
+  reveal 12
+  complete 12
+  signal pass-step
+  signal metar-wake
+  disarm core-watch   # once scanned, its destruction no longer fails us
+
+# --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
+every scanned-by federation metar-scan-building
+  signal metar-wake
+every scanned-by klingon metar-scan-building
+  signal metar-wake
+every count metar-portal == 2   # one of the three portals destroyed
+  timer portal-surge 5
+  timer portal-wake 10
+on timer portal-surge
+  say operations "An alien structure is down, and surges of power are running through the planet's core."
+on timer portal-wake
+  signal metar-wake
+on signal metar-wake
+  timer metar-stirs 10
+  timer metar-lifeforms 25
+  timer metar-outposts 30
+  timer metar-raids-on-rom 60
+  signal survive-step
+on timer metar-stirs
+  say "Incoming message" "See: the Metar sleep no more. Their eyes will turn on you!"
+on timer metar-lifeforms
+  say operations "Sir, many unknown life forms detected, with energy readings off the scale!"
+on timer metar-outposts
+  say operations "Our other outposts report the aliens coming up all over the planet and doing heavy damage."
+every timer metar-raids-on-rom
+  random metar-dea-protect metar-bur-rom-one metar-bur-rom-two metar-nak-rom-one metar-nak-rom-two metar-dea-rom-one metar-dea-rom-two metar-nak-rom-one
+  timer metar-raids-on-rom 60
+every signal metar-dea-protect
+  ai metar metar-dea-protect
+every signal metar-bur-rom-one
+  ai metar metar-bur-rom-one
+every signal metar-bur-rom-two
+  ai metar metar-bur-rom-two
+every signal metar-nak-rom-one
+  ai metar metar-nak-rom-one
+every signal metar-nak-rom-two
+  ai metar metar-nak-rom-two
+every signal metar-dea-rom-one
+  ai metar metar-dea-rom-one
+every signal metar-dea-rom-two
+  ai metar metar-dea-rom-two
+
+# --- Hold out for the Senate's ship: after 11 and the Metar's waking --------
+on signal survive-step*2
+  timer senate-orders 15
+  timer rescue-craft 500
+  timer data-request 1000
+on timer senate-orders
+  say "Message from the Senate" "Retreat to the colony and defend it. A starship is on the way for the records on the alien creatures... and for you too, naturally."
+on timer rescue-craft
+  say communications "Sir, a signal from the Senate's rescue ship: planetary interference stops them beaming us up for now. Stand by."
+on timer data-request
+  say "Incoming message" "Colony AP173.B: send us every record on the alien life forms at once. We will lift you and your crew out when it is in."
+  signal pass-step
+
+# --- Mission pass: objectives 11 and 12 and the pick-up, then 10 s ----------
+on signal pass-step*3
+  timer pass 10
+on timer pass
+  win
+
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 14 10
+  say operations "Our colony hub is gone. The mission has failed."
+# The focal point destroyed before we scanned it (fail 16); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 16 10
+  say operations "The Taubat weapon's focal point has been destroyed. We can't complete the mission."
+
+# Not expressible yet:
+# - scanned-by <side> metar-scan-building never fires: the computer's sides
+#   never scan (and the Federation never scans a workshop).
+# - The jnt03rom table's string 13 (scan the artifacts near the workshops) is
+#   not an objective in the game's graph, so it's left out.
+# - A resource top-up object for the colony is active but has an empty
+#   bundle (nothing to top up, so left out).
+# - The Romulans' own AI orders (colony guard, assault on the Klingons at 80 s,
+#   raids and scouts, an assault on the Federation when the Klingon colony is
+#   gone) only run when the side isn't played.

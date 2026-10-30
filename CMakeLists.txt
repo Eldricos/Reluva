@@ -118,6 +118,12 @@ add_library(reluva_engines STATIC
     src/engines/newworlds/font_viewer.cpp
     src/engines/newworlds/levels.cpp)
 target_link_libraries(reluva_engines PUBLIC reluva_common PRIVATE reluva_warnings)
+# The mission scripts (src/engines/newworlds/scripts/), built into the program.
+include(cmake/EmbedFiles.cmake)
+include(src/engines/newworlds/scripts/scripts.cmake)
+reluva_embed_files(reluva_engines mission_scripts.inc
+    BASE ${CMAKE_CURRENT_SOURCE_DIR}/src/engines/newworlds/scripts
+    FILES ${RELUVA_MISSION_SCRIPTS})
 
 # --- executable: SDL3 backend + ImGui launcher --------------------------------
 add_executable(reluva

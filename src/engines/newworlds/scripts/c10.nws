@@ -1,0 +1,101 @@
+# --- C10 as K ----------------------------------------
+# C10 "Bonus Klingon Mission" (Klingon, slot 1; map coverd1, colony at 344:431). Rewritten
+# from the game's own graph (S/ghidra/scripts_out/C10.json). A Romulan colony (slot 2,
+# hub 144:359) and a Taubat settlement (slot 3, round 200:339-236:411) both raid the
+# Klingons every 3 minutes, and a Romulan Bird of Prey circles the map. Objectives: wipe
+# out both colonies (75) and destroy the Bird of Prey (76).
+mission C10 K
+site colony 344 431
+site romulan-colony 144 359
+site taubat-settlement 216 375
+objective 75
+objective 76
+
+# --- The raids: every 180 s one of the side's assault orders, at random ---
+on start
+  timer romulan-raid 180
+  timer taubat-raid 180
+  move rom-bop 146 369 346 429 294 365 146 369 loop   # the Romulan Bird of Prey's patrol
+every timer romulan-raid
+  random rom-raid-1 rom-raid-2 rom-raid-3 rom-raid-4
+  timer romulan-raid 180
+every signal rom-raid-1
+  ai romulan rom-assault-kli-random1
+every signal rom-raid-2
+  ai romulan rom-assault-kli-random2
+every signal rom-raid-3
+  ai romulan rom-assault-kli-random3
+every signal rom-raid-4
+  ai romulan rom-assault-kli-random4
+every timer taubat-raid
+  random tau-raid-1 tau-raid-2 tau-raid-3 tau-raid-1 tau-raid-2 tau-raid-3 tau-raid-1 tau-raid-2
+  timer taubat-raid 180
+every signal tau-raid-1
+  ai taubat tau-assault-kli-random1
+every signal tau-raid-2
+  ai taubat tau-assault-kli-random2
+every signal tau-raid-3
+  ai taubat tau-assault-kli-random3
+
+# --- The Bird of Prey ---
+on destroyed rom-bop
+  say operations "Even Kahless would salute such a triumph. Placing this command in your hands was a wise choice by the council. This day will live on in our songs!"
+  complete 76
+
+# --- The Romulan colony: every one of its nine kinds of building gone ---
+on count romulan-hub == 0
+  signal romulan-kind-gone
+on count romulan-storage-facility == 0
+  signal romulan-kind-gone
+on count romulan-construction-yard == 0
+  signal romulan-kind-gone
+on count romulan-vehicle-yard == 0
+  signal romulan-kind-gone
+on count romulan-resource-processor == 0
+  signal romulan-kind-gone
+on count romulan-accommodation == 0
+  signal romulan-kind-gone
+on count romulan-power-generator == 0
+  signal romulan-kind-gone
+on count romulan-defensive-weapon == 0
+  signal romulan-kind-gone
+on count romulan-defensive-artillery == 0
+  signal romulan-kind-gone
+on signal romulan-kind-gone*9
+  say intelligence "Sir, the Romulan colony is torn apart! A glorious fight!"
+  signal colony-razed
+
+# --- The Taubat: hangars, houses and guns all gone ---
+on count taubat-hangar == 0
+  signal taubat-kind-gone
+on count taubat-house == 0
+  signal taubat-kind-gone
+on count taubat-gun == 0
+  signal taubat-kind-gone
+on signal taubat-kind-gone*3
+  say intelligence "Sir, every Taubat structure has fallen to our warriors!"
+  signal colony-razed
+
+# --- Both colonies razed: objective 75; then the pass ---
+on signal colony-razed*2
+  complete 75
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say operations "You are done here, Commander. By order of the High Council, proceed to Tancred IV; our warriors gather there to strike at the Metar. Today honour is ours. Qapla'!"
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 77 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The Bird of Prey's flight height (12000) on its loop.
+# - The Taubat also have four patrol orders of their tanks (type 111) the game starts by
+#   itself.

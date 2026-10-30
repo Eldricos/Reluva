@@ -1,0 +1,206 @@
+# --- R8 as R ----------------------------------------
+# R8 as the Romulans, written from the game's own mission graph (STNW.exe);
+# there is no recording of this mission.
+mission R8 R
+site colony 276 272
+site abandoned-base 404 412
+site metar-colony 368 288
+site metar-colony-core 370 285
+zone colony-arrival 263 263 288 280
+zone metar-approach 344 260 391 315
+zone abandoned-base 384 399 424 435
+zone tank-park 401 429 403 431
+zone artillery-park 416 403 420 406
+zone apc-park 418 416 421 419
+objective 12
+objective 14
+
+# Opening: the vehicles at the abandoned base, then the meteor storm over it
+# (warning at 20 s; from 80 s to 260 s a meteor a second over the base and
+# one every 3 s on each vehicle park; "over" said at 240 s, "subsiding" when
+# it stops).
+on start
+  timer briefing 5
+  timer storm-warning 20
+  timer storm-start 80
+  timer storm-over 240
+  timer storm-stop 260
+on timer briefing
+  say operations "You now command whatever remains at the deserted base north-east of here. The surviving APCs carry the essential supplies."
+on timer storm-warning
+  say science "A meteor storm is about to hit the abandoned base. Get the supply APCs out and bring them safely to our base. The Metar will try to stop us."
+on timer storm-start
+  say science "Meteorites coming down on the old main colony! Losing those APCs would be a disaster."
+  meteors abandoned-base 1
+  meteors tank-park 3
+  meteors artillery-park 3
+  meteors apc-park 3
+on timer storm-over
+  say science "The meteor storm is over. The old base's self-destruct has started; what's left will blow when the supplies arrive."
+on timer storm-stop
+  meteors abandoned-base off
+  meteors tank-park off
+  meteors artillery-park off
+  meteors apc-park off
+  say science "The storm is dying down. The old base has been put out of action for good; no Romulan technology must reach the enemy."
+
+# Any of our units inside the rectangle round the Metar colony stirs its
+# defences.
+on inside ours metar-approach
+  say intelligence "Careful: the Metar defences are responding to us."
+  signal metar-guard
+on signal metar-guard
+  ai metar met-colony-protection-1
+  ai metar met-colony-protection-2
+  ai metar met-colony-protection-3
+  ai metar met-colony-protection-4
+  ai metar met-colony-protection-5
+
+# Objective 12: the first supply vehicle (the whole group) inside the
+# rectangle at the colony meets it; that
+# also calls off the Metar sentinels in the corridor and on the plateau,
+# sets the Metar guarding their colony and starts their raids (in 5 min).
+on inside supply-vehicle-1 colony-arrival
+  say engineering "Supply vehicle 1 is here. Getting ready to beam its load into colony storage."
+  timer beam-1 10
+  timer sentinel-alert 10
+  signal vehicle-arrived
+on inside supply-vehicle-2 colony-arrival
+  say engineering "Supply vehicle 2 is here. Getting ready to beam its load into colony storage."
+  timer beam-2 10
+  timer sentinel-alert 10
+  signal vehicle-arrived
+on inside supply-vehicle-3 colony-arrival
+  say engineering "Supply vehicle 3 is here. Getting ready to beam its load into colony storage."
+  timer beam-3 10
+  timer sentinel-alert 10
+  signal vehicle-arrived
+on signal vehicle-arrived
+  complete 12
+  signal metar-guard
+  timer metar-raids 300
+  ai metar abort met-corridor-sentinel-0
+  ai metar abort met-corridor-sentinel-1
+  ai metar abort met-corridor-sentinel-2
+  ai metar abort met-corridor-sentinel-3
+  ai metar abort met-corridor-sentinel-4
+  ai metar abort met-corridor-sentinel-5
+  ai metar abort met-corridor-sentinel-6
+  ai metar abort met-corridor-sentinel-7
+  ai metar abort met-plateau-sentinel-0
+  ai metar abort met-plateau-sentinel-1
+  ai metar abort met-plateau-sentinel-2
+  ai metar abort met-plateau-sentinel-3
+  ai metar abort met-plateau-sentinel-4
+  ai metar abort met-plateau-sentinel-5
+  ai metar abort met-plateau-sentinel-6
+  ai metar abort met-plateau-sentinel-7
+  ai metar abort met-plateau-sentinel-8
+every timer sentinel-alert
+  say intelligence "Metar combat units are reported on the move everywhere."
+
+# Ten seconds after each arrival the vehicle is beamed up; once it's gone
+# its load is in (165 T dilithium, 165 T transaluminium, 1350 KG nitrium,
+# 1650 KG duranium). The first beam-up order ends the supply-vehicle watch;
+# the first vehicle gone blows up what is left of the abandoned base.
+on timer beam-1
+  disarm supply-fail
+  beam-up supply-vehicle-1
+on beamed-up supply-vehicle-1
+  say engineering "Supply vehicle 1 has reached colony storage. Next, seize the RAS commander of the Metar inside the core of their colony."
+  signal base-self-destruct
+  give dilithium 165
+  give transaluminium 165
+  give nitrium 1350
+  give duranium 1650
+on timer beam-2
+  disarm supply-fail
+  beam-up supply-vehicle-2
+on beamed-up supply-vehicle-2
+  say engineering "Supply vehicle 2 is in colony storage. The Metar RAS is waiting for us."
+  signal base-self-destruct
+  give dilithium 165
+  give transaluminium 165
+  give nitrium 1350
+  give duranium 1650
+on timer beam-3
+  disarm supply-fail
+  beam-up supply-vehicle-3
+on beamed-up supply-vehicle-3
+  say engineering "Supply vehicle 3 is in colony storage. Take the Metar colony core, search it and bring the RAS commander back."
+  signal base-self-destruct
+  give dilithium 165
+  give transaluminium 165
+  give nitrium 1350
+  give duranium 1650
+
+on signal base-self-destruct
+  damage primary-colony-hub all
+  damage primary-colony-building all
+
+# Objective 14: hold the Metar colony core (2 s to get in, 20 s to search;
+# leaving before then is reported once).
+on entered metar-colony-core
+  say intelligence "We're inside, sir. Searching the building."
+on capture-lost metar-colony-core
+  say intelligence "We've left the building before the search was done."
+on captured metar-colony-core
+  say intelligence "We have the RAS commander, sir. Transporting him now."
+  complete 14
+
+# The Metar raids: 5 min after the first arrival, then every 2 min, one of
+# eight at random.
+on timer metar-raids
+  timer metar-raid 120
+every timer metar-raid
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raid 120
+every signal metar-raid-1
+  ai metar metar-assault-rom-random1
+every signal metar-raid-2
+  ai metar metar-assault-rom-random2
+every signal metar-raid-3
+  ai metar metar-assault-rom-random3
+every signal metar-raid-4
+  ai metar metar-assault-rom-random4
+every signal metar-raid-5
+  ai metar metar-assault-rom-random5
+every signal metar-raid-6
+  ai metar metar-assault-rom-random6
+every signal metar-raid-7
+  ai metar metar-assault-rom-random7
+every signal metar-raid-8
+  ai metar metar-assault-rom-random8
+
+# Fails: the cause and "the Romulans cannot complete their mission" at once,
+# the end 10 s later. The supply-vehicle check (no armed APC left: the
+# game counts that type, which leaves out vehicle 3, a different type)
+# stops with the first beam-up.
+on count armed-apc <= 0 as supply-fail
+  fail 13 10
+  say operations "Every supply vehicle is lost. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+# The game wires this fail to the core search's "beaten to it" output, which
+# nothing sends: it never fires (the core's destruction isn't watched).
+on beaten metar-colony-core
+  fail 15 10
+  say intelligence "The colony core is destroyed and the RAS commander is dead. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+on destroyed colony-hub
+  fail 16 10
+  say operations "The colony hub is destroyed. The mission has failed."
+  say intelligence "The Romulans can't complete their mission."
+
+# The pass: both objectives, the message at once, the win 10 s later.
+on all-completed
+  say intelligence "The Romulans' mission is accomplished."
+  timer mission-won 10
+on timer mission-won
+  win
+
+# Not expressible yet:
+# - At the start the vehicles are moved to their posts by the side's own
+#   orders (scout-prepositioner, supply-vehicle-prepositioner,
+#   tank-prepositioner, artillery-prepositioner).
+# - Fail 15 is wired to the core search's "beaten to it" output, which
+#   nothing sends; written as the core destroyed (inferred).

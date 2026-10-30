@@ -1,0 +1,345 @@
+# --- J3 as K ----------------------------------------
+# J3 "The Mask Slips", played as the Klingons (slot 1).
+# Rewritten from the game's own mission graph (scripts_out/J3.json).
+mission J3 K
+site klingon-colony 224 191
+site workshops 168 239          # the eight Taubat workshops (Raid_Building_One..Eight), 152-184:223-255
+site metar-scan-building 176 239   # the anti-Hubrin weapon's target: the Metar colony core
+zone metar-valley 160 227 195 248
+objective 11
+objective 12 hidden
+objective 13 hidden
+
+# --- Greeting ---------------------------------------------------------------
+on start
+  timer greeting 10
+  timer rom-assault-klingons 80
+  timer fed-raids-on-kli 420
+  timer fed-heavy-raids-on-kli 600
+  timer rom-raids-on-kli 420
+  timer rom-heavy-raids-on-kli 600
+  timer fed-scouts 60
+  timer rom-scouts 60
+  timer tau-raids-on-kli 60
+on timer greeting
+  say operations "Contacts all over the scanners, east and south: this world is crawling with activity!"
+
+# --- The other sides' attacks on the colony -------------------------------
+# Two Romulan assaults at 80 s; Federation and Romulan raids every 180 s
+# from 420 s, heavier ones every 180 s from 600 s; a scout every 60 s from
+# each; Taubat raids every 60 s from the start; and the Federation turns on
+# us once the Romulan colony is wiped out.
+on timer rom-assault-klingons
+  ai romulan rom-klingon-assault-one
+  ai romulan rom-klingon-assault-two
+every timer fed-raids-on-kli
+  random fed-assault-kli-random1 fed-assault-kli-random2 fed-assault-kli-random3 fed-assault-kli-random1 fed-assault-kli-random2 fed-assault-kli-random3 fed-assault-kli-random2 fed-assault-kli-random3
+  timer fed-raids-on-kli 180
+every signal fed-assault-kli-random1
+  ai federation fed-assault-kli-random1
+every signal fed-assault-kli-random2
+  ai federation fed-assault-kli-random2
+every signal fed-assault-kli-random3
+  ai federation fed-assault-kli-random3
+every timer fed-heavy-raids-on-kli
+  random fed-assault-kli-random1a fed-assault-kli-random2a fed-assault-kli-random3a fed-assault-kli-random4a fed-assault-kli-random1a fed-assault-kli-random2a fed-assault-kli-random3a fed-assault-kli-random4a
+  timer fed-heavy-raids-on-kli 180
+every signal fed-assault-kli-random1a
+  ai federation fed-assault-kli-random1a
+every signal fed-assault-kli-random2a
+  ai federation fed-assault-kli-random2a
+every signal fed-assault-kli-random3a
+  ai federation fed-assault-kli-random3a
+every signal fed-assault-kli-random4a
+  ai federation fed-assault-kli-random4a
+every timer rom-raids-on-kli
+  random rom-assault-kli-random1 rom-assault-kli-random2 rom-assault-kli-random3 rom-assault-kli-random1 rom-assault-kli-random2 rom-assault-kli-random3 rom-assault-kli-random2 rom-assault-kli-random3
+  timer rom-raids-on-kli 180
+every signal rom-assault-kli-random1
+  ai romulan rom-assault-kli-random1
+every signal rom-assault-kli-random2
+  ai romulan rom-assault-kli-random2
+every signal rom-assault-kli-random3
+  ai romulan rom-assault-kli-random3
+every timer rom-heavy-raids-on-kli
+  random rom-assault-kli-random1a rom-assault-kli-random2a rom-assault-kli-random3a rom-assault-kli-random4a rom-assault-kli-random1a rom-assault-kli-random2a rom-assault-kli-random3a rom-assault-kli-random4a
+  timer rom-heavy-raids-on-kli 180
+every signal rom-assault-kli-random1a
+  ai romulan rom-assault-kli-random1a
+every signal rom-assault-kli-random2a
+  ai romulan rom-assault-kli-random2a
+every signal rom-assault-kli-random3a
+  ai romulan rom-assault-kli-random3a
+every signal rom-assault-kli-random4a
+  ai romulan rom-assault-kli-random4a
+every timer fed-scouts
+  random fed-scout-kli-random1 fed-scout-kli-random2 fed-scout-kli-random3 fed-scout-kli-random4 fed-scout-rom-random5 fed-scout-rom-random6 fed-scout-rom-random7 fed-scout-rom-random8
+  timer fed-scouts 60
+every signal fed-scout-kli-random1
+  ai federation fed-scout-kli-random1
+every signal fed-scout-kli-random2
+  ai federation fed-scout-kli-random2
+every signal fed-scout-kli-random3
+  ai federation fed-scout-kli-random3
+every signal fed-scout-kli-random4
+  ai federation fed-scout-kli-random4
+every signal fed-scout-rom-random5
+  ai federation fed-scout-rom-random5
+every signal fed-scout-rom-random6
+  ai federation fed-scout-rom-random6
+every signal fed-scout-rom-random7
+  ai federation fed-scout-rom-random7
+every signal fed-scout-rom-random8
+  ai federation fed-scout-rom-random8
+every timer rom-scouts
+  random rom-scout-kli-random1 rom-scout-kli-random2 rom-scout-kli-random3 rom-scout-kli-random4 rom-scout-fed-random5 rom-scout-fed-random6 rom-scout-fed-random7 rom-scout-fed-random8
+  timer rom-scouts 60
+every signal rom-scout-kli-random1
+  ai romulan rom-scout-kli-random1
+every signal rom-scout-kli-random2
+  ai romulan rom-scout-kli-random2
+every signal rom-scout-kli-random3
+  ai romulan rom-scout-kli-random3
+every signal rom-scout-kli-random4
+  ai romulan rom-scout-kli-random4
+every signal rom-scout-fed-random5
+  ai romulan rom-scout-fed-random5
+every signal rom-scout-fed-random6
+  ai romulan rom-scout-fed-random6
+every signal rom-scout-fed-random7
+  ai romulan rom-scout-fed-random7
+every signal rom-scout-fed-random8
+  ai romulan rom-scout-fed-random8
+every timer tau-raids-on-kli
+  random kli-assualt-random-one kli-assualt-random-two klingon-assualt-one klingon-assualt-two kli-assualt-random-one kli-assualt-random-two klingon-assualt-one klingon-assualt-two
+  timer tau-raids-on-kli 60
+every signal kli-assualt-random-one
+  ai taubat kli-assualt-random-one
+every signal kli-assualt-random-two
+  ai taubat kli-assualt-random-two
+every signal klingon-assualt-one
+  ai taubat klingon-assualt-one
+every signal klingon-assualt-two
+  ai taubat klingon-assualt-two
+# (Four "none left" watches: three on the Romulans' small buildings, one on
+# their large ones; all four must report.)
+on count romulan-small-buildings <= 0
+  signal rom-colony-down
+on count romulan-large-buildings <= 0
+  signal rom-colony-down
+on signal rom-colony-down*2
+  ai federation fed-klingon-assault-one
+  ai federation fed-klingon-assault-two
+
+# --- Objective 11: destroy three of the Taubat workshops ------------------
+# The game counts each one 35 s after it falls (5 s, then 30 s more).
+on destroyed raid-building-one
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-one-counted 35
+on timer workshop-one-counted
+  signal workshop-destroyed
+on destroyed raid-building-two
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-two-counted 35
+on timer workshop-two-counted
+  signal workshop-destroyed
+on destroyed raid-building-three
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-three-counted 35
+on timer workshop-three-counted
+  signal workshop-destroyed
+on destroyed raid-building-four
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-four-counted 35
+on timer workshop-four-counted
+  signal workshop-destroyed
+on destroyed raid-building-five
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-five-counted 35
+on timer workshop-five-counted
+  signal workshop-destroyed
+on destroyed raid-building-six
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-six-counted 35
+on timer workshop-six-counted
+  signal workshop-destroyed
+on destroyed raid-building-seven
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-seven-counted 35
+on timer workshop-seven-counted
+  signal workshop-destroyed
+on destroyed raid-building-eight
+  say security "One more Taubat workshop is in ruins!"
+  timer workshop-eight-counted 35
+on timer workshop-eight-counted
+  signal workshop-destroyed
+on signal workshop-destroyed*3
+  say engineering "Too late! A huge charge of energy is building up, aimed at the central tower!"
+  complete 11
+  reveal 12
+  signal core-go
+  signal survive-step
+  signal pass-step
+# A workshop a rival claims (captured or scanned) while ours is counting
+# (beaten), or one that falls after a rival's claim (futile), is lost to us;
+# six of them is fail 16. Only a human rival captures or scans, so against
+# the computer's sides this never happens.
+every beaten raid-building-one
+  signal workshop-lost
+every beaten raid-building-two
+  signal workshop-lost
+every beaten raid-building-three
+  signal workshop-lost
+every beaten raid-building-four
+  signal workshop-lost
+every beaten raid-building-five
+  signal workshop-lost
+every beaten raid-building-six
+  signal workshop-lost
+every beaten raid-building-seven
+  signal workshop-lost
+every beaten raid-building-eight
+  signal workshop-lost
+every futile raid-building-one
+  signal workshop-lost
+every futile raid-building-two
+  signal workshop-lost
+every futile raid-building-three
+  signal workshop-lost
+every futile raid-building-four
+  signal workshop-lost
+every futile raid-building-five
+  signal workshop-lost
+every futile raid-building-six
+  signal workshop-lost
+every futile raid-building-seven
+  signal workshop-lost
+every futile raid-building-eight
+  signal workshop-lost
+on signal workshop-lost*6
+  fail 16 10
+  say operations "Too few hangars fell in time. Our mission can't succeed now."
+
+# --- Objective 12: scan the anti-Hubrin weapon's target -------------------
+# Held 10 s to start, 60 s more to finish. It wakes the Metar.
+every scan-started science metar-scan-building
+  say science "Scanners running now, sir."
+every scan-lost science metar-scan-building
+  say science "The scan has dropped out, sir. It needs another attempt."
+on scanned science metar-scan-building as kli-core-scan
+  say science "We've finished scanning the anti-Hubrin weapon's target, sir."
+  reveal 12
+  complete 12
+  reveal 13
+  timer bop-promise 10
+  signal pass-step
+  signal metar-wake
+  disarm core-watch   # once scanned, its destruction no longer fails us
+  signal core-go
+on timer bop-promise
+  say operations "When an assault group gets into the valley of the Metar, a bird-of-prey will come to support it."
+
+# --- Objective 13: destroy the Metar colony core --------------------------
+# The core monitor and the valley detector wake once 11 and 12 are both done.
+on signal core-go*2
+  arm core-attack
+on inside ours metar-valley as core-attack dormant
+  say operations "The bird-of-prey is coming to help you finish off the Metar colony core."
+  move kli-bop 138 269 162 189 254 177 138 269 loop
+on destroyed metar-scan-building as core-attack dormant
+  say operations "The Metar colony core is destroyed. Objective complete."
+  complete 13
+  signal survive-step
+  signal pass-step
+
+# --- The Metar wake: our scan, a rival's scan, or a portal destroyed --------
+# (A rival's core scan, which makes ours futile, needs a human rival: the
+# computer's sides never scan.)
+every scanned-by federation metar-scan-building
+  signal metar-wake
+every scanned-by romulan metar-scan-building
+  signal metar-wake
+every count metar-portal == 2   # one of the three portals destroyed
+  timer portal-surge 5
+  timer portal-wake 10
+on timer portal-surge
+  say operations "An alien structure is down, and surges of power are running through the planet's core."
+on timer portal-wake
+  signal metar-wake
+on signal metar-wake
+  timer metar-stirs 10
+  timer metar-lifeforms 25
+  timer metar-outposts 30
+  timer metar-raids-on-kli 60
+  signal survive-step
+on timer metar-stirs
+  say "Incoming message" "See: the Metar sleep no more. Their eyes will turn on you!"
+on timer metar-lifeforms
+  say operations "Sir, many unknown life forms detected, with energy readings off the scale!"
+on timer metar-outposts
+  say operations "Our other outposts report the aliens coming up all over the planet and doing heavy damage."
+every timer metar-raids-on-kli
+  random metar-nak-protect metar-bur-kli-one metar-bur-kli-two metar-nak-kli-one metar-nak-kli-two metar-dea-kli-one metar-dea-kli-two metar-nak-kli-one
+  timer metar-raids-on-kli 60
+every signal metar-nak-protect
+  ai metar metar-nak-protect
+every signal metar-bur-kli-one
+  ai metar metar-bur-kli-one
+every signal metar-bur-kli-two
+  ai metar metar-bur-kli-two
+every signal metar-nak-kli-one
+  ai metar metar-nak-kli-one
+every signal metar-nak-kli-two
+  ai metar metar-nak-kli-two
+every signal metar-dea-kli-one
+  ai metar metar-dea-kli-one
+every signal metar-dea-kli-two
+  ai metar metar-dea-kli-two
+
+# --- Hold out for the bird-of-prey: after 11, 13 and the Metar's waking -----
+on signal survive-step*3
+  timer council 15
+  timer ves-jach-orbit 500
+  timer ves-jach-beam 1000
+on timer council
+  say "Message from the High Council" "Hold your ground: a battle worth songs lies ahead! A ship is coming to take you and your warriors off... should you survive until then."
+on timer ves-jach-orbit
+  say communications "The Ves Jach has reached low orbit and her captain is calling. Interference from the planet will delay our leaving."
+on timer ves-jach-beam
+  say "Message from the Ves Jach" "Closing on your position. Stand by to beam out."
+  signal pass-step
+
+# --- Mission pass: objectives 11, 12, 13 and the pick-up, then 10 s ---------
+on signal pass-step*4
+  timer pass 10
+on timer pass
+  win
+
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 15 10
+  say operations "The Klingon colony hub has been destroyed."
+# The core destroyed before we scanned it (fail 17); our scan switches this
+# off.
+on destroyed metar-scan-building as core-watch
+  fail 17 10
+  say operations "The anti-Hubrin weapon's target has been destroyed. We can't complete the mission."
+
+# Not expressible yet:
+# - scanned-by <side> metar-scan-building and the workshops' beaten / futile
+#   never fire: the computer's sides never capture or scan.
+# - A workshop destroyed after a rival's claim counts for the game only as
+#   lost; Reluva still reports it as destroyed (to objective 11) as well.
+# - Objective 13's core monitor wakes once 11 and 12 are both done, and a
+#   core destroyed before then counts at once; an armed handler here only
+#   hears events from then on.
+# - The valley detector looks for our units of certain classes (the game's
+#   mask), and polls: units already in the valley when it wakes set it off;
+#   "inside ours" only hears units coming in after it's armed.
+# - The jnt03klg table's string 14 (scan the small alien structures) is not an
+#   objective in the game's graph, so it's left out.
+# - A resource top-up object for the colony is active but has an empty bundle
+#   (top-up needs at least one material; it does nothing anyway).
+# - The Klingons' own AI orders (colony guard, assault on the Federation at
+#   80 s, raids and scouts, an assault on the Romulans when the Federation
+#   colony is gone) only run when the side isn't played.

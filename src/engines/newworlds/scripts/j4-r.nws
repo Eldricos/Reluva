@@ -1,0 +1,126 @@
+# --- J4 as R ----------------------------------------
+# J4, played as the Romulans (slot 2).
+# Rewritten from the game's own mission graph (scripts_out/J4.json).
+mission J4 R
+site romulan-colony 298 333
+zone old-klingon-colony 234 186 262 206
+site klingon-arsenal 234 205      # group ~Kli Sec Cen
+objective 12
+
+# --- The other sides' attacks on the colony -------------------------------
+# Three Klingon assaults at 360 s; Federation, Taubat and Metar raids every
+# 120 s from 360 s; and a Taubat strike the first time our units go into
+# the old Klingon colony.
+on start
+  timer kli-assault-romulans 360
+  timer fed-raids-on-rom 360
+  timer tau-raids-on-rom 360
+  timer metar-raids-on-rom 360
+on timer kli-assault-romulans
+  ai klingon kli-assault-romulans-1
+  ai klingon kli-assault-romulans-2
+  ai klingon kli-assault-romulans-3
+every timer fed-raids-on-rom
+  random fed-assault-rom-random1 fed-assault-rom-random2 fed-assault-rom-random3 fed-assault-rom-random4 fed-assault-rom-random5 fed-assault-rom-random6 fed-assault-rom-random7 fed-assault-rom-random8
+  timer fed-raids-on-rom 120
+every signal fed-assault-rom-random1
+  ai federation fed-assault-rom-random1
+every signal fed-assault-rom-random2
+  ai federation fed-assault-rom-random2
+every signal fed-assault-rom-random3
+  ai federation fed-assault-rom-random3
+every signal fed-assault-rom-random4
+  ai federation fed-assault-rom-random4
+every signal fed-assault-rom-random5
+  ai federation fed-assault-rom-random5
+every signal fed-assault-rom-random6
+  ai federation fed-assault-rom-random6
+every signal fed-assault-rom-random7
+  ai federation fed-assault-rom-random7
+every signal fed-assault-rom-random8
+  ai federation fed-assault-rom-random8
+every timer tau-raids-on-rom
+  random taubat-assault-rom-random1 taubat-assault-rom-random2 taubat-assault-rom-random3 taubat-assault-rom-random4 taubat-assault-rom-random5 taubat-assault-rom-random6 taubat-assault-rom-random7 taubat-assault-rom-random8
+  timer tau-raids-on-rom 120
+every signal taubat-assault-rom-random1
+  ai taubat taubat-assault-rom-random1
+every signal taubat-assault-rom-random2
+  ai taubat taubat-assault-rom-random2
+every signal taubat-assault-rom-random3
+  ai taubat taubat-assault-rom-random3
+every signal taubat-assault-rom-random4
+  ai taubat taubat-assault-rom-random4
+every signal taubat-assault-rom-random5
+  ai taubat taubat-assault-rom-random5
+every signal taubat-assault-rom-random6
+  ai taubat taubat-assault-rom-random6
+every signal taubat-assault-rom-random7
+  ai taubat taubat-assault-rom-random7
+# (taubat-assault-rom-random8: the game names this order but has none by that name, so this pick does nothing)
+every timer metar-raids-on-rom
+  random metar-assault-rom-random1 metar-assault-rom-random2 metar-assault-rom-random3 metar-assault-rom-random4 metar-assault-rom-random5 metar-assault-rom-random6 metar-assault-rom-random7 metar-assault-rom-random8
+  timer metar-raids-on-rom 120
+every signal metar-assault-rom-random1
+  ai metar metar-assault-rom-random1
+every signal metar-assault-rom-random2
+  ai metar metar-assault-rom-random2
+every signal metar-assault-rom-random3
+  ai metar metar-assault-rom-random3
+every signal metar-assault-rom-random4
+  ai metar metar-assault-rom-random4
+every signal metar-assault-rom-random5
+  ai metar metar-assault-rom-random5
+every signal metar-assault-rom-random6
+  ai metar metar-assault-rom-random6
+every signal metar-assault-rom-random7
+  ai metar metar-assault-rom-random7
+every signal metar-assault-rom-random8
+  ai metar metar-assault-rom-random8
+on inside ours old-klingon-colony
+  ai taubat taubat-sat-rom-colony-assault
+
+# --- Objective 12: take the Klingon arsenal and arm it ---------------------
+# Held 1 s to start, 10 s more to take it; the anti-matter fields then take
+# 60 s to set up.
+on entered klingon-arsenal
+  say intelligence "We're inside, sir. Searching the building."
+on capture-lost klingon-arsenal
+  say intelligence "The building has been abandoned before the search was finished."
+on captured klingon-arsenal
+  say intelligence "The building is ours, and we're starting to tune the anti-matter fields."
+  timer anti-matter 60
+on timer anti-matter
+  complete 12
+# (Fail 13: a rival taking the arsenal during our raid; nothing in the
+# mission ever sends that, so it can't happen.)
+fail 13 beaten klingon-arsenal
+  say intelligence "The arsenal has been destroyed. The mission has failed."
+  signal failing
+
+# --- Mission pass: a line at 10 s, the win at 20 s --------------------------
+on all-completed
+  timer pass-notice 10
+  timer pass 20
+on timer pass-notice
+  say intelligence "Mission accomplished for the Romulans."
+on timer pass
+  win
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 14 count colony-hub == 0
+  say intelligence "The Romulan colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
+  say intelligence "The Romulans are unable to finish their mission."
+
+# Not expressible yet:
+# - The raid's "beaten" outcome carries fail 13, but no object sends it (the
+#   J4 raids don't hand off); written on the building's name, not the raid
+#   label (kli-sec-cen), so Reluva's hand-off can't fire it either.
+# - The 60 s anti-matter timer also carries a line ("the building is armed,
+#   evacuate") that the game sends only to the pass counter, never to the
+#   panel, so it isn't said here.
+# - The Romulans' own AI orders (colony guard, a refugee sentry, random raids
+#   on the Federation from 300 s) only run when the side isn't played.

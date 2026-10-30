@@ -1,0 +1,101 @@
+# --- K14 as K ----------------------------------------
+# K14 as the Klingons, rewritten from the game's own mission graph (Klingon slot, with
+# the Taubat (3) and Metar (5) attack clocks). The containment device (CFD) starts in
+# place at 154:237.
+mission K14 K
+site colony 82 181
+site device 154 237
+site metar-core 330 189
+objective 12
+objective 14
+
+# Opening: Taubat raids from 30 s (one every 30 s), Metar raids from 2 minutes (one
+# every 100 s), named Metar assaults at 1, 2 and 3 minutes.
+on start
+  timer taubat-raids 30
+  timer metar-raids 120
+  timer metar-assault-1 60
+  timer metar-assault-3 120
+  timer metar-assault-2 180
+on timer metar-assault-1
+  ai metar met-assault-klingon-1
+on timer metar-assault-3
+  ai metar met-assault-klingon-3
+on timer metar-assault-2
+  ai metar met-assault-klingon-2
+
+# Objectives 12 and 14: scanning the Metar core settles both (the device has held).
+on cell-scanned metar-core
+  say science "These readings are nonsense... unless the aliens are building an anomaly generator."
+  complete 12
+  complete 14
+  timer pass-message 10
+
+# Mission pass: message 10 s after the scan, win 10 s after that.
+on timer pass-message
+  say intelligence "Every objective is met. Well done."
+  timer pass 10
+on timer pass
+  win
+
+# Mission fail: the colony hub or the device; message now, verdict at 10 s, end at
+# 20 s. (A pass already under way still wins if it gets there first, as in the game.)
+on count colony-hub == 0
+  fail 13 20
+  say intelligence "Our hub has been destroyed."
+  signal failing
+# (The device is our own placed object, which the colony's counts leave out:
+# heard by its loss, as F14's.)
+on destroyed containment-device
+  fail 15 20
+  say security "The device for the containment field has been destroyed by the Metar."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "We have not achieved our objectives."
+
+# Raids: one of eight Taubat assaults every 30 s, one of eight Metar assaults every 100 s.
+every timer taubat-raids
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raids 30
+every signal taubat-raid-1
+  ai taubat taubat-assault-kli-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-kli-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-kli-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-kli-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-kli-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-kli-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-kli-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-kli-random8
+every timer metar-raids
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raids 100
+every signal metar-raid-1
+  ai metar metar-assault-kli-random1
+every signal metar-raid-2
+  ai metar metar-assault-kli-random2
+every signal metar-raid-3
+  ai metar metar-assault-kli-random3
+every signal metar-raid-4
+  ai metar metar-assault-kli-random4
+every signal metar-raid-5
+  ai metar metar-assault-kli-random5
+every signal metar-raid-6
+  ai metar metar-assault-kli-random6
+every signal metar-raid-7
+  ai metar metar-assault-kli-random7
+every signal metar-raid-8
+  ai metar metar-assault-kli-random8
+
+# Not expressible yet:
+# - A Metar order to attack the device exists but nothing in the graph starts it; the
+#   Klingons' four unnamed patrols and the Taubat's build orders run without the script.
+# - The pass and fail lines go to every side's mail, not only the Klingons'.

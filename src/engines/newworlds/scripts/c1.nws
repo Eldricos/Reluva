@@ -1,0 +1,240 @@
+# --- C1 as F ----------------------------------------
+# C1 "Tutorial" (Federation, slot 0; map coverd3). Rewritten from the game's own graph
+# (S/ghidra/scripts_out/C1.json). Every line comes from Operations (the training officer)
+# with its voice clip, one after another on timers; some steps wait for the player to
+# build something or press a key (key codes are the game's, Windows virtual keys:
+# 9 Tab, 17 Ctrl, 38 Up arrow, 49 "1", 100/103/104/105 numpad 4/7/8/9, 112 F1, 113 F2).
+mission C1 F
+site colony 426 286
+zone colony-gate 408 280 424 312    # at the colony's south side
+zone attack-front 389 259 397 276   # where the Romulan attack comes through
+objective 16
+
+# --- Selecting buildings and the first build order (timed from the start) ---
+on start
+  timer select-1 1
+on timer select-1
+  say operations "Left-click the buildings one by one: the New Worlds window at the top right shows what each one is and its details." Tutor08
+  timer select-2 10
+on timer select-2
+  say operations "The buttons along the bottom of that window depend on the building. Keep clicking until you have the colony hub."
+  timer select-3 20
+on timer select-3
+  say operations "A right-click drops the selection; pick the hub again. More buildings and vehicles open up as the colony grows." Tutor09
+  timer build-1 17
+on timer build-1
+  say operations "Press Build to see what can be built. Pick the construction yard and move the pointer up the screen, north of the hub." Tutor10
+  timer build-2 12
+on timer build-2
+  say operations "Move it over free concrete until the hologram turns green, then left-click: building starts straight away."
+
+# --- The vehicle yard and a scout (once the construction yard stands) ---
+on built construction-yard
+  timer vehicles-1 3
+on timer vehicles-1
+  say operations "Move the pointer down to the lower edge of the screen so the view scrolls past the hub, then select the vehicle yard with a left-click." Tutor11
+  timer vehicles-2 13
+on timer vehicles-2
+  say operations "Now press Build at the foot of the New Worlds panel and page through the vehicles; only the ones you can make are shown." Tutor12
+  timer vehicles-3 21
+on timer vehicles-3
+  say operations "Left-click the scout: it is made at once and drives off to its rally point by itself." Tutor13
+  timer vehicles-4 10
+on timer vehicles-4
+  say operations "Leave Engineering with the X button at the panel's bottom right."
+  timer scout-watch 10
+# The scout step goes on once a scout exists and the watch has started (both, any order).
+on built ground-scout
+  signal scout-step
+on timer scout-watch
+  signal scout-step
+on signal scout-step*2
+  say operations "Scroll back to the colony hub, or press Home to jump there." Tutor14
+  timer upgrade-1 17
+on timer upgrade-1
+  say operations "Left-click the hub. The lit right arrow at the panel's bottom left means this building can be upgraded." Tutor15
+  timer upgrade-2 15
+on timer upgrade-2
+  say operations "Click the lit arrow to page on, then left-click the improved hub icon: the upgrade starts at once." Tutor16
+
+# --- The Tricorder (once the hub is upgraded); from here on each key detector is armed by
+# its prompt and stays deaf until then ---
+on built colony-hub-upgrade
+  timer tricorder-1 3
+on timer tricorder-1
+  say operations "Tab switches between the mini-map and the full-screen Tricorder, which takes over the main view from its corner." Tutor17
+  arm tab-1
+  timer tricorder-2 12
+on timer tricorder-2
+  say operations "It shows the world you are on as a relief map."
+  signal tricorder-step
+# The next line needs both: Tab pressed, and the line above shown (the game's two-count relay).
+on key 9 as tab-1 dormant
+  signal tricorder-step
+on signal tricorder-step*2
+  timer tricorder-3 12
+on timer tricorder-3
+  say operations "The Tricorder also colours minerals, terrain and every race's vehicles and buildings. You can play the whole game from it if you like." Tutor18
+  timer tricorder-4 19
+on timer tricorder-4
+  say operations "Press Tab again to go back to the normal camera." Tutor19
+  arm tab-2
+
+# --- The camera: each step waits for its key ---
+on key 9 as tab-2 dormant
+  timer camera-1 3
+on timer camera-1
+  say operations "This standard view is the bird's eye view. With NumLock on, numpad 4 and 6 turn the camera." Tutor20
+  timer camera-2 10
+on timer camera-2
+  say operations "Numpad 8 and 2 zoom in and out towards wherever the pointer is: targeted zoom."
+  arm numpad-8
+on key 104 as numpad-8 dormant
+  timer camera-3 25
+on timer camera-3
+  say operations "The four arrow keys move the camera forward, back, left and right." Tutor21
+  arm arrow-up
+on key 38 as arrow-up dormant
+  timer camera-4 15
+on timer camera-4
+  say operations "F2 lifts the camera much higher, to the sky view; the other controls stay the same." Tutor22
+  arm f2-sky
+on key 113 as f2-sky dormant
+  timer camera-5 26
+on timer camera-5
+  say operations "There is also control zoom: hold Ctrl and left-click to zoom in on what the pointer is over." Tutor23
+  timer camera-6 10
+on timer camera-6
+  say operations "Ctrl with a right-click zooms back out."
+  arm ctrl-zoom
+on key 17 as ctrl-zoom dormant
+  timer camera-7 22
+on timer camera-7
+  say operations "Now press F1 for the first-person view." Tutor24
+  arm f1-view
+on key 112 as f1-view dormant
+  timer camera-8 5
+on timer camera-8
+  say operations "Here the keys work a little differently: with NumLock on, 8 and 2 do targeted zoom, the arrows are unchanged and 4 and 6 turn the view." Tutor25
+  timer camera-9 13
+on timer camera-9
+  say operations "On the numpad, 7 and 1 raise and lower the camera."
+  arm numpad-7
+on key 103 as numpad-7 dormant
+  timer camera-10 23
+on timer camera-10
+  say operations "And 9 and 3 tip the camera forward and back." Tutor26
+  arm numpad-9
+on key 105 as numpad-9 dormant
+  timer camera-11 23
+on timer camera-11
+  say operations "In this view, double-clicking a building moves the camera in close and keeps it fixed on that building." Tutor27
+  timer camera-12 7
+on timer camera-12
+  say operations "In the locked view numpad 4 and 6 circle the building; a right-click unlocks it."
+  arm numpad-4
+on key 100 as numpad-4 dormant
+  timer camera-13 26
+on timer camera-13
+  say operations "Press F2 to get back to the sky view, then Shift+V to go straight to your vehicles." Tutor28
+  arm f2-back
+
+# --- Vehicles and battle groups ---
+on key 113 as f2-back dormant
+  timer group-1 10
+on timer group-1
+  say operations "Drag a box over the vehicles with the left button and let go: the ones picked show in the details panel." Tutor29
+  timer group-2 17
+on timer group-2
+  say operations "Ctrl+1 makes them battle group 1 (the manual explains groups). Then press Home to go back to the hub." Tutor30
+  arm ctrl-group
+on key 17 as ctrl-group dormant
+  timer group-3 20
+on timer group-3
+  say operations "Right-click to drop the vehicles and left-click the hub: the details panel now describes the colony." Tutor34
+  timer group-4 19
+on timer group-4
+  say operations "Press 1 to pick the battle group again; Shift+1 takes the camera to it." Tutor35
+  arm key-1
+on key 49 as key-1 dormant
+  timer orders-1 19
+
+# --- Orders and the playbook; the Romulans start moving ---
+on timer orders-1
+  say operations "With the group selected, left-click somewhere on top of the mountain: the vehicles drive there and defend themselves on the way." Tutor36
+  ai romulan rom-scout-fed-colony
+  move rom-artillery 370 270
+  move rom-artillery-b 370 266
+  timer orders-2 18
+on timer orders-2
+  say operations "Double-click elsewhere on the mountain top to open the playbook; rest the pointer on an icon for a moment to see what it does." Tutor37
+  timer orders-3 17
+on timer orders-3
+  say operations "Scouts and science vehicles have playbooks of their own, but only when they aren't grouped with other kinds of vehicle." Tutor38
+  timer orders-4 9
+on timer orders-4
+  say operations "They can run engineering, science and medical scans, and the science vehicle can take officers along for better scans."
+  timer orders-5 15
+on timer orders-5
+  say operations "Officers can also be put in buildings that use their speciality, to make those buildings work better; the manual tells you how." Tutor39
+  timer orders-6 11
+on timer orders-6
+  say operations "Press Home to return to the hub and 1 to make sure the battle group is selected."
+  timer orders-7 16
+on timer orders-7
+  say operations "Move the pointer round the hub until it becomes a green arrow and click, then wait for the vehicles to gather there. An enemy scout is close to the colony." Tutor31
+  timer orders-8 13
+on timer orders-8
+  say operations "Attack the scout with one of the playbook orders. Never let a scout scan your colony."
+
+# --- The Romulan attack: launched once one of our armed APCs and the Romulan scout have
+# reached the colony's south edge ---
+on inside armed-apc colony-gate
+  signal assault-trigger
+on inside romulan colony-gate
+  signal assault-trigger
+on signal assault-trigger*2
+  ai romulan rom-assault-fed-colony
+on count romulan-ground-scout == 0
+  timer attack-1 1
+on timer attack-1
+  say operations "Now that the scout is gone, enemies are attacking from the south. Move the pointer close to the incoming vehicles south of your hub, then press the left mouse button." Tutor32
+  timer attack-2 10
+on timer attack-2
+  say operations "Your vehicles close in on the enemy and fire on it once it is in range, by themselves."
+  timer attack-3 12
+# The last hint needs both: the line above, and Romulans at the attack front.
+on timer attack-3
+  signal attack-hint
+on inside romulan attack-front
+  signal attack-hint
+on signal attack-hint*2
+  say operations "Destroy the attacking units and the tutorial is over. Good luck." Tutor33
+
+# --- The end: both Romulan photon artillery units destroyed ---
+on count romulan-photon-artillery == 0
+  complete 16
+on all-completed
+  timer pass-message 5
+  timer pass 15
+on timer pass-message
+  say operations "The Romulan attackers are destroyed and your training is complete. Well done." Tutor40
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (marked at once, told 5 s later, over at 15 s) ---
+on destroyed colony-hub
+  fail 17 15
+  timer fail-message 5
+on timer fail-message
+  say intelligence "Your colony hub is gone, and without it your training can't be finished." Tutor41
+
+# Not expressible yet:
+# - An armed monitor tests the colony as it is, at once: the scout monitor (armed 10 s after
+#   the "leave Engineering" line) fires straight away if the scout was built earlier. Reluva's
+#   events come only when a count changes, so the step stays an AND of "scout built" and
+#   "watch started" (two signals), not a dormant handler.
+# - The Romulan area detectors filter by class: at the colony gate only a ground scout
+#   (0x4000000), at the attack front only armed vehicles (0x100); "inside romulan" takes any
+#   Romulan unit (no "romulan-<kind>" who).
+# - The Klingon and Taubat slots only hold dummy objects (they keep those sides alive).

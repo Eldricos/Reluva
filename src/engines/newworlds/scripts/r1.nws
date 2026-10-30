@@ -1,0 +1,179 @@
+# --- R1 as R ----------------------------------------
+# R1 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+mission R1 R
+site taubat-temple 256 151
+site ruins-nw 280 159
+site ruins-ne 280 183
+site ruins-sw 304 159
+site ruins-se 304 183
+site ruins 292 171
+site rival-base 160 327
+zone storm-field 292 220 300 228
+objective 13
+objective 16
+objective 17
+objective 19 optional
+objective 20 hidden optional
+
+# Opening: the staff's greeting a second after the start; the raid clocks
+# start (Taubat and the rival Romulans each begin random raids at 6 min,
+# then every 4 min); the rivals open with an assault and guard their colony.
+# A storm flashes over a small field east of the ruins all mission long.
+on start
+  say operations "Greetings from the command staff, commander. We have every confidence in you."
+  ai rival riv-rom-initial-assault
+  ai rival rival-romulans-colony-protection
+  timer taubat-raids 360
+  timer rival-raids 360
+  storm storm-field
+
+# Objective 13: the first vehicle yard, construction yard, power generator,
+# resource processor, transporter pad and accommodation block. (Each one's
+# own "finished" line is the generic rule's.)
+on built-all vehicle-yard construction-yard power-generator resource-processor transporter-pad accommodation
+  say engineering "Every building we needed is now finished."
+  complete 13
+
+# Objective 16: the rivals' fighting units down from twelve to nine.
+on count rival-fighting-units <= 9
+  say intelligence "Three of the rival Romulans' cloaked tanks are destroyed, sir."
+  complete 16
+
+# Objective 17: whichever of the temple or the ruins is sighted first gets
+# its line and its research topic (the other then stays silent); finishing it
+# meets the objective.
+on seen taubat-temple as first-find
+  disarm first-find
+  say intelligence "An alien building at {site:taubat-temple}. Its purpose is worth researching."
+  research temple
+on seen ruins-nw
+  signal ruins-sighted
+on seen ruins-ne
+  signal ruins-sighted
+on seen ruins-sw
+  signal ruins-sighted
+on seen ruins-se
+  signal ruins-sighted
+on signal ruins-sighted as first-find
+  disarm first-find
+  say intelligence "Strange ruins at {site:ruins}. We should research what they were for."
+  research portal
+on researched temple
+  say science "The Taubat temple seems to feed a stasis field lying under the four groups of ruins to the north."
+  complete 17
+on researched portal
+  say science "Under the four clusters of ruins there's a stasis field, drawing power from the Taubat temple further south."
+  complete 17
+
+# Optional objectives 19 and 20: find the rival base, destroy its hub and
+# power generator; then its research topic (and hidden objective 20) opens.
+on seen rival-base
+  say intelligence "Sir, our rivals' base is at {site:rival-base}."
+  signal rival-base-step
+on destroyed rival-colony-hub
+  say intelligence "The rival Romulans' colony hub is destroyed."
+  signal rival-base-down
+# (The game's watch here is on the rival's type 153, its power generator: the
+# Romulans' generator model, rps1, as a small building.)
+on destroyed rival-power-generator
+  say intelligence "The rival Romulans' power generator is destroyed."
+  signal rival-base-down
+on signal rival-base-down*2
+  say intelligence "With the rival base gone, sir, we should find out who was behind it."
+  complete 19
+  signal rival-base-step
+on signal rival-base-step*2
+  reveal 20
+  research rival-base
+on researched rival-base
+  say science "This site has all the marks of one of Admiral Narok's operations."
+  complete 20
+on count rival-fighting-units <= 3
+  stop rival-raid
+on count rival-fighting-units <= 0
+  say intelligence "Every one of the rival Romulans' tanks is destroyed."
+
+# Scans that find nothing.
+every scanned-nothing science
+  say science "Ordinary science scans show nothing unusual, sir."
+every scanned-nothing strong-science
+  say science "A detailed scan, sir, but it's all as I'd expect."
+every scanned-nothing medical
+  say medical "Ordinary medical scans find nothing abnormal, sir."
+every scanned-nothing strong-medical
+  say medical "Full diagnostics turn up nothing of interest, sir."
+every scanned-nothing engineering
+  say engineering "Structure and systems scan within normal limits, sir."
+every scanned-nothing strong-engineering
+  say engineering "Not much here of interest to engineering, sir."
+
+# The raids: after the 6-minute wait, every 4 minutes one of eight
+# assaults at random. The rivals' stop once they're down to three units.
+on timer taubat-raids
+  timer taubat-raid 240
+every timer taubat-raid
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raid 240
+every signal taubat-raid-1
+  ai taubat taubat-assault-rom-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-rom-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-rom-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-rom-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-rom-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-rom-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-rom-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-rom-random8
+on timer rival-raids
+  timer rival-raid 240
+every timer rival-raid
+  random rival-raid-1 rival-raid-2 rival-raid-3 rival-raid-4 rival-raid-5 rival-raid-6 rival-raid-7 rival-raid-8
+  timer rival-raid 240
+every signal rival-raid-1
+  ai rival riv-rom-assault-rom-random1
+every signal rival-raid-2
+  ai rival riv-rom-assault-rom-random2
+every signal rival-raid-3
+  ai rival riv-rom-assault-rom-random3
+every signal rival-raid-4
+  ai rival riv-rom-assault-rom-random4
+every signal rival-raid-5
+  ai rival riv-rom-assault-rom-random5
+every signal rival-raid-6
+  ai rival riv-rom-assault-rom-random6
+every signal rival-raid-7
+  ai rival riv-rom-assault-rom-random7
+every signal rival-raid-8
+  ai rival riv-rom-assault-rom-random8
+
+# Mission fail: the colony hub. The cause now, "failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 21 20
+  say operations "The colony hub is destroyed. The mission has failed."
+  timer fail-message 10
+on timer fail-message
+  say operations "We have failed."
+
+# The pass: the objective counter fills, the message 10 s later, the win at 20 s.
+on all-completed
+  timer mission-pass 10
+  timer mission-won 20
+on timer mission-pass
+  say operations "Mission complete."
+on timer mission-won
+  win
+
+# Not expressible yet:
+# - The game's pass counter counts the first sighting (temple or ruins) as
+#   one of its four steps; here the pass waits for the objectives instead.
+# - Each building's first-completion line (only the first of each type) is
+#   left to the generic "every built" rule, which speaks for every one.
+# - The game's text gives the sites as <143:260> (temple), <302:162> (ruins)
+#   and <165:323> (rival base); the sites here are the monitored cells
+#   ("ruins" is the middle of the four).

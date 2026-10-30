@@ -1,0 +1,179 @@
+# --- R2 as R ----------------------------------------
+# R2 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+mission R2 R
+site colony 254 347
+site taubat-temple 264 159
+site taubat-hangar-one 264 167
+site taubat-hangar-two 264 175
+zone colony-approach 236 335 272 359
+objective 13
+objective 14
+objective 15
+objective 16 optional
+objective 17 optional
+
+# Opening: the greeting after a second; the Orions (in the Taubat colony)
+# send two assaults at once, guard their colony from 10 s, and start random
+# raids at 6 min, then one every 4 min. Our Bird of Prey flies its patrol
+# loop all mission long.
+on start
+  say operations "Welcome to Taphet. All is in order."
+  move rom-bop 344 295 236 423 204 339 344 295 loop
+  ai orion orion-romulan-colony-assualt-one
+  ai orion orion-romulan-colony-assualt-two
+  timer orion-guard 10
+  timer orion-raids 360
+on timer orion-guard
+  ai orion orion-colony-protection-one
+  ai orion orion-colony-protection-two
+  ai orion orion-colony-protection-three
+# The first Taubat-side unit inside the rectangle round our colony.
+on inside taubat colony-approach
+  say intelligence "Enemy units are closing on our colony, sir."
+
+# Objective 13: the first sickbay, vehicle yard, construction yard and
+# science block. (Each one's own line is the generic rule's.)
+on built-all sickbay vehicle-yard construction-yard science-station
+  say engineering "Every building we needed is finished, sir."
+  complete 13
+  signal backdoor
+
+# Sightings.
+on seen taubat-temple
+  say intelligence "A Taubat temple at {site:taubat-temple}."
+on seen taubat-hangar-one
+  say intelligence "A Taubat vehicle factory at {site:taubat-hangar-one}."
+on seen taubat-hangar-two
+  say intelligence "A Taubat vehicle factory at {site:taubat-hangar-two}."
+
+# Optional objective 16: hold the temple 10 s; its mineral transporter
+# sends 100 T polycomposite, 100 T transaluminium and 1000 KG duranium.
+# Losing it before then is reported each time.
+on entered taubat-temple
+  say security "The temple is ours. It holds technology for transporting minerals; we're switching it on."
+every capture-lost taubat-temple
+  say security "The Taubat temple is lost to us. We should go back in with more troops."
+on captured taubat-temple
+  say engineering "The minerals are at our base now. We should pull out of the temple and destroy it."
+  complete 16
+  give polycomposite 100
+  give transaluminium 100
+  give duranium 1000
+
+# Optional objective 17: hold the first vehicle factory 10 s (a loss
+# before then reported each time).
+on entered taubat-hangar-one
+  say security "The vehicle factory is ours. Looking for the Taubat prisoners."
+every capture-lost taubat-hangar-one
+  say security "The Taubat vehicle factory is lost to us. We should go back in with more troops."
+on captured taubat-hangar-one
+  say security "The Taubat prisoners are safe at our base. We should pull out of the factory and destroy it."
+  complete 17
+
+# Objective 14: five steps - the temple, both factories (each reported once
+# it has been gone 10 s), the houses and every fighting unit (the side's
+# tanks, artillery and Orion pirates; watched from the first factory's
+# report on).
+on destroyed taubat-temple
+  timer temple-gone 10
+on timer temple-gone
+  say intelligence "The Taubat temple is destroyed."
+  signal orion-step
+on destroyed taubat-hangar-one
+  timer hangar-one-gone 10
+on timer hangar-one-gone
+  say intelligence "One of the vehicle factories the Orions hold is destroyed."
+  signal orion-step
+  arm orion-units
+on destroyed taubat-hangar-two
+  timer hangar-two-gone 10
+on timer hangar-two-gone
+  say "Incoming message" "Curse you! You will pay for meddling in this."
+  say communications "That was the Orions. An idle threat, I expect."
+  signal orion-step
+  arm orion-units
+on count taubat-small-buildings <= 0   # the houses
+  say intelligence "The houses the Orions hold are destroyed."
+  signal orion-step
+on count taubat-fighting-units <= 0 as orion-units dormant
+  say intelligence "Every Orion and Taubat unit is destroyed."
+  signal orion-step
+on signal orion-step*5
+  say intelligence "The Orions are utterly beaten, sir."
+  complete 14
+  signal backdoor
+
+# Objective 15: 50 T of dilithium beamed to the starship, as soon as the
+# stock reaches 250 T - or, once objectives 13 and 14 are met, at 50 T (a
+# second check, asleep until then). The beam-up happens once.
+on stock dilithium 250 as rich-check
+  signal beam-up
+on signal backdoor*2 as low-check-wake
+  arm low-check
+on stock dilithium 50 as low-check dormant
+  signal beam-up
+on signal beam-up
+  disarm rich-check
+  disarm low-check
+  disarm low-check-wake
+  say communications "Beaming 50 units of dilithium up to the starship."
+  take dilithium 50
+  complete 15
+
+# Scans that find nothing.
+every scanned-nothing science
+  say science "Ordinary science scans show nothing unusual, sir."
+every scanned-nothing strong-science
+  say science "A detailed scan, sir, but it's all as I'd expect."
+every scanned-nothing medical
+  say medical "Ordinary medical scans find nothing abnormal, sir."
+every scanned-nothing strong-medical
+  say medical "Full diagnostics turn up nothing of interest."
+every scanned-nothing engineering
+  say engineering "Structure and systems scan within normal limits, sir."
+every scanned-nothing strong-engineering
+  say engineering "Nothing here that would interest you, sir."
+
+# The Orions' raids: every 4 minutes after the first 6, one of eight at random.
+on timer orion-raids
+  timer orion-raid 240
+every timer orion-raid
+  random orion-raid-1 orion-raid-2 orion-raid-3 orion-raid-4 orion-raid-5 orion-raid-6 orion-raid-7 orion-raid-8
+  timer orion-raid 240
+every signal orion-raid-1
+  ai orion orion-assault-rom-random1
+every signal orion-raid-2
+  ai orion orion-assault-rom-random2
+every signal orion-raid-3
+  ai orion orion-assault-rom-random3
+every signal orion-raid-4
+  ai orion orion-assault-rom-random4
+every signal orion-raid-5
+  ai orion orion-assault-rom-random5
+every signal orion-raid-6
+  ai orion orion-assault-rom-random6
+every signal orion-raid-7
+  ai orion orion-assault-rom-random7
+every signal orion-raid-8
+  ai orion orion-assault-rom-random8
+
+# Mission fail: the colony hub. The cause now, "failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 18 20
+  say operations "The colony hub is destroyed."
+  timer fail-message 10
+on timer fail-message
+  say operations "We have failed."
+
+# The pass: the counter (objectives 13, 14, 15) fills, the message 10 s
+# later, the win at 20 s.
+on all-completed
+  timer mission-pass 10
+  timer mission-won 20
+on timer mission-pass
+  say operations "Mission complete."
+on timer mission-won
+  win
+
+# Not expressible yet:
+# - Each building's first-completion line is left to the generic rule.

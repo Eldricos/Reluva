@@ -111,6 +111,7 @@ struct MissionScript {
     struct Action {
         std::string verb;
         std::vector<std::string> args;
+        int line = 0;
     };
     struct Handler {
         bool every = false;
@@ -130,13 +131,16 @@ struct MissionScript {
     std::map<std::string, std::array<int, 4>> zones; // a0, b0, a1, b1 (smallest first)
     std::vector<Objective> objectives;
     std::vector<Handler> handlers;
+    std::string file; // the file it was read from (for messages), if named
 };
 
-// Reads scripts; one text may hold several missions.
-Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out);
+// Reads scripts; one text may hold several missions. file: the text's name,
+// for its errors ("scripts/c4.nws:23: ...") and the scripts' file.
+Error parseMissionScripts(std::string_view text, std::vector<MissionScript>& out, std::string_view file = {});
 
-// The scripts Reluva has (mission_scripts.cpp): the missions' own, and the
-// rules every mission shares ("generic").
+// The scripts Reluva has (src/engines/newworlds/scripts/, built into the
+// program): the missions' own, and the rules every mission shares
+// ("generic").
 const std::vector<MissionScript>& missionScripts();
 const MissionScript* findMissionScript(std::string_view shortName, char side);
 

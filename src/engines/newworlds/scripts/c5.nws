@@ -1,0 +1,60 @@
+# --- C5 as F ----------------------------------------
+# C5 "Mining Resources" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten
+# from the game's own graph (S/ghidra/scripts_out/C5.json). All lines come from Command,
+# without voice clips. The colony starts short: 100 dilithium, 900 nitrium.
+mission C5 F
+site colony 88 415
+objective 34
+objective 35
+
+# --- Opening instructions ---
+on start
+  timer intro-1 2
+  timer intro-2 15
+  timer intro-3 25
+on timer intro-1
+  say command "To check your objectives, press Mission on this window to open Command."
+on timer intro-2
+  say command "A mining station needs flat ground. Pick it from the Build menu, move the hologram about until it turns green and click to give the order."
+on timer intro-3
+  say command "On the Tricorder, mineral deposits show up as coloured patches..."
+
+# --- Two mining stations: the first objective ---
+on built mining-station
+  say command "The first mine is working. Its ore is taken to the resource processor and refined there into materials the colony can use."
+on built-all mining-station*2
+  say command "Both mining stations are running. Upgrading the resource processor will make the refining go faster."
+  complete 34
+
+# --- 200 dilithium and 1500 nitrium in store: the second objective, 10 s after both ---
+on stock nitrium 1500
+  say command "The nitrium we need has been refined and is in the colony's storage facility."
+  signal supplies
+on stock dilithium 200
+  say command "The dilithium we need has been refined and is in the colony's storage facility."
+  signal supplies
+on signal supplies*2
+  timer supplies-done 10
+on timer supplies-done
+  say command "Everything we needed has been refined and stored."
+  complete 35
+
+# --- Pass ---
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "Tutorial 2 is complete. Stand by while tutorial 3 loads."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 36 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The mine counts are exact (exactly one, then exactly two stations standing).

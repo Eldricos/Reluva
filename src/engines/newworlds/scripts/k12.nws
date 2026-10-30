@@ -1,0 +1,154 @@
+# --- K12 as K ----------------------------------------
+# K12 as the Klingons, rewritten from the game's own mission graph (Klingon slot, with
+# the Taubat (3), Hubrin (4) and Metar (5) slots' clocks and monitors).
+mission K12 K
+site colony 82 181
+site device-site 152 239
+objective 12
+objective 14
+
+# Opening: Taubat and Metar raids from the first minute, one each a minute; three
+# named Metar assaults at 1, 2 and 3 minutes.
+on start
+  timer taubat-raids 60
+  timer metar-raids 60
+  timer metar-assault-1 60
+  timer metar-assault-3 120
+  timer metar-assault-2 180
+on timer metar-assault-1
+  ai metar met-assault-klingon-1
+on timer metar-assault-3
+  ai metar met-assault-klingon-3
+on timer metar-assault-2
+  ai metar met-assault-klingon-2
+
+# Objective 12: the colony three times its starting size, five generators (or three
+# advanced ones) and four vehicle yards; that opens the device's last research.
+on colony-size 300
+  signal infrastructure
+on count power-generator == 5
+  signal power
+on count advanced-generator == 3
+  signal power
+on signal power
+  signal power-and-yards
+on count vehicle-yard == 4
+  signal power-and-yards
+on signal power-and-yards*2
+  signal infrastructure
+on signal infrastructure*2
+  say engineering "Sir, the colony can now support building the containment device. It needs one last research check."
+  complete 12
+  signal objective
+  research cfd-research
+
+# The device: made by the game 10 s after the research, set down at the Hubrin's site.
+on researched cfd-research
+  timer device-built 10
+on timer device-built
+  spawn us containment-device 1 152 239
+  say engineering "The device is built. We're taking it to the site the Hubrin marked, to the south."
+
+# The device in place (the build-and-hold watch sees it standing): the Metar go for it
+# and a Hubrin is beamed in beside it with a warning.
+on standing containment-device 1
+  say engineering "Sir, transport is complete. The device for the field's containment is in place now."
+  ai metar metar-attack-on-cfd
+  spawn hubrin hubrin 1 154 241
+  timer sabotage-1 10
+  timer sabotage-3 30
+on timer sabotage-1
+  say intelligence "Sir, another Hubrin has appeared by the device. It says a mistake in the construction has thrown the field off balance."
+  timer sabotage-2 10
+on timer sabotage-2
+  say engineering "A remote scan confirms the fault. A science vehicle must get close to find the imbalance."
+on timer sabotage-3
+  arm site-scan
+
+# Objective 14: scan the device site and recalibrate (20 s), and keep the device for
+# 10 minutes; both are needed. The site scan sleeps until a third sabotage timer,
+# 30 s after the device is in place.
+on scanned * device-site as site-scan dormant
+  say science "Trying to isolate the imbalance. Stand by..."
+  timer recalibrate 20
+on timer recalibrate
+  say engineering "The fault has been located. Now recalibrating the device for the containment field..."
+  signal device-online
+on standing containment-device 600
+  signal device-online
+on signal device-online*2
+  say engineering "A narrow escape, commander. As first built it would soon have overloaded our whole grid."
+  complete 14
+  signal objective
+
+# Mission pass: both objectives; the message at once, the win at 10 s.
+on signal objective*2
+  say intelligence "The Klingons' mission is accomplished."
+  timer pass 10
+on timer pass
+  win
+
+# Mission fail: the colony hub or the device; the cause now, the verdict at 10 s, the
+# end at 20 s.
+on count colony-hub == 0
+  fail 13 20
+  say intelligence "Our hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 15 20
+  say security "The device for the containment field has been destroyed by the Metar!"
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "We have not achieved our objectives."
+
+# The Hubrin observer killed (a message only).
+on count hubrin == 0
+  say intelligence "The Hubrin observer is dead."
+
+# Raids: one of eight Taubat and one of eight Metar assaults every minute.
+every timer taubat-raids
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raids 60
+every signal taubat-raid-1
+  ai taubat taubat-assault-kli-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-kli-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-kli-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-kli-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-kli-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-kli-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-kli-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-kli-random8
+every timer metar-raids
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raids 60
+every signal metar-raid-1
+  ai metar metar-assault-kli-random1
+every signal metar-raid-2
+  ai metar metar-assault-kli-random2
+every signal metar-raid-3
+  ai metar metar-assault-kli-random3
+every signal metar-raid-4
+  ai metar metar-assault-kli-random4
+every signal metar-raid-5
+  ai metar metar-assault-kli-random5
+every signal metar-raid-6
+  ai metar metar-assault-kli-random6
+every signal metar-raid-7
+  ai metar metar-assault-kli-random7
+every signal metar-raid-8
+  ai metar metar-assault-kli-random8
+
+# Not expressible yet:
+# - The spawner kind is read as firing its message
+#   (and the Hubrin's, the sabotage timers) when its units die; the recording shows the
+#   lines in sequence without anyone dying, so they are written as following the spawn.
+# - The success and failure lines also go to the other two sides' mail (all sides).

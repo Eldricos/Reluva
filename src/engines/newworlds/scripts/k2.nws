@@ -1,0 +1,217 @@
+# --- K2 as K ----------------------------------------
+# K2 as the Klingons, rewritten from the game's own mission graph (Klingon slot, the
+# allied Taubat in slot 3 and the rebel Taubat in slot 4).
+mission K2 K
+site colony 296 247
+site ally-base 280 135
+site enemy-base 152 207
+zone east-approach 292 287 300 299
+zone south-approach 276 203 300 215
+zone ally-approach 248 95 256 167
+zone rebel-front 176 123 192 215
+zone rebel-flank 132 231 152 251
+objective 13
+objective 14
+objective 15
+objective 16
+objective 17
+
+# Opening: the allies call for help; both Taubat sides take up guard, the rebels
+# send three assaults at the colony after 16 s and start raiding at 6 minutes.
+on start
+  timer start-message 1
+  timer taubat-guard 16
+  timer rebel-raids 360
+  timer rebel-strike 640
+on timer start-message
+  say "Incoming message" "The heretics are rising against us. Now keep your promises and help us purge our world of them."
+on timer taubat-guard
+  ai taubat allied-taubat-protection-one
+  ai taubat allied-taubat-protection-two
+  ai taubat enemy-taubat-protection-one
+  ai taubat enemy-taubat-protection-two
+  ai taubat enemy-taubat-protection-three
+  ai taubat taubat-klingon-colony-assault-one
+  ai taubat taubat-klingon-colony-assault-two
+  ai taubat taubat-klingon-colony-assault-three
+on seen ally-base
+  say intelligence "The allied Taubat base is at 279:126."
+
+# Warnings: rebels nearing the colony (said once) or the allied base.
+on inside enemy-taubat east-approach
+  signal colony-threatened
+on inside enemy-taubat south-approach
+  signal colony-threatened
+on signal colony-threatened
+  say intelligence "Enemy units are closing on our colony, sir."
+on inside enemy-taubat ally-approach
+  say intelligence "Enemy units are closing on the allied Taubat base, sir."
+
+# The rebels fall on the allies when our tanks or artillery push towards them,
+# or after 640 s, whichever comes first.
+on inside disruptor-tank rebel-front
+  signal rebels-strike
+on inside disruptor-tank rebel-flank
+  signal rebels-strike
+on inside photon-artillery rebel-front
+  signal rebels-strike
+on inside photon-artillery rebel-flank
+  signal rebels-strike
+on timer rebel-strike
+  signal rebels-strike
+on signal rebels-strike
+  stop rebel-strike
+  ai taubat taubat-taubat-colony-assault-one
+  ai taubat taubat-taubat-colony-assault-two
+  ai taubat taubat-taubat-colony-assault-three
+  ai taubat taubat-taubat-colony-assault-four
+  ai taubat taubat-taubat-colony-assault-five
+  ai taubat taubat-taubat-colony-assault-six
+  ai taubat taubat-taubat-colony-assault-seven
+
+# Objectives 13 and 14: five disruptor turrets and eight disruptor tanks.
+on count defensive-weapon == 5
+  say engineering "The defensive weapon systems are finished."
+  complete 13
+  signal defences
+on count disruptor-tank == 8
+  say engineering "The disruptor tanks are ready."
+  complete 14
+  signal defences
+on signal defences*2
+  say engineering "The colony defences we needed are all in place."
+  signal objective
+
+# Objective 17: finding the rebel base shows who is behind them.
+on seen enemy-base
+  say intelligence "There are Orions in the rebel Taubat base. They are plainly behind the uprising."
+  complete 17
+  signal objective
+
+# Objective 16: rebel houses, temple, both vehicle factories, then their gun platforms.
+on count enemy-taubat-colony == 0   # the rebels' houses carry this label
+  say intelligence "The rebel Taubat houses are destroyed."
+  signal rebels-down
+on destroyed enemy-taubat-temple
+  timer rebel-temple-gone 10
+on timer rebel-temple-gone
+  say intelligence "The rebel Taubat temple is destroyed."
+  signal rebels-down
+on destroyed enemy-taubat-hangar-one
+  timer rebel-hangar-one-gone 10
+on timer rebel-hangar-one-gone
+  say intelligence "A rebel Taubat vehicle factory is destroyed."
+  signal rebels-down
+  signal rebel-hangars
+on destroyed enemy-taubat-hangar-two
+  timer rebel-hangar-two-gone 10
+on timer rebel-hangar-two-gone
+  say intelligence "A rebel Taubat vehicle factory is destroyed."
+  signal rebels-down
+  signal rebel-hangars
+# the gun-platform count is only watched once both factory watches have reported
+on signal rebel-hangars*2
+  arm rebel-vehicles
+on count enemy-taubat-fighting-units <= 0 as rebel-vehicles dormant
+  say intelligence "The rebel Taubat gun platforms are destroyed."
+  signal rebels-down
+on signal rebels-down*5
+  say intelligence "Every rebel Taubat force has been crushed."
+  complete 16
+  signal objective
+
+# Mission pass: defences, base found, rebels crushed; then objective 15 (the allies
+# survived), a message at 10 s and the win at 20 s.
+on signal objective*3
+  complete 15
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say operations "Every objective is met. Well done."
+on timer pass
+  win
+
+# The allies suffering (three blows lose the mission). Each watch fires once and then
+# sleeps ("every", so the walkthrough doesn't play them); the allies' vehicle count is
+# only watched from 10 s after their factory falls.
+every destroyed taubat-hangar as ally-hangar
+  disarm ally-hangar
+  timer ally-hangar-gone 10
+every timer ally-hangar-gone
+  say "Incoming message" "They are wiping us out. We need help!"
+  signal allies-hit
+  arm ally-vehicles
+every count taubat-fighting-units <= 1 as ally-vehicles dormant
+  disarm ally-vehicles
+  say "Incoming message" "We are being overrun."
+  signal allies-hit
+every count taubat-house == 0 as ally-houses
+  disarm ally-houses
+  say "Incoming message" "Our homes are on fire. Why will you not help us?"
+  signal allies-hit
+
+# Mission fail: the colony hub, the allies (three blows) or the allied temple; the
+# cause's message now, the verdict at 10 s, the end at 20 s.
+on count colony-hub == 0
+  fail 19 20
+  say operations "The colony hub is destroyed. The mission has failed."
+  signal failing
+on signal allies-hit*3
+  fail 20 20
+  say operations "The allied Taubat are destroyed. The mission has failed."
+  signal failing
+on count allied-temple == 0
+  fail 21 20
+  say "Incoming message" "The temple lies in ruins. Everything is lost! Now the gods will swallow us whole."
+  say operations "The allied Taubat temple is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say operations "We have not achieved our objectives."
+
+# Rebel raids: from 6 minutes, one of eight assaults every 4 minutes.
+every timer rebel-raids
+  random raid-1 raid-2 raid-3 raid-4 raid-5 raid-6 raid-7 raid-8
+  timer rebel-raids 240
+every signal raid-1
+  ai taubat taubat-assault-kli-random1
+every signal raid-2
+  ai taubat taubat-assault-kli-random2
+every signal raid-3
+  ai taubat taubat-assault-kli-random3
+every signal raid-4
+  ai taubat taubat-assault-kli-random4
+every signal raid-5
+  ai taubat taubat-assault-kli-random5
+every signal raid-6
+  ai taubat taubat-assault-kli-random6
+every signal raid-7
+  ai taubat taubat-assault-kli-random7
+every signal raid-8
+  ai taubat taubat-assault-kli-random8
+
+# Scans that find nothing.
+every scanned-nothing science
+  say science "Ordinary science scans show nothing unusual."
+every scanned-nothing strong-science
+  say science "A detailed scan... nothing out of the ordinary."
+every scanned-nothing medical
+  say medical "Ordinary medical scans find nothing abnormal."
+every scanned-nothing strong-medical
+  say medical "Full diagnostics: nothing of interest here."
+every scanned-nothing engineering
+  say engineering "Structures and systems are within normal limits."
+every scanned-nothing strong-engineering
+  say engineering "Nothing of interest here."
+
+# Not expressible yet:
+# - The approach warnings filter by unit class (tanks; near the allies a wider mask);
+#   here any rebel unit counts.
+# - Both factions' houses and hangars share Reluva's type names (taubat-house,
+#   taubat-hangar), so "count taubat-house == 0" (the allies' houses) also waits for
+#   the rebels', and a rebel hangar destroyed also reads as "destroyed taubat-hangar".
+# - A research topic about the allies' reactors (150000 points, science) is defined but
+#   nothing in the graph makes it available, and its result goes to an object that
+#   doesn't exist: it never plays.
+# - The briefing (phase 2) and the unnamed patrols.

@@ -1,0 +1,291 @@
+# --- F1 as F ----------------------------------------
+# F1 as the Federation, rewritten from the game's own graph (STNW.exe dump F1.json, slot 0,
+# with the Klingon (1), Taubat (3) and temple (5) objects that report to the Federation).
+mission F1 F
+site klingon-tracks 358 202
+site taubat-colony 330 174
+site temple-approach 338 154
+site temple-edge 338 150
+site temple 332 152
+objective 16
+objective 17
+objective 18
+objective 19 hidden
+
+# --- The temple's reactor is already failing: the temple starts at 40 % of its strength ---
+on start
+  damage taubat-temple 60
+
+# --- The Klingons: a timetable of probes and attacks from the start ---------------------
+on start
+  timer kli-guard 1
+  timer kli-recce 10
+  timer kli-first-attack 100
+  timer kli-attack-1 500
+  timer kli-attack-2 800
+  timer kli-attack-3 1100
+  timer kli-random-attack 300
+  timer kli-random-scout 300
+  timer kli-scout-response 300
+on timer kli-guard
+  ai klingon klingon-colony-protection-one
+  ai klingon klingon-colony-protection-two
+  ai klingon klingon-colony-protection-three
+on timer kli-recce
+  say intelligence "Command urges caution: the Klingons have set up a colony to the south."
+  ai klingon initial-recce
+on timer kli-first-attack
+  say intelligence "Incoming vehicle, Sir. Klingon, and it's making for the colony!"
+  ai klingon initial-assault-one
+  ai klingon initial-assault-two
+  ai klingon initial-assault-three
+on timer kli-attack-1
+  ai klingon assault-one
+on timer kli-attack-2
+  ai klingon assault-two
+on timer kli-attack-3
+  ai klingon assault-three
+on timer kli-scout-response
+  ai klingon scout-response1
+  ai klingon scout-response2
+  ai klingon scout-response3
+  ai klingon scout-response4
+  ai klingon scout-response5
+  ai klingon scout-response6
+  ai klingon scout-response7
+  ai klingon scout-response8
+# every 300 s one of eight assaults, and one of eight scouting runs, at random
+every timer kli-random-attack
+  random kli-raid-1 kli-raid-2 kli-raid-3 kli-raid-4 kli-raid-5 kli-raid-6 kli-raid-7 kli-raid-8
+  timer kli-random-attack 300
+every signal kli-raid-1
+  ai klingon assault-random1
+every signal kli-raid-2
+  ai klingon assault-random2
+every signal kli-raid-3
+  ai klingon assault-random3
+every signal kli-raid-4
+  ai klingon assault-random4
+every signal kli-raid-5
+  ai klingon assault-random5
+every signal kli-raid-6
+  ai klingon assault-random6
+every signal kli-raid-7
+  ai klingon assault-random7
+every signal kli-raid-8
+  ai klingon assault-random8
+every timer kli-random-scout
+  random kli-scout-1 kli-scout-2 kli-scout-3 kli-scout-4 kli-scout-5 kli-scout-6 kli-scout-7 kli-scout-8
+  timer kli-random-scout 300
+every signal kli-scout-1
+  ai klingon scout-random1
+every signal kli-scout-2
+  ai klingon scout-random2
+every signal kli-scout-3
+  ai klingon scout-random3
+every signal kli-scout-4
+  ai klingon scout-random4
+every signal kli-scout-5
+  ai klingon scout-random5
+every signal kli-scout-6
+  ai klingon scout-random6
+every signal kli-scout-7
+  ai klingon scout-random7
+every signal kli-scout-8
+  ai klingon scout-random8
+on seen klingon-tracks
+  say security "Disruptor fire on the sensors. Looks like the Klingons mean to take this planet."
+
+# --- Scans of things the mission has no use for ------------------------------------------
+every scanned-nothing science
+  say science "Routine science scans find nothing unusual, Sir."
+every scanned-nothing strong-science
+  say science "A detailed scan, Sir, but it's all just as I'd expect."
+every scanned-nothing medical
+  say medical "Routine medical scans show nothing wrong, Sir."
+every scanned-nothing strong-medical
+  say medical "The full diagnostics turn up nothing of note, Sir."
+every scanned-nothing engineering
+  say engineering "Structure and systems read normal, Sir."
+every scanned-nothing strong-engineering
+  say engineering "Nothing much here for engineering, Sir."
+
+# --- Objective 16: the first of five buildings --------------------------------------------
+on built-all vehicle-yard construction-yard power-generator resource-processor accommodation
+  complete 16
+  signal objective
+  timer colony-built 5
+on timer colony-built
+  say command "The colony expansion is finished."
+
+# --- The Taubat mine (science scans, 1 s to start, 10 s to finish) -------------------------
+every scan-started science taubat-mine
+  say science "Scan under way, Sir."
+on scanned science taubat-mine
+  say science "The scan's done, but the readings are unclear. I'd like someone else to look."
+every scan-started strong-science taubat-mine
+  say science "Scanning, with low-pass filters to clean up the signal."
+every scan-lost strong-science taubat-mine
+  say science "Lost the scan: it didn't run long enough, Sir."
+on scanned strong-science taubat-mine
+  say science "Done: it looks like a primitive mine, but the radiation there is unusually high."
+
+# --- Objective 17: the plague in the Taubat colony ------------------------------------------
+on seen taubat-colony
+  say medical "We've located the centre of the plague. A medical scan of the central buildings would help."
+every scan-started medical taubat-colony
+  say medical "Starting the medical scan, Sir."
+every scan-lost medical taubat-colony
+  say medical "We lost the medical scan, Sir. We'll need another go."
+on scanned medical taubat-colony
+  say medical "The scan is over, but its results aren't conclusive. Someone with expertise would judge it better in person."
+every scan-started strong-medical taubat-colony
+  say medical "Starting a full diagnostic scan."
+every scan-lost strong-medical taubat-colony
+  say medical "The scan was lost. We'll have to repeat it to get a diagnosis."
+on scanned strong-medical taubat-colony
+  say medical "Done. Taubat biology is new to us, so I can't be certain, but I'd say radiation sickness."
+  say medical "Let's have this studied at the colony. Our sickbay staff can handle the research."
+  research taubat-colony-research
+on researched taubat-colony-research
+  complete 17
+  signal objective
+  signal radiation-hint
+  timer plague-report-1 5
+  timer plague-report-2 15
+  timer plague-reminder 30
+  timer research-done 20
+on timer plague-report-1
+  say medical "The research bears out the Doctor: radiation sickness, worsened by mutated strains of ordinary Taubat germs."
+on timer plague-report-2
+  say medical "Only an artificial source could give this much contamination. We must find it and shut it off, and soon."
+on timer research-done
+  say command "The medical research is finished."
+on timer plague-reminder
+  say medical "The Taubat are dying. We have to find where that radiation comes from, now."
+
+# --- Objective 18: the temple ----------------------------------------------------------------
+on seen temple-approach
+  say "Incoming message" "Strangers, this ground is holy. Please, leave at once."
+on seen temple-edge
+  signal radiation-hint
+# needs both the research and a look at the temple
+on signal radiation-hint*2
+  say engineering "Sensors read a powerful energy signature at {site:temple}, westward of the Taubat settlement. It's worth investigating."
+every scan-started medical temple
+  say medical "No wonder these Taubat are dying: the radiation is off the scale. Engineering should look into it."
+every scan-started strong-medical temple
+  say medical "No wonder these Taubat are dying: the radiation is off the scale. Engineering should look into it."
+every scan-started science temple
+  say science "Very high radiation, and the field gradients point to this building as the source. Engineering should know."
+every scan-started strong-science temple
+  say science "Very high radiation, and the field gradients point to this building as the source. Engineering should know."
+# engineering scans: 30 s to finish
+every scan-started engineering temple
+  say engineering "Starting a systems scan."
+every scan-lost engineering temple
+  say engineering "The scan was cut short. We'll have to run it again for that data."
+on scanned engineering temple
+  say engineering "Scan done: the trouble seems to be a reactor containment field out of alignment."
+  timer temple-apc-hint 10
+  signal temple-surveyed
+on timer temple-apc-hint
+  say engineering "To repair the field generators we'll have to send an away team in an APC."
+every scan-started strong-engineering temple
+  say engineering "Starting a full systems scan."
+every scan-lost strong-engineering temple
+  say engineering "The scan was cut short. We'll have to run it again for that data."
+on scanned strong-engineering temple
+  say engineering "Scan done: quite an advanced reactor, but the Taubat have let it fall into disrepair."
+  timer temple-field-hint 10
+  signal temple-surveyed
+on timer temple-field-hint
+  say engineering "The main containment field is misaligned and leaking badly. Easy to fix, but we must get in quickly."
+on signal temple-surveyed
+  timer temple-report 20
+# 20 s after the survey: objective 18 met, 19 revealed, the capture watch woken, and the
+# Taubat's patience runs out
+on timer temple-report
+  complete 18
+  reveal 19
+  arm temple-capture
+  signal objective
+  timer temple-done 15
+  timer temple-security 20
+  timer taubat-demand 25
+  timer taubat-death 1200
+on timer temple-done
+  say command "The engineering scan of the temple is finished."
+on timer temple-security
+  say security "We mustn't provoke the Taubat. Use a single APC to take the temple."
+on timer taubat-demand
+  say intelligence "Sir, the Taubat insist we leave this area. They give us five minutes."
+  timer taubat-hostile 300
+on timer taubat-hostile
+  hostile taubat
+on timer taubat-death
+  fail 23 20
+  say medical "The Taubat are dead. We couldn't stop the plague."
+  signal failing
+
+# --- Objective 19: take the temple and hold it 10 s (a raid that sleeps until the survey) ---------
+every entered temple as temple-capture dormant
+  say engineering "The away team is inside, Sir. Starting on the field realignment."
+every capture-lost temple as temple-capture dormant
+  say engineering "We left the temple too soon: the containment field is still unfixed."
+on captured temple as temple-capture dormant
+  say engineering "The containment field is aligned again and radiation is dropping. Just in time, Sir."
+  complete 19
+  signal objective
+
+# --- The Klingon colony falls (if the player takes it) -----------------------------------
+# their build timetable (con yard 60 s ... science block 660 s) runs by itself; losing
+# their hub cancels the rest
+on hub-destroyed klingon
+  ai klingon abort kli-npc-build-con-yard
+  ai klingon abort kli-npc-build-veh-yard
+  ai klingon abort kli-npc-build-res-proc
+  ai klingon abort kli-npc-build-accom-blck
+  ai klingon abort kli-npc-build-shld-gen1
+  ai klingon abort kli-npc-build-sci-blck
+
+# --- The pass: four objectives, a message at 10 s, the win at 20 s ----------------------------
+on signal objective*4
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "All objectives met. Well done."
+on timer pass
+  win
+
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on count taubat-hangar == 2
+  fail 20 20
+  say security "One of the Taubat colony's buildings has been destroyed."
+  signal failing
+on count taubat-house == 5
+  fail 20 20
+  say security "One of the Taubat colony's buildings has been destroyed."
+  signal failing
+on destroyed colony-hub
+  fail 21 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+on destroyed taubat-temple
+  fail 22 20
+  say security "The Taubat temple has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
+
+# Not expressible yet:
+# - Repeating a finished scan or capture gets its own line in the game ("consult a specialist",
+#   "radiation still rising", (the game's line), "health deteriorating, research at once",
+#   "containment field deteriorating", "field won't hold long", "temple retaken, field holding"):
+#   no event for "the same thing again, after it succeeded".
+# - The weak science scan of the mine has no "lost" line, the strong scans do (kept as written).
+# - The Klingons' build timetable is part of their AI orders, not the script; the random
+#   assaults and scouts are a 300 s repeating random pick among eight orders each.
+# - The research topic's points and field (150000, medical) are research data, not script.

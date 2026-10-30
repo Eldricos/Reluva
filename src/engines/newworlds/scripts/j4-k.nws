@@ -1,0 +1,120 @@
+# --- J4 as K ----------------------------------------
+# J4, played as the Klingons (slot 1).
+# Rewritten from the game's own mission graph (scripts_out/J4.json).
+mission J4 K
+site klingon-colony 330 181
+zone old-klingon-colony 234 186 262 206
+site science-station 258 189      # group ~Kli Sci Blk
+site arsenal 234 205              # group ~Kli Sec Cen
+site construction-yard 234 189    # group ~Kli Con Yard
+site colonial-house 258 173       # group ~Kli Acm Blk
+objective 16
+objective 17
+objective 18
+objective 19
+
+# --- Attacks: the Taubat strike the first time a side enters the old colony
+on inside ours old-klingon-colony
+  ai taubat taubat-sat-kli-colony-assault
+on inside federation old-klingon-colony
+  ai taubat taubat-sat-fed-colony-assault
+on inside romulan old-klingon-colony
+  ai taubat taubat-sat-rom-colony-assault
+
+# --- The four recaptures: each held 1 s to start, 5 s more to count --------
+# Objective 16: the science station.
+on entered science-station
+  say intelligence "We're in! Clearing out the Metar."
+on capture-lost science-station
+  say intelligence "We can't take the building back."
+on captured science-station
+  say intelligence "Success! The science station is ours again."
+  complete 16
+  signal recaptured
+# Objective 17: the arsenal.
+on entered arsenal
+  say intelligence "We're in! Clearing out the Metar."
+on capture-lost arsenal
+  say intelligence "The recapture has failed: they're too strong for us."
+on captured arsenal
+  say intelligence "Success! The arsenal is ours again."
+  complete 17
+  signal recaptured
+# Objective 18: the construction yard and the colonial house, both.
+on entered construction-yard
+  say intelligence "We're in! Wiping out the captors."
+on capture-lost construction-yard
+  say intelligence "We can't take the construction yard back."
+on captured construction-yard
+  say intelligence "Success! The construction yard is ours again."
+  signal yard-and-house
+  signal recaptured
+on entered colonial-house
+  say intelligence "We're in! Clearing out the Metar."
+on capture-lost colonial-house
+  say intelligence "The recapture has failed: they're too strong for us."
+on captured colonial-house
+  say intelligence "Success! The colonial house is ours again."
+  signal yard-and-house
+  signal recaptured
+on signal yard-and-house*2
+  complete 18
+on signal recaptured*4
+  timer primaries-notice 10
+  signal pass-step
+on timer primaries-notice
+  say intelligence "The primary objectives are complete."
+
+# --- Objective 19: no Metar or Taubat fighting units left -------------------
+on count metar-fighting-units <= 0
+  signal natives-gone
+on count taubat-fighting-units <= 0
+  signal natives-gone
+on signal natives-gone*2
+  timer secondary-notice 5
+  signal pass-step
+on timer secondary-notice
+  say intelligence "Secondary objective met: every Metar and Taubat unit has been destroyed."
+  complete 19
+
+# --- Mission pass: the four recaptures and the natives gone, then 10 s / 20 s
+on signal pass-step*2
+  timer pass-notice 10
+  timer pass 20
+on timer pass-notice
+  say intelligence "Mission accomplished for the Klingons."
+on timer pass
+  win
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+# (The four buildings' fails come from their raids being "beaten" by a rival;
+# nothing in the mission ever sends that, so they can't happen in the game.)
+fail 20 beaten science-station
+  say intelligence "The science station has been destroyed. The mission has failed."
+  signal failing
+fail 21 beaten arsenal
+  say intelligence "The arsenal has been destroyed. The mission has failed."
+  signal failing
+fail 22 beaten colonial-house
+  say intelligence "The colonial house has been destroyed. The mission has failed."
+  signal failing
+fail 23 beaten construction-yard
+  say intelligence "The construction yard has been destroyed. The objective has failed."
+  signal failing
+fail 24 count colony-hub == 0
+  say intelligence "The Klingon colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
+  say intelligence "The Klingons are unable to finish their mission."
+
+# Not expressible yet:
+# - The recaptures' fail lines hang on their "beaten" outcome, which no
+#   object sends (the J4 raids don't hand off); written on the buildings'
+#   names, not the raid labels, so Reluva's hand-off can't fire them either.
+# - Fail 25 (all Klingon forces destroyed) and the table's string 15 (hold all
+#   four at once) have nothing in the game's graph; the pass only counts each
+#   recapture once, not simultaneous control.
+# - The Klingons' own AI orders (colony guard, assaults on the Federation at
+#   300 s and the Romulans at 360 s) only run when the side isn't played.

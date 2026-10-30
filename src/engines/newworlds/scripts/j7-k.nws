@@ -1,0 +1,302 @@
+# --- J7 as K ----------------------------------------
+# J7 as the Klingons (slot 1), from the game's own mission graph.
+# Stock up dilithium and transal for the Hubrin (the game takes a share of
+# each), and keep our Hubrin guide alive; both objectives are met together.
+mission J7 K
+objective 13
+objective 15
+
+# Fail criteria, the game's way: the cause at once, word to every side at
+# 5 s that the Klingons can't complete their mission, the end at 10 s.
+# Our hub (14); our Hubrin guide killed (16).
+on destroyed kli-hubrin
+  fail 16 10
+  say intelligence "Our Hubrin guide is dead."
+  signal failing
+on destroyed colony-hub
+  fail 14 10
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-news 5
+on timer fail-news
+  say intelligence "The Klingons' mission can no longer succeed."
+
+# Start: the other sides' attack clocks
+on start
+  timer fed-raid-kli 180
+  timer fed-raid-rom 180
+  timer rom-raid-fed 180
+  timer rom-raid-kli 180
+  timer tau-raid-fed 180
+  timer tau-raid-kli 180
+  timer tau-raid-rom 180
+  timer met-raid-fed 300
+  timer met-raid-kli 300
+  timer met-raid-rom 300
+  timer met-assault-federation 1800
+  timer met-assault-klingon 2100
+  timer met-assault-romulan 2400
+
+# Objectives 13 and 15: 250 of dilithium in stock (100 is taken), 250 of
+# transal in stock (50 is taken); with both delivered the guide's job is done
+on stock dilithium 250
+  take dilithium 100
+  say engineering "Your dilithium is ready."
+  signal quota
+on stock transalumin 250
+  take transalumin 50
+  say engineering "The transal consignment is ready to go."
+  signal quota
+on signal quota*2
+  complete 13
+  complete 15
+
+# Mission passed: the news at once, the win 10 s later
+on all-completed
+  say intelligence "The Klingons' mission is accomplished."
+  timer pass 10
+on timer pass
+  win
+
+# A colony grown to four times its starting size draws two Metar attacks
+# on it: ours, and the other sides' too
+on colony-size 400
+  ai metar met-assault-leading-player-kli-a
+  ai metar met-assault-leading-player-kli-b
+on colony-size federation 400
+  ai metar met-assault-leading-player-fed-a
+  ai metar met-assault-leading-player-fed-b
+on colony-size romulan 400
+  ai metar met-assault-leading-player-rom-a
+  ai metar met-assault-leading-player-rom-b
+
+# The other sides' AI: attacks on a clock (the Klingons' own attack orders
+# are left out: the player gives those)
+# Federation raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
+every timer fed-raid-kli
+  timer fed-raid-kli 60
+  random fed-raid-kli-1 fed-raid-kli-2 fed-raid-kli-3 fed-raid-kli-4 fed-raid-kli-5 fed-raid-kli-6 fed-raid-kli-7 fed-raid-kli-8
+every signal fed-raid-kli-1
+  ai federation fed-assault-kli-random1
+every signal fed-raid-kli-2
+  ai federation fed-assault-kli-random2
+every signal fed-raid-kli-3
+  ai federation fed-assault-kli-random3
+every signal fed-raid-kli-4
+  ai federation fed-assault-kli-random4
+every signal fed-raid-kli-5
+  ai federation fed-assault-kli-random5
+every signal fed-raid-kli-6
+  ai federation fed-assault-kli-random6
+every signal fed-raid-kli-7
+  ai federation fed-assault-kli-random7
+every signal fed-raid-kli-8
+  ai federation fed-assault-kli-random8
+
+# Federation raids on the Romulans: one of eight attacks every 60 s, the first at 180 s
+every timer fed-raid-rom
+  timer fed-raid-rom 60
+  random fed-raid-rom-1 fed-raid-rom-2 fed-raid-rom-3 fed-raid-rom-4 fed-raid-rom-5 fed-raid-rom-6 fed-raid-rom-7 fed-raid-rom-8
+every signal fed-raid-rom-1
+  ai federation fed-assault-rom-random1
+every signal fed-raid-rom-2
+  ai federation fed-assault-rom-random2
+every signal fed-raid-rom-3
+  ai federation fed-assault-rom-random3
+every signal fed-raid-rom-4
+  ai federation fed-assault-rom-random4
+every signal fed-raid-rom-5
+  ai federation fed-assault-rom-random5
+every signal fed-raid-rom-6
+  ai federation fed-assault-rom-random6
+every signal fed-raid-rom-7
+  ai federation fed-assault-rom-random7
+every signal fed-raid-rom-8
+  ai federation fed-assault-rom-random8
+
+# Romulan raids on the Federation: one of eight attacks every 60 s, the first at 180 s
+every timer rom-raid-fed
+  timer rom-raid-fed 60
+  random rom-raid-fed-1 rom-raid-fed-2 rom-raid-fed-3 rom-raid-fed-4 rom-raid-fed-5 rom-raid-fed-6 rom-raid-fed-7 rom-raid-fed-8
+every signal rom-raid-fed-1
+  ai romulan rom-assault-fed-random1
+every signal rom-raid-fed-2
+  ai romulan rom-assault-fed-random2
+every signal rom-raid-fed-3
+  ai romulan rom-assault-fed-random3
+every signal rom-raid-fed-4
+  ai romulan rom-assault-fed-random4
+every signal rom-raid-fed-5
+  ai romulan rom-assault-fed-random5
+every signal rom-raid-fed-6
+  ai romulan rom-assault-fed-random6
+every signal rom-raid-fed-7
+  ai romulan rom-assault-fed-random7
+every signal rom-raid-fed-8
+  ai romulan rom-assault-fed-random8
+
+# Romulan raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
+every timer rom-raid-kli
+  timer rom-raid-kli 60
+  random rom-raid-kli-1 rom-raid-kli-2 rom-raid-kli-3 rom-raid-kli-4 rom-raid-kli-5 rom-raid-kli-6 rom-raid-kli-7 rom-raid-kli-8
+every signal rom-raid-kli-1
+  ai romulan rom-assault-kli-random1
+every signal rom-raid-kli-2
+  ai romulan rom-assault-kli-random2
+every signal rom-raid-kli-3
+  ai romulan rom-assault-kli-random3
+every signal rom-raid-kli-4
+  ai romulan rom-assault-kli-random4
+every signal rom-raid-kli-5
+  ai romulan rom-assault-kli-random5
+every signal rom-raid-kli-6
+  ai romulan rom-assault-kli-random6
+every signal rom-raid-kli-7
+  ai romulan rom-assault-kli-random7
+every signal rom-raid-kli-8
+  ai romulan rom-assault-kli-random8
+
+# Taubat raids on the Federation: one of eight attacks every 60 s, the first at 180 s
+every timer tau-raid-fed
+  timer tau-raid-fed 60
+  random tau-raid-fed-1 tau-raid-fed-2 tau-raid-fed-3 tau-raid-fed-4 tau-raid-fed-5 tau-raid-fed-6 tau-raid-fed-7 tau-raid-fed-8
+every signal tau-raid-fed-1
+  ai taubat taubat-assault-fed-random1
+every signal tau-raid-fed-2
+  ai taubat taubat-assault-fed-random2
+every signal tau-raid-fed-3
+  ai taubat taubat-assault-fed-random3
+every signal tau-raid-fed-4
+  ai taubat taubat-assault-fed-random4
+every signal tau-raid-fed-5
+  ai taubat taubat-assault-fed-random5
+every signal tau-raid-fed-6
+  ai taubat taubat-assault-fed-random6
+every signal tau-raid-fed-7
+  ai taubat taubat-assault-fed-random7
+every signal tau-raid-fed-8
+  ai taubat taubat-assault-fed-random8
+
+# Taubat raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
+every timer tau-raid-kli
+  timer tau-raid-kli 60
+  random tau-raid-kli-1 tau-raid-kli-2 tau-raid-kli-3 tau-raid-kli-4 tau-raid-kli-5 tau-raid-kli-6 tau-raid-kli-7 tau-raid-kli-8
+every signal tau-raid-kli-1
+  ai taubat taubat-assault-kli-random1
+every signal tau-raid-kli-2
+  ai taubat taubat-assault-kli-random2
+every signal tau-raid-kli-3
+  ai taubat taubat-assault-kli-random3
+every signal tau-raid-kli-4
+  ai taubat taubat-assault-kli-random4
+every signal tau-raid-kli-5
+  ai taubat taubat-assault-kli-random5
+every signal tau-raid-kli-6
+  ai taubat taubat-assault-kli-random6
+every signal tau-raid-kli-7
+  ai taubat taubat-assault-kli-random7
+every signal tau-raid-kli-8
+  ai taubat taubat-assault-kli-random8
+
+# Taubat raids on the Romulans: one of eight attacks every 60 s, the first at 180 s
+every timer tau-raid-rom
+  timer tau-raid-rom 60
+  random tau-raid-rom-1 tau-raid-rom-2 tau-raid-rom-3 tau-raid-rom-4 tau-raid-rom-5 tau-raid-rom-6 tau-raid-rom-7 tau-raid-rom-8
+every signal tau-raid-rom-1
+  ai taubat taubat-assault-rom-random1
+every signal tau-raid-rom-2
+  ai taubat taubat-assault-rom-random2
+every signal tau-raid-rom-3
+  ai taubat taubat-assault-rom-random3
+every signal tau-raid-rom-4
+  ai taubat taubat-assault-rom-random4
+every signal tau-raid-rom-5
+  ai taubat taubat-assault-rom-random5
+every signal tau-raid-rom-6
+  ai taubat taubat-assault-rom-random6
+every signal tau-raid-rom-7
+  ai taubat taubat-assault-rom-random7
+every signal tau-raid-rom-8
+  ai taubat taubat-assault-rom-random8
+
+# Metar raids on the Federation: one of eight attacks every 60 s, the first at 300 s
+every timer met-raid-fed
+  timer met-raid-fed 60
+  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
+every signal met-raid-fed-1
+  ai metar metar-assault-fed-random1
+every signal met-raid-fed-2
+  ai metar metar-assault-fed-random2
+every signal met-raid-fed-3
+  ai metar metar-assault-fed-random3
+every signal met-raid-fed-4
+  ai metar metar-assault-fed-random4
+every signal met-raid-fed-5
+  ai metar metar-assault-fed-random5
+every signal met-raid-fed-6
+  ai metar metar-assault-fed-random6
+every signal met-raid-fed-7
+  ai metar metar-assault-fed-random7
+every signal met-raid-fed-8
+  ai metar metar-assault-fed-random8
+
+# Metar raids on the Klingons: one of eight attacks every 60 s, the first at 300 s
+every timer met-raid-kli
+  timer met-raid-kli 60
+  random met-raid-kli-1 met-raid-kli-2 met-raid-kli-3 met-raid-kli-4 met-raid-kli-5 met-raid-kli-6 met-raid-kli-7 met-raid-kli-8
+every signal met-raid-kli-1
+  ai metar metar-assault-kli-random1
+every signal met-raid-kli-2
+  ai metar metar-assault-kli-random2
+every signal met-raid-kli-3
+  ai metar metar-assault-kli-random3
+every signal met-raid-kli-4
+  ai metar metar-assault-kli-random4
+every signal met-raid-kli-5
+  ai metar metar-assault-kli-random5
+every signal met-raid-kli-6
+  ai metar metar-assault-kli-random6
+every signal met-raid-kli-7
+  ai metar metar-assault-kli-random7
+every signal met-raid-kli-8
+  ai metar metar-assault-kli-random8
+
+# Metar raids on the Romulans: one of eight attacks every 60 s, the first at 300 s
+every timer met-raid-rom
+  timer met-raid-rom 60
+  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
+every signal met-raid-rom-1
+  ai metar metar-assault-rom-random1
+every signal met-raid-rom-2
+  ai metar metar-assault-rom-random2
+every signal met-raid-rom-3
+  ai metar metar-assault-rom-random3
+every signal met-raid-rom-4
+  ai metar metar-assault-rom-random4
+every signal met-raid-rom-5
+  ai metar metar-assault-rom-random5
+every signal met-raid-rom-6
+  ai metar metar-assault-rom-random6
+every signal met-raid-rom-7
+  ai metar metar-assault-rom-random7
+every signal met-raid-rom-8
+  ai metar metar-assault-rom-random8
+
+# Metar orders on a clock
+on timer met-assault-federation
+  ai metar met-assault-federation
+on timer met-assault-klingon
+  ai metar met-assault-klingon
+on timer met-assault-romulan
+  ai metar met-assault-romulan
+
+# Not expressible yet:
+# - Fail 14: the Klingons' hub monitor names its fail criterion
+#   "Colony_hub_destroyed" but the table calls it "Colony_hub-destroyed", so
+#   the game ends the mission without ticking the fail string.
+# - The Hubrin guides walk to each colony on their own orders (unit orders of
+#   the Hubrin side, not started by the script), and the AI sides build on
+#   their own timetable and stop when their hub falls.
+# - Messages caused by the other sides: their mission passed/failed
+#   announcements (sent to every side). There's no event for a rival's pass.

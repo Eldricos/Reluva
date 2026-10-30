@@ -1,0 +1,145 @@
+# --- J1 as F ----------------------------------------
+# J1 "Into the Arena", played as the Federation (slot 0).
+# Rewritten from the game's own mission graph (scripts_out/J1.json).
+mission J1 F
+site federation-colony 426 69
+site taubat-colony 298 205
+site temple 394 309
+objective 21
+objective 23
+objective 25 hidden
+
+# --- The other sides' attacks on the colony -------------------------------
+# A Klingon strike 10 s in; from 480 s a random Klingon and a random Romulan
+# assault every 180 s (each picks one of eight routes).
+on start
+  timer kli-assault-federation 10
+  timer kli-raids-on-fed 480
+  timer rom-raids-on-fed 480
+on timer kli-assault-federation
+  ai klingon kli-assault-federation-1
+every timer kli-raids-on-fed
+  random kli-assault-fed-random1 kli-assault-fed-random2 kli-assault-fed-random3 kli-assault-fed-random4 kli-assault-fed-random5 kli-assault-fed-random6 kli-assault-fed-random7 kli-assault-fed-random8
+  timer kli-raids-on-fed 180
+every signal kli-assault-fed-random1
+  ai klingon kli-assault-fed-random1
+every signal kli-assault-fed-random2
+  ai klingon kli-assault-fed-random2
+every signal kli-assault-fed-random3
+  ai klingon kli-assault-fed-random3
+every signal kli-assault-fed-random4
+  ai klingon kli-assault-fed-random4
+every signal kli-assault-fed-random5
+  ai klingon kli-assault-fed-random5
+every signal kli-assault-fed-random6
+  ai klingon kli-assault-fed-random6
+every signal kli-assault-fed-random7
+  ai klingon kli-assault-fed-random7
+every signal kli-assault-fed-random8
+  ai klingon kli-assault-fed-random8
+every timer rom-raids-on-fed
+  random rom-assault-fed-random1 rom-assault-fed-random2 rom-assault-fed-random3 rom-assault-fed-random4 rom-assault-fed-random5 rom-assault-fed-random6 rom-assault-fed-random7 rom-assault-fed-random8
+  timer rom-raids-on-fed 180
+every signal rom-assault-fed-random1
+  ai romulan rom-assault-fed-random1
+every signal rom-assault-fed-random2
+  ai romulan rom-assault-fed-random2
+every signal rom-assault-fed-random3
+  ai romulan rom-assault-fed-random3
+every signal rom-assault-fed-random4
+  ai romulan rom-assault-fed-random4
+every signal rom-assault-fed-random5
+  ai romulan rom-assault-fed-random5
+every signal rom-assault-fed-random6
+  ai romulan rom-assault-fed-random6
+every signal rom-assault-fed-random7
+  ai romulan rom-assault-fed-random7
+every signal rom-assault-fed-random8
+  ai romulan rom-assault-fed-random8
+
+# --- Objective 21: expand the colony threefold ----------------------------
+# At twice its starting size the Romulans take notice and send two assaults.
+on colony-size 200
+  ai romulan rom-assault-federation-1
+  ai romulan rom-assault-federation-2
+on colony-size 300
+  say engineering "The colony's development is complete, sir."
+  complete 21
+
+# --- Objective 23: scan the radiation source (the temple) -----------------
+on scanned science temple
+  complete 23
+  reveal 25
+
+# --- Objective 25: take the temple and hold it for a minute ---------------
+# Our capture monitor reports each entry until the hold succeeds, then stops.
+every entered temple as fed-temple-watch
+  say engineering "We're inside the Taubat temple, sir."
+every vacated temple
+  say intelligence "Nobody holds the Taubat temple now."
+on held temple 60
+  say engineering "The alien power source is stable now, sir."
+  complete 25
+  disarm fed-temple-watch
+  disarm temple-unheld   # a held temple can no longer fail us by being destroyed
+
+# --- What the rivals do at the temple and the settlement -------------------
+# (The captures can't come from the computer's sides: they never capture.)
+every captured-by klingon temple
+  say intelligence "The Klingons have got into the Taubat temple."
+every captured-by romulan temple
+  say intelligence "The Romulans have got into the Taubat temple."
+every captured-by romulan taubat-colony 30
+  say intelligence "A Romulan raid has seized part of the Taubat settlement."
+on count klingon-disruptor-tank == 14
+  say intelligence "You should know, sir: the Klingons are massing a large force."
+on destroyed taubat-temple
+  say intelligence "The Taubat temple has been destroyed."
+
+# --- Fails: the cause at once, a line at 10 s, the mission lost at 20 s ----
+fail 22 count colony-hub == 0
+  say intelligence "The Federation colony hub has been destroyed."
+  signal failing
+fail 24 colony-total taubat 50   # the settlement down to half (Klingon work, usually)
+  say intelligence "The Taubat settlement has been laid waste."
+  signal failing
+# The temple destroyed before anyone has held it: any side's hold switches
+# this off.
+fail 24 destroyed taubat-temple as temple-unheld
+  signal failing
+# A rival's hold on the temple (fail 26); only a human rival can capture.
+on held-by klingon temple 60
+  fail 26 20
+  say intelligence "The Klingons now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on held-by romulan temple 60
+  fail 26 20
+  say intelligence "The Romulans now control the Taubat power source."
+  disarm temple-unheld
+  signal failing
+on signal failing
+  timer fail-notice 10
+on timer fail-notice
+  say intelligence "The Federation is unable to finish its mission."
+
+# --- Mission pass: all three objectives, a line at 10 s, the win at 20 s ----
+on all-completed
+  timer pass-notice 10
+  timer pass 20
+on timer pass-notice
+  say intelligence "Mission accomplished for the Federation."
+on timer pass
+  win
+
+# Not expressible yet:
+# - captured-by / held-by <side> temple and captured-by romulan taubat-colony
+#   30 never fire: the computer's sides never capture (kept for a human rival).
+# - The temple scan is also wired to a stance switch (Tau_hostile_to_Federation)
+#   that the mission doesn't have, so nothing happens: the Taubat stay neutral.
+# - The rivals' own pass/fail lines ("the Klingons have completed their
+#   mission", 10 s after their counter fills) and what the game's referee does
+#   with a rival's pass; the generic side-failed rule covers only the fail.
+# - The Federation's own AI orders (build timetable, aborted when the hub falls;
+#   assaults on the Romulans at 1200/1260 s and on the Klingons when they have
+#   14 tanks; random raids from 480 s) only run when the side isn't played.

@@ -1,0 +1,262 @@
+# --- J8 as R ----------------------------------------
+# J8 as the Romulans (slot 2), from the game's own mission graph.
+# Research and build the anomaly device, then get it to the detonation site
+# while keeping the vehicle yard and the device itself alive.
+mission J8 R
+zone detonation-site 252 307 260 315
+objective 13
+objective 15
+objective 17 hidden
+
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J8). Our hub (14), our last vehicle yard (16),
+# and the device (18), watched only once it's built (see objective 13).
+on destroyed colony-hub
+  fail 14 10
+  say command "Colony hub lost. The mission has failed."
+on count vehicle-yard == 0
+  fail 16 10
+  say command "Vehicle yard lost. The mission has failed."
+on destroyed anomaly-device as device-watch dormant
+  fail 18 10
+  say command "The anomaly device has been destroyed. The mission has failed."
+
+# Start: the device research is open from the start (nothing in the graph
+# unlocks it); the Metar starship flies its patrol loop; the other sides'
+# clocks
+on start
+  research anomaly-device
+  move met-starship 202 237 276 410 178 359 202 237 loop
+  timer fed-raid-kli 90
+  timer fed-raid-rom 90
+  timer federation-colony-protection-relay 16
+  timer kli-raid-fed 90
+  timer kli-raid-rom 90
+  timer met-raid-fed 120
+  timer met-raid-kli 120
+  timer met-raid-rom 120
+  timer metar-colony-protection-relay-one 16
+  timer metar-colony-protection-relay-two 16
+  timer metar-colony-protection-relay-three 16
+  timer metar-colony-protection-relay-four 16
+  timer metar-federation-attack 960
+  timer metar-klingon-attack 960
+  timer metar-romulan-attack 960
+
+# Objective 13: the research done, the device built; a minute after the
+# research our device is given its route to the site
+on researched anomaly-device
+  say science "Our researchers have worked out how to build the device."
+  timer device-route 60
+on timer device-route
+  ai romulan rom-anomaly-device-controller
+# (Objective 17 is hidden until the device is built.)
+on built anomaly-device
+  say engineering "Our anomaly device is built and setting off. Guard it with everything we have."
+  arm device-watch
+  complete 13
+  reveal 17
+
+# Objectives 15 and 17: the device inside the rectangle at the site
+on inside anomaly-device detonation-site
+  say engineering "The device is at its target and starting up. We've done it."
+  complete 15
+  complete 17
+
+# Mission passed: the win 10 s later (no announcement in J8)
+on all-completed
+  timer pass 10
+on timer pass
+  win
+
+# The other sides' AI: orders on a clock (the Romulans' own attack orders
+# are left out: the player gives those)
+# Federation raids on the Klingons: one of eight attacks every 30 s, the first at 90 s
+every timer fed-raid-kli
+  timer fed-raid-kli 30
+  random fed-raid-kli-1 fed-raid-kli-2 fed-raid-kli-3 fed-raid-kli-4 fed-raid-kli-5 fed-raid-kli-6 fed-raid-kli-7 fed-raid-kli-8
+every signal fed-raid-kli-1
+  ai federation fed-assault-kli-random1
+every signal fed-raid-kli-2
+  ai federation fed-assault-kli-random2
+every signal fed-raid-kli-3
+  ai federation fed-assault-kli-random3
+every signal fed-raid-kli-4
+  ai federation fed-assault-kli-random4
+every signal fed-raid-kli-5
+  ai federation fed-assault-kli-random5
+every signal fed-raid-kli-6
+  ai federation fed-assault-kli-random6
+every signal fed-raid-kli-7
+  ai federation fed-assault-kli-random7
+every signal fed-raid-kli-8
+  ai federation fed-assault-kli-random8
+
+# Federation raids on the Romulans: one of eight attacks every 30 s, the first at 90 s
+every timer fed-raid-rom
+  timer fed-raid-rom 30
+  random fed-raid-rom-1 fed-raid-rom-2 fed-raid-rom-3 fed-raid-rom-4 fed-raid-rom-5 fed-raid-rom-6 fed-raid-rom-7 fed-raid-rom-8
+every signal fed-raid-rom-1
+  ai federation fed-assault-rom-random1
+every signal fed-raid-rom-2
+  ai federation fed-assault-rom-random2
+every signal fed-raid-rom-3
+  ai federation fed-assault-rom-random3
+every signal fed-raid-rom-4
+  ai federation fed-assault-rom-random4
+every signal fed-raid-rom-5
+  ai federation fed-assault-rom-random5
+every signal fed-raid-rom-6
+  ai federation fed-assault-rom-random6
+every signal fed-raid-rom-7
+  ai federation fed-assault-rom-random7
+every signal fed-raid-rom-8
+  ai federation fed-assault-rom-random8
+
+# Federation orders on a clock
+on timer federation-colony-protection-relay
+  ai federation federation-colony-protection-one
+  ai federation federation-colony-protection-two
+  ai federation federation-colony-protection-three
+  ai federation federation-colony-protection-four
+
+# Klingon raids on the Federation: one of eight attacks every 30 s, the first at 90 s
+every timer kli-raid-fed
+  timer kli-raid-fed 30
+  random kli-raid-fed-1 kli-raid-fed-2 kli-raid-fed-3 kli-raid-fed-4 kli-raid-fed-5 kli-raid-fed-6 kli-raid-fed-7 kli-raid-fed-8
+every signal kli-raid-fed-1
+  ai klingon kli-assault-fed-random1
+every signal kli-raid-fed-2
+  ai klingon kli-assault-fed-random2
+every signal kli-raid-fed-3
+  ai klingon kli-assault-fed-random3
+every signal kli-raid-fed-4
+  ai klingon kli-assault-fed-random4
+every signal kli-raid-fed-5
+  ai klingon kli-assault-fed-random5
+every signal kli-raid-fed-6
+  ai klingon kli-assault-fed-random6
+every signal kli-raid-fed-7
+  ai klingon kli-assault-fed-random7
+every signal kli-raid-fed-8
+  ai klingon kli-assault-fed-random8
+
+# Klingon raids on the Romulans: one of eight attacks every 30 s, the first at 90 s
+every timer kli-raid-rom
+  timer kli-raid-rom 30
+  random kli-raid-rom-1 kli-raid-rom-2 kli-raid-rom-3 kli-raid-rom-4 kli-raid-rom-5 kli-raid-rom-6 kli-raid-rom-7 kli-raid-rom-8
+every signal kli-raid-rom-1
+  ai klingon kli-assault-rom-random1
+every signal kli-raid-rom-2
+  ai klingon kli-assault-rom-random2
+every signal kli-raid-rom-3
+  ai klingon kli-assault-rom-random3
+every signal kli-raid-rom-4
+  ai klingon kli-assault-rom-random4
+every signal kli-raid-rom-5
+  ai klingon kli-assault-rom-random5
+every signal kli-raid-rom-6
+  ai klingon kli-assault-rom-random6
+every signal kli-raid-rom-7
+  ai klingon kli-assault-rom-random7
+every signal kli-raid-rom-8
+  ai klingon kli-assault-rom-random8
+
+# Metar raids on the Federation: one of eight attacks every 60 s, the first at 120 s
+every timer met-raid-fed
+  timer met-raid-fed 60
+  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
+every signal met-raid-fed-1
+  ai metar metar-assault-fed-random1
+every signal met-raid-fed-2
+  ai metar metar-assault-fed-random2
+every signal met-raid-fed-3
+  ai metar metar-assault-fed-random3
+every signal met-raid-fed-4
+  ai metar metar-assault-fed-random4
+every signal met-raid-fed-5
+  ai metar metar-assault-fed-random5
+every signal met-raid-fed-6
+  ai metar metar-assault-fed-random6
+every signal met-raid-fed-7
+  ai metar metar-assault-fed-random7
+every signal met-raid-fed-8
+  ai metar metar-assault-fed-random8
+
+# Metar raids on the Klingons: one of eight attacks every 60 s, the first at 120 s
+every timer met-raid-kli
+  timer met-raid-kli 60
+  random met-raid-kli-1 met-raid-kli-2 met-raid-kli-3 met-raid-kli-4 met-raid-kli-5 met-raid-kli-6 met-raid-kli-7 met-raid-kli-8
+every signal met-raid-kli-1
+  ai metar metar-assault-kli-random1
+every signal met-raid-kli-2
+  ai metar metar-assault-kli-random2
+every signal met-raid-kli-3
+  ai metar metar-assault-kli-random3
+every signal met-raid-kli-4
+  ai metar metar-assault-kli-random4
+every signal met-raid-kli-5
+  ai metar metar-assault-kli-random5
+every signal met-raid-kli-6
+  ai metar metar-assault-kli-random6
+every signal met-raid-kli-7
+  ai metar metar-assault-kli-random7
+every signal met-raid-kli-8
+  ai metar metar-assault-kli-random8
+
+# Metar raids on the Romulans: one of eight attacks every 60 s, the first at 120 s
+every timer met-raid-rom
+  timer met-raid-rom 60
+  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
+every signal met-raid-rom-1
+  ai metar metar-assault-rom-random1
+every signal met-raid-rom-2
+  ai metar metar-assault-rom-random2
+every signal met-raid-rom-3
+  ai metar metar-assault-rom-random3
+every signal met-raid-rom-4
+  ai metar metar-assault-rom-random4
+every signal met-raid-rom-5
+  ai metar metar-assault-rom-random5
+every signal met-raid-rom-6
+  ai metar metar-assault-rom-random6
+every signal met-raid-rom-7
+  ai metar metar-assault-rom-random7
+every signal met-raid-rom-8
+  ai metar metar-assault-rom-random8
+
+# Metar orders on a clock
+on timer metar-colony-protection-relay-one
+  ai metar metar-colony-protection-one
+  ai metar metar-colony-protection-two
+  ai metar metar-colony-protection-three
+  ai metar metar-colony-protection-four
+on timer metar-colony-protection-relay-two
+  ai metar metar-colony-protection-five
+  ai metar metar-colony-protection-six
+  ai metar metar-colony-protection-seven
+  ai metar metar-colony-protection-eight
+on timer metar-colony-protection-relay-three
+  ai metar metar-colony-protection-nine
+  ai metar metar-colony-protection-ten
+  ai metar metar-colony-protection-eleven
+  ai metar metar-colony-protection-twelve
+on timer metar-colony-protection-relay-four
+  ai metar metar-colony-protection-thirteen
+on timer metar-federation-attack
+  ai metar metar-federation-assault-one
+  ai metar metar-federation-assault-two
+on timer metar-klingon-attack
+  ai metar metar-klingon-assault-one
+  ai metar metar-klingon-assault-two
+on timer metar-romulan-attack
+  ai metar metar-romulan-assault-one
+  ai metar metar-romulan-assault-two
+
+# Not expressible yet:
+# - The rivals' devices: their research, building and route orders (60 s
+#   after their research) happen on their side; there's no event for a
+#   rival's research.
+# - Objective 15 (protect the vehicle yard) is met only when the device
+#   arrives, together with 17; the game words it as its own objective but
+#   checks nothing else.

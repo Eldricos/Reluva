@@ -694,6 +694,15 @@ void testMissionScripts() {
     CHECK(std::count_if(out.begin(), out.end(), [](const auto& o) { return o.kind == MissionRun::Output::Ai && o.sender == "K"; }) == 1);
     CHECK(std::count_if(out.begin(), out.end(), [](const auto& o) { return o.kind == MissionRun::Output::Stance; }) == 1);
     CHECK(bool(parseMissionScripts("  say command \"x\"\n", s)));
+    // Errors give the file and line: the line's own, an action's included.
+    CHECK(parseMissionScripts("mission T F\n\non buil x\n", s, "scripts/t.nws").message ==
+          "scripts/t.nws:3: unknown event buil");
+    CHECK(parseMissionScripts("mission T F\non start\n  say command \"x\"\n  complete\n", s, "scripts/t.nws").message ==
+          "scripts/t.nws:4: expected: complete <objective id>");
+    CHECK(parseMissionScripts("mission T F\non start\n  frobnicate\n", s).message ==
+          "mission script:3: unknown action frobnicate");
+    CHECK(!parseMissionScripts("mission T F\non start\n  win\n", s, "scripts/t.nws") && s[0].file == "scripts/t.nws" &&
+          s[0].handlers[0].line == 2 && s[0].handlers[0].actions[0].line == 3);
 
     // Reluva's scripts all read, and each recorded mission's walkthrough
     // plays through without losing; those whose recordings reached the end
@@ -701,6 +710,8 @@ void testMissionScripts() {
     CHECK(missionScripts().size() >= 31);
     const MissionScript* generic = findMissionScript("generic", 'F');
     CHECK(generic != nullptr);
+    CHECK(generic->file == "scripts/generic.nws" && findMissionScript("C4", 'F')->file == "scripts/c4.nws" &&
+          findMissionScript("J1", 'K')->file == "scripts/j1-k.nws");
     for (const MissionScript& m : missionScripts()) {
         if (&m == generic)
             continue;
@@ -743,7 +754,8 @@ void testMissionScripts() {
             for (double t = 0; !r.finished() && r.nextTimer() >= 0 && t < 60; t += r.nextTimer())
                 r.advance(r.nextTimer());
             if (!(r.finished() && !r.won()))
-                std::fprintf(stderr, "%s (%c) line %d: its fail doesn't lose\n", m.mission.c_str(), m.side, h.line);
+                std::fprintf(stderr, "%s:%d: %s (%c): its fail doesn't lose\n", m.file.c_str(), h.line,
+                             m.mission.c_str(), m.side);
             CHECK(r.finished() && !r.won());
         }
     }
@@ -887,8 +899,8 @@ void testScriptNames() {
         auto check = [&](const MissionScript::Handler& h, const std::string& name, const std::set<std::string>& known) {
             if (name == "*" || known.count(name) || notYet.count(name))
                 return;
-            std::fprintf(stderr, "%s (%c) line %d: %s waits for %s, which nothing gives\n", m.mission.c_str(), m.side,
-                         h.line, h.event.kind.c_str(), name.c_str());
+            std::fprintf(stderr, "%s:%d: %s (%c): %s waits for %s, which nothing gives\n", m.file.c_str(), h.line,
+                         m.mission.c_str(), m.side, h.event.kind.c_str(), name.c_str());
             ++failures;
         };
         const std::set<std::string> scans = {"science", "medical", "engineering", "strong-science",

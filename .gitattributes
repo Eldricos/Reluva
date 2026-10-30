@@ -1,0 +1,2 @@
+# The mission scripts are embedded byte for byte: keep their line endings.
+*.nws text eol=lf

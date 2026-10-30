@@ -1,0 +1,103 @@
+# --- R14 as R ----------------------------------------
+# R14 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+mission R14 R
+site metar-core 82 269
+objective 12
+objective 14
+
+# Opening: Taubat raids every 30 s from the first 30 s; Metar raids every
+# 100 s after 2 minutes; set Metar assaults at 2, 5 and 9 minutes, and an
+# attack on the containment device at 11 minutes.
+on start
+  timer taubat-raids 30
+  timer metar-raids 120
+  timer metar-assault-1 120
+  timer metar-assault-2 300
+  timer metar-assault-3 540
+  timer metar-device-attack 660
+on timer metar-assault-1
+  ai metar met-assault-romulan-1
+on timer metar-assault-2
+  ai metar met-assault-romulan-2
+on timer metar-assault-3
+  ai metar met-assault-romulan-3
+on timer metar-device-attack
+  ai metar metar-attack-on-cfd
+
+# Objectives 12 and 14: the scan of the Metar core meets both.
+on scanned science metar-core
+  say science "Sir, these readings suggest the Metar are making an anomaly generator."
+  complete 12
+  complete 14
+
+# Fails: the cause at once, "you have failed" at 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 13 20
+  say operations "The colony hub is destroyed."
+  signal failing
+on destroyed containment-device
+  fail 15 20
+  say security "The Metar have wrecked the containment field device."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "You have not completed your mission."
+
+# The pass: the message 10 s later (to every side), the win at 20 s.
+on all-completed
+  timer mission-pass 10
+  timer mission-won 20
+on timer mission-pass
+  say intelligence "Your mission is complete."
+on timer mission-won
+  win
+
+# The raids: one of eight at random each time.
+on timer taubat-raids
+  timer taubat-raid 30
+every timer taubat-raid
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raid 30
+every signal taubat-raid-1
+  ai taubat taubat-assault-rom-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-rom-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-rom-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-rom-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-rom-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-rom-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-rom-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-rom-random8
+on timer metar-raids
+  timer metar-raid 100
+every timer metar-raid
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raid 100
+every signal metar-raid-1
+  ai metar metar-assault-rom-random1
+every signal metar-raid-2
+  ai metar metar-assault-rom-random2
+every signal metar-raid-3
+  ai metar metar-assault-rom-random3
+every signal metar-raid-4
+  ai metar metar-assault-rom-random4
+every signal metar-raid-5
+  ai metar metar-assault-rom-random5
+every signal metar-raid-6
+  ai metar metar-assault-rom-random6
+every signal metar-raid-7
+  ai metar metar-assault-rom-random7
+every signal metar-raid-8
+  ai metar metar-assault-rom-random8
+
+# Not expressible yet:
+# - The core scan is a cell-scan monitor on 82:269 (the game's first scan
+#   bit, taken to be science; weak or strong not told apart).
+# - Messages sent to every side's mail (the pass and the fails).

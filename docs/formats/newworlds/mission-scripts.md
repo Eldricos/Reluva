@@ -8,8 +8,9 @@ own format (a handler per event, not the game's graph object by object)
 and in its own words - every message paraphrases the game's, and a check
 makes sure none shares a run of six words with the game's text. The first
 scripts were written from recordings of play ([play.md](play.md)); the
-recordings now serve to check them. The scripts are in
-`src/engines/newworlds/mission_scripts.cpp`, read by `mission_script.h/.cpp`.
+recordings now serve to check them. The scripts are text files in
+`src/engines/newworlds/scripts/`, built into the program and read by
+`mission_script.h/.cpp` ([below](#where-they-are-and-editing-them)).
 
 ## What's in a script
 
@@ -53,6 +54,41 @@ recordings now serve to check them. The scripts are in
 The format is described at the top of `mission_script.h`. Its timers and
 fail delays count the game's script seconds (16 ticks, 0.8 s;
 [exe.md](exe.md#the-simulation-clock)), so the numbers are the game's own.
+
+## Where they are, and editing them
+
+Each script is a plain-text file in `src/engines/newworlds/scripts/`:
+`generic.nws` holds the rules every mission shares, and each mission has
+its own, named after it (`f1.nws`, `k14.nws`, `c4.nws`), with its side for
+the joint missions, which have one for each (`j1-f.nws`, `j1-k.nws`,
+`j1-r.nws`). A file starts with its `# --- C4 as F ---` heading, then its
+`mission C4 F` line, and ends with what it can't say yet ("Not
+expressible yet"); one file may hold more than one mission, but these
+don't.
+
+They're built into the program, so the game doesn't need them on disk:
+`cmake/EmbedFiles.cmake` turns each file into a byte array in a generated
+`mission_scripts.inc` (in the build tree's `generated/`), which
+`mission_scripts.cpp` includes; the build makes it again whenever a file
+changes. The files, in the order `missionScripts()` lists them, are named
+in `src/engines/newworlds/scripts/scripts.cmake`: a new script's file is
+added there.
+
+To change a script, edit its file and build: a mistake is reported with
+the file and line, as a compiler would (`scripts/c4.nws:23: unknown event
+buil`), by the tests (`reluva_newworlds_tests` reads every script, plays
+each through and checks the names its handlers wait for, each failure
+named `scripts/c4.nws:23: ...`) and, should one slip through, by the game
+as it starts a mission (it then plays unscripted). `reluva-tool
+script-check <file>` reads a script file from disk and walks it, without a
+build.
+
+A savestate records a fingerprint of the mission's rules, each rule's line
+in its file included ([savestates.md](../../savestates.md)), so a save
+made before a script's file was edited, or its rules moved to other lines,
+is refused ("the script has changed since the save was made"). Moving the
+scripts out of `mission_scripts.cpp` into these files moved every rule to
+another line: saves made before that are refused.
 
 ## How far they go
 

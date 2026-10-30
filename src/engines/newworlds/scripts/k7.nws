@@ -1,0 +1,129 @@
+# --- K7 as K ----------------------------------------
+# K7 as the Klingons, rewritten from the game's own mission graph (Klingon slot, with
+# the Taubat (slot 3) and Metar (slot 5) raid clocks).
+mission K7 K
+site colony 176 407
+site escape-pod-1 52 307
+site escape-pod-2 180 139
+objective 10
+objective 11
+objective 12
+
+# Opening: Taubat raids from 4 minutes (one a minute), Metar raids from 4 minutes
+# (one every 2 minutes).
+on start
+  timer taubat-raids 240
+  timer metar-raids 240
+
+# Objective 10: two photon torpedo launchers and the science block's special weapons wing.
+on count defensive-artillery == 1
+  say engineering "The first photon torpedo launcher is ready."
+  signal expansion
+on count defensive-artillery == 2
+  say engineering "The second photon torpedo launcher is ready."
+  signal expansion
+on count special-weapons == 1
+  say engineering "The science block's special weapons wing is finished."
+  signal expansion
+on signal expansion*3
+  say engineering "The colony expansion we needed is done, sir."
+  complete 10
+  signal objective
+
+# Objective 11: scan the first escape pod (2 s to lock on, 20 s to finish) to beam the
+# scientist out.
+on scan-started * escape-pod-1
+  say intelligence "Life signs, sir. Scanning for a transporter lock."
+on scan-lost * escape-pod-1
+  say intelligence "We lost the scan before we had a lock, sir."
+on scanned * escape-pod-1
+  say intelligence "The scientist has been beamed to the colony, sir."
+  complete 11
+  signal objective
+
+# Objective 12: scan the second escape pod (same timings) to recover the data core.
+on scan-started * escape-pod-2
+  say intelligence "No life signs, sir. Scanning for the data core."
+on scan-lost * escape-pod-2
+  say intelligence "The scan was cut off, sir. Nothing conclusive."
+on scanned * escape-pod-2
+  say intelligence "We have the starship's data core, sir."
+  complete 12
+  signal objective
+
+# Mission pass: three objectives, message at 10 s, win at 20 s.
+on signal objective*3
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say operations "Mission complete."
+on timer pass
+  win
+
+# Mission fail: the colony hub, or an escape pod (see below); the cause now, the
+# verdict at 10 s, the end at 20 s.
+on count colony-hub == 0
+  fail 8 20
+  say operations "The colony hub is destroyed. The mission has failed."
+  signal failing
+on destroyed escape-pod-1
+  fail 9 20
+  say intelligence "The escape pod is destroyed. The mission has failed."
+  signal failing
+on destroyed escape-pod-2
+  fail 9 20
+  say intelligence "The escape pod is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say operations "We have not achieved our objectives."
+
+# Raids: one of eight Taubat assaults every 60 s, one of eight Metar assaults every 120 s.
+every timer taubat-raids
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raids 60
+every signal taubat-raid-1
+  ai taubat taubat-assault-kli-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-kli-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-kli-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-kli-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-kli-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-kli-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-kli-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-kli-random8
+every timer metar-raids
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raids 120
+every signal metar-raid-1
+  ai metar metar-assault-kli-random1
+every signal metar-raid-2
+  ai metar metar-assault-kli-random2
+every signal metar-raid-3
+  ai metar metar-assault-kli-random3
+every signal metar-raid-4
+  ai metar metar-assault-kli-random4
+every signal metar-raid-5
+  ai metar metar-assault-kli-random5
+every signal metar-raid-6
+  ai metar metar-assault-kli-random6
+every signal metar-raid-7
+  ai metar metar-assault-kli-random7
+every signal metar-raid-8
+  ai metar metar-assault-kli-random8
+
+# Not expressible yet:
+# - Fail 9 (escape pod destroyed) hangs off the pod raids' "beaten to it" output, which
+#   only a Go_Futile message reaches; nothing in K7 sends one. Whether the engine treats
+#   a destroyed pod that way is unknown, so "destroyed escape-pod-N" is a guess.
+# - A second data-core line (no sign of the general, search the area) exists but nothing
+#   sends it.
+# - The briefing (phase 2) shuttle flight; the Taubat and Metar patrols and the Taubat's
+#   three build orders run without the script.

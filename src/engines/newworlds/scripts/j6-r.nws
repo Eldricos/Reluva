@@ -1,0 +1,284 @@
+# --- J6 as R ----------------------------------------
+# J6 as the Romulans (slot 2), from the game's own mission graph.
+# Test the alien device on the Klingons (scan their hub for a target, then
+# bring down their shields and beam it in), and scan the Metar core.
+mission J6 R
+site klingon-colony 234 301
+site metar-colony 386 317
+objective 13
+objective 15
+objective 17
+
+# Fail criteria, the game's way: the fail string at once, word to every
+# side at 10 s that the Romulans can't complete their mission, the end at
+# 20 s. Our hub (19); the Klingon hub lost before our strong scan of it
+# is done (14: the scan disarms this watch, see objective 13).
+on destroyed colony-hub
+  fail 19 20
+  say intelligence "Our colony hub has been destroyed."
+  signal failing
+on hub-destroyed klingon as klingon-hub-watch
+  fail 14 20
+  signal failing
+on signal failing
+  timer fail-news 10
+on timer fail-news
+  say intelligence "The Romulans' mission can no longer succeed."
+
+# Start: the other sides' attack clocks
+on start
+  timer fed-raid-kli 180
+  timer fed-raid-rom 180
+  timer kli-raid-fed 240
+  timer kli-raid-rom 180
+  timer met-raid-fed 480
+  timer met-raid-kli 480
+  timer met-raid-rom 480
+  timer met-assault-klingons-1 1
+  timer met-assault-romulans-1 1
+  timer met-assault-romulans-2 900
+  timer met-assault-federation-1 1
+  timer met-assault-federation-2 1200
+
+# Arrivals: the Klingons warn us off their colony; advice near the Metar
+on seen klingon-colony
+  say "Incoming message" "Away with you, Romulan! The treaty gives you no right to creep about on Klingon soil."
+on seen metar-colony
+  say intelligence "Leave the aliens be if you can - stirring them up may cost you."
+
+# Objective 13: a strong engineering scan of the Klingon hub, held 10 s;
+# done, it stops the fail-14 watch on their hub
+every scan-started strong-engineering klingon-hub
+  say engineering "Starting the survey. Looking for a likely target."
+every scan-lost strong-engineering klingon-hub
+  say engineering "The scan broke off. Allow me proper time, please."
+on scanned strong-engineering klingon-hub
+  say engineering "Their council chamber should suit the test nicely. Waiting for their shields to drop."
+  complete 13
+  disarm klingon-hub-watch
+# An ordinary engineering scan of the hub only finds that Grinke is needed
+every scan-started engineering klingon-hub
+  say engineering "Scan under way, Sir."
+every scan-lost engineering klingon-hub
+  say engineering "Lost the scan. Starting again."
+on scanned engineering klingon-hub
+  say engineering "Survey done, but their screens are scrambling our sensors. Could Grinke lend a hand?"
+
+# Objective 15: every Klingon shield generator destroyed; the device is
+# beamed in and the objective met 15 s later, when the device also takes
+# out the Klingon hub
+on count klingon-shield-generator == 0
+  timer kli-shields-down 5
+  timer device-placed 15
+on timer kli-shields-down
+  say engineering "Klingon shields gone. Beaming the device across."
+on timer device-placed
+  say engineering "The device is in place."
+  complete 15
+  damage colony-hub all klingon
+
+# Objective 17: a strong science scan of the Metar core (1 s to start, 10 s
+# held); it also opens the biodata research
+every scan-started strong-science metar-colony-hub
+  say science "Running a thorough scan."
+every scan-lost strong-science metar-colony-hub
+  say science "Scan lost. You did not allow me enough time."
+on scanned strong-science metar-colony-hub
+  say science "It worked. The creatures are reshaping their own make-up - remarkable. Medical should study the data."
+  complete 17
+  research metar-biodata
+every scan-started science metar-colony-hub
+  say science "Scan started, Sir."
+every scan-lost science metar-colony-hub
+  say science "The scan dropped, Sir. Trying again."
+on scanned science metar-colony-hub
+  say science "Scan finished, though Kensal ought to check my results."
+# The research's second unlock: the sickbay's medical lab ward (type 314) built.
+on built medical-lab
+  research metar-biodata
+on researched metar-biodata
+  say medical "The biodata analysis is done. My findings are intriguing."
+
+# Mission passed (all three objectives): the news at 10 s, the win at 20 s
+on all-completed
+  timer pass-news 10
+  timer pass 20
+on timer pass-news
+  say intelligence "The Romulans' mission is accomplished."
+on timer pass
+  win
+
+# The other sides' AI: attacks on a clock (the Romulans' own attack orders
+# are left out: the player gives those)
+# Federation raids on the Klingons: one of eight attacks every 60 s, the first at 180 s
+every timer fed-raid-kli
+  timer fed-raid-kli 60
+  random fed-raid-kli-1 fed-raid-kli-2 fed-raid-kli-3 fed-raid-kli-4 fed-raid-kli-5 fed-raid-kli-6 fed-raid-kli-7 fed-raid-kli-8
+every signal fed-raid-kli-1
+  ai federation fed-assault-kli-random1
+every signal fed-raid-kli-2
+  ai federation fed-assault-kli-random2
+every signal fed-raid-kli-3
+  ai federation fed-assault-kli-random3
+every signal fed-raid-kli-4
+  ai federation fed-assault-kli-random4
+every signal fed-raid-kli-5
+  ai federation fed-assault-kli-random5
+every signal fed-raid-kli-6
+  ai federation fed-assault-kli-random6
+every signal fed-raid-kli-7
+  ai federation fed-assault-kli-random7
+every signal fed-raid-kli-8
+  ai federation fed-assault-kli-random8
+
+# Federation raids on the Romulans: one of eight attacks every 60 s, the first at 180 s
+every timer fed-raid-rom
+  timer fed-raid-rom 60
+  random fed-raid-rom-1 fed-raid-rom-2 fed-raid-rom-3 fed-raid-rom-4 fed-raid-rom-5 fed-raid-rom-6 fed-raid-rom-7 fed-raid-rom-8
+every signal fed-raid-rom-1
+  ai federation fed-assault-rom-random1
+every signal fed-raid-rom-2
+  ai federation fed-assault-rom-random2
+every signal fed-raid-rom-3
+  ai federation fed-assault-rom-random3
+every signal fed-raid-rom-4
+  ai federation fed-assault-rom-random4
+every signal fed-raid-rom-5
+  ai federation fed-assault-rom-random5
+every signal fed-raid-rom-6
+  ai federation fed-assault-rom-random6
+every signal fed-raid-rom-7
+  ai federation fed-assault-rom-random7
+every signal fed-raid-rom-8
+  ai federation fed-assault-rom-random8
+
+# Klingon raids on the Federation: one of eight attacks every 60 s, the first at 240 s
+every timer kli-raid-fed
+  timer kli-raid-fed 60
+  random kli-raid-fed-1 kli-raid-fed-2 kli-raid-fed-3 kli-raid-fed-4 kli-raid-fed-5 kli-raid-fed-6 kli-raid-fed-7 kli-raid-fed-8
+every signal kli-raid-fed-1
+  ai klingon kli-assault-fed-random1
+every signal kli-raid-fed-2
+  ai klingon kli-assault-fed-random2
+every signal kli-raid-fed-3
+  ai klingon kli-assault-fed-random3
+every signal kli-raid-fed-4
+  ai klingon kli-assault-fed-random4
+every signal kli-raid-fed-5
+  ai klingon kli-assault-fed-random5
+every signal kli-raid-fed-6
+  ai klingon kli-assault-fed-random6
+every signal kli-raid-fed-7
+  ai klingon kli-assault-fed-random7
+every signal kli-raid-fed-8
+  ai klingon kli-assault-fed-random8
+
+# Klingon raids on the Romulans: one of eight attacks every 60 s, the first at 180 s
+every timer kli-raid-rom
+  timer kli-raid-rom 60
+  random kli-raid-rom-1 kli-raid-rom-2 kli-raid-rom-3 kli-raid-rom-4 kli-raid-rom-5 kli-raid-rom-6 kli-raid-rom-7 kli-raid-rom-8
+every signal kli-raid-rom-1
+  ai klingon kli-assault-rom-random1
+every signal kli-raid-rom-2
+  ai klingon kli-assault-rom-random2
+every signal kli-raid-rom-3
+  ai klingon kli-assault-rom-random3
+every signal kli-raid-rom-4
+  ai klingon kli-assault-rom-random4
+every signal kli-raid-rom-5
+  ai klingon kli-assault-rom-random5
+every signal kli-raid-rom-6
+  ai klingon kli-assault-rom-random6
+every signal kli-raid-rom-7
+  ai klingon kli-assault-rom-random7
+every signal kli-raid-rom-8
+  ai klingon kli-assault-rom-random8
+
+# Metar raids on the Federation: one of eight attacks every 120 s, the first at 480 s
+every timer met-raid-fed
+  timer met-raid-fed 120
+  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
+every signal met-raid-fed-1
+  ai metar metar-assault-fed-random1
+every signal met-raid-fed-2
+  ai metar metar-assault-fed-random2
+every signal met-raid-fed-3
+  ai metar metar-assault-fed-random3
+every signal met-raid-fed-4
+  ai metar metar-assault-fed-random4
+every signal met-raid-fed-5
+  ai metar metar-assault-fed-random5
+every signal met-raid-fed-6
+  ai metar metar-assault-fed-random6
+every signal met-raid-fed-7
+  ai metar metar-assault-fed-random7
+every signal met-raid-fed-8
+  ai metar metar-assault-fed-random8
+
+# Metar raids on the Klingons: one of eight attacks every 120 s, the first at 480 s
+every timer met-raid-kli
+  timer met-raid-kli 120
+  random met-raid-kli-1 met-raid-kli-2 met-raid-kli-3 met-raid-kli-4 met-raid-kli-5 met-raid-kli-6 met-raid-kli-7 met-raid-kli-8
+every signal met-raid-kli-1
+  ai metar metar-assault-kli-random1
+every signal met-raid-kli-2
+  ai metar metar-assault-kli-random2
+every signal met-raid-kli-3
+  ai metar metar-assault-kli-random3
+every signal met-raid-kli-4
+  ai metar metar-assault-kli-random4
+every signal met-raid-kli-5
+  ai metar metar-assault-kli-random5
+every signal met-raid-kli-6
+  ai metar metar-assault-kli-random6
+every signal met-raid-kli-7
+  ai metar metar-assault-kli-random7
+every signal met-raid-kli-8
+  ai metar metar-assault-kli-random8
+
+# Metar raids on the Romulans: one of eight attacks every 120 s, the first at 480 s
+every timer met-raid-rom
+  timer met-raid-rom 120
+  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
+every signal met-raid-rom-1
+  ai metar metar-assault-rom-random1
+every signal met-raid-rom-2
+  ai metar metar-assault-rom-random2
+every signal met-raid-rom-3
+  ai metar metar-assault-rom-random3
+every signal met-raid-rom-4
+  ai metar metar-assault-rom-random4
+every signal met-raid-rom-5
+  ai metar metar-assault-rom-random5
+every signal met-raid-rom-6
+  ai metar metar-assault-rom-random6
+every signal met-raid-rom-7
+  ai metar metar-assault-rom-random7
+every signal met-raid-rom-8
+  ai metar metar-assault-rom-random8
+
+# Metar orders on a clock
+on timer met-assault-klingons-1
+  ai metar met-assault-klingons-1
+on timer met-assault-romulans-1
+  ai metar met-assault-romulans-1
+on timer met-assault-romulans-2
+  ai metar met-assault-romulans-2
+on timer met-assault-federation-1
+  ai metar met-assault-federation-1
+on timer met-assault-federation-2
+  ai metar met-assault-federation-2
+
+# Not expressible yet:
+# - When the Federation destroys our shields the game means to tell us they
+#   took the device, but the line goes to a misspelt target and never shows.
+# - The scan "futile" lines are unreachable in J6 (nothing sends Go_Futile).
+# - J6 gives the Romulans no "scan found nothing" lines (the other two sides
+#   have them).
+# - Messages caused by the other sides: their mission passed/failed
+#   announcements; the Klingons' "an alien device in the main hall" goes to
+#   them, not us. There's no event for a rival's pass.
+# - Whether the biodata research needs both the scan and the ward, or either:
+#   the game sends the topic from both; here either opens it.
+# - The AI sides stop their build orders when their hub falls, and build on
+#   their own timetable (npc build orders).

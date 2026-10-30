@@ -1,0 +1,151 @@
+# --- R12 as R ----------------------------------------
+# R12 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+mission R12 R
+site device-site 184 359
+site field-fault 186 357
+zone storm-field 188 268 196 276
+objective 12
+objective 14
+
+# Opening: the Taubat and the Metar each raid us at random every minute
+# from the first; three set Metar assaults at 1, 2 and 3 minutes. A storm
+# flashes over a field to the west all mission long.
+on start
+  storm storm-field
+  timer taubat-raids 60
+  timer metar-raids 60
+  timer metar-assault-1 60
+  timer metar-assault-3 120
+  timer metar-assault-2 180
+on timer metar-assault-1
+  ai metar met-assault-romulan-1
+on timer metar-assault-3
+  ai metar met-assault-romulan-3
+on timer metar-assault-2
+  ai metar met-assault-romulan-2
+on destroyed hubrin
+  say intelligence "The Hubrin observer is dead."
+
+# Objective 12: the colony three times its starting size, plus four vehicle
+# yards and five power generators (or three advanced ones); then the
+# containment device's last research opens.
+on built-all vehicle-yard*4 power-generator*5|advanced-generator*3
+  signal infrastructure
+on colony-size 300
+  signal infrastructure
+on signal infrastructure*2
+  say engineering "Sir, the colony can now support building the containment device. One last round of research diagnostics is needed."
+  complete 12
+  research cfd
+
+# The device: made by the script 10 s after the research and beamed in at
+# the site the Hubrin marked; once it stands, the Metar go for it and a
+# Hubrin saboteur is beamed in beside it.
+on researched cfd
+  timer device-made 10
+on timer device-made
+  spawn us containment-device 1 184 359 containment-device
+  say engineering "It's built. We're taking the device to the site the Hubrin marked, to the south."
+on standing containment-device 1
+  say engineering "Sir, transport is complete: we have the device for the field's containment in position."
+  ai metar metar-attack-on-cfd
+  spawn hubrin hubrin 1 194 353 hubrin-saboteur
+  timer saboteur-1 10
+on timer saboteur-1
+  say intelligence "Sir, another Hubrin has shown up by the device. It says a construction error nobody foresaw has unbalanced the field."
+  timer saboteur-2 10
+on timer saboteur-2
+  say engineering "Our remote scan agrees. A science vehicle has to get close to isolate the imbalance."
+  timer fault-scan-ready 10
+on timer fault-scan-ready
+  arm fault-scan
+
+# Objective 14: the fault scanned (a watch asleep until 10 s after the line
+# above) and fixed 20 s later, and the device standing for 10 minutes.
+on scanned science field-fault as fault-scan dormant
+  say science "Trying to isolate the imbalance. Stand by..."
+  timer recalibrate 20
+on timer recalibrate
+  say engineering "Error located. Now recalibrating the device for the containment field..."
+  signal device-online
+on standing containment-device 600
+  signal device-online
+on signal device-online*2
+  say engineering "A close call, commander. As first set up, it would soon have overloaded the whole system."
+  complete 14
+
+# Fails: the cause at once, "the Romulans cannot complete their mission" at
+# 10 s, the end at 20 s.
+on destroyed colony-hub
+  fail 13 20
+  say intelligence "The Romulan hub has been destroyed."
+  signal failing
+on destroyed containment-device
+  fail 15 20
+  say security "Metar forces have wrecked the field containment device!"
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say intelligence "The Romulans can't complete their mission."
+
+# The pass: both objectives, the message at once (to every side), the win
+# 10 s later.
+on all-completed
+  say intelligence "The Romulans' mission is accomplished."
+  timer mission-won 10
+on timer mission-won
+  win
+
+# The raids: every minute, one of eight at random, from each side.
+on timer taubat-raids
+  timer taubat-raid 60
+every timer taubat-raid
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raid 60
+every signal taubat-raid-1
+  ai taubat taubat-assault-rom-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-rom-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-rom-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-rom-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-rom-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-rom-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-rom-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-rom-random8
+on timer metar-raids
+  timer metar-raid 60
+every timer metar-raid
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raid 60
+every signal metar-raid-1
+  ai metar metar-assault-rom-random1
+every signal metar-raid-2
+  ai metar metar-assault-rom-random2
+every signal metar-raid-3
+  ai metar metar-assault-rom-random3
+every signal metar-raid-4
+  ai metar metar-assault-rom-random4
+every signal metar-raid-5
+  ai metar metar-assault-rom-random5
+every signal metar-raid-6
+  ai metar metar-assault-rom-random6
+every signal metar-raid-7
+  ai metar metar-assault-rom-random7
+every signal metar-raid-8
+  ai metar metar-assault-rom-random8
+
+# Not expressible yet:
+# - The device spawner's own line ("construction complete") is sent when its
+#   group is gone; the recording heard it at once, as written here.
+# - The fault scan is of the cell 186:357, of the kind the game's first scan
+#   bit records (taken to be science).
+# - The game's hub fail sends "Fail Crieria 1", misspelt, so fail string 13
+#   is never ticked (the mission still fails); written as fail 13.
+# - Messages sent to every side's mail (the pass, the fail, the observer).

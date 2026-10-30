@@ -1,0 +1,45 @@
+# --- C6 as F ----------------------------------------
+# C6 "Power" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
+# game's own graph (S/ghidra/scripts_out/C6.json). All lines come from Command, without
+# voice clips. The colony starts with 300 dilithium and 3950 nitrium: enough for four
+# generators (800 nitrium each), not five.
+mission C6 F
+site colony 88 415
+objective 44
+
+# --- Opening instruction ---
+on start
+  timer intro-1 2
+on timer intro-1
+  say command "To check your objectives, press Mission on this window to open Command."
+
+# --- Four generators use up the nitrium; mining must make up the fifth (the nitrium watch
+# only starts then: before, the stock is above 800 from the start) ---
+on built-all power-generator*4
+  say command "There isn't enough nitrium left for the last generator. Set up mining to refill the colony's stores."
+  arm nitrium-up
+on stock nitrium 800 as nitrium-up dormant
+  say command "There is now enough nitrium for a fifth generator. Build it to finish this part of the tutorial."
+
+# --- Five generators: the objective ---
+on built-all power-generator*5
+  say command "Every generator we need is up and running."
+  complete 44
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "Tutorial 3 is complete. Stand by while tutorial 4 loads."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 45 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The generator counts are exact (exactly four, exactly five standing).

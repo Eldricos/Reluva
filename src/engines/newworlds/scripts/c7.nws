@@ -1,0 +1,64 @@
+# --- C7 as F ----------------------------------------
+# C7 "Defense" (Federation, slot 0; map coverd3, colony at 88:415). Rewritten from the
+# game's own graph (S/ghidra/scripts_out/C7.json). All lines come from Command, without
+# voice clips. vehicle-yard-upgrade is the extended vehicle yard (type 146). Handlers are
+# in the order the recording met them (play-vm-c7.md).
+mission C7 F
+site colony 88 415
+objective 53
+objective 54
+objective 55
+
+# --- Opening instructions ---
+on start
+  timer intro-1 2
+  timer intro-2 10
+on timer intro-1
+  say command "To check your objectives, press Mission on this window to open Command."
+on timer intro-2
+  say command "Before you can build a security center, your colony hub must reach stage 2, and so must your construction yard."
+
+# --- Vehicle yard and its upgrade: the way to photon artillery and phaser tanks ---
+on built vehicle-yard
+  say command "Photon artillery needs a stage 2 vehicle yard now, and that in turn needs the hub and construction yard at stage 2."
+on built vehicle-yard-upgrade
+  say command "Photon units can be built now. For phaser tanks you'll need a science block with a phaser coil lab added to it."
+
+# --- The three objectives ---
+on built security-center
+  say command "The security center is working. A vehicle yard will give you mobile units."
+  complete 53
+on built-all photon-artillery*2
+  say command "The photon artillery vehicles are ready."
+  complete 55
+  signal defence-force
+on built-all phaser-tank*2
+  say command "The phaser tanks are ready."
+  complete 54
+  signal defence-force
+on signal defence-force*2
+  timer defence-message 5
+on timer defence-message
+  say command "The colony now has the defence force it needs."
+
+# --- Pass ---
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "Tutorial 4 is complete. Stand by while tutorial 5 loads."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 56 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The counts are exact: the game fires when exactly one security center / vehicle yard
+#   / yard upgrade, or exactly two tanks / artillery units, exist (a unit lost before the
+#   second is built keeps the count from reaching 2 at that moment).

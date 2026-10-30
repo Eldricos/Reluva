@@ -1,0 +1,120 @@
+# --- K8 as K ----------------------------------------
+# K8 as the Klingons, rewritten from the game's own mission graph (Klingon slot, with
+# the Taubat (slot 3) and Metar (slot 5) monitors and attack clocks).
+mission K8 K
+site colony 152 303
+site taubat-temple 78 293
+zone bop-zone 152 235 193 264
+zone storm-field 124 228 132 236
+site metar-hub 162 213
+objective 12
+objective 14
+
+# Opening: the Metar send two assaults at 3 minutes and start raiding; the Taubat
+# start raiding at 3 minutes and send four assaults at 5 minutes.
+on start
+  storm storm-field
+  timer metar-assault 180
+  timer metar-raids 180
+  timer taubat-raids 180
+  timer taubat-assault 300
+  arm metar-units
+on timer metar-assault
+  ai metar met-assault-klingon-1
+  ai metar met-assault-klingon-2
+on timer taubat-assault
+  ai taubat tau-assault-klingon-1
+  ai taubat tau-assault-klingon-2
+  ai taubat tau-assault-klingon-3
+  ai taubat tau-assault-klingon-4
+
+# Our units reaching the pass east of the Metar base call in the Bird of Prey,
+# which flies four legs and lands.
+on inside ours bop-zone
+  say operations "Our Bird of Prey is on its way to you."
+  move kli-bop 182 194 162 254 204 230 87 174
+
+# Coming in sight of the Taubat temple puts the Taubat on guard.
+on seen taubat-temple
+  ai taubat taubat-colony-protection-one
+  ai taubat taubat-colony-protection-two
+
+# Objective 12: the Metar core, the second core and every portal destroyed.
+on count metar-hub == 0
+  signal metar-sites
+on count metar-starship == 0   # the second core: type 223, a grounded starship
+  signal metar-sites
+on count metar-portal == 0
+  signal metar-sites
+on signal metar-sites*3
+  complete 12
+  signal objective
+
+# Objective 14: the Metar's fighting units down to four or fewer (a watch the game wakes
+# on its first tick).
+on count metar-fighting-units <= 4 as metar-units dormant
+  complete 14
+  signal objective
+
+# Mission pass: both objectives, message at 10 s, win at 20 s.
+on signal objective*2
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say intelligence "Victory to the Klingons!"
+on timer pass
+  win
+
+# Mission fail: the colony hub. Here the game ends at once.
+on count colony-hub == 0
+  say intelligence "Our hub has been destroyed."
+  say intelligence "We have not achieved our objectives."
+  lose 13
+
+# Raids: one of eight Taubat and one of eight Metar assaults every 2 minutes.
+every timer taubat-raids
+  random taubat-raid-1 taubat-raid-2 taubat-raid-3 taubat-raid-4 taubat-raid-5 taubat-raid-6 taubat-raid-7 taubat-raid-8
+  timer taubat-raids 120
+every signal taubat-raid-1
+  ai taubat taubat-assault-kli-random1
+every signal taubat-raid-2
+  ai taubat taubat-assault-kli-random2
+every signal taubat-raid-3
+  ai taubat taubat-assault-kli-random3
+every signal taubat-raid-4
+  ai taubat taubat-assault-kli-random4
+every signal taubat-raid-5
+  ai taubat taubat-assault-kli-random5
+every signal taubat-raid-6
+  ai taubat taubat-assault-kli-random6
+every signal taubat-raid-7
+  ai taubat taubat-assault-kli-random7
+every signal taubat-raid-8
+  ai taubat taubat-assault-kli-random8
+every timer metar-raids
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raids 120
+every signal metar-raid-1
+  ai metar metar-assault-kli-random1
+every signal metar-raid-2
+  ai metar metar-assault-kli-random2
+every signal metar-raid-3
+  ai metar metar-assault-kli-random3
+every signal metar-raid-4
+  ai metar metar-assault-kli-random4
+every signal metar-raid-5
+  ai metar metar-assault-kli-random5
+every signal metar-raid-6
+  ai metar metar-assault-kli-random6
+every signal metar-raid-7
+  ai metar metar-assault-kli-random7
+every signal metar-raid-8
+  ai metar metar-assault-kli-random8
+
+# Not expressible yet:
+# - The objectives' own lines ((the game's line), "75% of the Metar
+#   destroyed") sit behind relays that wait for a 10th message and only ever get one:
+#   the game never shows them, so they are left out here.
+# - Two objects share the name of the pass message (a 10 s timer and an instant relay);
+#   which one the game resolves is unknown. Written as the timer.
+# - The Taubat and Metar patrols run without the script.

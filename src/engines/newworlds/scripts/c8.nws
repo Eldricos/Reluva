@@ -1,0 +1,55 @@
+# --- C8 as F ----------------------------------------
+# C8 "Combat" (Federation, slot 0; map coverd3, colony at 88:415; a small Klingon colony
+# at 232:343). Rewritten from the game's own graph (S/ghidra/scripts_out/C8.json). All
+# lines come from Command, without voice clips. Upgrades: colony-hub-advanced (type 160),
+# construction-yard-advanced (162), vehicle-yard-upgrade (146).
+mission C8 F
+site colony 88 415
+site klingon-colony 232 343
+objective 69
+objective 70
+
+# --- Opening instructions ---
+on start
+  timer intro-1 2
+  timer intro-2 10
+  timer intro-3 20
+on timer intro-1
+  say command "To check your objectives, press Mission on this window to open Command."
+on timer intro-2
+  say command "Keep the colony's power up, and mine more materials when you run low."
+on timer intro-3
+  say command "Use your forces with thought: unarmed scouts find targets fast, tanks suit close fighting, and artillery is for long range only."
+
+# --- A viable colony: advanced hub and yard, extended vehicle yard, security center ---
+on built-all colony-hub-advanced construction-yard-advanced vehicle-yard-upgrade security-center
+  say command "The colony is viable now. From here on its power, resources and defence are in your hands."
+  complete 69
+
+# --- The Klingon hub ---
+on destroyed klingon-hub
+  say command "The Klingon hub has been destroyed."
+  complete 70
+
+# --- Pass ---
+on all-completed
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "Tutorial 5 is complete, and with it the colony infrastructure training. You are ready for your first training mission. Congratulations."
+on timer pass
+  win
+
+# --- The fail: the colony hub destroyed (said at once, the failure 10 s later, over at 20 s) ---
+on destroyed colony-hub
+  fail 71 20
+  say command "We have lost the colony hub."
+  timer fail-message 10
+on timer fail-message
+  say command "You have not achieved your objectives."
+
+# Not expressible yet:
+# - The Klingons (slot 1) have three patrol orders round their colony (222:337, 222:345,
+#   230:345), started by the game itself, not by a script.
+# - The four buildings are counted as "exactly one standing" each, at the moment it's
+#   finished.

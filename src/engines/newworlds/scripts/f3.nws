@@ -1,0 +1,130 @@
+# --- F3 as F ----------------------------------------
+# F3 as the Federation, rewritten from the game's own graph (STNW.exe dump F3.json, slot 0,
+# with the Klingon (1), Romulan (2) and Taubat (3) objects that report to the Federation).
+mission F3 F
+objective 15
+objective 16
+objective 17
+
+# --- Klingon and Romulan raids: from 300 s, every 180 s each picks one of eight at random ---
+on start
+  timer kli-raids 300
+  timer rom-raids 300
+every timer kli-raids
+  random kli-raid-1 kli-raid-2 kli-raid-3 kli-raid-4 kli-raid-5 kli-raid-6 kli-raid-7 kli-raid-8
+  timer kli-raids 180
+every signal kli-raid-1
+  ai klingon kli-assault-fed-random1
+every signal kli-raid-2
+  ai klingon kli-assault-fed-random2
+every signal kli-raid-3
+  ai klingon kli-assault-fed-random3
+every signal kli-raid-4
+  ai klingon kli-assault-fed-random4
+every signal kli-raid-5
+  ai klingon kli-assault-fed-random5
+every signal kli-raid-6
+  ai klingon kli-assault-fed-random6
+every signal kli-raid-7
+  ai klingon kli-assault-fed-random7
+every signal kli-raid-8
+  ai klingon kli-assault-fed-random8
+every timer rom-raids
+  random rom-raid-1 rom-raid-2 rom-raid-3 rom-raid-4 rom-raid-5 rom-raid-6 rom-raid-7 rom-raid-8
+  timer rom-raids 180
+every signal rom-raid-1
+  ai romulan rom-assault-fed-random1
+every signal rom-raid-2
+  ai romulan rom-assault-fed-random2
+every signal rom-raid-3
+  ai romulan rom-assault-fed-random3
+every signal rom-raid-4
+  ai romulan rom-assault-fed-random4
+every signal rom-raid-5
+  ai romulan rom-assault-fed-random5
+every signal rom-raid-6
+  ai romulan rom-assault-fed-random6
+every signal rom-raid-7
+  ai romulan rom-assault-fed-random7
+every signal rom-raid-8
+  ai romulan rom-assault-fed-random8
+
+# --- Objective 15: the first of six buildings -----------------------------------------------
+on built-all sickbay vehicle-yard construction-yard science-station power-generator transporter-pad
+  say command "Every building we needed is up, Sir."
+  complete 15
+  signal objective
+
+# --- The Taubat ("Inbetweener") colony under attack ------------------------------------------
+on count taubat-house == 11
+  say "Incoming message" "Help! They are destroying us."
+# two of these three and the colony counts as lost (each watch fires once, then sleeps)
+every count taubat-hangar == 0 as hangars-ruined
+  disarm hangars-ruined
+  signal taubat-ruin
+every count taubat-house == 9 as houses-ruined
+  disarm houses-ruined
+  signal taubat-ruin
+every count taubat-temple == 0 as temple-ruined
+  disarm temple-ruined
+  signal taubat-ruin
+on signal taubat-ruin*2
+  fail 18 20
+  say command "The Inbetweener colony has been laid waste. Primary objective 2 has failed."
+  signal failing
+
+# --- Objective 16: the Klingon photon artillery ------------------------------------------------
+on count klingon-photon-artillery == 0
+  say command "The Klingon attackers are all destroyed. Primary objective 2 is complete."
+  complete 16
+  signal objective
+# (the shared rules announce the fall of a hub)
+on hub-destroyed klingon
+  ai klingon abort kli-npc-build-con-yard
+  ai klingon abort kli-npc-build-veh-yard
+  ai klingon abort kli-npc-build-advpwrgen-one
+  ai klingon abort kli-npc-build-advpwrgen-two
+  ai klingon abort kli-npc-build-shld-gen
+  ai klingon abort kli-npc-build-def-weap-one
+  ai klingon abort kli-npc-build-def-weap-two
+  ai klingon abort kli-npc-build-def-art
+
+# --- Objective 17: the Romulan cloaked tanks ----------------------------------------------------
+on count romulan-cloaked-tank == 0
+  say command "The Romulan saboteurs are all destroyed. Primary objective 3 is complete."
+  complete 17
+  signal objective
+on hub-destroyed romulan
+  ai romulan abort rom-npc-build-con-yard
+  ai romulan abort rom-npc-build-veh-yard
+  ai romulan abort rom-npc-build-advpwrgen-one
+  ai romulan abort rom-npc-build-advpwrgen-two
+  ai romulan abort rom-npc-build-shld-gen
+  ai romulan abort rom-npc-build-def-weap-one
+  ai romulan abort rom-npc-build-def-weap-two
+  ai romulan abort rom-npc-build-def-art
+
+# --- The pass: three objectives, a message at once, the win at 20 s ----------------------------
+on signal objective*3
+  say command "The primary objectives are complete, Sir."
+  timer pass 20
+on timer pass
+  win
+
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ------------------------------
+on destroyed colony-hub
+  fail 19 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
+
+# Not expressible yet:
+# - "Two of three Taubat losses" counts monitor events (a 2-relay); written as three
+#   self-disarming handlers feeding a signal counter (once-only "on" handlers would be fired by
+#   script-check's walkthrough).
+# - The Klingons' and Romulans' build timetables (their named build orders and unit builds)
+#   are AI order data, not script; the script only cancels the named builds when a hub falls.
+# - The Hubrin slot holds only a dummy object (keeps the side alive).

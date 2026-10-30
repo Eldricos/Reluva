@@ -1,0 +1,170 @@
+# --- J2 as R ----------------------------------------
+# J2 "Absent Friends", played as the Romulans (slot 2).
+# Rewritten from the game's own mission graph (scripts_out/J2.json).
+mission J2 R
+site romulan-colony 192 231
+zone intrusion-zone 96 236 148 296
+zone storm-field 244 284 252 292
+site alien-structure 112 280   # the Hubrin fortress, as the 120 s message gives it
+site taubat-hangar 120 295     # where the staff are held (group Taubat_Hangar)
+objective 7
+objective 8 hidden
+
+# --- Timed messages, and the Hubrin turning on everyone at 120 s ------------
+# (A magnetic storm flashes over a field south-east of the colony all along.)
+on start
+  storm storm-field
+  timer storm-warning 60
+  timer kidnap 120
+  timer defence-advice 180
+  timer weapons-advice 300
+  timer mining-advice 360
+  timer fed-assault-romulans 80
+  timer fed-raids-on-rom 480
+  timer kli-raids-on-rom 480
+  timer hubrin-raids-on-rom 420
+on timer storm-warning
+  say intelligence "Our colony shield buffer is fluctuating. I can't be sure, but the magnetic storm may be the cause."
+on timer kidnap
+  hostile hubrin
+  say intelligence "Two of our staff have gone missing! There's a transporter trace near an alien structure at {site:alien-structure}. Start a rescue right away!"
+  complete 7
+  reveal 8
+on timer defence-advice
+  say security "We must defend the colony and build our best technology against beings this strong. No wonder the Taubat left this world!"
+on timer weapons-advice
+  say security "Reports say photon tanks and turrets on the mountain tops may be the answer to the Hubrin's greater range and firepower."
+on timer mining-advice
+  say intelligence "To develop the colony fully we should set up remote mining sites, guarded by shield generators and turrets."
+
+# --- The other sides' attacks on the colony -------------------------------
+# Two Federation assaults at 80 s; from 480 s a random Federation and
+# Klingon assault every 180 s; from 420 s a Hubrin raider every 120 s until
+# the Hubrin fortress (or our hub) falls (each order beams its raider in
+# near 134:305 itself); and the Klingons turn on us once
+# the Federation colony has been wiped out.
+on timer fed-assault-romulans
+  ai federation fed-romulan-assault-one
+  ai federation fed-romulan-assault-two
+every timer fed-raids-on-rom
+  random fed-assault-rom-random1 fed-assault-rom-random2 fed-assault-rom-random3 fed-assault-rom-random4 fed-assault-rom-random5 fed-assault-rom-random6 fed-assault-rom-random7 fed-assault-rom-random8
+  timer fed-raids-on-rom 180
+every signal fed-assault-rom-random1
+  ai federation fed-assault-rom-random1
+every signal fed-assault-rom-random2
+  ai federation fed-assault-rom-random2
+every signal fed-assault-rom-random3
+  ai federation fed-assault-rom-random3
+every signal fed-assault-rom-random4
+  ai federation fed-assault-rom-random4
+every signal fed-assault-rom-random5
+  ai federation fed-assault-rom-random5
+every signal fed-assault-rom-random6
+  ai federation fed-assault-rom-random6
+every signal fed-assault-rom-random7
+  ai federation fed-assault-rom-random7
+every signal fed-assault-rom-random8
+  ai federation fed-assault-rom-random8
+every timer kli-raids-on-rom
+  random kli-assault-rom-random1 kli-assault-rom-random2 kli-assault-rom-random3 kli-assault-rom-random4 kli-assault-rom-random5 kli-assault-rom-random6 kli-assault-rom-random7 kli-assault-rom-random8
+  timer kli-raids-on-rom 180
+every signal kli-assault-rom-random1
+  ai klingon kli-assault-rom-random1
+every signal kli-assault-rom-random2
+  ai klingon kli-assault-rom-random2
+every signal kli-assault-rom-random3
+  ai klingon kli-assault-rom-random3
+every signal kli-assault-rom-random4
+  ai klingon kli-assault-rom-random4
+every signal kli-assault-rom-random5
+  ai klingon kli-assault-rom-random5
+every signal kli-assault-rom-random6
+  ai klingon kli-assault-rom-random6
+every signal kli-assault-rom-random7
+  ai klingon kli-assault-rom-random7
+every signal kli-assault-rom-random8
+  ai klingon kli-assault-rom-random8
+every timer hubrin-raids-on-rom
+  random hubrin-assault-rom-random1 hubrin-assault-rom-random2 hubrin-assault-rom-random3 hubrin-assault-rom-random4 hubrin-assault-rom-random5 hubrin-assault-rom-random6 hubrin-assault-rom-random7 hubrin-assault-rom-random8
+  timer hubrin-raids-on-rom 120
+every signal hubrin-assault-rom-random1
+  ai hubrin hubrin-assault-rom-random1
+every signal hubrin-assault-rom-random2
+  ai hubrin hubrin-assault-rom-random2
+every signal hubrin-assault-rom-random3
+  ai hubrin hubrin-assault-rom-random3
+every signal hubrin-assault-rom-random4
+  ai hubrin hubrin-assault-rom-random4
+every signal hubrin-assault-rom-random5
+  ai hubrin hubrin-assault-rom-random5
+every signal hubrin-assault-rom-random6
+  ai hubrin hubrin-assault-rom-random6
+every signal hubrin-assault-rom-random7
+  ai hubrin hubrin-assault-rom-random7
+every signal hubrin-assault-rom-random8
+  ai hubrin hubrin-assault-rom-random8
+every destroyed hubrin-fortress
+  stop hubrin-raids-on-rom
+# (Four "none left" watches: three on the Federation's small buildings, one on
+# their large ones; all four must report.)
+on count federation-small-buildings <= 0
+  signal fed-colony-down
+on count federation-large-buildings <= 0
+  signal fed-colony-down
+on signal fed-colony-down*2
+  ai klingon kli-romulan-assault-one
+  ai klingon kli-romulan-assault-two
+
+# --- Our bird-of-prey ------------------------------------------------------
+# The first of our units inside the rectangle north-east of the colony sends
+# the bird-of-prey along its route, where it lands at the last point.
+on inside ours intrusion-zone
+  move rom-bop 145 246 100 299 172 299 50 222
+
+# --- Objective 8: rescue the staff from the Taubat hangar ----------------
+# The raid: hold the hangar 10 s to start the search, 60 s more to finish it.
+every entered taubat-hangar
+  say intelligence "Searching the building for our staff."
+every capture-lost taubat-hangar
+  say intelligence "Something's wrong: the recovery team has stopped answering."
+on captured taubat-hangar as rom-raid
+  say intelligence "Our people aren't here. Faint bio-traces show they were taken elsewhere a while back."
+  complete 8
+  timer new-orders 7
+  timer pass 10
+on timer new-orders
+  say communications "New orders from command: we're being moved to a new outpost, and another team will look into the loss of our staff."
+on timer pass
+  win
+# A rival finishing its raid while ours is still running beats us (fail 10);
+# once a rival has finished, our own success is futile (nothing happens).
+# (A rival's raid here is a capture, which only a human rival can make.)
+on beaten taubat-hangar
+  fail 10 10
+  say intelligence "A garbled message from our staff: it seems the Klingons or the Federation have raided the building."
+every captured-by federation taubat-hangar
+  timer fed-took-staff 7
+every captured-by klingon taubat-hangar
+  timer kli-took-staff 7
+on timer fed-took-staff
+  say intelligence "The Federation has taken the building and our staff with it."
+on timer kli-took-staff
+  say intelligence "The Klingons have taken the building and our staff with it."
+
+# --- Fails: the cause at once, the mission lost 10 s later ----------------
+on count colony-hub == 0
+  fail 9 10
+  say operations "The Romulan colony hub has been destroyed."
+  stop hubrin-raids-on-rom
+on destroyed taubat-hangar
+  fail 10 10
+  say operations "The Taubat hangar holding our staff has been destroyed. The mission has failed."
+
+# Not expressible yet:
+# - captured-by <side> taubat-hangar and beaten never fire against the
+#   computer's sides: they never capture.
+# - The objective sent at 120 s is shown only as the objective change; the
+#   game's "new primary objective" mail goes to a distributor, not the panel.
+# - The Romulans' own AI orders (colony guard at 60 s, assault on the
+#   Klingons at 65 s, random raids, an assault on the Federation when the
+#   Klingon colony is gone) only run when the side isn't played.

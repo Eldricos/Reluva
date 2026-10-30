@@ -1,0 +1,196 @@
+# --- F2 as F ----------------------------------------
+# F2 as the Federation, rewritten from the game's own graph (STNW.exe dump F2.json, slot 0,
+# with the Orion/Metar slot 5 objects that act on the Federation).
+mission F2 F
+site orion-drop-north 70 365
+site orion-drop-west 46 309
+site orion-drop-east 94 381
+zone meteors-north 70 394 166 322
+zone meteors-middle 178 374 262 290
+zone meteors-south 274 398 362 262
+objective 14
+objective 15
+objective 16
+objective 17 hidden
+objective 18 hidden optional
+
+# --- Meteor storms over three stretches of the map, all mission long ----------------------
+on start
+  meteors meteors-north 1
+  meteors meteors-middle 1.5
+  meteors meteors-south 2
+
+# --- Orion pirates: from 360 s, every 240 s one of eight raids at random -----------------
+on start
+  timer starship-ready 1800
+  timer orion-raids 360
+every timer orion-raids
+  random orion-raid-1 orion-raid-2 orion-raid-3 orion-raid-4 orion-raid-5 orion-raid-6 orion-raid-7 orion-raid-8
+  timer orion-raids 240
+# each raid: its order beams four pirates down at a drop point, then sends them at the colony
+every signal orion-raid-1
+  ai orion orion-assault-fed-random1
+every signal orion-raid-2
+  ai orion orion-assault-fed-random2
+every signal orion-raid-3
+  ai orion orion-assault-fed-random3
+every signal orion-raid-4
+  ai orion orion-assault-fed-random4
+every signal orion-raid-5
+  ai orion orion-assault-fed-random5
+every signal orion-raid-6
+  ai orion orion-assault-fed-random6
+every signal orion-raid-7
+  ai orion orion-assault-fed-random7
+every signal orion-raid-8
+  ai orion orion-assault-fed-random8
+
+# --- Scans of things the mission has no use for ------------------------------------------
+every scanned-nothing science
+  say science "Routine science scans find nothing unusual, Sir."
+every scanned-nothing strong-science
+  say science "A detailed scan, Sir, but it's all just as I'd expect."
+every scanned-nothing medical
+  say medical "Routine medical scans show nothing wrong, Sir."
+every scanned-nothing strong-medical
+  say medical "The full diagnostics turn up nothing of note, Sir."
+every scanned-nothing engineering
+  say engineering "Structure and systems read normal, Sir."
+every scanned-nothing strong-engineering
+  say engineering "Nothing much here for engineering, Sir."
+
+# --- Objective 14: the first of six buildings ----------------------------------------------
+on built-all vehicle-yard construction-yard accommodation mining-station resource-processor transporter-pad
+  complete 14
+  signal primary
+  timer first-stage 5
+on timer first-stage
+  say command "Sir, the first stage of the colony is finished."
+
+# --- Objective 15: 120 T of dilithium for the starship, 1800 s in, within 180 s -------------
+on timer starship-ready
+  say communications "The starship is ready to take the supplies aboard."
+  timer delivery-deadline 180
+  arm delivery
+# the dilithium check sleeps until the starship is ready, then looks at the stock as it is
+on stock dilithium 120 as delivery dormant
+  stop delivery-deadline
+  say communications "The supplies are on their way up to the ship. Objective done."
+  take dilithium 120
+  complete 15
+  signal primary
+on timer delivery-deadline
+  fail 20 20
+  say communications "We can't hold on for the delivery any longer. Primary objective 2 has failed."
+  signal failing
+
+# --- Objective 16: the crashed starship (science scans, 1 s to start, 10 s to finish) ------
+every scan-started science crashed-starship
+  say science "Scan under way, Sir."
+on scanned science crashed-starship
+  say science "The scan's done, but the readings are unclear. I'd like someone else to look."
+every scan-started strong-science crashed-starship
+  say science "Scanning, with low-pass filters to clean up the signal."
+every scan-lost strong-science crashed-starship
+  say science "Lost the scan: it didn't run long enough, Sir."
+on scanned strong-science crashed-starship
+  say science "Finished. The data is going to the science building now; research on it should start right away."
+  research crash-site-research
+  arm wreck-medical
+on researched crash-site-research
+  complete 16
+  disarm site-fail
+  signal primary
+  timer derelict-1 1
+  timer primary-3-done 5
+  timer derelict-2 8
+on timer derelict-1
+  say science "It's a derelict starship, age unknown. It may be Taubat."
+on timer primary-3-done
+  say command "Primary objective 3 is complete."
+on timer derelict-2
+  say science "The Doctor should give the wreck a medical scan to trace its bio-patterns."
+on signal primary*3
+  say command "The primary objectives are complete, Sir."
+  signal stage
+
+# --- Objective 17: the virus on the wreck (medical scans asleep until the strong science scan) --
+every scan-started medical crashed-starship as wreck-medical dormant
+  say medical "I'm picking up particles in the air. I'll need more skill to study them."
+on scan-started strong-medical crashed-starship as wreck-medical dormant
+  say medical "We've found an airborne virus, and it's very contagious. A sickbay should research it now."
+  reveal 17
+  signal disease-research
+  timer infection 10
+# the research needs the strong medical scan and the first sickbay
+on built sickbay
+  signal disease-research
+on signal disease-research*2
+  research disease-research
+on researched disease-research
+  complete 17
+  say medical "The research identifies it as xenopolycythemia. Now trying to isolate the viral markers..."
+  timer secondary-1-done 10
+  signal stage
+  signal cure
+on timer secondary-1-done
+  say command "Secondary objective 1 is complete."
+  reveal 18
+
+# --- The epidemic: it breaks out 10 s after the strong medical scan starts ------------------
+on timer infection
+  infect
+  signal cure
+on infection 1
+  say medical "The infection is spreading. Sickbay must research a cure and get it out at once!"
+# these two sleep once the cure is under way
+on infection 30 as disease-warnings
+  say medical "We must act against this disease before it kills the colony!"
+on infection 80 as disease-warnings
+  fail 21 20
+  say medical "The disease has swept through the whole colony."
+  signal failing
+
+# --- Objective 18: the cure (needs the outbreak and the research), 10 s later --------------
+on signal cure*2
+  timer disease-shut-off 10
+  timer cure 10
+on timer disease-shut-off
+  disarm disease-warnings
+on timer cure
+  say medical "We have a cure. Releasing it through the colony's life support now."
+  cure
+on cured
+  say medical "The xenopolycythemia outbreak is under control."
+  complete 18
+  timer secondary-2-done 10
+on timer secondary-2-done
+  say command "Secondary objective 2 is complete."
+
+# --- The pass: primaries and secondary 1, a message at 10 s, the win at 20 s -----------------
+on signal stage*2
+  timer pass-message 10
+  timer pass 20
+on timer pass-message
+  say command "All objectives met. Well done."
+on timer pass
+  win
+
+# --- Fails: the cause at once, "failed" at 10 s, the end at 20 s ----------------------------
+on destroyed colony-hub
+  fail 19 20
+  say command "Our colony hub has been destroyed."
+  signal failing
+# watched only until objective 16 is met
+on destroyed crashed-starship as site-fail
+  fail 22 20
+  say command "The archaeological site has been destroyed."
+  signal failing
+on signal failing
+  timer fail-message 10
+on timer fail-message
+  say command "We have not met our objectives."
+
+# Not expressible yet:
+# - Repeating a finished scan gets its own line ("consult a specialist", "need longer to get
+#   the information").

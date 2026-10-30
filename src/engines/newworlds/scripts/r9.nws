@@ -1,0 +1,178 @@
+# --- R9 as R ----------------------------------------
+# R9 as the Romulans, rewritten from the game's own mission graph (STNW.exe).
+mission R9 R
+zone federation-ambush-south 396 320 415 336
+zone federation-ambush-north 379 328 391 347
+zone klingon-ambush 207 384 232 409
+zone klingon-colony 224 367 236 383
+objective 12
+objective 14
+objective 16
+
+# Opening: the Federation, the Klingons and the Metar each start random
+# raids on us after 3 minutes, then one every 2 minutes.
+on start
+  timer federation-raids 180
+  timer klingon-raids 180
+  timer metar-raids 180
+
+# Ambushes: any of our units inside these rectangles springs the waiting
+# groups.
+on inside ours federation-ambush-south
+  ai federation trigger fed-pouncer-0
+on inside ours federation-ambush-north
+  ai federation trigger fed-pouncer-1
+on inside ours klingon-ambush
+  ai klingon trigger kli-pouncer-0
+  ai klingon trigger kli-pouncer-1
+
+# Objective 12: hold the Federation science block (2 s to get in, 20 s to
+# search; leaving before then is reported once); the device data opens its
+# research topic.
+on entered fed-science-block
+  say intelligence "We're inside, sir. Searching the building."
+on capture-lost fed-science-block
+  say intelligence "We've left the building before the search was done."
+on captured fed-science-block
+  say intelligence "We have the device data, sir. Sending it now."
+  complete 12
+  research bgd
+
+# Objective 14: the study done wakes three watches: a vehicle yard (7 s
+# after one stands, the device is sent on its way to the Klingon colony),
+# the device's arrival there, and the device being made.
+on researched bgd
+  say engineering "The device study is finished. We've asked for one to be built."
+  arm yard-check
+  arm device-route
+  arm device-made
+on built vehicle-yard as yard-check dormant
+  timer device-launch 7
+on timer device-launch
+  ai romulan rom-bgd-controller
+# once the device exists, losing it fails the mission
+on built bad-guy-device as device-made dormant
+  complete 14
+  arm device-fail
+
+# Objective 16: the device inside the rectangle at the Klingon colony and,
+# 7 s on, every Klingon building and their hub destroyed outright; the
+# colony down to half its size meets the objective.
+on inside bad-guy-device klingon-colony as device-route dormant
+  say security "The device has been placed in the Klingon colony. Prepare for activation."
+  timer device-blast 7
+on timer device-blast
+  damage kln-building all
+  damage kln-colony-hub all
+on colony-total klingon 50
+  complete 16
+
+# The others' hubs: losing one calls off that side's remaining build orders.
+on hub-destroyed federation
+  ai federation abort fed-npc-build-landing-pad
+  ai federation abort fed-npc-build-sickbay
+  ai federation abort fed-npc-build-farm
+on hub-destroyed klingon
+  ai klingon abort kli-npc-build-sickbay
+  ai klingon abort kli-npc-build-res-proc
+  ai klingon abort kli-npc-build-farm
+
+# The raids: one of eight at random from each side, every 2 minutes.
+on timer federation-raids
+  timer federation-raid 120
+every timer federation-raid
+  random federation-raid-1 federation-raid-2 federation-raid-3 federation-raid-4 federation-raid-5 federation-raid-6 federation-raid-7 federation-raid-8
+  timer federation-raid 120
+every signal federation-raid-1
+  ai federation fed-assault-rom-random1
+every signal federation-raid-2
+  ai federation fed-assault-rom-random2
+every signal federation-raid-3
+  ai federation fed-assault-rom-random3
+every signal federation-raid-4
+  ai federation fed-assault-rom-random4
+every signal federation-raid-5
+  ai federation fed-assault-rom-random5
+every signal federation-raid-6
+  ai federation fed-assault-rom-random6
+every signal federation-raid-7
+  ai federation fed-assault-rom-random7
+every signal federation-raid-8
+  ai federation fed-assault-rom-random8
+on timer klingon-raids
+  timer klingon-raid 120
+every timer klingon-raid
+  random klingon-raid-1 klingon-raid-2 klingon-raid-3 klingon-raid-4 klingon-raid-5 klingon-raid-6 klingon-raid-7 klingon-raid-8
+  timer klingon-raid 120
+every signal klingon-raid-1
+  ai klingon kli-assault-rom-random1
+every signal klingon-raid-2
+  ai klingon kli-assault-rom-random2
+every signal klingon-raid-3
+  ai klingon kli-assault-rom-random3
+every signal klingon-raid-4
+  ai klingon kli-assault-rom-random4
+every signal klingon-raid-5
+  ai klingon kli-assault-rom-random5
+every signal klingon-raid-6
+  ai klingon kli-assault-rom-random6
+every signal klingon-raid-7
+  ai klingon kli-assault-rom-random7
+every signal klingon-raid-8
+  ai klingon kli-assault-rom-random8
+on timer metar-raids
+  timer metar-raid 120
+every timer metar-raid
+  random metar-raid-1 metar-raid-2 metar-raid-3 metar-raid-4 metar-raid-5 metar-raid-6 metar-raid-7 metar-raid-8
+  timer metar-raid 120
+every signal metar-raid-1
+  ai metar metar-assault-rom-random1
+every signal metar-raid-2
+  ai metar metar-assault-rom-random2
+every signal metar-raid-3
+  ai metar metar-assault-rom-random3
+every signal metar-raid-4
+  ai metar metar-assault-rom-random4
+every signal metar-raid-5
+  ai metar metar-assault-rom-random5
+every signal metar-raid-6
+  ai metar metar-assault-rom-random6
+every signal metar-raid-7
+  ai metar metar-assault-rom-random7
+every signal metar-raid-8
+  ai metar metar-assault-rom-random8
+
+# Fails: the cause at once, "the Romulans cannot complete their mission" at
+# 5 s, the end at 10 s.
+# The game wires this fail to the search's "beaten to it" output, which
+# nothing sends: it never fires (its line says the block was destroyed, but
+# the block's destruction isn't watched).
+on beaten fed-science-block
+  fail 13 10
+  say intelligence "The science block is destroyed. The mission has failed."
+  signal failing
+on destroyed bad-guy-device as device-fail dormant
+  fail 15 10
+  say operations "The device has been destroyed. The mission has failed."
+  signal failing
+on destroyed colony-hub
+  fail 17 10
+  say operations "The colony hub is destroyed. The mission has failed."
+  signal failing
+on signal failing
+  timer fail-message 5
+on timer fail-message
+  say intelligence "The Romulans can't complete their mission."
+
+# The pass: all three objectives, the message 5 s later, the win at 10 s.
+on all-completed
+  timer mission-pass 5
+  timer mission-won 10
+on timer mission-pass
+  say intelligence "The Romulans' mission is accomplished."
+on timer mission-won
+  win
+
+# Not expressible yet:
+# - Fail 13 is wired to the search's "beaten to it" output, which nothing
+#   sends; written as the block destroyed (inferred from its line).

@@ -1,0 +1,202 @@
+# --- J9 as R ----------------------------------------
+# J9 as the Romulans (slot 2), from the game's own mission graph.
+# Scan the Metar temple for the sentient anomaly device, research it, and
+# capture one of the Metar starships.
+mission J9 R
+site metar-temple 264 303
+objective 13
+objective 15
+
+# Fail criteria, the game's way: the cause at once, the end 10 s later (no
+# word to the other sides in J9). Our hub (14); all three Metar starships
+# destroyed (16; the game's message calls them colony cores). Fail 17 (a
+# rival got the technology while we were scanning) is with the scan below.
+on destroyed colony-hub
+  fail 14 10
+  say command "Colony hub lost. The mission has failed."
+on count metar-starship == 0
+  fail 16 10
+  say command "The Metar colony cores are all gone. The mission has failed."
+
+# Start: the other sides' attack clocks
+on start
+  timer fed-raid-kli 60
+  timer fed-raid-rom 60
+  timer kli-raid-fed 60
+  timer met-raid-fed 220
+  timer met-raid-kli 220
+  timer met-raid-rom 220
+
+# Objective 13: scan the temple (10 s before the officer reports, then held
+# a minute); the technology is beamed home and its research opens; the
+# research done meets the objective. The game's watch is "the device's block
+# scanned by us" (any of our scanning units nearby), on the group
+# Anomaly_Device: a cell scan.
+every scan-started cell anomaly-device
+  say engineering "Searching the temple for the device's technology."
+every scan-lost cell anomaly-device
+  say engineering "We lost the scan. Have another try."
+on scanned cell anomaly-device
+  say engineering "The technology is beamed home to our hub for research."
+  research anomaly-device
+# The race for the device: the first side to finish takes the technology. A
+# rival finishing while ours runs beats us (fail 17); once a rival has
+# finished, our later scan is futile (no technology, no research). The
+# computer's sides only win it if their own units happen to scan the block.
+on beaten anomaly-device
+  fail 17 10
+  say engineering "The technology is gone from here; the Federation or the Klingons must have taken it."
+every futile anomaly-device
+  say engineering "That scan was useless."
+on researched anomaly-device
+  say science "Our researchers have worked out how to use the device."
+  complete 13
+  arm starship-watch
+
+# Objective 15: holding a Metar starship; the game starts watching for it
+# only once the research is done
+on captured metar-starship as starship-watch dormant
+  say engineering "The starship is ours."
+  complete 15
+
+# Mission passed: the win 10 s later (no announcement in J9)
+on all-completed
+  timer pass 10
+on timer pass
+  win
+
+# The other sides' AI: attacks on a clock (the Romulans' own attack orders
+# are left out: the player gives those)
+# Federation raids on the Klingons: one of eight attacks every 30 s, the first at 60 s
+every timer fed-raid-kli
+  timer fed-raid-kli 30
+  random fed-raid-kli-1 fed-raid-kli-2 fed-raid-kli-3 fed-raid-kli-4 fed-raid-kli-5 fed-raid-kli-6 fed-raid-kli-7 fed-raid-kli-8
+every signal fed-raid-kli-1
+  ai federation fed-assault-kli-random1
+every signal fed-raid-kli-2
+  ai federation fed-assault-kli-random2
+every signal fed-raid-kli-3
+  ai federation fed-assault-kli-random3
+every signal fed-raid-kli-4
+  ai federation fed-assault-kli-random4
+every signal fed-raid-kli-5
+  ai federation fed-assault-kli-random5
+every signal fed-raid-kli-6
+  ai federation fed-assault-kli-random6
+every signal fed-raid-kli-7
+  ai federation fed-assault-kli-random7
+every signal fed-raid-kli-8
+  ai federation fed-assault-kli-random8
+
+# Federation raids on the Romulans: one of eight attacks every 30 s, the first at 60 s
+every timer fed-raid-rom
+  timer fed-raid-rom 30
+  random fed-raid-rom-1 fed-raid-rom-2 fed-raid-rom-3 fed-raid-rom-4 fed-raid-rom-5 fed-raid-rom-6 fed-raid-rom-7 fed-raid-rom-8
+every signal fed-raid-rom-1
+  ai federation fed-assault-rom-random1
+every signal fed-raid-rom-2
+  ai federation fed-assault-rom-random2
+every signal fed-raid-rom-3
+  ai federation fed-assault-rom-random3
+every signal fed-raid-rom-4
+  ai federation fed-assault-rom-random4
+every signal fed-raid-rom-5
+  ai federation fed-assault-rom-random5
+every signal fed-raid-rom-6
+  ai federation fed-assault-rom-random6
+every signal fed-raid-rom-7
+  ai federation fed-assault-rom-random7
+every signal fed-raid-rom-8
+  ai federation fed-assault-rom-random8
+
+# Klingon raids on the Federation: one of eight attacks every 30 s, the first at 60 s
+every timer kli-raid-fed
+  timer kli-raid-fed 30
+  random kli-raid-fed-1 kli-raid-fed-2 kli-raid-fed-3 kli-raid-fed-4 kli-raid-fed-5 kli-raid-fed-6 kli-raid-fed-7 kli-raid-fed-8
+every signal kli-raid-fed-1
+  ai klingon kli-assault-fed-random1
+every signal kli-raid-fed-2
+  ai klingon kli-assault-fed-random2
+every signal kli-raid-fed-3
+  ai klingon kli-assault-fed-random3
+every signal kli-raid-fed-4
+  ai klingon kli-assault-fed-random4
+every signal kli-raid-fed-5
+  ai klingon kli-assault-fed-random5
+every signal kli-raid-fed-6
+  ai klingon kli-assault-fed-random6
+every signal kli-raid-fed-7
+  ai klingon kli-assault-fed-random7
+every signal kli-raid-fed-8
+  ai klingon kli-assault-fed-random8
+
+# Metar raids on the Federation: one of eight attacks every 100 s, the first at 220 s
+every timer met-raid-fed
+  timer met-raid-fed 100
+  random met-raid-fed-1 met-raid-fed-2 met-raid-fed-3 met-raid-fed-4 met-raid-fed-5 met-raid-fed-6 met-raid-fed-7 met-raid-fed-8
+every signal met-raid-fed-1
+  ai metar metar-assault-fed-random1
+every signal met-raid-fed-2
+  ai metar metar-assault-fed-random2
+every signal met-raid-fed-3
+  ai metar metar-assault-fed-random3
+every signal met-raid-fed-4
+  ai metar metar-assault-fed-random4
+every signal met-raid-fed-5
+  ai metar metar-assault-fed-random5
+every signal met-raid-fed-6
+  ai metar metar-assault-fed-random6
+every signal met-raid-fed-7
+  ai metar metar-assault-fed-random7
+every signal met-raid-fed-8
+  ai metar metar-assault-fed-random8
+
+# Metar raids on the Klingons: one of eight attacks every 100 s, the first at 220 s
+every timer met-raid-kli
+  timer met-raid-kli 100
+  random met-raid-kli-1 met-raid-kli-2 met-raid-kli-3 met-raid-kli-4 met-raid-kli-5 met-raid-kli-6 met-raid-kli-7 met-raid-kli-8
+every signal met-raid-kli-1
+  ai metar metar-assault-kli-random1
+every signal met-raid-kli-2
+  ai metar metar-assault-kli-random2
+every signal met-raid-kli-3
+  ai metar metar-assault-kli-random3
+every signal met-raid-kli-4
+  ai metar metar-assault-kli-random4
+every signal met-raid-kli-5
+  ai metar metar-assault-kli-random5
+every signal met-raid-kli-6
+  ai metar metar-assault-kli-random6
+every signal met-raid-kli-7
+  ai metar metar-assault-kli-random7
+every signal met-raid-kli-8
+  ai metar metar-assault-kli-random8
+
+# Metar raids on the Romulans: one of eight attacks every 100 s, the first at 220 s
+every timer met-raid-rom
+  timer met-raid-rom 100
+  random met-raid-rom-1 met-raid-rom-2 met-raid-rom-3 met-raid-rom-4 met-raid-rom-5 met-raid-rom-6 met-raid-rom-7 met-raid-rom-8
+every signal met-raid-rom-1
+  ai metar metar-assault-rom-random1
+every signal met-raid-rom-2
+  ai metar metar-assault-rom-random2
+every signal met-raid-rom-3
+  ai metar metar-assault-rom-random3
+every signal met-raid-rom-4
+  ai metar metar-assault-rom-random4
+every signal met-raid-rom-5
+  ai metar metar-assault-rom-random5
+every signal met-raid-rom-6
+  ai metar metar-assault-rom-random6
+every signal met-raid-rom-7
+  ai metar metar-assault-rom-random7
+every signal met-raid-rom-8
+  ai metar metar-assault-rom-random8
+
+# Not expressible yet:
+# - The game's capture watch counts starships held, so one captured before
+#   the research and still held when the watch starts counts at once; here
+#   only a capture made after the research does (the event is the capture).
+# - The Klingons' random raids on the Romulans never happen in the game: their
+#   timer names orders (Kli_Assault_Kli_Random1-8) that don't exist. Left out.
+# - The AI sides' own research and captures (no events for rivals).
