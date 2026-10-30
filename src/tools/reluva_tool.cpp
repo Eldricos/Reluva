@@ -42,6 +42,12 @@
 //                                                  write <out>.bmp and <out>_alpha.bmp
 
 #include "common/fs.h"
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+#include <windows.h>
+#include <shellapi.h>
+#endif
 #include "common/savestate.h"
 #include "common/video/bink.h"
 #include "common/audio/decode.h"
@@ -82,7 +88,7 @@ namespace {
 using Bytes = std::vector<uint8_t>;
 
 bool readFile(const char* path, Bytes& out) {
-    std::ifstream in(path, std::ios::binary);
+    std::ifstream in(reluva::fs::fromUtf8(path), std::ios::binary);
     if (!in) {
         std::fprintf(stderr, "cannot open %s\n", path);
         return false;
@@ -386,7 +392,7 @@ int cmdCatList(int argc, char** argv) {
         return 2;
     }
     reluva::newworlds::CatArchive cat;
-    if (reluva::Error err = cat.open(argv[2])) {
+    if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -407,11 +413,11 @@ int cmdCatExtract(int argc, char** argv) {
         return 2;
     }
     reluva::newworlds::CatArchive cat;
-    if (reluva::Error err = cat.open(argv[2])) {
+    if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
-    const std::filesystem::path outDir = argv[3];
+    const std::filesystem::path outDir = reluva::fs::fromUtf8(argv[3]);
     const std::string filter = argc > 4 ? argv[4] : "";
     std::vector<uint8_t> data;
     unsigned written = 0;
@@ -534,7 +540,7 @@ bool writeBmp(const std::string& path, int w, int h, const uint8_t* palette, int
         out.insert(out.end(), pixels + size_t(y) * size_t(w), pixels + size_t(y + 1) * size_t(w));
         out.resize(out.size() + size_t(stride - w), 0);
     }
-    std::ofstream f(path, std::ios::binary);
+    std::ofstream f(reluva::fs::fromUtf8(path), std::ios::binary);
     f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
     return bool(f);
 }
@@ -628,7 +634,7 @@ int cmdTexSurvey(int argc, char** argv) {
     std::vector<uint8_t> data;
     for (int a = 2; a < argc; ++a) {
         reluva::newworlds::CatArchive cat;
-        if (reluva::Error err = cat.open(argv[a])) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[a]))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -711,7 +717,7 @@ int cmdTexKeys(int argc, char** argv) {
     std::printf("%-44s %3s %4s %-8s %6s  %-14s %s\n", "texture", "fmt", "key", "colour", "px", "corners", "corner colour");
     for (int a = 2; a < argc; ++a) {
         reluva::newworlds::CatArchive cat;
-        if (reluva::Error err = cat.open(argv[a])) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[a]))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -888,7 +894,7 @@ int cmdTable(int argc, char** argv) {
 
 
 bool writeObj(const reluva::newworlds::GeoModel& m, const std::string& path) {
-    std::ofstream f(path);
+    std::ofstream f(reluva::fs::fromUtf8(path));
     f << "# exported by reluva-tool geo-info\n";
     // OBJ numbers vertices across the whole file, so offset each part's.
     std::vector<size_t> base;
@@ -1282,7 +1288,7 @@ int cmdGmfFit(int argc, char** argv) {
     if (argc < 3)
         return 2;
     nw::CatArchive cat;
-    if (reluva::Error err = cat.open(argv[2])) {
+    if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -1302,7 +1308,7 @@ int cmdGmfFit(int argc, char** argv) {
             order.resize(geoNames.size()), order[i] = i;
     if (orderFile) {
         order.assign(order.size(), nw::kNoModel);
-        std::ifstream in(orderFile);
+        std::ifstream in(reluva::fs::fromUtf8(orderFile));
         unsigned n;
         std::string stem;
         while (in >> n >> stem) {
@@ -1784,13 +1790,13 @@ int cmdLevelInfo(int argc, char** argv) {
     std::vector<std::pair<std::string, std::string>> maps; // map name, archive
     for (int a = 3; a < argc; ++a) {
         nw::CatArchive cat;
-        if (reluva::Error err = cat.open(argv[a])) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[a]))) {
             std::fprintf(stderr, "%s: %s\n", argv[a], err.message.c_str());
             continue;
         }
         for (const auto& e : cat.entries())
             if (e.tag == nw::cattag::Gmf)
-                maps.emplace_back(e.name, reluva::fs::toUtf8(std::filesystem::path(argv[a]).filename()));
+                maps.emplace_back(e.name, reluva::fs::toUtf8(reluva::fs::fromUtf8(argv[a]).filename()));
     }
     for (const auto& l : levels) {
         std::string where;
@@ -1874,7 +1880,7 @@ int cmdWavDecode(int argc, char** argv) {
         return 1;
     }
     const std::vector<uint8_t> out = reluva::audio::encodePcmWav(s);
-    std::ofstream f(argv[3], std::ios::binary);
+    std::ofstream f(reluva::fs::fromUtf8(argv[3]), std::ios::binary);
     f.write(reinterpret_cast<const char*>(out.data()), std::streamsize(out.size()));
     if (!f) {
         std::fprintf(stderr, "cannot write %s\n", argv[3]);
@@ -1894,7 +1900,7 @@ int cmdGmfDump(int argc, char** argv) {
     }
     namespace nw = reluva::newworlds;
     nw::CatArchive cat;
-    if (reluva::Error err = cat.open(argv[2])) {
+    if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -1903,7 +1909,7 @@ int cmdGmfDump(int argc, char** argv) {
         if (e.tag == nw::cattag::Geometry)
             geoNames.push_back(e.name);
     const std::vector<size_t> order = nw::tileModelOrder(geoNames);
-    const std::filesystem::path out = argv[3];
+    const std::filesystem::path out = reluva::fs::fromUtf8(argv[3]);
     std::filesystem::create_directories(out);
     std::vector<uint8_t> data;
     int maps = 0;
@@ -2022,7 +2028,7 @@ int cmdGeoSheet(int argc, char** argv) {
                 std::memcpy(sheet.row(y0 + y) + x0 * 4, cell.row(y), size_t(kCellW) * 4);
         }
     }
-    std::ofstream out(argv[2], std::ios::binary);
+    std::ofstream out(reluva::fs::fromUtf8(argv[2]), std::ios::binary);
     out << "P6\n" << sheet.w << ' ' << sheet.h << "\n255\n";
     for (int y = 0; y < sheet.h; ++y)
         for (int x = 0; x < sheet.w; ++x)
@@ -2038,7 +2044,7 @@ int cmdGroundTextures(int argc, char** argv) {
     }
     namespace nw = reluva::newworlds;
     nw::CatArchive cat;
-    if (reluva::Error err = cat.open(argv[2])) {
+    if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -2336,7 +2342,7 @@ int cmdGeoSurvey(int argc, char** argv) {
     std::vector<uint8_t> d;
     for (int a = 2; a < argc; ++a) {
         reluva::newworlds::CatArchive cat;
-        if (reluva::Error err = cat.open(argv[a])) {
+        if (reluva::Error err = cat.open(reluva::fs::fromUtf8(argv[a]))) {
             std::fprintf(stderr, "%s\n", err.message.c_str());
             return 1;
         }
@@ -2538,7 +2544,7 @@ int cmdScriptCheck(int argc, char** argv) {
         return 2;
     }
     namespace nw = reluva::newworlds;
-    std::ifstream in(argv[2], std::ios::binary);
+    std::ifstream in(reluva::fs::fromUtf8(argv[2]), std::ios::binary);
     if (!in) {
         std::fprintf(stderr, "cannot open %s\n", argv[2]);
         return 1;
@@ -2601,7 +2607,7 @@ int cmdBinkDecode(int argc, char** argv) {
         return 2;
     }
     reluva::video::BinkMovie movie;
-    if (reluva::Error err = movie.open(argv[2])) {
+    if (reluva::Error err = movie.open(reluva::fs::fromUtf8(argv[2]))) {
         std::fprintf(stderr, "%s\n", err.message.c_str());
         return 1;
     }
@@ -2642,6 +2648,26 @@ int cmdBinkDecode(int argc, char** argv) {
 }
 
 int main(int argc, char** argv) {
+#ifdef _WIN32
+    // Windows hands main its arguments in the ANSI code page: take them
+    // again as UTF-16 and pass them on as UTF-8, as the paths expect.
+    std::vector<std::string> utf8;
+    std::vector<char*> args;
+    if (int n = 0; LPWSTR* wide = CommandLineToArgvW(GetCommandLineW(), &n)) {
+        for (int i = 0; i < n; ++i) {
+            const int len = WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, nullptr, 0, nullptr, nullptr);
+            std::string a(size_t(std::max(len, 1)), '\0');
+            WideCharToMultiByte(CP_UTF8, 0, wide[i], -1, a.data(), len, nullptr, nullptr);
+            a.resize(a.size() - 1);
+            utf8.push_back(std::move(a));
+        }
+        LocalFree(wide);
+        for (std::string& a : utf8)
+            args.push_back(a.data());
+        args.push_back(nullptr);
+        argc = n, argv = args.data();
+    }
+#endif
     if (argc >= 2 && std::strcmp(argv[1], "bink-decode") == 0)
         return cmdBinkDecode(argc, argv);
     if (argc >= 2 && std::strcmp(argv[1], "hexdump") == 0)

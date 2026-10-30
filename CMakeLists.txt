@@ -131,6 +131,9 @@ target_compile_definitions(reluva PRIVATE RELUVA_VERSION="${PROJECT_VERSION}")
 # --- developer tools -----------------------------------------------------------
 add_executable(reluva-tool src/tools/reluva_tool.cpp)
 target_link_libraries(reluva-tool PRIVATE reluva_engines reluva_warnings)
+if(WIN32)
+    target_link_libraries(reluva-tool PRIVATE shell32) # CommandLineToArgvW: UTF-8 arguments
+endif()
 
 # --- tests ----------------------------------------------------------------------
 if(RELUVA_BUILD_TESTS)
