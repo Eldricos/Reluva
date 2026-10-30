@@ -5,6 +5,7 @@
 
 #include "common/fs.h"
 #include "common/text.h"
+#include "engines/newworlds/bytes.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/texture.h"
 
@@ -18,9 +19,7 @@ namespace {
 constexpr size_t kHeaderSize = 24; // "FONTPROP", u16 first, u16 count, u32 size, u32 height, u32 ?
 constexpr size_t kGlyphSize = 16;  // u32 x, y, width, height
 
-int32_t s32(const std::vector<uint8_t>& d, size_t o) {
-    return int32_t(uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24);
-}
+using bytes::s32;
 
 bool endsWith(const std::string& s, std::string_view suffix) {
     return s.size() >= suffix.size() && s.compare(s.size() - suffix.size(), suffix.size(), suffix) == 0;
@@ -31,8 +30,8 @@ bool endsWith(const std::string& s, std::string_view suffix) {
 Error parseFif(const std::vector<uint8_t>& data, GameFont& out) {
     if (data.size() < kHeaderSize || std::memcmp(data.data(), "FONTPROP", 8) != 0)
         return Error::fail("not a FONTPROP font");
-    out.first = uint32_t(data[8] | data[9] << 8);
-    const size_t count = size_t(data[10] | data[11] << 8);
+    out.first = bytes::u16(data, 8);
+    const size_t count = bytes::u16(data, 10);
     out.size = s32(data, 12);
     out.lineHeight = s32(data, 16);
     if (data.size() != kHeaderSize + count * kGlyphSize)

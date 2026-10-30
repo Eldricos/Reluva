@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/gmf.h"
+#include "engines/newworlds/bytes.h"
 
 #include <algorithm>
 #include <cstdio>
@@ -19,20 +20,8 @@ constexpr size_t kGridOffset = 18;  // in a type-20 body, after its header value
 constexpr size_t kCellEntrySize = 10;
 constexpr size_t kPaletteSize = 1024;
 
-struct Reader {
-    const std::vector<uint8_t>& d;
-    bool has(size_t at, size_t bytes) const { return at <= d.size() && bytes <= d.size() - at; }
-    uint16_t u16(size_t o) const { return uint16_t(d[o] | d[o + 1] << 8); }
-    uint32_t u32(size_t o) const {
-        return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-    }
-};
-
-std::string hex(size_t v) {
-    char buf[24];
-    std::snprintf(buf, sizeof buf, "0x%zx", v);
-    return buf;
-}
+using bytes::hex;
+using bytes::Reader;
 
 } // namespace
 

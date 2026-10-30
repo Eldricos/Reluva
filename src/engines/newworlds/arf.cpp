@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/arf.h"
+#include "engines/newworlds/bytes.h"
 
 #include <cstring>
 #include <string>
@@ -10,16 +11,8 @@ namespace reluva::newworlds {
 
 namespace {
 
-uint32_t u32(const std::vector<uint8_t>& d, size_t o) {
-    return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-}
-
-float f32(const std::vector<uint8_t>& d, size_t o) {
-    const uint32_t v = u32(d, o);
-    float f;
-    std::memcpy(&f, &v, 4);
-    return f;
-}
+using bytes::f32;
+using bytes::u32;
 
 } // namespace
 

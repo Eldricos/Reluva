@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/levels.h"
+#include "engines/newworlds/bytes.h"
 
 #include <algorithm>
 #include <cctype>
@@ -19,14 +20,7 @@ std::string_view trim(std::string_view s) {
     return s;
 }
 
-bool sameName(std::string_view a, std::string_view b) {
-    if (a.size() != b.size())
-        return false;
-    for (size_t i = 0; i < a.size(); ++i)
-        if (std::tolower(static_cast<unsigned char>(a[i])) != std::tolower(static_cast<unsigned char>(b[i])))
-            return false;
-    return true;
-}
+using bytes::sameName;
 
 // "F1,2,Power Corrupts" -> a level; false if the line isn't one.
 bool parseLine(std::string_view line, Level& out) {

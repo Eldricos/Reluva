@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/geo.h"
+#include "engines/newworlds/bytes.h"
 
 #include <algorithm>
 #include <cmath>
@@ -18,26 +19,11 @@ constexpr uint32_t kMaxCount = 1u << 20;
 constexpr uint32_t kMaxParts = 256;
 constexpr uint32_t kMaxPartValue = 255; // sanity limit for a part's node number
 
-struct Reader {
-    const std::vector<uint8_t>& d;
-    bool has(size_t at, size_t bytes) const { return at <= d.size() && bytes <= d.size() - at; }
-    uint32_t u32(size_t o) const {
-        return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-    }
-    float f32(size_t o) const {
-        const uint32_t v = u32(o);
-        float f;
-        std::memcpy(&f, &v, 4);
-        return f;
-    }
+struct Reader : bytes::Reader {
     GeoModel::Vec3 vec3(size_t o) const { return {f32(o), f32(o + 4), f32(o + 8)}; }
 };
 
-std::string hex(size_t v) {
-    char buf[24];
-    std::snprintf(buf, sizeof buf, "0x%zx", v);
-    return buf;
-}
+using bytes::hex;
 
 bool isUnit(const GeoModel::Vec3& v) {
     const float len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
@@ -48,7 +34,7 @@ bool isUnit(const GeoModel::Vec3& v) {
 
 Error parseGeo(const std::vector<uint8_t>& data, GeoModel& out) {
     out = GeoModel{};
-    const Reader r{data};
+    const Reader r{{data}};
     if (!r.has(0, 16))
         return Error::fail("model too small");
     // The file starts with face 0: its header is the file header, whose

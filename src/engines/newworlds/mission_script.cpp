@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/mission_script.h"
+#include "engines/newworlds/bytes.h"
 
 #include "engines/newworlds/ai_data.h"
 
@@ -52,11 +53,7 @@ bool toInt(const std::string& s, int& out) {
     return true;
 }
 
-bool sameName(std::string_view a, std::string_view b) {
-    return a.size() == b.size() && std::equal(a.begin(), a.end(), b.begin(), [](char x, char y) {
-               return std::tolower(static_cast<unsigned char>(x)) == std::tolower(static_cast<unsigned char>(y));
-           });
-}
+using bytes::sameName;
 
 // "colony-hub" -> "Colony hub"
 std::string displayName(const std::string& id) {

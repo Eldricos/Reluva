@@ -52,6 +52,7 @@
 #include "common/video/bink.h"
 #include "common/audio/decode.h"
 #include "common/audio/wav.h"
+#include "engines/newworlds/bytes.h"
 #include "engines/newworlds/cat_archive.h"
 #include "engines/newworlds/fif.h"
 #include "engines/newworlds/string_table.h"
@@ -97,12 +98,10 @@ bool readFile(const char* path, Bytes& out) {
     return true;
 }
 
-uint16_t rd16(const Bytes& d, size_t o) { return o + 2 <= d.size() ? uint16_t(d[o] | d[o + 1] << 8) : 0; }
-uint32_t rd32(const Bytes& d, size_t o) {
-    return o + 4 <= d.size() ? uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 |
-                                   uint32_t(d[o + 3]) << 24
-                             : 0;
-}
+// Little-endian values, 0 past the end of the file.
+constexpr auto& rd16 = reluva::newworlds::bytes::u16Or0;
+constexpr auto& rd32 = reluva::newworlds::bytes::u32Or0;
+using reluva::newworlds::bytes::asFloat;
 
 void hexdump(const Bytes& d, size_t off, size_t len) {
     size_t end = std::min(d.size(), off + len);
@@ -786,8 +785,7 @@ std::string describeWords(const Bytes& d, size_t p, size_t end, int count) {
     char buf[64];
     for (int i = 0; i < count && p + 4 <= end; ++i, p += 4) {
         const uint32_t v = rd32(d, p);
-        float f;
-        std::memcpy(&f, &v, 4);
+        const float f = asFloat(v);
         const bool plausibleFloat = (v & 0x7f800000) != 0 && (v & 0x7f800000) != 0x7f800000 && f > -1e6f &&
                                     f < 1e6f && (f > 1e-4f || f < -1e-4f);
         if (plausibleFloat)
@@ -854,8 +852,7 @@ int cmdWords(int argc, char** argv) {
     std::printf("%8s  %8s  %11s  %14s  %s\n", "offset", "hex", "u32", "float", "u16 pair");
     for (size_t i = 0; i < count && off + 4 <= d.size(); ++i, off += 4) {
         const uint32_t v = rd32(d, off);
-        float f;
-        std::memcpy(&f, &v, 4);
+        const float f = asFloat(v);
         std::printf("%8zx  %08x  %11u  %14g  %u, %u\n", off, v, v, double(f), v & 0xffff, v >> 16);
     }
     return 0;
@@ -876,8 +873,7 @@ int cmdTable(int argc, char** argv) {
         std::printf("%6zx:", off);
         for (size_t i = 0; i < perRow && off + i * 4 + 4 <= d.size(); ++i) {
             const uint32_t v = rd32(d, off + i * 4);
-            float f;
-            std::memcpy(&f, &v, 4);
+            const float f = asFloat(v);
             const bool isFloat = (v & 0x7f800000) != 0 && (v & 0x7f800000) != 0x7f800000 && f > -1e7f && f < 1e7f &&
                                  (f > 1e-6f || f < -1e-6f);
             if (isFloat)
@@ -1059,10 +1055,7 @@ int cmdGeoFaces(int argc, char** argv) {
         std::printf("face %u at 0x%zx: (%u, %u, %u, %u)\n", i, p, rd32(d, p), rd32(d, p + 4), n, rd32(d, p + 12));
         p += 16;
         for (uint32_t k = 0; k < n; ++k, p += 32) {
-            float u, v;
-            const uint32_t ub = rd32(d, p + 4), vb = rd32(d, p + 8);
-            std::memcpy(&u, &ub, 4);
-            std::memcpy(&v, &vb, 4);
+            const float u = asFloat(rd32(d, p + 4)), v = asFloat(rd32(d, p + 8));
             std::printf("    v %-4u uv %9.4f %9.4f  rest %u %u %u %u %u\n", rd32(d, p), double(u / 65536),
                         double(v / 65536), rd32(d, p + 12), rd32(d, p + 16), rd32(d, p + 20), rd32(d, p + 24),
                         rd32(d, p + 28));
@@ -2551,7 +2544,7 @@ int cmdScriptCheck(int argc, char** argv) {
     }
     const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
     std::vector<nw::MissionScript> scripts;
-    if (reluva::Error err = nw::parseMissionScripts(text, scripts)) {
+    if (reluva::Error err = nw::parseMissionScripts(text, scripts, argv[2])) {
         std::printf("doesn't read: %s\n", err.message.c_str());
         return 1;
     }

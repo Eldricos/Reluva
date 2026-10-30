@@ -2,31 +2,31 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/string_table.h"
+#include "engines/newworlds/bytes.h"
 #include "common/text.h"
 
 namespace reluva::newworlds {
 
-static uint32_t rd32(const std::vector<uint8_t>& d, size_t o) {
-    return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-}
+using bytes::u16;
+using bytes::u32;
 
 Error StringTable::parse(const std::vector<uint8_t>& data) {
     strings_.clear();
     if (data.size() < 4)
         return Error::fail("string table too small");
-    const uint32_t count = rd32(data, 0);
+    const uint32_t count = u32(data, 0);
     size_t pos = 4;
     std::vector<uint16_t> units;
     for (uint32_t i = 0; i < count; ++i) {
         if (pos + 4 > data.size())
             return Error::fail("string table ends before string " + std::to_string(i) + " of " +
                                std::to_string(count));
-        const uint32_t id = rd32(data, pos);
+        const uint32_t id = u32(data, pos);
         pos += 4;
         units.clear();
         bool terminated = false;
         while (pos + 2 <= data.size()) {
-            const uint16_t u = uint16_t(data[pos] | data[pos + 1] << 8);
+            const uint16_t u = u16(data, pos);
             pos += 2;
             if (u == 0) {
                 terminated = true;

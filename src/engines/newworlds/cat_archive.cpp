@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/cat_archive.h"
+#include "engines/newworlds/bytes.h"
 #include "common/fs.h"
 
 #include <algorithm>
@@ -18,16 +19,9 @@ constexpr size_t kContainerEntrySize = 264;
 constexpr size_t kPathLen = 260;
 constexpr size_t kModifiedOffset = 8 + 0x11e;
 
-uint16_t rd16(const uint8_t* p) { return uint16_t(p[0] | p[1] << 8); }
-uint32_t rd32(const uint8_t* p) {
-    return uint32_t(p[0]) | uint32_t(p[1]) << 8 | uint32_t(p[2]) << 16 | uint32_t(p[3]) << 24;
-}
-
-std::string hex(uint64_t v) {
-    char buf[24];
-    std::snprintf(buf, sizeof buf, "0x%llx", static_cast<unsigned long long>(v));
-    return buf;
-}
+using bytes::hex;
+using bytes::u16;
+using bytes::u32;
 
 } // namespace
 
@@ -65,11 +59,11 @@ Error CatArchive::open(const std::filesystem::path& path) {
 
     uint8_t header[kHeaderSize];
     file_.read(reinterpret_cast<char*>(header), kHeaderSize);
-    if (!file_ || rd16(header) != cattag::Root || rd32(header + 2) + 6ULL != fileSize ||
-        rd16(header + 6) != cattag::Table)
+    if (!file_ || u16(header) != cattag::Root || u32(header + 2) + 6ULL != fileSize ||
+        u16(header + 6) != cattag::Table)
         return Error::fail(where + "not a New Worlds archive");
 
-    const uint32_t tableSize = rd32(header + 8);
+    const uint32_t tableSize = u32(header + 8);
     if (kHeaderSize + uint64_t(tableSize) > fileSize || tableSize < 4)
         return Error::fail(where + "table size out of range");
     std::vector<uint8_t> table(tableSize);
@@ -77,7 +71,7 @@ Error CatArchive::open(const std::filesystem::path& path) {
     if (!file_)
         return Error::fail(where + "cannot read table");
 
-    const uint32_t count = rd32(table.data());
+    const uint32_t count = u32(table.data());
     size_t pos = 4;
     uint64_t expectedChunk = kHeaderSize + uint64_t(tableSize);
     std::vector<std::pair<int, uint64_t>> open; // container index, end of its chunk
@@ -87,7 +81,7 @@ Error CatArchive::open(const std::filesystem::path& path) {
             return Error::fail(where + "table ends inside entry " + std::to_string(i));
         const uint8_t* e = table.data() + pos;
         // Offsets are relative to the file without the table's contents.
-        const uint64_t chunk = uint64_t(rd32(e)) + tableSize;
+        const uint64_t chunk = uint64_t(u32(e)) + tableSize;
         if (chunk != expectedChunk)
             return Error::fail(where + "entry " + std::to_string(i) + " points at " + hex(chunk) + ", expected " +
                                hex(expectedChunk));
@@ -99,8 +93,8 @@ Error CatArchive::open(const std::filesystem::path& path) {
             return Error::fail(where + "cannot read chunk of entry " + std::to_string(i));
 
         CatEntry entry;
-        entry.tag = rd16(chunkHeader);
-        entry.size = rd32(chunkHeader + 2);
+        entry.tag = u16(chunkHeader);
+        entry.size = u32(chunkHeader + 2);
         entry.offset = chunk + 6;
         entry.container = isContainerTag(entry.tag);
         if (entry.offset + entry.size > fileSize)
@@ -120,7 +114,7 @@ Error CatArchive::open(const std::filesystem::path& path) {
             const char* name = reinterpret_cast<const char*>(e + 8);
             entry.originalPath.assign(name, strnlen(name, kPathLen));
             entry.name = normalizeName(entry.originalPath);
-            entry.modified = rd32(e + kModifiedOffset);
+            entry.modified = u32(e + kModifiedOffset);
             expectedChunk = entry.offset + entry.size;
             if (!entry.name.empty())
                 byName_.emplace(entry.name, entries_.size());

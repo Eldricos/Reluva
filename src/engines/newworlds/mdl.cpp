@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/mdl.h"
+#include "engines/newworlds/bytes.h"
 
 #include <cctype>
 #include <cmath>
@@ -14,12 +15,7 @@ constexpr size_t kNameSize = 32;
 constexpr size_t kEntrySize = kNameSize + 4; // name, then a u32 value
 constexpr uint32_t kMaxEntries = 4096;
 
-struct Reader {
-    const std::vector<uint8_t>& d;
-    bool has(size_t at, size_t bytes) const { return at <= d.size() && bytes <= d.size() - at; }
-    uint32_t u32(size_t o) const {
-        return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-    }
+struct Reader : bytes::Reader {
     std::string name(size_t o) const {
         std::string s;
         for (size_t i = 0; i < kNameSize && d[o + i]; ++i)
@@ -64,7 +60,7 @@ Error readEntries(const Reader& r, size_t& p, std::vector<MdlModel::Name>& out) 
 // an unnamed state leaves the list empty).
 Error parseMdl(const std::vector<uint8_t>& data, MdlModel& out) {
     out = MdlModel{};
-    const Reader r{data};
+    const Reader r{{data}};
     if (!r.has(0, kNameSize + 4))
         return Error::fail("model too small");
     out.title = r.name(0);

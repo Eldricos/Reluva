@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The Reluva contributors
 
 #include "engines/newworlds/texture.h"
+#include "engines/newworlds/bytes.h"
 
 #include <cstddef>
 #include <string>
@@ -14,9 +15,7 @@ constexpr uint32_t kPaletted = 1;          // one layer: palette indices
 constexpr uint32_t kPalettedWithAlpha = 6; // two layers: palette indices, then alpha
 constexpr uint32_t kMaxSide = 4096;
 
-uint32_t rd32(const std::vector<uint8_t>& d, size_t o) {
-    return uint32_t(d[o]) | uint32_t(d[o + 1]) << 8 | uint32_t(d[o + 2]) << 16 | uint32_t(d[o + 3]) << 24;
-}
+using bytes::u32;
 
 } // namespace
 
@@ -24,7 +23,7 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
     out = Texture{};
     if (data.size() < 8)
         return Error::fail("texture too small");
-    out.format = rd32(data, 0);
+    out.format = u32(data, 0);
     int layers;
     if (out.format == kPaletted)
         layers = 1;
@@ -33,7 +32,7 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
     else
         return Error::fail("unsupported texture format " + std::to_string(out.format));
 
-    const uint32_t paletteCount = rd32(data, 4);
+    const uint32_t paletteCount = u32(data, 4);
     if (paletteCount > 256)
         return Error::fail("palette has " + std::to_string(paletteCount) + " entries");
     const size_t palette = 8, header = palette + size_t(paletteCount) * 4;
@@ -41,20 +40,20 @@ Error decodeTexture(const std::vector<uint8_t>& data, Texture& out) {
         return Error::fail("texture ends inside its header");
     // After the palette: u32 0, width, height; or u32 1, key index, width,
     // height for textures with a transparent palette index.
-    const uint32_t flag = rd32(data, header);
+    const uint32_t flag = u32(data, header);
     size_t sizeAt = header + 4;
     if (flag == 1) {
         out.colourKeyed = true;
         if (header + 8 > data.size())
             return Error::fail("texture ends inside its header");
-        out.keyIndex = rd32(data, header + 4);
+        out.keyIndex = u32(data, header + 4);
         sizeAt = header + 8;
     } else if (flag != 0) {
         return Error::fail("unknown value " + std::to_string(flag) + " after the palette");
     }
     if (sizeAt + 8 > data.size())
         return Error::fail("texture ends inside its header");
-    const uint32_t w = rd32(data, sizeAt), h = rd32(data, sizeAt + 4);
+    const uint32_t w = u32(data, sizeAt), h = u32(data, sizeAt + 4);
     const size_t indices = sizeAt + 8;
 
     if (w == 0 || h == 0 || w > kMaxSide || h > kMaxSide)
