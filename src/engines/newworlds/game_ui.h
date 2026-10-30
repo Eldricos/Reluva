@@ -21,6 +21,14 @@ namespace reluva::newworlds {
 // panels show what they're given.
 class GameUi {
 public:
+    // small_ and large_ point into fonts_: a move keeps them (the vector's
+    // buffer moves with it), a copy wouldn't, so there's none.
+    GameUi() = default;
+    GameUi(const GameUi&) = delete;
+    GameUi& operator=(const GameUi&) = delete;
+    GameUi(GameUi&&) = default;
+    GameUi& operator=(GameUi&&) = default;
+
     // side: 'F', 'K' or 'R'. False if the side's GUI archive isn't there.
     bool load(const Archives& archives, char side);
     bool loaded() const { return loaded_; }

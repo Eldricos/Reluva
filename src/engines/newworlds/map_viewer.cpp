@@ -22,6 +22,10 @@ constexpr float kMaxPitch = 89.0f * kPi / 180.0f;
 constexpr float kKeyTurn = 10.0f * kPi / 180.0f;
 constexpr float kUnitScale = 4; // see render()
 constexpr uint64_t kFrameMs = 100; // animation frames: 10 a second (arf.md#open-questions)
+// The game's own frames are its 50 ms ticks: a cloaking unit's shimmer is
+// thrown anew each, the selection's marks blink every 10
+// (exe.md#cloaking, exe.md#the-tricorder).
+constexpr uint64_t kShimmerMs = 50, kBlinkMs = 500;
 // Where a block's four tiles go, in its record's order: round the square
 // (block 0 of kurt64 numbers its tiles 0, 1, 3, 2). Not confirmed.
 constexpr int kSlotX[4] = {0, 1, 1, 0};
@@ -56,6 +60,7 @@ void MapViewer::activate() {
         return;
     }
     dirty_ = true;
+    forgetTitle();
     updateTitle();
 }
 
@@ -108,6 +113,9 @@ void MapViewer::show(int index) {
     view_ = View::BirdsEye;
     pavedModels_.clear();
     makeUnderlay();
+    makeWalls();
+    tricorderShifted_.clear(); // (the map's own palette)
+    scene_.clear();
     resetView();
     updateTitle();
 }
@@ -252,14 +260,16 @@ constexpr int8_t kCorner[4][4][2] = {{{-1, 1}, {0, 1}, {0, 0}, {-1, 0}},
                                      {{0, 0}, {1, 0}, {1, -1}, {0, -1}},
                                      {{-1, 0}, {0, 0}, {0, -1}, {-1, -1}}};
 
-bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
-    // The race's shifts for each class's band (hue, saturation, value):
-    // ground, unsurveyed, the six ores, the border, the grey band, the
-    // grid scheme's fill (exe.md#the-tricorder); and its background.
-    struct Shift {
-        float hue, sat, val;
-    };
-    const int r = tricorderRace_ == 'K' ? 1 : tricorderRace_ == 'R' ? 2 : 0;
+namespace {
+
+// The race's shifts for each class's band (hue, saturation, value):
+// ground, unsurveyed, the six ores, the border, the grey band, the grid
+// scheme's fill (exe.md#the-tricorder); and its background.
+struct Shift {
+    float hue, sat, val;
+};
+constexpr size_t kTricorderBands = 11;
+Shift bandShift(int r, int c) {
     static constexpr Shift kRaced[3][3] = {
         {{0, 1, 0.8f}, {0, 1.2f, 0.53f}, {0, 1, 0.4f}},
         {{180, 0.7f, 0.8f}, {180, 0.8f, 0.63f}, {180, 0.6f, 0.31f}},
@@ -267,6 +277,13 @@ bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
     static constexpr Shift kOres[6] = {{270, 1, 1.5f}, {30, 1, 1.33f}, {210, 1, 1.5f},
                                        {330, 1, 1.33f}, {90, 1, 1.33f}, {150, 1, 1.33f}};
     static constexpr Shift kGrid[3] = {{0, 0.75f, 0.8f}, {180, 0.6f, 0.9f}, {300, 1, 0.9f}};
+    return c == 10 ? kGrid[r] : c == 8 ? kRaced[r][2] : c == 9 ? Shift{0, 0, 1} : c >= 2 ? kOres[c - 2] : kRaced[r][c];
+}
+
+} // namespace
+
+bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
+    const int r = tricorderRace_ == 'K' ? 1 : tricorderRace_ == 'R' ? 2 : 0;
     static constexpr uint8_t kBackground[3][3] = {{0x00, 0x41, 0xa1}, {0x71, 0x39, 0x21}, {0x21, 0x81, 0x21}};
     const int bx = int(std::floor(fx)) / 2, by = int(std::floor(fy)) / 2;
     const int t = fx < 0 || fy < 0 || bx >= map_.width || by >= map_.height ? -1 : tileAt(int(fx), int(fy));
@@ -278,8 +295,14 @@ bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
         out[0] = kBackground[r][0], out[1] = kBackground[r][1], out[2] = kBackground[r][2];
         return false;
     }
-    auto classAt = [&](int x, int y) { return tricorderClass_ ? std::clamp(tricorderClass_(x, y), 0, 7) : 0; };
-    auto inView = [&](int x, int y) { return !tricorderInView_ || tricorderInView_(x, y); };
+    // (The blocks' classes and views as prepareTricorder() last read them.)
+    const size_t blocks = size_t(map_.width) * size_t(map_.height);
+    auto classAt = [&](int x, int y) {
+        return tricorderClasses_.size() == blocks ? int(tricorderClasses_[size_t(y) * size_t(map_.width) + size_t(x)]) : 0;
+    };
+    auto inView = [&](int x, int y) {
+        return tricorderViews_.size() != blocks || tricorderViews_[size_t(y) * size_t(map_.width) + size_t(x)] != 0;
+    };
     const int scheme = tricorderScheme_;
     const int fill = scheme == 2 ? 10 : 0;
     // The quarter of its block (its tile), and the pixel in it (8 x 8, from
@@ -319,10 +342,41 @@ bool MapViewer::tricorderColour(float fx, float fy, uint8_t* out) const {
     }
     if (!shape || !hatch)
         c = fill;
-    const Shift sh = c == 10 ? kGrid[r] : c == 8 ? kRaced[r][2] : c == 9 ? Shift{0, 0, 1} : c >= 2 ? kOres[c - 2] : kRaced[r][c];
+    // (Each band's colours shifted once, by prepareTricorder().)
+    if (tricorderShifted_.size() == kTricorderBands * map_.palette.size() && tricorderShiftedRace_ == tricorderRace_) {
+        const auto& shifted = tricorderShifted_[size_t(c) * map_.palette.size() + code];
+        out[0] = shifted[0], out[1] = shifted[1], out[2] = shifted[2];
+        return true;
+    }
+    const Shift sh = bandShift(r, c);
     const auto shifted = shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
     out[0] = shifted[0], out[1] = shifted[1], out[2] = shifted[2];
     return true;
+}
+
+void MapViewer::prepareTricorder() {
+    const size_t blocks = size_t(std::max(map_.width, 0)) * size_t(std::max(map_.height, 0));
+    tricorderClasses_.assign(tricorderClass_ ? blocks : 0, 0);
+    tricorderViews_.assign(tricorderInView_ ? blocks : 0, 1);
+    for (int by = 0; by < map_.height; ++by)
+        for (int bx = 0; bx < map_.width; ++bx) {
+            const size_t i = size_t(by) * size_t(map_.width) + size_t(bx);
+            if (tricorderClass_)
+                tricorderClasses_[i] = int8_t(std::clamp(tricorderClass_(bx, by), 0, 7));
+            if (tricorderInView_)
+                tricorderViews_[i] = tricorderInView_(bx, by) ? 1 : 0;
+        }
+    if (tricorderShifted_.size() == kTricorderBands * map_.palette.size() && tricorderShiftedRace_ == tricorderRace_)
+        return;
+    const int r = tricorderRace_ == 'K' ? 1 : tricorderRace_ == 'R' ? 2 : 0;
+    tricorderShifted_.resize(kTricorderBands * map_.palette.size());
+    for (int c = 0; c < int(kTricorderBands); ++c)
+        for (size_t code = 0; code < map_.palette.size(); ++code) {
+            const Shift sh = bandShift(r, c);
+            tricorderShifted_[size_t(c) * map_.palette.size() + code] =
+                shiftHsv(map_.palette[code].data(), sh.hue, sh.sat, sh.val);
+        }
+    tricorderShiftedRace_ = tricorderRace_;
 }
 
 void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tiles, char race,
@@ -331,6 +385,7 @@ void MapViewer::drawTricorder(Surface& s, int x0, int y0, int w, int h, int tile
     if (map_.width <= 0 || map_.height <= 0)
         return;
     setTricorder(race, cellClass, inView);
+    prepareTricorder();
     float ox = 0, oy = 0, tw = 1, th = 1;
     minimapWindow(w, h, tiles, ox, oy, tw, th);
     for (int y = 0; y < h; ++y) {
@@ -729,6 +784,48 @@ const MapViewer::TileEdges& MapViewer::tileEdges(uint32_t tileIndex) {
     return e;
 }
 
+// The walls between tiles whose shared edge doesn't meet: on each tile's
+// east and north edge, a quad for each quarter of it where the two tiles'
+// heights there are 80 or more apart.
+void MapViewer::makeWalls() {
+    wallQuads_.clear();
+    for (int ty = 0; ty < 2 * map_.height; ++ty)
+        for (int tx = 0; tx < 2 * map_.width; ++tx) {
+            const int here = tileAt(tx, ty);
+            for (int s = 0; s < 2; ++s) {
+                const int there = tileAt(tx + (s == 0), ty + (s == 1));
+                if (here < 0 || there < 0)
+                    continue;
+                const TileEdges& a = tileEdges(uint32_t(here));
+                const TileEdges& b = tileEdges(uint32_t(there));
+                const int other = s == 0 ? 2 : 3; // the neighbour's west or south side
+                if (!a.present[s] || !b.present[other])
+                    continue;
+                // The shared edge, in world coordinates.
+                const float ex = float(tx + 1) * kTileSize, ey = float(ty + 1) * kTileSize;
+                const float cx = (float(tx) + 0.5f) * kTileSize, cy = (float(ty) + 0.5f) * kTileSize;
+                for (int k = 0; k < 4; ++k) {
+                    const float z0a = a.z[s][k], z1a = a.z[s][k + 1];
+                    const float z0b = b.z[other][k], z1b = b.z[other][k + 1];
+                    if (std::fabs(z0a - z0b) < 80 && std::fabs(z1a - z1b) < 80)
+                        continue;
+                    const float t0 = -kTileSize / 2 + float(k) * kTileSize / 4, t1 = t0 + kTileSize / 4;
+                    auto at = [&](float t, float z) { return s == 0 ? Vec3{ex, cy + t, z} : Vec3{cx + t, ey, z}; };
+                    const float zl = std::min({z0a, z1a, z0b, z1b});
+                    Wall w{{at(t0, z0a), at(t1, z1a), at(t1, z1b), at(t0, z0b)},
+                           {z0a - zl, z1a - zl, z1b - zl, z0b - zl},
+                           s == 0 ? Vec3{ex, cy, 0} : Vec3{cx, ey, 0},
+                           uint32_t(z0a + z1a > z0b + z1b ? here : there),
+                           s,
+                           k,
+                           z0a + z1a > z0b + z1b,
+                           zl};
+                    wallQuads_.push_back(w);
+                }
+            }
+        }
+}
+
 // The game's views: how far and how steeply the camera looks at its
 // target. By eye from the recordings; the game's own figures aren't known.
 namespace {
@@ -791,11 +888,12 @@ void MapViewer::follow(float x, float y, float heading, const std::string& model
         return;
     const TileModel& m = namedModel(model, false);
     const float radius = m.error.empty() && m.geo.radius > 0 ? m.geo.radius * kUnitScale : 600.0f;
-    targetX_ = x, targetY_ = y;
-    targetZ_ = groundHeight(x, y) + 0.8f * radius;
-    yaw_ = heading - kPi / 2 + followOrbit_;
-    pitch_ = std::clamp(0.16f + followRise_, 0.02f, kMaxPitch);
-    distance_ = 5 * radius * followDistance_ / 800;
+    const float z = groundHeight(x, y) + 0.8f * radius, yaw = heading - kPi / 2 + followOrbit_;
+    const float pitch = std::clamp(0.16f + followRise_, 0.02f, kMaxPitch), distance = 5 * radius * followDistance_ / 800;
+    if (x == targetX_ && y == targetY_ && z == targetZ_ && yaw == yaw_ && pitch == pitch_ && distance == distance_)
+        return; // (redrawn only when the camera moved)
+    targetX_ = x, targetY_ = y, targetZ_ = z;
+    yaw_ = yaw, pitch_ = pitch, distance_ = distance;
     dirty_ = true;
 }
 
@@ -1006,14 +1104,36 @@ void MapViewer::update(uint64_t nowMs) {
     if (nowMs / kFrameMs != animClockMs_ / kFrameMs &&
         std::any_of(buildings_.begin(), buildings_.end(), [](const Placed& o) { return o.progress < 1 && !o.builder.empty(); }))
         dirty_ = true;
+    // The selection's marks blink; a cloaking unit's shimmer is thrown anew.
+    if (nowMs / kBlinkMs != animClockMs_ / kBlinkMs &&
+        std::any_of(units_.begin(), units_.end(), [](const UnitDraw& u) { return u.selected; }))
+        dirty_ = true;
+    if (nowMs / kShimmerMs != animClockMs_ / kShimmerMs &&
+        std::any_of(units_.begin(), units_.end(), [](const UnitDraw& u) { return u.shimmer > 0; }))
+        dirty_ = true;
     animClockMs_ = nowMs;
-    if (dirty_) {
+    shimmerFrame_ = uint32_t(nowMs / kShimmerMs);
+    const bool kept = scene_.size() == screen_.pixels.size();
+    if (dirty_ && (!sceneHeld_ || !kept)) {
         render();
+        scene_ = screen_.pixels;
         if (overlay_)
             overlay_();
-        dirty_ = false;
         updateTitle();
+    } else if (dirty_ || overlayDirty_) {
+        // The scene as last drawn, the overlay anew over it.
+        std::copy(scene_.begin(), scene_.end(), screen_.pixels.begin());
+        if (overlay_)
+            overlay_();
     }
+    dirty_ = overlayDirty_ = false;
+}
+
+void MapViewer::setTitle(const std::string& title) {
+    if (title == shownTitle_)
+        return;
+    shownTitle_ = title;
+    sys_.setWindowTitle(title);
 }
 
 void MapViewer::updateTitle() {
@@ -1028,7 +1148,7 @@ void MapViewer::updateTitle() {
     title += " (" + archives_[ref.archive]->path().filename().string();
     if (!status_.empty()) {
         title += "; " + status_ + ")";
-        sys_.setWindowTitle(titleFilter_ ? titleFilter_(title) : title);
+        setTitle(titleFilter_ ? titleFilter_(title) : title);
         return;
     }
     title += "; " + std::to_string(map_.width) + " x " + std::to_string(map_.height) + " blocks, " +
@@ -1045,7 +1165,7 @@ void MapViewer::updateTitle() {
         title += " [untextured]";
     else
         title += std::string(" [") + kColouringNames[colouring_] + "]";
-    sys_.setWindowTitle(titleFilter_ ? titleFilter_(title) : title);
+    setTitle(titleFilter_ ? titleFilter_(title) : title);
 }
 
 // The terrain code of a tile's cell (column cx from the west, row cy from the
@@ -1074,6 +1194,8 @@ void MapViewer::render() {
         return;
 
     const OrbitCamera cam(Vec{targetX_, targetY_, targetZ_}, yaw_, pitch_, distance_, w, h);
+    if (colouring_ == 1 && tricorderClass_)
+        prepareTricorder(); // (the relief's colours)
     const Vec light = normalize(Vec{-0.4f, 0.5f, -0.75f}); // towards the light, in view space
     const float tileRadius = kTileSize * 0.75f;
     raster_.begin(screen_);
@@ -1324,90 +1446,59 @@ void MapViewer::render() {
         drawModel(m, at, std::cos(a), std::sin(a), nullptr, nullptr, kUnitScale, 1, &pose, 1, u.shimmer);
     }
     // Walls: where a tile's east or north edge and its neighbour's don't meet,
-    // close the gap with flat, unlit quads. The game draws something there
-    // (cliff walls in screenshots); how isn't known, so this is the viewer's
-    // own approximation.
+    // close the gap with flat, unlit quads (makeWalls). The game draws
+    // something there (cliff walls in screenshots); how isn't known, so this
+    // is the viewer's own approximation.
     if (walls_)
-        for (int ty = 0; ty < 2 * map_.height; ++ty)
-            for (int tx = 0; tx < 2 * map_.width; ++tx) {
-                const int here = tileAt(tx, ty);
-                for (int s = 0; s < 2; ++s) {
-                    const int there = tileAt(tx + (s == 0), ty + (s == 1));
-                    if (there < 0)
-                        continue;
-                    const TileEdges& a = tileEdges(uint32_t(here));
-                    const TileEdges& b = tileEdges(uint32_t(there));
-                    const int other = s == 0 ? 2 : 3; // the neighbour's west or south side
-                    if (!a.present[s] || !b.present[other])
-                        continue;
-                    // The shared edge, in world coordinates.
-                    const float ex = float(tx + 1) * kTileSize, ey = float(ty + 1) * kTileSize;
-                    const float cx = (float(tx) + 0.5f) * kTileSize, cy = (float(ty) + 0.5f) * kTileSize;
-                    const ViewVertex mid = cam.toView(Vec{s == 0 ? ex : cx, s == 0 ? cy : ey, 0});
-                    if (mid.z < -tileRadius)
-                        continue;
-                    for (int k = 0; k < 4; ++k) {
-                        const float z0a = a.z[s][k], z1a = a.z[s][k + 1];
-                        const float z0b = b.z[other][k], z1b = b.z[other][k + 1];
-                        if (std::fabs(z0a - z0b) < 80 && std::fabs(z1a - z1b) < 80)
-                            continue;
-                        const float t0 = -kTileSize / 2 + float(k) * kTileSize / 4, t1 = t0 + kTileSize / 4;
-                        auto at = [&](float t, float z) {
-                            return s == 0 ? Vec{ex, cy + t, z} : Vec{cx + t, ey, z};
-                        };
-                        poly.clear();
-                        // (u, v): across the quarter edge, and height above the
-                        // wall's lowest point.
-                        const float zl = std::min({z0a, z1a, z0b, z1b});
-                        poly.push_back(cam.toView(at(t0, z0a), 0, z0a - zl));
-                        poly.push_back(cam.toView(at(t1, z1a), 1, z1a - zl));
-                        poly.push_back(cam.toView(at(t1, z1b), 1, z1b - zl));
-                        poly.push_back(cam.toView(at(t0, z0b), 0, z0b - zl));
-                        poly = clipNear(poly, cam.nearZ);
-                        if (poly.size() < 3)
-                            continue;
-                        projected.clear();
-                        for (const auto& p : poly)
-                            projected.push_back(cam.project(p));
-                        // Textured with the cliff texture, projected sideways
-                        // (or coloured like the higher tile's edge cells);
-                        // east- and north-facing walls are shaded differently.
-                        const bool aHigher = z0a + z1a > z0b + z1b;
-                        const GmfMap::Tile& high = map_.tiles[size_t(aHigher ? here : there)];
-                        const int edgeCell = aHigher ? 7 : 0;
-                        const float shadeLevel = s == 0 ? 0.6f : 0.75f;
-                        const float zLow = std::min({z0a, z1a, z0b, z1b});
-                        auto wall = [&](float u, float v, uint8_t* out) {
-                            static const uint8_t plain[3] = {150, 160, 175};
-                            const uint8_t* col = plain;
-                            const int along = std::clamp(k * 2 + int(u * 2), 0, 7);
-                            const Texture* tt = textured_ && colouring_ == 0 && !wallTexture_.rgba.empty()
-                                                    ? &wallTexture_
-                                                    : nullptr;
-                            if (textured_ && colouring_ == 1) {
-                                const unsigned code =
-                                    terrainCode(high, s == 0 ? edgeCell : along, s == 0 ? along : edgeCell);
-                                if (code && code < map_.palette.size())
-                                    col = map_.palette[code].data();
-                            } else if (tt) {
-                                // The image upright: its top row at the top of the wall.
-                                const float tu = (float(k) + u) / 4, tv = -(zLow + v) / kTileSize;
-                                int tx = int(std::floor(tu * float(tt->width))) % tt->width;
-                                int ty = int(std::floor(tv * float(tt->height))) % tt->height;
-                                tx += tx < 0 ? tt->width : 0;
-                                ty += ty < 0 ? tt->height : 0;
-                                col = &tt->rgba[(size_t(ty) * size_t(tt->width) + size_t(tx)) * 4];
-                            }
-                            for (int i = 0; i < 3; ++i)
-                                out[i] = uint8_t(float(col[i]) * shadeLevel);
-                            out[3] = 255;
-                            return true;
-                        };
-                        for (size_t i = 1; i + 1 < projected.size(); ++i)
-                            raster_.drawTriangle(projected[0], projected[i], projected[i + 1], wall);
-                    }
+        for (const Wall& wq : wallQuads_) {
+            if (cam.toView(Vec{wq.middle.x, wq.middle.y, wq.middle.z}).z < -tileRadius)
+                continue;
+            const int s = wq.side, k = wq.quarter;
+            poly.clear();
+            // (u, v): across the quarter edge, and height above the wall's
+            // lowest point.
+            for (int i = 0; i < 4; ++i)
+                poly.push_back(cam.toView(Vec{wq.corner[i].x, wq.corner[i].y, wq.corner[i].z}, i == 1 || i == 2 ? 1.0f : 0.0f,
+                                          wq.rise[i]));
+            poly = clipNear(poly, cam.nearZ);
+            if (poly.size() < 3)
+                continue;
+            projected.clear();
+            for (const auto& p : poly)
+                projected.push_back(cam.project(p));
+            // Textured with the cliff texture, projected sideways (or
+            // coloured like the higher tile's edge cells); east- and
+            // north-facing walls are shaded differently.
+            const GmfMap::Tile& high = map_.tiles[wq.high];
+            const int edgeCell = wq.higherHere ? 7 : 0;
+            const float shadeLevel = s == 0 ? 0.6f : 0.75f;
+            const float zLow = wq.foot;
+            auto wall = [&](float u, float v, uint8_t* out) {
+                static const uint8_t plain[3] = {150, 160, 175};
+                const uint8_t* col = plain;
+                const int along = std::clamp(k * 2 + int(u * 2), 0, 7);
+                const Texture* tt = textured_ && colouring_ == 0 && !wallTexture_.rgba.empty() ? &wallTexture_ : nullptr;
+                if (textured_ && colouring_ == 1) {
+                    const unsigned code = terrainCode(high, s == 0 ? edgeCell : along, s == 0 ? along : edgeCell);
+                    if (code && code < map_.palette.size())
+                        col = map_.palette[code].data();
+                } else if (tt) {
+                    // The image upright: its top row at the top of the wall.
+                    const float tu = (float(k) + u) / 4, tv = -(zLow + v) / kTileSize;
+                    int tx = int(std::floor(tu * float(tt->width))) % tt->width;
+                    int ty = int(std::floor(tv * float(tt->height))) % tt->height;
+                    tx += tx < 0 ? tt->width : 0;
+                    ty += ty < 0 ? tt->height : 0;
+                    col = &tt->rgba[(size_t(ty) * size_t(tt->width) + size_t(tx)) * 4];
                 }
-            }
+                for (int i = 0; i < 3; ++i)
+                    out[i] = uint8_t(float(col[i]) * shadeLevel);
+                out[3] = 255;
+                return true;
+            };
+            for (size_t i = 1; i + 1 < projected.size(); ++i)
+                raster_.drawTriangle(projected[0], projected[i], projected[i + 1], wall);
+        }
 
     for (const auto& o : outlines)
         for (size_t i = 0; i < o.size(); ++i) {
@@ -1428,7 +1519,7 @@ void MapViewer::render() {
     // Selected units: marks above each for its health (exe.md#the-selection-
     // panel): one while it has any, one more past each fifth (up to five),
     // in a zigzag, blinking.
-    const bool blink = (shimmerFrame_ / 10) % 2 == 1;
+    const bool blink = (animClockMs_ / kBlinkMs) % 2 == 1;
     for (const UnitDraw& u : units_) {
         if (!u.selected)
             continue;

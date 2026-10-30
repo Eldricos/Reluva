@@ -189,6 +189,7 @@ MissionViewer::MissionViewer(System& sys, Surface& screen, const Archives& archi
 }
 
 void MissionViewer::activate() {
+    map_.forgetTitle(); // (another page's was up)
     if (!shown_) {
         shown_ = true;
         show(0);
@@ -464,7 +465,7 @@ void MissionViewer::resetPlayUi() {
     log_.clear();
     walkNote_.clear();
     selectedBuilding_ = 0;
-    razeAsked_ = cancelAsked_ = 0;
+    razeAsked_ = cancelAsked_ = cancelFrom_ = 0;
     colonyDetails_ = false;
     staffView_ = trainingView_ = false;
     pickedOfficer_ = -1, officerClickMs_ = 0;
@@ -483,6 +484,13 @@ void MissionViewer::resetPlayUi() {
     unitVoices_.clear();
     spokenSelection_.clear();
     buttons_.clear();
+    panels_.clear();
+}
+
+void MissionViewer::selectUnits(const std::vector<int>& ids) {
+    world_->select(ids);
+    selectedBuilding_ = razeAsked_ = cancelAsked_ = cancelFrom_ = 0;
+    colonyDetails_ = false;
 }
 
 void MissionViewer::stopPlay() {
@@ -584,8 +592,9 @@ void MissionViewer::combatStep() {
                    flashes_.end());
     blasts_.erase(std::remove_if(blasts_.begin(), blasts_.end(), [&](const Blast& b) { return b.start + 800 <= nowMs_; }),
                   blasts_.end());
-    if (!flashes_.empty() || !blasts_.empty() || !events.empty() || !world_->projectiles().empty())
-        redraw();
+    if (!flashes_.empty() || !blasts_.empty() || !events.empty() || !world_->projectiles().empty() ||
+        (effects_ && !effects_->sparks().empty()) || (fieldWork_ && !fieldWork_->scanning().empty()))
+        redraw(); // (they move, flicker or march on as time passes)
 }
 
 namespace {
@@ -609,16 +618,19 @@ void line(Surface& s, int x0, int y0, int x1, int y1, uint8_t r, uint8_t g, uint
 
 // Shots as beams (phasers orange, disruptors green) or a shell flying,
 // blasts where something was destroyed, and a hit point bar over what's
-// damaged or selected.
+// damaged or selected: only what the player sees (the fog hides the rest).
 void MissionViewer::drawCombat() {
     if (!world_ || tricorderFull_)
         return;
     auto toScreen = [&](float x, float y, float up, int& sx, int& sy) {
         return map_.worldToScreen(x, y, map_.groundAtWorld(x, y) + up, sx, sy);
     };
+    auto seen = [&](float x, float y) { return !fog_ || fog_->seenAt(x, y, playerSlot_); };
     // The projectiles in flight: a phaser pulse an orange streak, a
     // disruptor bolt a green one, a shell a bright dot up its arc.
     for (const Projectile& p : world_->projectiles()) {
+        if (p.fromSlot != playerSlot_ && !seen(p.x, p.y))
+            continue;
         int ax = 0, ay = 0, bx = 0, by = 0;
         if (p.kind == WeaponKind::Artillery) {
             if (!map_.worldToScreen(p.x, p.y, p.z + 300, ax, ay))
@@ -640,7 +652,7 @@ void MissionViewer::drawCombat() {
     // Where they struck: a spark.
     for (const Flash& f : flashes_) {
         int cx = 0, cy = 0;
-        if (!toScreen(f.x1, f.y1, 500, cx, cy))
+        if (!seen(f.x1, f.y1) || !toScreen(f.x1, f.y1, 500, cx, cy))
             continue;
         const bool green = f.weapon == WeaponKind::Single;
         for (int d = -3; d <= 3; ++d) {
@@ -650,7 +662,7 @@ void MissionViewer::drawCombat() {
     }
     for (const Blast& b : blasts_) {
         int cx = 0, cy = 0, ex = 0, ey = 0;
-        if (!toScreen(b.x, b.y, 300, cx, cy) || !toScreen(b.x + b.size, b.y, 300, ex, ey))
+        if (!seen(b.x, b.y) || !toScreen(b.x, b.y, 300, cx, cy) || !toScreen(b.x + b.size, b.y, 300, ex, ey))
             continue;
         const float t = float(nowMs_ - b.start) / 800.0f;
         const int r = std::max(2, int(std::hypot(float(ex - cx), float(ey - cy)) * (0.3f + t)));
@@ -689,7 +701,8 @@ void MissionViewer::drawCombat() {
             const Unit* a = world_->unit(from);
             const Unit* b = world_->unit(to);
             int ax = 0, ay = 0, bx = 0, by = 0;
-            if (!a || !b || !toScreen(a->x, a->y, 700, ax, ay) || !toScreen(b->x, b->y, 800, bx, by))
+            if (!a || !b || !visible(*a) || !visible(*b) || !toScreen(a->x, a->y, 700, ax, ay) ||
+                !toScreen(b->x, b->y, 800, bx, by))
                 continue;
             const int n = std::max({std::abs(bx - ax), std::abs(by - ay), 1});
             const int phase = int(nowMs_ / 60 % 6);
@@ -698,7 +711,7 @@ void MissionViewer::drawCombat() {
                     plot(screen_, ax + (bx - ax) * i / n, ay + (by - ay) * i / n, 140, 210, 255);
         }
         for (const Unit& u : world_->units())
-            if (const int holder = fieldWork_->heldBy(u.id); holder >= 0) {
+            if (const int holder = fieldWork_->heldBy(u.id); holder >= 0 && visible(u)) {
                 int sx = 0, sy = 0;
                 if (toScreen(u.x, u.y, 3500, sx, sy))
                     ui_.drawSmall(screen_, sx - ui_.smallWidth("CAPTURED") / 2, sy - 12, "CAPTURED",
@@ -706,7 +719,7 @@ void MissionViewer::drawCombat() {
             }
     }
     for (const Unit& u : world_->units()) {
-        if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0)
+        if (!(u.selected || u.hp < u.maxHp) || u.hp <= 0 || !visible(u))
             continue;
         int sx = 0, sy = 0;
         if (!toScreen(u.x, u.y, u.building ? 3000 : 1500, sx, sy))
@@ -843,14 +856,15 @@ void MissionViewer::choose(const BuildingType& t) {
 }
 
 // The hologram follows the pointer, on the tile grid, green where the
-// building can go.
+// building can go; gone while the pointer is over a panel (or the
+// full-screen Tricorder is up), the map under it not to be built on.
 void MissionViewer::updateGhost() {
     if (placing_.empty() || !colony_)
         return;
     float x = 0, y = 0;
     int a = -1, b = -1;
     bool ok = false;
-    if (map_.screenToGround(mouseX_, mouseY_, x, y)) {
+    if ((!playing_ || (!tricorderFull_ && panelAt(mouseX_, mouseY_) < 0)) && map_.screenToGround(mouseX_, mouseY_, x, y)) {
         const int pa = int(y / MapViewer::kBlockUnits * 8), pb = int(x / MapViewer::kBlockUnits * 8);
         // In play, the game's own test (exe.md#building-placement).
         if (sim_ ? !sim_->placementSpot(placing_, x, y, a, b, ok) : !colony_->spotAt(placing_, pa, pb, a, b, ok))
@@ -1097,8 +1111,8 @@ bool MissionViewer::playEvent(const Event& ev) {
                 world_->setGroup(n);
             else if (shift && world_->groupCentre(n, x, y))
                 map_.centreOn(x, y);
-            else if (!shift)
-                world_->selectGroup(n);
+            else if (!shift && world_->selectGroup(n))
+                selectUnits(world_->selection());
             showUnits();
             break;
         }
@@ -1141,13 +1155,17 @@ bool MissionViewer::playEvent(const Event& ev) {
         if (map_.gameKey(ev.key, mouseX_, mouseY_))
             break;
         return true; // the data viewer's keys don't apply in play
-    case EventType::MouseDown:
-        if (!placing_.empty() && !ctrl) {
-            // Left click builds where the hologram is green; right click
-            // puts it away.
+    case EventType::MouseDown: {
+        // The panels are over the map, and the full-screen Tricorder over
+        // them: what's under them isn't clicked.
+        const int panel = panelAt(ev.mouseX, ev.mouseY);
+        if (!placing_.empty() && !ctrl &&
+            (ev.button == MouseButton::Right || (ev.button == MouseButton::Left && panel < 0 && !tricorderFull_))) {
+            // Left click on the map builds where the hologram is green;
+            // right click puts it away.
             if (ev.button == MouseButton::Left)
-                placeBuilding();
-            else if (ev.button == MouseButton::Right) {
+                updateGhost(), placeBuilding();
+            else {
                 placing_.clear();
                 map_.setGhost({}, 0, 0, false);
             }
@@ -1165,18 +1183,34 @@ bool MissionViewer::playEvent(const Event& ev) {
             redraw();
             break;
         }
-        if ((ev.button == MouseButton::Left || (ev.button == MouseButton::Right && !ctrl)) && interface_ &&
-            pressButton(ev.mouseX, ev.mouseY, ev.button == MouseButton::Right, ev.clicks))
-            break;
-        if (ev.button == MouseButton::Left && interface_ && !ctrl && tricorder_[2] > 0 &&
-            ev.mouseX >= tricorder_[0] && ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
-            ev.mouseY < tricorder_[1] + tricorder_[3]) {
-            // A click on the tricorder takes the camera there.
-            float wx = 0, wy = 0;
-            map_.minimapToWorld(ev.mouseX, ev.mouseY, tricorder_[0], tricorder_[1], tricorder_[2], tricorder_[3],
-                                kTricorderTiles << tricorderZoom_, wx, wy);
-            map_.stopFollowing();
-            map_.centreOn(wx, wy);
+        // A click on a Tricorder's map (a left click, or a double right
+        // click) takes the camera there. The full-screen one takes every
+        // click: the darkened panels and the hidden map under it aren't
+        // there to click.
+        {
+            int mx = tricorder_[0], my = tricorder_[1], mw = tricorder_[2], mh = tricorder_[3];
+            int tiles = kTricorderTiles << tricorderZoom_;
+            if (tricorderFull_ && hasMap_)
+                fullTricorderRect(mx, my, mw, tiles), mh = mw;
+            const bool onMap = (tricorderFull_ || panel >= 0) && mw > 0 && ev.mouseX >= mx && ev.mouseY >= my &&
+                               ev.mouseX < mx + mw && ev.mouseY < my + mh;
+            if (onMap && !ctrl &&
+                (ev.button == MouseButton::Left || (ev.button == MouseButton::Right && ev.clicks >= 2))) {
+                float wx = 0, wy = 0;
+                map_.minimapToWorld(ev.mouseX, ev.mouseY, mx, my, mw, mh, tiles, wx, wy);
+                map_.stopFollowing();
+                followed_ = 0;
+                map_.centreOn(wx, wy);
+                break;
+            }
+            if (tricorderFull_)
+                break;
+        }
+        // A panel: its buttons, the topmost first; the rest of it covers
+        // the map.
+        if (panel >= 0) {
+            if (ev.button == MouseButton::Left || (ev.button == MouseButton::Right && !ctrl))
+                pressButton(ev.mouseX, ev.mouseY, ev.button == MouseButton::Right, ev.clicks);
             break;
         }
         if (ev.button == MouseButton::Left && ctrl) {
@@ -1185,15 +1219,9 @@ bool MissionViewer::playEvent(const Event& ev) {
             map_.zoomAt(ev.mouseX, ev.mouseY, false);
         } else if (ev.button == MouseButton::Right && ev.clicks >= 2) {
             // A double right click takes the camera to the ground there, on
-            // the map or the Tricorder (exe.md#cameras).
+            // the map or the Tricorder (above; exe.md#cameras).
             float wx = 0, wy = 0;
-            const bool onTricorder = interface_ && tricorder_[2] > 0 && ev.mouseX >= tricorder_[0] &&
-                                     ev.mouseY >= tricorder_[1] && ev.mouseX < tricorder_[0] + tricorder_[2] &&
-                                     ev.mouseY < tricorder_[1] + tricorder_[3];
-            if (onTricorder)
-                map_.minimapToWorld(ev.mouseX, ev.mouseY, tricorder_[0], tricorder_[1], tricorder_[2], tricorder_[3],
-                                    kTricorderTiles << tricorderZoom_, wx, wy);
-            if (onTricorder || map_.screenToGround(ev.mouseX, ev.mouseY, wx, wy)) {
+            if (map_.screenToGround(ev.mouseX, ev.mouseY, wx, wy)) {
                 map_.stopFollowing();
                 followed_ = 0;
                 map_.centreOn(wx, wy);
@@ -1203,7 +1231,7 @@ bool MissionViewer::playEvent(const Event& ev) {
             if (map_.locked())
                 map_.unlock();
             else
-                world_->clearSelection(), selectedBuilding_ = 0;
+                selectUnits({});
             showUnits();
         } else if (ev.button == MouseButton::Left) {
             boxing_ = true;
@@ -1211,13 +1239,17 @@ bool MissionViewer::playEvent(const Event& ev) {
             return true;
         }
         break;
+    }
     case EventType::MouseMove:
-        if (!placing_.empty()) {
+        if (!placing_.empty())
             updateGhost();
+        // What the panels show under the pointer (the menu's item, the
+        // Tricorder's readout, the playbook's names) follows it.
+        if (!boxing_) {
+            if (interface_ || !playbook_.empty())
+                redraw();
             return true;
         }
-        if (!boxing_)
-            return true;
         break;
     case EventType::MouseUp: {
         if (ev.button != MouseButton::Left || !boxing_)
@@ -1235,7 +1267,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                     sx >= x0 && sx <= x1 && sy >= y0 && sy <= y1)
                     picked.push_back(u.id);
             }
-            world_->select(picked);
+            selectUnits(picked);
         } else {
             // A click: the nearest unit to it, if close; else, with units
             // selected, they go there; a double click on the ground locks
@@ -1314,7 +1346,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                 if (ev.clicks >= 2)
                     doubleClicked(building);
             } else if (best >= 0 && ev.clicks >= 2 && (other < 0 || otherD >= bestD)) {
-                world_->select({best}), selectedBuilding_ = 0;
+                selectUnits({best});
                 doubleClicked(best);
             } else if (ownBuilding >= 0 && !world_->selection().empty()) {
                 const Unit& b = *world_->unit(ownBuilding);
@@ -1335,7 +1367,7 @@ bool MissionViewer::playEvent(const Event& ev) {
                 orderSpoken(false);
             }
             else if (best >= 0)
-                world_->select({best}), selectedBuilding_ = 0;
+                selectUnits({best});
             else if (map_.screenToGround(ev.mouseX, ev.mouseY, gx, gy)) {
                 if (!world_->selection().empty()) {
                     for (int id : world_->selection())
@@ -1532,8 +1564,12 @@ void MissionViewer::update(uint64_t nowMs) {
         const double dt = paused_ || unfocused_ ? 0.0 : std::min(double(nowMs - lastTickMs_) / 1000.0, 0.25);
         lastTickMs_ = nowMs;
         // The mission moves on (mission_sim.h); the screen shows what it
-        // did and what its script said.
+        // did and what its script said. (Only a whole tick moves anything:
+        // the map is drawn anew when what it shows changed, the panels
+        // when the mission moved on.)
+        const double clock = sim_->clock();
         sim_->advance(dt);
+        const bool advanced = sim_->clock() != clock;
         // The pointer on the screen's outermost pixels scrolls the
         // isometric cameras that way, speeding up 80 a tick to 6400.
         edgeClock_ += dt * 20;
@@ -1563,7 +1599,10 @@ void MissionViewer::update(uint64_t nowMs) {
             shownOthers_ = std::move(others);
             showColony();
         }
-        showUnits();
+        if (advanced) {
+            showUnits();
+            redraw();
+        }
         combatStep();
         showProgress();
         for (const MissionSim::Said& said : sim_->takeSaid())
@@ -1589,8 +1628,13 @@ void MissionViewer::update(uint64_t nowMs) {
         }
         updateGhost(); // the camera may have moved under the pointer
         if (economy_ && nowMs / 1000 != (nowMs - uint64_t(dt * 1000)) / 1000)
-            redraw(); // the panels' figures, once a second
+            redraw(), updateTitle(); // the panels' figures (and the title's), once a second
+        // The Tricorder's blips blink; a menu item clicked flashes.
+        if (nowMs / 500 != blinkPhase_ || nowMs - menuFlash_.second < 400)
+            blinkPhase_ = nowMs / 500, redraw();
     }
+    // The full-screen Tricorder covers the map: it isn't drawn under it.
+    map_.holdScene(playing_ && tricorderFull_);
     if (mapInView())
         map_.update(nowMs);
     else if (dirty_ && flowScreen()) {
@@ -1611,8 +1655,12 @@ void MissionViewer::update(uint64_t nowMs) {
     wasPlaying_ = playing;
 }
 
+// In play the map's scene changes mark it themselves (the units, the
+// camera, the buildings): what play draws over it is all that's redrawn.
 void MissionViewer::redraw() {
-    if (mapInView())
+    if (mapInView() && playing_)
+        map_.redrawOverlay();
+    else if (mapInView())
         map_.redraw();
     else
         dirty_ = true;
@@ -1645,6 +1693,8 @@ void MissionViewer::drawBriefing() {
         drawCombat();
         if (interface_)
             drawInterface();
+        else
+            buttons_.clear(), panels_.clear(); // (nothing of the interface to click)
         drawPlay();
         return;
     }
@@ -1799,7 +1849,7 @@ std::string MissionViewer::title(const std::string& mapTitle) const {
 
 void MissionViewer::updateTitle() {
     if (!missions_.empty())
-        sys_.setWindowTitle(title(mapTitle_));
+        map_.setTitle(title(mapTitle_)); // (only when it changed)
 }
 
 std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& stem) {
@@ -1966,9 +2016,23 @@ void MissionViewer::drawPlaybook() {
     }
 }
 
-// A click on a panel's button: true if one was hit.
+int MissionViewer::panelAt(int x, int y) const {
+    if (!interface_)
+        return -1;
+    for (size_t i = panels_.size(); i-- > 0;)
+        if (const PanelArea& p = panels_[i]; x >= p.x && y >= p.y && x < p.x + p.w && y < p.y + p.h)
+            return int(i);
+    return -1;
+}
+
+// A click on a panel's button: true if one was hit. The buttons drawn last
+// are on top: those of the topmost panel under the click, or of panels
+// drawn after it; a panel's own covers those under it.
 bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
-    for (const PanelButton& b : buttons_) {
+    const int panel = panelAt(x, y);
+    const size_t first = panel < 0 ? 0 : panels_[size_t(panel)].firstButton;
+    for (size_t i = buttons_.size(); i-- > first;) {
+        const PanelButton& b = buttons_[i];
         if (x < b.x || y < b.y || x >= b.x + b.w || y >= b.y + b.h)
             continue;
         const bool entry = b.action.rfind("msel", 0) == 0 && b.action.size() > 4 && std::isdigit(uint8_t(b.action[4]));
@@ -1985,8 +2049,7 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
             } else if (clicks >= 2) {
                 doubleClicked(id);
             } else {
-                world_->select({id});
-                selectedBuilding_ = 0;
+                selectUnits({id});
             }
         } else if (b.action == "msel-delete" && world_) {
             std::vector<int> kept;
@@ -2067,13 +2130,17 @@ bool MissionViewer::pressButton(int x, int y, bool right, int clicks) {
         } else if (b.action == "raze" && u) {
             razeAsked_ = u->id;
         } else if (b.action == "cancel-yes") {
-            if (sim_)
+            // (Only the question asked on this building's details.)
+            const std::vector<int> pending = pendingBuilds();
+            if (sim_ && u && cancelFrom_ == u->id && colonyDetails_ &&
+                std::find(pending.begin(), pending.end(), cancelAsked_) != pending.end())
                 sim_->cancelBuild(cancelAsked_);
-            cancelAsked_ = 0;
+            cancelAsked_ = cancelFrom_ = 0;
         } else if (b.action == "cancel-no") {
-            cancelAsked_ = 0;
-        } else if (b.action.rfind("cancel", 0) == 0) {
+            cancelAsked_ = cancelFrom_ = 0;
+        } else if (b.action.rfind("cancel", 0) == 0 && u) {
             cancelAsked_ = std::atoi(b.action.c_str() + 6);
+            cancelFrom_ = u->id;
         } else if (b.action == "raze-no") {
             razeAsked_ = 0;
         } else if (b.action == "raze-yes" && u && economy_) {
@@ -2366,8 +2433,11 @@ void MissionViewer::jumpTo(int slot) {
         return;
     if (slot >= 5) {
         float x = 0, y = 0;
-        if (world_->selectGroup(slot - 4) && world_->groupCentre(slot - 4, x, y))
-            map_.centreOn(x, y);
+        if (world_->selectGroup(slot - 4)) {
+            selectUnits(world_->selection());
+            if (world_->groupCentre(slot - 4, x, y))
+                map_.centreOn(x, y);
+        }
         showUnits();
         return;
     }
@@ -2524,6 +2594,8 @@ void MissionViewer::drawPlay() {
 void MissionViewer::drawInterface() {
     const Level& level = missions_[size_t(current_)];
     const char side = missionSides(level.shortName)[size_t(side_)];
+    buttons_.clear();
+    panels_.clear();
     if (uiSide_ != side) {
         uiSide_ = side;
         ui_ = GameUi{};
@@ -2541,7 +2613,6 @@ void MissionViewer::drawInterface() {
                                 ui_.smallWidth("TERRAIN AT <000:000>"), ui_.smallWidth("ENGINEERING, HIGHLY SKILLED") + 24}) +
                       22;
     sideW_ = sideW;
-    buttons_.clear();
 
     // The strip along the top: the compass, or with the full-screen
     // Tricorder up, its readout (the compass moves to the
@@ -2589,7 +2660,7 @@ void MissionViewer::drawInterface() {
             // DEMOLISH asks first; so does cancelling a site.
             if (razeAsked_ == picked->id)
                 actions = {{"DEMOLISH? YES", "raze-yes"}, {"NO", "raze-no"}};
-            if (cancelAsked_ && colonyDetails_)
+            if (cancelAsked_ && cancelFrom_ == picked->id && colonyDetails_)
                 actions = {{"CANCEL IT? YES", "cancel-yes"}, {"NO", "cancel-no"}};
         }
         const std::vector<std::string> cards = staffView_ ? staffCards() : std::vector<std::string>{};
@@ -2606,6 +2677,7 @@ void MissionViewer::drawInterface() {
                           : economy_ ? 9 + 5 * kJumpRows : 7;
         const int x = screen_.w - sideW, y = 0, w = sideW, h = 24 + lines * lh + 8;
         ui_.drawPanel(screen_, x, y, w, h, vehicleMenu_ && !buildMenu_ ? "ENGINEERING" : "NEW WORLDS");
+        panels_.push_back({x, y, w, h, buttons_.size()});
         // The Romulans start with a little less (most of their recordings).
         static const char* const kNames[] = {"DILITHIUM", "POLYCOMP", "THERMOCONC", "TRANSALUMIN", "NITRIUM", "DURANIUM"};
         static constexpr int kStart[] = {500, 1000, 2300, 500, 4000, 5000}, kRomulan[] = {500, 988, 2211, 497, 3500, 5000};
@@ -2835,6 +2907,7 @@ void MissionViewer::drawInterface() {
     {
         const int x = screen_.w - sideW, w = sideW, h = 102 + lh + 4, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "TRICORDER");
+        panels_.push_back({x, y, w, h, buttons_.size()});
         const int mx = x + 12, my = y + 14, mw = w - 24, mh = h - 34 - 2 * lh;
         const int tiles = kTricorderTiles << tricorderZoom_;
         if (hasMap_) {
@@ -2890,6 +2963,7 @@ void MissionViewer::drawInterface() {
             const int ah = 30 + int(others.size() + (allyPick_ >= 0 ? 1 : 0)) * (lh + 2);
             const int ay = y - ah;
             ui_.drawPanel(screen_, x, ay, w, ah, "ALLY");
+            panels_.push_back({x, ay, w, ah, buttons_.size()});
             int ry = ay + 15;
             for (int slot : others) {
                 const int st = world_->stance(playerSlot_, slot);
@@ -2921,6 +2995,7 @@ void MissionViewer::drawInterface() {
     if (!commsClosed_) {
         const int w = 220, h = 70 + lh + 4, x = (screen_.w - sideW - w) / 2 + 10, y = screen_.h - h;
         ui_.drawPanel(screen_, x, y, w, h, "COMMUNICATIONS");
+        panels_.push_back({x, y, w, h, buttons_.size()});
         const int n = int(log_.size());
         const int shown = commsShown_ < 0 || commsShown_ >= n ? n - 1 : commsShown_;
         if (log_.empty()) {
@@ -2987,6 +3062,7 @@ void MissionViewer::drawInterface() {
         }
         const int h = 30 + int(lines.size()) * lh;
         ui_.drawPanel(screen_, 0, 0, w, h, "COMMAND");
+        panels_.push_back({0, 0, w, h, buttons_.size()});
         for (size_t i = 0; i < lines.size(); ++i)
             ui_.drawSmall(screen_, 12, 15 + int(i) * lh, lines[i].first, lines[i].second);
     }
@@ -3190,8 +3266,7 @@ void MissionViewer::selectAllOfKind(char k) {
         if (is)
             ids.push_back(u.id);
     }
-    world_->select(ids);
-    selectedBuilding_ = 0;
+    selectUnits(ids);
     showUnits();
 }
 

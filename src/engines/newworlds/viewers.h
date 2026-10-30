@@ -185,6 +185,20 @@ public:
     // Given the title this viewer would set, returns the one to set instead.
     void setTitleFilter(std::function<std::string(const std::string&)> filter) { titleFilter_ = std::move(filter); }
     void redraw() { dirty_ = true; }
+    // Only what the overlay draws changed: the last scene again under it,
+    // not drawn anew (the scene's own changes mark it themselves).
+    void redrawOverlay() { overlayDirty_ = true; }
+    // While held, the scene isn't drawn at all: the last one stays under
+    // the overlay (the full-screen Tricorder covers it); let go, it's
+    // drawn as it now is.
+    void holdScene(bool hold) {
+        if (hold != sceneHeld_)
+            sceneHeld_ = hold, dirty_ = true;
+    }
+    // The window's title, set only when it changes; forgetTitle() after
+    // something else (another page) has set it.
+    void setTitle(const std::string& title);
+    void forgetTitle() { shownTitle_.clear(); }
     // How the ground is coloured (0 textures, 1 terrain codes, 2 deposits).
     int colouring() const { return colouring_; }
     // Points the camera at a map position as the game gives them (eighths
@@ -289,15 +303,17 @@ public:
         // raised, in radians, for a model with one.
         float turretYaw = 0, gunPitch = 0;
         // A cloaking unit's shimmer (exe.md#cloaking): each corner of its
-        // model is thrown up to this far (world units) each frame.
+        // model is thrown up to this far (world units) each frame (a new
+        // throw each game tick).
         float shimmer = 0;
         float health = 1; // hit points left, a share (its selection marks)
         float lift = 0;    // above the ground (a bee in flight)
+        bool operator==(const UnitDraw&) const = default;
     };
+    // Redraws only if they changed.
     void setUnits(std::vector<UnitDraw> units) {
-        units_ = std::move(units);
-        ++shimmerFrame_;
-        dirty_ = true;
+        if (units != units_)
+            units_ = std::move(units), dirty_ = true;
     }
     // The ground's height at a world point (0 off the map); the map's size
     // in world units.
@@ -399,6 +415,27 @@ private:
     void placeScenery();
     void makeUnderlay();
     const TileEdges& tileEdges(uint32_t tile);
+    // Walls: the quads closing the gaps between tiles' edges, found once
+    // for the shown map (makeWalls), each frame only drawn.
+    struct Wall {
+        Vec3 corner[4];     // round the quad: this tile's edge, then the neighbour's
+        float rise[4];      // each corner's height above the wall's foot
+        Vec3 middle;        // the shared edge's middle, at height 0 (culling)
+        uint32_t high;      // the higher tile's record (its edge cells' codes)
+        int side, quarter;  // 0 the tile's east edge, 1 its north; which quarter of it
+        bool higherHere;    // this tile is the higher one
+        float foot;         // the lowest corner's height
+    };
+    std::vector<Wall> wallQuads_;
+    void makeWalls();
+    // The Tricorder's blocks for a frame (prepareTricorder): each block's
+    // class and whether it's in view, from the sources, and the palette's
+    // colours shifted for each class's band, for the race.
+    void prepareTricorder();
+    std::vector<int8_t> tricorderClasses_;
+    std::vector<uint8_t> tricorderViews_;
+    std::vector<std::array<uint8_t, 3>> tricorderShifted_; // band * palette size + code
+    char tricorderShiftedRace_ = 0;
     int tileAt(int tx, int ty) const; // tile record at a tile position, or -1
     static unsigned terrainCode(const GmfMap::Tile& tile, int cx, int cy);
 
@@ -448,14 +485,16 @@ private:
     int colouring_ = 0; // see kColouringNames
     bool dragging_ = false;
     int dragX_ = 0, dragY_ = 0;
-    bool dirty_ = true;
+    bool dirty_ = true, overlayDirty_ = false, sceneHeld_ = false;
+    std::vector<uint8_t> scene_; // the last scene drawn (the screen's pixels before the overlay)
+    std::string shownTitle_;
     unsigned drawnTiles_ = 0, drawnFaces_ = 0, drawnObjects_ = 0;
     char tricorderRace_ = 'F';
     int tricorderScheme_ = 0;
     std::function<int(int, int)> tricorderClass_;
     std::function<bool(int, int)> tricorderInView_;
     float reliefTileX_ = 0, reliefTileY_ = 0; // the ground tile being drawn (for the relief's colours)
-    uint32_t shimmerFrame_ = 0; // a new throw for each set of units drawn
+    uint32_t shimmerFrame_ = 0; // a new throw each game tick (50 ms)
     std::function<void()> overlay_;
     std::function<std::string(const std::string&)> titleFilter_;
 };
@@ -674,6 +713,10 @@ private:
     void drawPlaybook();
     void rallySelected();
     bool pressButton(int x, int y, bool right = false, int clicks = 1);
+    int panelAt(int x, int y) const; // the topmost panel there (its index in panels_), or -1
+    // The selection replaced by these units: no building picked, nothing
+    // asked about one, the hub's details put away (as a click selects).
+    void selectUnits(const std::vector<int>& ids);
     std::vector<std::string> staffCards() const;
     std::vector<std::string> trainingLines() const;
     const ColonyStructure* structureOf(int unit) const; // the colony's building's, or none
@@ -820,6 +863,7 @@ private:
     int selectedBuilding_ = 0;      // a building selected (its unit id), its details in NEW WORLDS
     int razeAsked_ = 0;             // DEMOLISH pressed: the building asked about (yes / no)
     int cancelAsked_ = 0;           // a site or upgrade picked on the colony's details (yes / no)
+    int cancelFrom_ = 0;            // the building whose details it was picked on (the hub)
     // The playbook (exe.md#orders): the orders a double click offers for
     // the selection and what was clicked, as a column of icons beside the
     // Tricorder. Each entry: its icon, its name, and the order (f follow
@@ -841,6 +885,15 @@ private:
         std::string action;
     };
     std::vector<PanelButton> buttons_;
+    // The panels drawn this frame, in order (each over those before): where,
+    // and its first button in buttons_ (those after it, up to the next
+    // panel's, are its own). A click inside one is the interface's.
+    struct PanelArea {
+        int x, y, w, h;
+        size_t firstButton;
+    };
+    std::vector<PanelArea> panels_;
+    uint64_t blinkPhase_ = 0;           // the Tricorder's blink, as last drawn (nowMs / 500)
     bool staffView_ = false;            // the STAFF panel: the officers' cards
     bool trainingView_ = false;         // its TRAINING list: the officers' courses
     int alertedLast_ = 0;               // Space: the alerted object the camera went to last
