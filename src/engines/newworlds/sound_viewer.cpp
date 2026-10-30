@@ -7,16 +7,41 @@
 #include "common/fs.h"
 
 #include <algorithm>
+#include <cstdint>
 #include <cstdio>
 #include <fstream>
 #include <iterator>
 #include <map>
+#include <memory>
 
 namespace reluva::newworlds {
+
+namespace {
+
+// What draw() and updateTitle() would otherwise work out again each frame
+// while a sound plays (viewers.h's SoundViewer has no room for them): the
+// waveform's columns for the sound shown, and the title's copies part for
+// the sound selected. One per viewer, cleared as a viewer is made.
+struct ViewerCache {
+    std::weak_ptr<const audio::Sound> sound; // the waveform's sound
+    bool hasWave = false;
+    int width = 0;
+    std::vector<std::pair<int, int>> columns; // each column's lowest and highest sample
+    size_t copiesOf = SIZE_MAX;               // the sound the copies part is for
+    std::string copies;
+};
+
+ViewerCache& cacheOf(const void* viewer) {
+    static std::map<const void*, ViewerCache> caches;
+    return caches[viewer];
+}
+
+} // namespace
 
 SoundViewer::SoundViewer(System& sys, Surface& screen, const Archives& archives, audio::Mixer* mixer,
                          const std::filesystem::path& gameDir)
     : sys_(sys), screen_(screen), archives_(archives), mixer_(mixer) {
+    cacheOf(this) = {};
     for (size_t a = 0; a < archives_.size(); ++a) {
         const auto& entries = archives_[a]->entries();
         for (size_t i = 0; i < entries.size(); ++i)
@@ -199,16 +224,28 @@ void SoundViewer::draw() {
         plot(x, mid, 60, 66, 84);
     if (!sound || !sound->frames())
         return;
-    // The waveform: each column's lowest and highest sample (first channel).
+    // The waveform: each column's lowest and highest sample (first channel),
+    // worked out once for the sound and width.
     const size_t n = sound->frames(), ch = size_t(sound->channels);
     const size_t playFrame = playing ? size_t(position) : n;
-    for (int x = 0; x < w; ++x) {
-        const size_t from = n * size_t(x) / size_t(w), to = std::max(from + 1, n * size_t(x + 1) / size_t(w));
-        int lo = 32767, hi = -32768;
-        for (size_t f = from; f < to && f < n; ++f) {
-            lo = std::min(lo, int(sound->samples[f * ch]));
-            hi = std::max(hi, int(sound->samples[f * ch]));
+    ViewerCache& cache = cacheOf(this);
+    if (!cache.hasWave || cache.width != w || cache.sound.owner_before(sound) || sound.owner_before(cache.sound) ||
+        cache.sound.expired()) {
+        cache.columns.assign(size_t(std::max(w, 0)), {});
+        for (int x = 0; x < w; ++x) {
+            const size_t from = n * size_t(x) / size_t(w), to = std::max(from + 1, n * size_t(x + 1) / size_t(w));
+            int lo = 32767, hi = -32768;
+            for (size_t f = from; f < to && f < n; ++f) {
+                lo = std::min(lo, int(sound->samples[f * ch]));
+                hi = std::max(hi, int(sound->samples[f * ch]));
+            }
+            cache.columns[size_t(x)] = {lo, hi};
         }
+        cache.sound = sound, cache.width = w, cache.hasWave = true;
+    }
+    for (int x = 0; x < w; ++x) {
+        const size_t from = n * size_t(x) / size_t(w);
+        const auto [lo, hi] = cache.columns[size_t(x)];
         const int y0 = mid - hi * (h / 2 - 20) / 32768, y1 = mid - lo * (h / 2 - 20) / 32768;
         const bool played = from < playFrame;
         for (int y = y0; y <= y1; ++y)
@@ -238,27 +275,36 @@ void SoundViewer::updateTitle() {
                       double(sound->frames()) / sound->rate);
         title += std::string(info) + ", " + audio::formatName(sound->format) + ")";
     }
-    // Its copies: how many, and any other names or archives they're in.
-    size_t copies = 0;
-    std::vector<std::string> names;
-    for (size_t s = 0; s < sounds_.size(); ++s) {
-        if (firstCopy_[s] != firstCopy_[current])
-            continue;
-        ++copies;
-        std::string where;
-        if (nameOf(s) != nameOf(current))
-            where = nameOf(s);
-        if (archiveOf(s) != archiveOf(current))
-            where += (where.empty() ? "in " : " in ") + archiveOf(s);
-        if (!where.empty() && std::find(names.begin(), names.end(), where) == names.end())
-            names.push_back(where);
+    // Its copies: how many, and any other names or archives they're in
+    // (the same for as long as it's selected).
+    ViewerCache& cache = cacheOf(this);
+    if (cache.copiesOf != current) {
+        size_t copies = 0;
+        std::vector<std::string> names;
+        const std::string& name = nameOf(current);
+        const std::string archive = archiveOf(current);
+        for (size_t s = 0; s < sounds_.size(); ++s) {
+            if (firstCopy_[s] != firstCopy_[current])
+                continue;
+            ++copies;
+            std::string where;
+            if (nameOf(s) != name)
+                where = nameOf(s);
+            if (const std::string in = archiveOf(s); in != archive)
+                where += (where.empty() ? "in " : " in ") + in;
+            if (!where.empty() && std::find(names.begin(), names.end(), where) == names.end())
+                names.push_back(where);
+        }
+        cache.copies.clear();
+        if (copies > 1) {
+            cache.copies = " [" + std::to_string(copies) + " copies";
+            for (size_t i = 0; i < names.size(); ++i)
+                cache.copies += (i ? ", " : "; also ") + names[i];
+            cache.copies += "]";
+        }
+        cache.copiesOf = current;
     }
-    if (copies > 1) {
-        title += " [" + std::to_string(copies) + " copies";
-        for (size_t i = 0; i < names.size(); ++i)
-            title += (i ? ", " : "; also ") + names[i];
-        title += "]";
-    }
+    title += cache.copies;
     title += playing() ? " [playing]" : " (Space: play)";
     if (autoPlay_)
         title += " [auto-play]";

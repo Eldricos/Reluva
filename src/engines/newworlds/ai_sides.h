@@ -9,6 +9,7 @@
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/world.h"
 
+#include <array>
 #include <deque>
 #include <map>
 #include <memory>
@@ -208,6 +209,22 @@ private:
     std::function<bool(int slot, int bx, int by)> seen_;
     std::function<bool(int type)> playerYards_;
     std::map<std::string, int> counts_;
+    // What observe() counted from, as it was last time (not saved: made
+    // again on the first observe() after a load): while no unit's counted
+    // figures change, the counts can't either.
+    struct Observed {
+        int id, slot, type;
+        char side;
+        bool building, built, held;
+        std::string name, label;
+    };
+    std::vector<Observed> observed_;
+    bool observedValid_ = false;
+    std::map<int, int> observedSize_, observedTotal_;
+    // Units steer() last sent somewhere with no way there (an empty path),
+    // from where and to where: from the same spot to the same place
+    // findPath() gives the same again (not saved).
+    std::map<int, std::array<float, 4>> noWay_;
     double clock_ = 0;
     int ticks_ = 0;        // the game's ticks so far (20 a second)
     double tickRest_ = 0;  // and a part of one, carried

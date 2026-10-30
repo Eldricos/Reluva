@@ -7,6 +7,10 @@
 
 #include "engines/newworlds/ai_data.h"
 
+#include <array>
+#include <cstdint>
+#include <iterator>
+
 namespace reluva::newworlds {
 
 namespace {
@@ -6295,11 +6299,34 @@ const char* raceName(char race) {
     }
 }
 
-const CombatType* combatType(int id) {
+namespace {
+
+// Each type id's place in kTypes (-1: none), worked out at compile time
+// (the first entry with an id wins, as a scan would have it).
+constexpr int kTopTypeId = [] {
+    int top = 0;
     for (const CombatType& t : kTypes)
-        if (t.id == id)
-            return &t;
-    return nullptr;
+        top = t.id > top ? t.id : top;
+    return top;
+}();
+constexpr auto kTypeIndex = [] {
+    std::array<int16_t, size_t(kTopTypeId) + 1> index{};
+    for (int16_t& i : index)
+        i = -1;
+    for (size_t i = 0; i < std::size(kTypes); ++i)
+        if (kTypes[i].id >= 0 && index[size_t(kTypes[i].id)] < 0)
+            index[size_t(kTypes[i].id)] = int16_t(i);
+    return index;
+}();
+static_assert(std::size(kTypes) < 32768);
+
+} // namespace
+
+const CombatType* combatType(int id) {
+    if (id < 0 || id > kTopTypeId)
+        return nullptr;
+    const int i = kTypeIndex[size_t(id)];
+    return i < 0 ? nullptr : &kTypes[size_t(i)];
 }
 
 const SideInfo* sideInfo(std::string_view mission, int slot) {

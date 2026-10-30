@@ -3646,6 +3646,193 @@ void testRivalPowerGenerator() {
     }));
 }
 
+// The lookups and caches the simulation's hot paths use give what the
+// plain scans did: type by id and by name, repairs forgetting units that
+// are gone, the AI's counts noticing each kind of change.
+void testLookupsAndCaches() {
+    // Types by id: each one's own, none for ids not in the table.
+    int types = 0;
+    for (int id = -5; id < 400; ++id)
+        if (const CombatType* t = combatType(id)) {
+            CHECK(t->id == id);
+            ++types;
+        }
+    CHECK(types > 100 && !combatType(-1) && !combatType(0) && !combatType(100000) && !combatType(-100000));
+    CHECK(std::string_view(combatType(8)->name) == "phaser-tank");
+    // By name: the race's own, else the first by id.
+    auto scan = [](std::string_view name, char race, bool buildingsOnly) -> const CombatType* {
+        const CombatType* first = nullptr;
+        for (int id = 1; id < 330; ++id)
+            if (const CombatType* t = combatType(id); t && name == t->name && (t->building || !buildingsOnly)) {
+                if (t->race == race)
+                    return t;
+                if (!first)
+                    first = t;
+            }
+        return first;
+    };
+    for (int id = 1; id < 330; ++id)
+        if (const CombatType* t = combatType(id))
+            for (char race : std::string_view("FKRTMHOEV?"))
+                for (bool only : {false, true})
+                    CHECK(typeNamed(t->name, race, only) == scan(t->name, race, only));
+    CHECK(!typeNamed("no-such-type", 'F') && !typeNamed("", 'F'));
+
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(128 * 128, 1);
+    // Repairs: a unit gone leaves nothing behind in the save.
+    auto repairsSave = [&](bool firstDamaged) {
+        World w(t);
+        const int a = spawnObject(w, 0, 'F', *combatType(8), 100000, 100000, {});
+        const int b = spawnObject(w, 0, 'F', *combatType(8), 140000, 100000, {});
+        const int hub = spawnObject(w, 0, 'F', *combatType(23), 100000, 140000, {});
+        spawnObject(w, 0, 'F', *combatType(77), 140000, 140000, {});
+        if (firstDamaged)
+            w.unit(a)->hp = 10;
+        w.unit(b)->hp = 10;
+        w.unit(hub)->hp = 300;
+        Repairs r(w);
+        for (int i = 0; i < 20; ++i)
+            r.tick();
+        w.remove(a);
+        for (int i = 0; i < 20; ++i)
+            r.tick();
+        CHECK(w.unit(b)->hp == 11 && w.unit(hub)->hp > 300);
+        save::Serializer out = save::Serializer::saver();
+        r.syncState(out);
+        return out.take();
+    };
+    CHECK(repairsSave(true) == repairsSave(false));
+
+    // The AI's counts: a label, a building held and a unit gone each told.
+    World w(t);
+    AiSides ai("F1", 0, w);
+    ai.start();
+    ai.observe({});
+    CHECK(ai.observe({}).empty());
+    auto count = [](const std::vector<ScriptEvent>& ev, const std::string& what, const std::string& n) {
+        return std::any_of(ev.begin(), ev.end(), [&](const ScriptEvent& e) {
+            return e.kind == "count" && e.args.size() == 2 && e.args[0] == what && e.args[1] == n;
+        });
+    };
+    Unit* tank = nullptr;
+    Unit* building = nullptr;
+    for (const Unit& u : w.units()) {
+        Unit* m = w.unit(u.id);
+        if (u.slot == 1 && !u.building && !tank)
+            tank = m;
+        if (u.slot == 1 && u.building && u.built >= 1 && u.name != "colony-hub" && !building)
+            building = m;
+    }
+    CHECK(tank && building);
+    if (!tank || !building)
+        return;
+    tank->label = "perf-test-label";
+    CHECK(count(ai.observe({}), "perf-test-label", "1"));
+    CHECK(ai.observe({}).empty());
+    // A save loaded: nothing new to tell.
+    {
+        save::Serializer out = save::Serializer::saver();
+        ai.syncState(out);
+        const std::vector<uint8_t> bytes = out.take();
+        save::Serializer in = save::Serializer::loader(bytes);
+        ai.syncState(in);
+        CHECK(in.ok() && ai.observe({}).empty());
+    }
+    building->heldBy = 0;
+    const auto held = ai.observe({});
+    CHECK(std::any_of(held.begin(), held.end(), [](const ScriptEvent& e) {
+        return e.kind == "count" && e.args.size() == 2 &&
+               (e.args[0] == "klingon-small-buildings" || e.args[0] == "klingon-large-buildings");
+    }));
+    building->heldBy = -1;
+    CHECK(!ai.observe({}).empty());
+    const Unit gone = *tank;
+    w.remove(gone.id);
+    WorldEvent killed;
+    killed.kind = WorldEvent::Destroyed;
+    killed.what = gone;
+    const auto after = ai.observe({killed});
+    CHECK(count(after, "perf-test-label", "0"));
+    CHECK(ai.observe({}).empty());
+}
+
+// World's own lookups, made as needed and never saved (each tile's steps
+// out, the regions searches found closed, the id index): the same answers
+// warm as from a world that has done nothing yet.
+void testWorldPathCaches() {
+    Terrain t;
+    t.width = 24, t.height = 20;
+    t.moveClass.assign(size_t(t.width * t.height), 1);
+    uint32_t seed = 12345;
+    auto rnd = [&] { return (seed = seed * 1664525u + 1013904223u) >> 8; };
+    for (int& c : t.moveClass)
+        if (rnd() % 7 == 0)
+            c = 0;
+    // A pit walled round (columns and rows 2-7), open inside.
+    for (int y = 2; y <= 7; ++y)
+        for (int x = 2; x <= 7; ++x)
+            t.moveClass[size_t(y * t.width + x)] = (x == 2 || x == 7 || y == 2 || y == 7) ? 0 : 1;
+    // Ramps and a plateau behind a cliff.
+    t.heightAt = [](float x, float y) {
+        return x > 12 * kTile && y > 10 * kTile ? 3000.0f : float(int(x / 3000) % 3) * 700;
+    };
+    World warm(t);
+    for (int ty = -1; ty <= t.height; ++ty)
+        for (int tx = -1; tx <= t.width; ++tx)
+            for (int dy = -1; dy <= 1; ++dy)
+                for (int dx = -1; dx <= 1; ++dx) {
+                    const World cold(t);
+                    CHECK(cold.canStep(tx, ty, dx, dy) == warm.canStep(tx, ty, dx, dy));
+                }
+    // Paths, warm and cold, each asked twice; and from where each ends
+    // (a unit stuck short of a goal it can't reach asks again).
+    int stuck = 0;
+    for (int q = 0; q < 300; ++q) {
+        float x0 = float(rnd() % uint32_t(t.width * 8192)), y0 = float(rnd() % uint32_t(t.height * 8192));
+        const float x1 = float(rnd() % uint32_t(t.width * 8192)), y1 = float(rnd() % uint32_t(t.height * 8192));
+        if (q % 4 == 0) // from inside the pit
+            x0 = (3.5f + float(q % 3)) * kTile, y0 = (3.5f + float(q % 4)) * kTile;
+        const auto path = World(t).findPath(x0, y0, x1, y1);
+        CHECK(warm.findPath(x0, y0, x1, y1) == path && warm.findPath(x0, y0, x1, y1) == path);
+        if (!path.empty()) {
+            const auto [ex, ey] = path.back();
+            const auto again = World(t).findPath(ex, ey, x1, y1);
+            CHECK(warm.findPath(ex, ey, x1, y1) == again);
+            stuck += again.empty() && (int(ex / kTile) != int(x1 / kTile) || int(ey / kTile) != int(y1 / kTile));
+        }
+    }
+    CHECK(stuck > 0);
+    // The id index: through adding, removing and a save loaded.
+    std::vector<int> ids;
+    for (int i = 0; i < 8; ++i)
+        ids.push_back(warm.addUnit('F', groundScout('F'), (1.5f + float(i)) * kTile, 0.5f * kTile));
+    warm.remove(ids[2]);
+    warm.remove(ids[5]);
+    auto indexed = [](const World& w, int id) {
+        const Unit* found = nullptr;
+        for (const Unit& u : w.units())
+            if (u.id == id)
+                found = &u;
+        return w.unit(id) == found;
+    };
+    for (int id = -1; id < 12; ++id)
+        CHECK(indexed(warm, id));
+    CHECK(!warm.unit(ids[2]) && warm.unit(ids[3]) && warm.unit(ids[3])->x == 4.5f * kTile);
+    save::Serializer out = save::Serializer::saver();
+    warm.syncState(out);
+    World loaded(t);
+    save::Serializer in = save::Serializer::loader(out.take());
+    loaded.syncState(in);
+    CHECK(in.ok());
+    for (int id = -1; id < 12; ++id)
+        CHECK(indexed(loaded, id));
+    CHECK(loaded.unit(ids[7]) && loaded.unit(ids[7])->x == 8.5f * kTile && !loaded.unit(ids[5]));
+    const int added = loaded.addUnit('K', groundScout('K'), 0.5f * kTile, 0.5f * kTile);
+    CHECK(added == ids.back() + 1 && loaded.unit(added) && loaded.unit(added)->side == 'K');
+}
+
 int main() {
     auto tmp = std::filesystem::temp_directory_path() / "reluva_cat_tests";
     testNormalizeName();
@@ -3702,6 +3889,8 @@ int main() {
     testPodsOfLostBuildings();
     testKlingonPods();
     testRivalPowerGenerator();
+    testLookupsAndCaches();
+    testWorldPathCaches();
     std::filesystem::remove_all(tmp);
     if (failures)
         std::fprintf(stderr, "%d check(s) failed\n", failures);

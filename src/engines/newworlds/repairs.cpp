@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <cmath>
-#include <set>
+#include <vector>
 
 namespace reluva::newworlds {
 
@@ -32,15 +32,23 @@ void Repairs::advance(double seconds) {
 }
 
 void Repairs::tick() {
+    // The world is ours to change (world_ isn't const); units() only hands
+    // out a const view, and looking each unit up by id would be O(n) apiece.
+    auto& units = const_cast<std::vector<Unit>&>(world_.units());
+    types_.resize(units.size());
     // The yards fill their sides' pools.
-    for (const Unit& u : world_.units())
+    for (size_t i = 0; i < units.size(); ++i) {
+        const Unit& u = units[i];
+        const CombatType* t = types_[i] = combatType(u.type);
         if (u.hp > 0 && u.built >= 1 && u.slot >= 0 && u.slot < 7)
-            if (const CombatType* t = combatType(u.type); t && t->repair == 4)
+            if (t && t->repair == 4)
                 pool_[size_t(u.slot)] = std::min(kPoolCap, pool_[size_t(u.slot)] + kYardFill);
+    }
     // The buildings draw on them, class 1 first.
     for (int cls = 1; cls <= 3; ++cls)
-        for (const Unit& u : world_.units()) {
-            const CombatType* t = combatType(u.type);
+        for (size_t i = 0; i < units.size(); ++i) {
+            const Unit& u = units[i];
+            const CombatType* t = types_[i];
             if (!t || t->repair != cls || u.hp <= 0 || u.built < 1 || u.slot < 0 || u.slot >= 7)
                 continue;
             State& s = states_[u.id];
@@ -49,12 +57,13 @@ void Repairs::tick() {
             if (take > 0)
                 s.stored += take, pool -= take;
         }
-    std::set<int> alive;
-    for (const Unit& seen : world_.units())
-        alive.insert(seen.id);
-    for (int id : alive) {
-        Unit& u = *world_.unit(id);
-        const CombatType* t = combatType(u.type);
+    // Each unit mends on its own (nothing here reads another's), so the
+    // world's order serves as well as the ids' order.
+    alive_.clear();
+    for (size_t i = 0; i < units.size(); ++i) {
+        Unit& u = units[i];
+        alive_.push_back(u.id);
+        const CombatType* t = types_[i];
         if (!t || t->repair == 4 || u.hp <= 0 || u.built < 1 || u.hp >= u.maxHp)
             continue;
         State& s = states_[u.id];
@@ -74,8 +83,12 @@ void Repairs::tick() {
         u.hp = std::min(u.maxHp, u.hp + 1);
         s.countdown = std::max(1, int(std::trunc(std::trunc(6400 / u.maxHp) / (2 * skill + 1))));
     }
+    // Forget the units that are gone (the world keeps them in id order, so
+    // this rarely sorts).
+    if (!std::is_sorted(alive_.begin(), alive_.end()))
+        std::sort(alive_.begin(), alive_.end());
     for (auto it = states_.begin(); it != states_.end();)
-        it = alive.count(it->first) ? std::next(it) : states_.erase(it);
+        it = std::binary_search(alive_.begin(), alive_.end(), it->first) ? std::next(it) : states_.erase(it);
 }
 
 float shieldedDamage(const Unit& target, float damage, const Fog* fog, float security) {

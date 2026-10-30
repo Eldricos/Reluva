@@ -10,8 +10,11 @@
 #include <array>
 #include <functional>
 #include <map>
+#include <vector>
 
 namespace reluva::newworlds {
+
+struct CombatType;
 
 // Repairs, as the game's executable has them (exe.md#repairs), every tick
 // and in battle too; a building still going up isn't repaired.
@@ -52,6 +55,9 @@ private:
     std::map<int, State> states_;
     std::array<double, 7> pool_{};
     double clock_ = 0;
+    // Scratch for tick(), kept to save allocating (not saved).
+    std::vector<const CombatType*> types_;
+    std::vector<int> alive_;
 };
 
 // The hit points a hit takes from its target (exe.md#shields): a building,

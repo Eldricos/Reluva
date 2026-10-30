@@ -118,9 +118,20 @@ int spawnObject(World& world, int slot, char race, const CombatType& type, float
 }
 
 const CombatType* typeNamed(std::string_view name, char race, bool buildingsOnly) {
+    // The types with each name, by id (built once).
+    static const std::map<std::string_view, std::vector<const CombatType*>, std::less<>> byName = [] {
+        std::map<std::string_view, std::vector<const CombatType*>, std::less<>> out;
+        for (int id = 1; id < 330; ++id)
+            if (const CombatType* t = combatType(id))
+                out[t->name].push_back(t);
+        return out;
+    }();
+    const auto it = byName.find(name);
+    if (it == byName.end())
+        return nullptr;
     const CombatType* first = nullptr;
-    for (int id = 1; id < 330; ++id)
-        if (const CombatType* t = combatType(id); t && name == t->name && (t->building || !buildingsOnly)) {
+    for (const CombatType* t : it->second)
+        if (t->building || !buildingsOnly) {
             if (t->race == race)
                 return t;
             if (!first)
@@ -747,8 +758,23 @@ void AiSides::steer(Running& r) {
         if (u.moving())
             continue;
         const auto [tx, ty] = spread(n, wx, wy);
-        if (std::hypot(u.x - tx, u.y - ty) > kSpacing)
+        if (std::hypot(u.x - tx, u.y - ty) > kSpacing) {
+            // No way there from here last time: none now either (the path
+            // would come back empty again), so only what moveTo() does
+            // besides.
+            const std::array<float, 4> from{u.x, u.y, tx, ty};
+            if (auto it = noWay_.find(id); it != noWay_.end() && it->second == from && !u.flies && !u.building) {
+                u.ordered = false;
+                u.target = 0;
+                u.firing = false;
+                continue;
+            }
             world_.moveTo(id, tx, ty);
+            if (!u.moving() && !u.flies && !u.building)
+                noWay_[id] = from;
+            else
+                noWay_.erase(id);
+        }
     }
 }
 
@@ -809,7 +835,37 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
                 out.push_back({"side-failed", {raceName(e.what.side)}, a, b});
         }
     }
+    for (const WorldEvent& e : events)
+        if (e.kind == WorldEvent::Destroyed)
+            noWay_.erase(e.what.id);
+    // Nothing the counts come from changed (the units and their names,
+    // sides, types, whether up and whether held): the same counts, so
+    // none to tell, and the same colony sizes.
+    const std::vector<Unit>& units = world_.units();
+    bool same = observedValid_ && observed_.size() == units.size();
+    for (size_t i = 0; same && i < units.size(); ++i) {
+        const Unit& u = units[i];
+        const Observed& o = observed_[i];
+        same = o.id == u.id && o.slot == u.slot && o.type == u.type && o.side == u.side &&
+               o.building == u.building && o.built == (u.built >= 1) && o.held == (u.heldBy >= 0) &&
+               o.name == u.name && o.label == u.label;
+    }
+    if (!same) {
+        observed_.resize(units.size());
+        for (size_t i = 0; i < units.size(); ++i) {
+            const Unit& u = units[i];
+            Observed& o = observed_[i];
+            o.id = u.id, o.slot = u.slot, o.type = u.type, o.side = u.side;
+            o.building = u.building, o.built = u.built >= 1, o.held = u.heldBy >= 0;
+            o.name = u.name, o.label = u.label;
+        }
+        observedValid_ = true;
+    }
     std::map<std::string, int> counts;
+    std::map<int, int> size, total; // total: with the buildings other sides hold
+    if (same) {
+        size = observedSize_, total = observedTotal_;
+    } else {
     for (const Unit& u : world_.units())
         if (!(u.slot == player_ && u.building) && u.built >= 1) // (sites aren't counted)
             for (const std::string& n : scriptNames(u, player_))
@@ -818,7 +874,6 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
     // large buildings and its armed vehicles, standing and not held by
     // another side; and its colony's size, small + 3 x large, as a share
     // of what it was at the start.
-    std::map<int, int> size, total; // total: with the buildings other sides hold
     for (const Unit& u : world_.units()) {
         const CombatType* t = combatType(u.type);
         if (t && u.built >= 1 && u.heldBy >= 0)
@@ -834,6 +889,8 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
         else if (t->mask & 0x100)
             ++counts[side + "fighting-units"];
         total[u.slot] += t->mask & 0x2 ? 1 : t->mask & 0x4 ? 3 : 0;
+    }
+    observedSize_ = size, observedTotal_ = total;
     }
     if (colonyBase_.empty())
         colonyBase_ = size, colonyBase_[-1] = 0; // (taken once)
@@ -856,6 +913,8 @@ std::vector<ScriptEvent> AiSides::observe(const std::vector<WorldEvent>& events)
                 out.push_back({kind, {raceName(race), std::to_string(share)}});
         }
     }
+    if (same) // (counts_ is what they came to)
+        return out;
     for (const auto& [n, c] : counts)
         if (auto it = counts_.find(n); it == counts_.end() || it->second != c)
             out.push_back({"count", {n, std::to_string(c)}});
@@ -927,6 +986,10 @@ void AiSides::syncState(save::Serializer& s) {
     }
     s(factoryQueue_)(factoryJobs_);
     s(races_)(nativeSites_)(rallied_)(colonyBase_)(colonyShare_)(colonyTotal_)(counts_)(clock_)(ticks_)(tickRest_);
+    if (s.loading()) { // (made again from what's loaded)
+        observedValid_ = false;
+        noWay_.clear();
+    }
 }
 
 } // namespace reluva::newworlds

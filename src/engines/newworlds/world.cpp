@@ -87,7 +87,66 @@ bool World::passable(int tx, int ty) const {
     return terrain_.moveClass[size_t(ty) * size_t(terrain_.width) + size_t(tx)] != 0;
 }
 
+namespace {
+// A step's bit in a tile's steps (World::steps_): the eight ways, row by
+// row from the south-west.
+constexpr std::array<std::pair<int, int>, 8> kStepWays{{{-1, -1}, {0, -1}, {1, -1}, {-1, 0}, {1, 0}, {-1, 1}, {0, 1}, {1, 1}}};
+int stepBit(int dx, int dy) {
+    const int k = (dy + 1) * 3 + (dx + 1);
+    return k < 4 ? k : k - 1;
+}
+} // namespace
+
 bool World::canStep(int tx, int ty, int dx, int dy) const {
+    if (tx < 0 || ty < 0 || tx >= terrain_.width || ty >= terrain_.height || dx < -1 || dx > 1 || dy < -1 ||
+        dy > 1 || (dx == 0 && dy == 0))
+        return stepUncached(tx, ty, dx, dy);
+    return (stepsAt(size_t(ty) * size_t(terrain_.width) + size_t(tx)) >> stepBit(dx, dy)) & 1;
+}
+
+uint8_t World::stepsAt(size_t tile) const {
+    const int w = terrain_.width;
+    if (steps_.empty()) {
+        steps_.assign(size_t(w) * size_t(terrain_.height), 0);
+        centres_.assign(steps_.size(), 0);
+    }
+    if (steps_[tile] & 0x100)
+        return uint8_t(steps_[tile] & 0xff);
+    // As stepUncached, each tile's middle's height asked once (bit 9: known).
+    auto centre = [&](size_t i, float x, float y) {
+        if (!(steps_[i] & 0x200))
+            centres_[i] = terrain_.heightAt(x, y), steps_[i] = uint16_t(steps_[i] | 0x200);
+        return centres_[i];
+    };
+    const int tx = int(tile % size_t(w)), ty = int(tile / size_t(w));
+    uint16_t m = 0x100;
+    for (int k = 0; k < 8; ++k) {
+        const auto [dx, dy] = kStepWays[size_t(k)];
+        if (!passable(tx + dx, ty + dy))
+            continue;
+        if (dx != 0 && dy != 0 && (!passable(tx + dx, ty) || !passable(tx, ty + dy)))
+            continue;
+        bool ok = true;
+        if (terrain_.heightAt) {
+            const float x0 = (float(tx) + 0.5f) * kTile, y0 = (float(ty) + 0.5f) * kTile;
+            float last = centre(tile, x0, y0);
+            for (int i = 1; i <= 4 && ok; ++i) {
+                const float x = x0 + float(dx) * kTile * float(i) / 4, y = y0 + float(dy) * kTile * float(i) / 4;
+                const float nx = (float(tx + dx) + 0.5f) * kTile, ny = (float(ty + dy) + 0.5f) * kTile;
+                const float h = i == 4 && x == nx && y == ny ? centre(size_t(ty + dy) * size_t(w) + size_t(tx + dx), x, y)
+                                                             : terrain_.heightAt(x, y);
+                ok = !(std::fabs(h - last) > kMaxStep / 2); // (as stepUncached has it)
+                last = h;
+            }
+        }
+        if (ok)
+            m = uint16_t(m | (1 << k));
+    }
+    steps_[tile] = uint16_t(steps_[tile] | m);
+    return uint8_t(m & 0xff);
+}
+
+bool World::stepUncached(int tx, int ty, int dx, int dy) const {
     if (!passable(tx + dx, ty + dy))
         return false;
     if (dx != 0 && dy != 0 && (!passable(tx + dx, ty) || !passable(tx, ty + dy)))
@@ -128,14 +187,28 @@ std::vector<std::pair<float, float>> World::findPath(float x0, float y0, float x
         moved = true;
     }
     const auto index = [w](int x, int y) { return size_t(y) * size_t(w) + size_t(x); };
-    std::vector<float> cost(size_t(w) * size_t(h), 1e30f);
-    std::vector<int> from(size_t(w) * size_t(h), -1);
-    using Node = std::pair<float, int>; // estimate, tile index
-    std::priority_queue<Node, std::vector<Node>, std::greater<>> open;
     auto guess = [&](int x, int y) {
         const float dx = float(std::abs(x - gx)), dy = float(std::abs(y - gy));
         return std::max(dx, dy) + 0.4142f * std::min(dx, dy);
     };
+    const size_t start = index(sx, sy);
+    if (!regions_.empty() && regions_[start] >= 0 && regions_[index(gx, gy)] != regions_[start]) {
+        // A goal out of the start's region: the search below would go over
+        // all the region and stop at its nearest tile to the goal (the
+        // first, as it counts them, of the nearest). If that's the start,
+        // there's no way to take.
+        float best = 1e30f;
+        size_t nearest = start;
+        for (const int i : regionTiles_[size_t(regions_[start])])
+            if (guess(i % w, i / w) < best)
+                best = guess(i % w, i / w), nearest = size_t(i);
+        if (nearest == start)
+            return {};
+    }
+    std::vector<float> cost(size_t(w) * size_t(h), 1e30f);
+    std::vector<int> from(size_t(w) * size_t(h), -1);
+    using Node = std::pair<float, int>; // estimate, tile index
+    std::priority_queue<Node, std::vector<Node>, std::greater<>> open;
     cost[index(sx, sy)] = 0;
     open.push({guess(sx, sy), int(index(sx, sy))});
     bool reached = sx == gx && sy == gy;
@@ -159,6 +232,31 @@ std::vector<std::pair<float, float>> World::findPath(float x0, float y0, float x
                     reached = true;
                 open.push({c + guess(x + dx, y + dy), int(j)});
             }
+    }
+    if (!reached && passable(sx, sy) && (regions_.empty() || regions_[start] < 0)) {
+        // All the start reaches searched: a region, if each step in it
+        // goes both ways (then a search from any tile of it reaches just
+        // it).
+        std::vector<int> tiles;
+        bool both = true;
+        for (size_t i = 0; i < cost.size() && both; ++i) {
+            if (cost[i] >= 1e30f)
+                continue;
+            tiles.push_back(int(i));
+            const uint8_t m = stepsAt(i);
+            for (int k = 0; k < 8 && both; ++k)
+                if ((m >> k) & 1) {
+                    const auto [dx, dy] = kStepWays[size_t(k)];
+                    both = canStep(int(i) % w + dx, int(i) / w + dy, -dx, -dy);
+                }
+        }
+        if (both) {
+            if (regions_.empty())
+                regions_.assign(cost.size(), -1);
+            for (const int i : tiles)
+                regions_[size_t(i)] = int(regionTiles_.size());
+            regionTiles_.push_back(std::move(tiles));
+        }
     }
     if (!reached) {
         // Out of reach (in a pit, say): as near as it can get instead.
@@ -242,17 +340,39 @@ int World::addUnit(char side, const UnitKind& kind, float x, float y, float head
     u.kind = kind;
     u.x = u.lastX = x, u.y = u.lastY = y, u.heading = heading;
     units_.push_back(std::move(u));
-    return units_.back().id;
+    const int id = units_.back().id;
+    if (id >= 0) {
+        if (size_t(id) >= index_.size())
+            index_.resize(size_t(id) + 1, -1);
+        index_[size_t(id)] = int(units_.size()) - 1;
+    }
+    return id;
+}
+
+void World::reindex() {
+    index_.assign(size_t(std::max(nextId_, 0)), -1);
+    for (size_t i = 0; i < units_.size(); ++i) {
+        const int id = units_[i].id;
+        if (id < 0)
+            continue;
+        if (size_t(id) >= index_.size())
+            index_.resize(size_t(id) + 1, -1);
+        if (index_[size_t(id)] < 0) // (the first, as a search would find)
+            index_[size_t(id)] = int(i);
+    }
 }
 
 Unit* World::unit(int id) {
-    for (Unit& u : units_)
-        if (u.id == id)
-            return &u;
-    return nullptr;
+    return const_cast<Unit*>(std::as_const(*this).unit(id));
 }
 
 const Unit* World::unit(int id) const {
+    if (id >= 0 && size_t(id) < index_.size()) {
+        const int i = index_[size_t(id)];
+        if (i >= 0 && size_t(i) < units_.size() && units_[size_t(i)].id == id)
+            return &units_[size_t(i)];
+    }
+    // (Not indexed: none, unless its id was changed from outside.)
     for (const Unit& u : units_)
         if (u.id == id)
             return &u;
@@ -261,6 +381,7 @@ const Unit* World::unit(int id) const {
 
 void World::remove(int id) {
     units_.erase(std::remove_if(units_.begin(), units_.end(), [&](const Unit& u) { return u.id == id; }), units_.end());
+    reindex();
     for (Unit& u : units_)
         if (u.target == id)
             u.target = 0, u.ordered = false, u.firing = false;
@@ -535,12 +656,22 @@ void World::combatTick() {
         if (rescan && t && !u.ordered)
             t = nullptr;
         if (!t && looks && (rescan || u.target)) {
-            float best = 1e30f;
+            // The nearest with a clear line (the first so in units_'
+            // order among the nearest): those passing the cheaper tests,
+            // nearest first, their lines checked until one is clear.
+            candidates_.clear();
             for (Unit& v : units_)
                 if (v.hp > 0 && v.id != u.id && !v.cloaked && v.built >= 1 && pickable(v) &&
-                    (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) && inArc(u, v) && inPitch(u, v) &&
-                    distance(u, v) < best && (u.weapon.kind == WeaponKind::Artillery || lineClear(u, v)))
-                    best = distance(u, v), t = &v;
+                    (u.ai ? prey(u.slot, v.slot) : hostile(u, v)) && inRange(u, v) && inArc(u, v) && inPitch(u, v))
+                    if (const float d = distance(u, v); d < 1e30f)
+                        candidates_.push_back({d, &v});
+            std::stable_sort(candidates_.begin(), candidates_.end(),
+                             [](const auto& a, const auto& b) { return a.first < b.first; });
+            for (const auto& [d, v] : candidates_)
+                if (u.weapon.kind == WeaponKind::Artillery || lineClear(u, *v)) {
+                    t = v;
+                    break;
+                }
         }
         if (!t && u.lastAttacker && looks)
             if (Unit* a = unit(u.lastAttacker); a && a->hp > 0 && !a->cloaked && inRange(u, *a) && inArc(u, *a) && inPitch(u, *a))
@@ -898,6 +1029,7 @@ void World::flyProjectiles() {
 
 void World::syncState(save::Serializer& s) {
     s(stances_)(events_)(projectiles_)(tickClock_)(tick_)(units_)(groups_)(nextId_);
+    reindex();
 }
 
 } // namespace reluva::newworlds

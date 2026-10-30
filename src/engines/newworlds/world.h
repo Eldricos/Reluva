@@ -304,6 +304,25 @@ private:
     std::vector<Unit> units_;
     std::array<std::vector<int>, 10> groups_;
     int nextId_ = 1;
+
+    // Derived, never saved (made again as needed, and on load):
+    // each id's place in units_ (-1 none), for unit()'s lookups;
+    std::vector<int> index_;
+    void reindex();
+    // and, made as needed (the terrain never changes), each tile's steps
+    // out (bit k: canStep the k-th way, kStepWays' order; bit 8: worked
+    // out) and the regions searches found closed (what a search from any
+    // tile of one reaches is the region: index into regionTiles_, -1 none
+    // known), so findPath can tell a goal it can't reach and, if the start
+    // is then the nearest it gets, give up without searching again (as a
+    // unit stuck short of where it's sent asks again and again).
+    mutable std::vector<uint16_t> steps_;
+    mutable std::vector<float> centres_; // each tile's middle's height (steps_' bit 9: known)
+    mutable std::vector<int> regions_;
+    mutable std::vector<std::vector<int>> regionTiles_; // each region's tiles, in order
+    uint8_t stepsAt(size_t tile) const;
+    bool stepUncached(int tx, int ty, int dx, int dy) const;
+    std::vector<std::pair<float, Unit*>> candidates_; // combatTick's targets to try, nearest first
 };
 
 } // namespace reluva::newworlds
