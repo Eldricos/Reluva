@@ -26,6 +26,8 @@ struct BriefingRow {
     bool hold;          // waits for the mission script's show (a scene played out)
     int scene;          // the briefing scene's unit it follows (briefingScene; -1 none)
     int scheme;         // the Tricorder's and relief's drawing (0 ring hatch, 1 dot, 2 grid lines)
+    int zoom;           // the Tricorder's zoom (0 X4, 1 X2, 2 X1)
+    int tricorderView;  // the Tricorder's view (0 Starship, 1 Relief, 2 Relief orbit, 3 Relief fixed)
 };
 
 // A briefing scene's unit: what the mission's briefing script flies over

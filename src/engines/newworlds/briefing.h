@@ -43,6 +43,9 @@ struct BriefingStep {
     // How the Tricorder and the relief view draw the ground meanwhile (0
     // the ring hatch, 1 the dot, 2 grid lines; exe.md#the-tricorder).
     int scheme = 0;
+    // The Tricorder's zoom (0 X4, 1 X2, 2 X1) and view (0 Starship, 1
+    // Relief, 2 Relief orbit, 3 Relief fixed) the step sets.
+    int zoom = 1, tricorderView = 1;
 };
 
 // The briefing of a mission played as a side ('F', 'K', 'R'): the

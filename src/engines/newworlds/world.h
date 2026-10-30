@@ -264,6 +264,12 @@ public:
     // A shooter's best security skill (its officers'; 0 none): its shots
     // do (skill + 1) times their damage, artillery's excepted.
     void setMarksmanship(std::function<float(const Unit& shooter)> skill) { marksmanship_ = std::move(skill); }
+    // What one of u's shots carries (its pulse times its guns, times its
+    // security skill + 1 but artillery's), and the hit points one takes
+    // out of t. That can be 0 (a shield field and a good security officer):
+    // the game doesn't mind, it fires on (exe.md#sides-and-combat).
+    float shotDamage(const Unit& u) const;
+    float hitDamage(const Unit& u, const Unit& t) const;
     // Each object's size to shots and lines of fire: its model's bounds
     // radius, 0.9 of it for a vehicle (exe.md#sides-and-combat). Without
     // one, 6000 for buildings and 1000 for vehicles.

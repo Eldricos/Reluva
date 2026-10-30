@@ -3,6 +3,8 @@
 
 #include "engines/newworlds/economy.h"
 
+#include "engines/newworlds/ai_data.h"
+
 #include <algorithm>
 #include <array>
 #include <numeric>
@@ -93,13 +95,16 @@ constexpr double kShortageEvery = 0.6;
 // Vehicle production (exe.md#vehicle-production): a job is its build value
 // x 300 power units; each tick a running yard takes up to 300 from its
 // buffer, times its efficiency; it starts above 0.35 and stops below 0.2.
-// Then the vehicle rolls out through the yard's dock (exe.md#docking), by
-// its dock legs: a tank about 9.5 s from the Federation's yard, 4 s from
-// the Klingons', 7.3 s from the Romulans'; a scout, quicker, about two
-// thirds of that.
+// Then the vehicle rolls out through the yard's dock (exe.md#docking,
+// Economy::rollOutTicks), by its dock legs at its dock speed: a tank about
+// 9.5 s from the Federation's yard, 4-6 s from the Klingons', 7.3 s from
+// the Romulans'; a scout quicker, a bee in 2-3 s. Without the yard's dock
+// read, the tanks' figures (a scout's two thirds of them).
 constexpr double kWorkPerValue = 300;
 constexpr float kYardDraw = 300, kYardStart = 0.35f, kYardStop = 0.2f;
-double rolloutSeconds(char side, int type) {
+double rolloutSeconds(char side, int type, const Economy::DockPoints& dock) {
+    if (dock.known)
+        return Economy::rollOutTicks(dock, dockSpeed(type)) / kTicksPerSecond;
     const double tank = side == 'K' ? 4 : side == 'R' ? 7.3 : 9.5;
     // (97, 37, 98: the sides' ground scouts, exe.md#costs-and-prerequisites.)
     return type == 97 || type == 37 || type == 98 ? tank * 6.5 / 9.5 : tank;
@@ -582,10 +587,16 @@ Stock Economy::stock() const {
     return s;
 }
 
-std::array<float, kOres> Economy::oreStock() const {
+std::array<float, kOres> Economy::oreStock(int processor) const {
+    std::array<int64_t, kOres> units{};
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "resource-processor" && (processor == 0 || s.id == processor))
+            if (auto it = depots_.find(s.id); it != depots_.end())
+                for (int k = 0; k < kOres; ++k)
+                    units[size_t(k)] += it->second.ore[size_t(k)];
     std::array<float, kOres> t{};
     for (int k = 0; k < kOres; ++k)
-        t[size_t(k)] = float(ore_[size_t(k)]) / float(kTonne);
+        t[size_t(k)] = float(units[size_t(k)]) / float(kTonne);
     return t;
 }
 
@@ -680,6 +691,7 @@ int Economy::addBuilt(const std::string& type, float x, float y) {
         // makes the colony's own a first time and never takes it off
         // (exe.md#the-economy).
         raiseCapacity(2 * t->capacity);
+        startHousing_ += t->capacity;
         // The hub takes in everyone still in orbit; accommodation standing
         // at the start takes people straight from the hub.
         if (type == "colony-hub") {
@@ -1174,7 +1186,7 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
             continue;
         }
         if (j.rollout < 0)
-            j.rollout = rolloutSeconds(side_, j.type);
+            j.rollout = rolloutSeconds(side_, j.type, dockOf(*s));
         j.rollout -= 1 / kTicksPerSecond;
         if (j.rollout <= 0) {
             if (const VehicleType* v = vehicleType(j.type))
@@ -1187,7 +1199,7 @@ void Economy::produce(std::vector<ScriptEvent>& out) {
                 Bee b;
                 b.id = nextBee_++;
                 b.worker = true, b.home = false;
-                b.x = s->x, b.y = s->y;
+                std::tie(b.x, b.y) = rollOutSpot(*s); // out of the yard's dock
                 bees_.push_back(b);
                 madeWorkers.push_back({b.id, j.asker});
             } else {
@@ -1394,7 +1406,8 @@ void Economy::dig(ColonyStructure& mine, std::array<int64_t, kOres>& into, std::
 // bring it at their pace. A mine doesn't work without its crew
 // (exe.md#crew-and-efficiency).
 void Economy::mineTick(std::vector<ScriptEvent>& out) {
-    const bool processor = has("resource-processor");
+    const ColonyStructure* taker = beesModelled_ ? nullptr : oreTaker();
+    const int processor = taker ? taker->id : 0;
     for (ColonyStructure& s : structures_) {
         if (s.type != "mining-station" || s.progress < 1 || s.exhausted || crewShare(s) == 0)
             continue;
@@ -1410,43 +1423,55 @@ void Economy::mineTick(std::vector<ScriptEvent>& out) {
             dig(s, d.dug, out);
             pack(s.id, d.dug, false);
         } else if (processor) {
-            dig(s, ore_, out);
+            dig(s, depots_[processor].ore, out);
         }
     }
 }
 
-// Refining, while a processor stands with its crew: one store slot a tick
-// (ores 1-6 in the first six), a quarter tonne at a time, one for one into
-// the ore's material. (Reluva keeps the ore and the refining colony-wide:
-// the first finished processor with its crew does it, and its own plants
-// are the ones that count.)
+// Refining (exe.md#the-economy): each processor on its own, from its own
+// store, with its own plants. A tick it turns to one of its 16 store slots
+// (ores 1-6 in the first six) and refines up to a quarter tonne of that
+// ore, one for one, into the ore's material, twice that with its finished
+// plant for the material. (The game's refining step asks for no crew,
+// power or efficiency: a processor refines what it holds once it stands.
+// Ore only comes to one with its crew.)
 void Economy::refineTick() {
-    const auto refiner = std::find_if(structures_.begin(), structures_.end(), [&](const ColonyStructure& s) {
-        return s.type == "resource-processor" && s.progress >= 1 && crewShare(s) > 0;
-    });
-    if (refiner == structures_.end())
-        return;
-    const int slot = refineSlot_++ % kRefineSlots;
+    for (const ColonyStructure& s : structures_)
+        if (s.type == "resource-processor" && s.progress >= 1)
+            refine(s, depots_[s.id]);
+}
+
+void Economy::refine(const ColonyStructure& processor, Depot& d) {
+    const int slot = d.turn++ % kRefineSlots;
     if (slot < kOres) {
-        const int64_t use = std::min(kRefinePerVisit, ore_[size_t(slot)]);
-        ore_[size_t(slot)] -= use;
-        // Its plant for the material, finished, doubles what it makes.
-        refined_[size_t(slot)] += fittedOn(kPlants[size_t(slot)], refiner->id) ? 2 * use : use;
+        const int64_t use = std::min(kRefinePerVisit, d.ore[size_t(slot)]);
+        d.ore[size_t(slot)] -= use;
+        d.goods[size_t(slot)] += fittedOn(kPlants[size_t(slot)], processor.id) ? 2 * use : use;
     }
-    // Every 32 ticks its goods go to storage: packed into pods for the
-    // bees to carry, or straight there.
-    if (refineSlot_ % kShipEvery == 0) {
+    // Every 32 of its ticks its goods go to storage: packed into pods for
+    // the bees to carry, or straight there.
+    if (d.turn % kShipEvery == 0) {
         if (beesModelled_) {
-            for (const ColonyStructure& c : structures_)
-                if (c.type == "resource-processor" && c.progress >= 1) {
-                    pack(c.id, refined_, true);
-                    break;
-                }
+            pack(processor.id, d.goods, true);
         } else {
-            deposit(refined_);
-            refined_ = {};
+            deposit(d.goods);
+            d.goods = {};
         }
     }
+}
+
+// The first processor a pod of ore would go to: standing, not being
+// evacuated, with its crew (takes, less the bees).
+const ColonyStructure* Economy::oreTaker() const {
+    for (const ColonyStructure& s : structures_) {
+        if (s.type != "resource-processor" || s.progress < 1 || s.evacuating)
+            continue;
+        const BuildingType* t = buildingType(s.type);
+        if (t && t->crewSlots > 0 && s.crew < 1)
+            continue;
+        return &s;
+    }
+    return nullptr;
 }
 
 std::vector<ScriptEvent> Economy::advance(double seconds) {
@@ -1466,6 +1491,14 @@ void Economy::raiseCapacity(int n) {
     capacity_ += n;
     if (capacity_ > kCapacityCap)
         capBank_ += capacity_ - kCapacityCap, capacity_ = kCapacityCap;
+}
+
+CarriedCapacity Economy::debriefed() const {
+    CarriedCapacity c = carried();
+    c.capacity += startHousing_;
+    if (c.capacity > kCapacityCap)
+        c.bank += c.capacity - kCapacityCap, c.capacity = kCapacityCap;
+    return c;
 }
 
 void Economy::lowerCapacity(int n) {
@@ -1537,13 +1570,6 @@ void Economy::remove(int id) {
         dead_ += endRide(r, false);
     for (const ColonyStructure& c : structures_)
         if (c.id == id) {
-            // The ore and goods at the processor go with the last (Reluva
-            // keeps them colony-wide, as its refining).
-            if (c.type == "resource-processor" &&
-                std::none_of(structures_.begin(), structures_.end(), [&](const ColonyStructure& o) {
-                    return o.type == "resource-processor" && o.id != id && o.progress >= 1;
-                }))
-                ore_ = {}, refined_ = {};
             // Its people die with it (not those razing let go); those on
             // their way to it turn back to the hub's pool (those riding,
             // above).
@@ -1668,8 +1694,10 @@ bool Economy::takes(const ColonyStructure& s, const Pod& p) const {
 // A pod at its destination: its contents into the building's store.
 void Economy::unload(const Pod& p) {
     if (!p.refined) {
-        for (int k = 0; k < kOres; ++k)
-            ore_[size_t(k)] += p.load[size_t(k)];
+        // (Into the processor's own store: depots_.erase took a lost one's.)
+        if (const ColonyStructure* s = structure(p.dest); s && s->type == "resource-processor")
+            for (int k = 0; k < kOres; ++k)
+                depots_[p.dest].ore[size_t(k)] += p.load[size_t(k)];
         return;
     }
     for (Store& st : stores_)
@@ -1705,6 +1733,25 @@ int Economy::dockIn(const ColonyStructure& s, float speed) const {
     if (!d.known)
         return kDockTicks;
     return 1 + leg(d.arrival, d.capture, speed, false) + kSlowLeg * leg(d.capture, d.lock, speed, !d.vertical) + kLockTicks;
+}
+
+int Economy::rollOutTicks(float lockToRelease, float releaseToDeparture, float speed) {
+    auto ticks = [speed](float d) { return std::max(kShortestLeg, int(d / speed)); };
+    return 1 + 1 + kSlowLeg * ticks(lockToRelease) + 1 + ticks(releaseToDeparture);
+}
+
+int Economy::rollOutTicks(const DockPoints& d, float speed) {
+    // (At a level dock the vehicle keeps to the ground, 50 above LOCK's
+    // height, until the last leg.)
+    const float across = std::hypot(d.release[0] - d.lock[0], d.release[1] - d.lock[1]);
+    const float dz = d.departure[2] - (d.vertical ? d.release[2] : d.lock[2] + 50);
+    const float up = std::hypot(std::hypot(d.departure[0] - d.release[0], d.departure[1] - d.release[1]), dz);
+    return rollOutTicks(d.vertical ? std::hypot(across, d.release[2] - d.lock[2]) : across, up, speed);
+}
+
+std::pair<float, float> Economy::rollOutSpot(const DockPoints& d, float x, float y) {
+    // (Without a dock: 0.6 of a block south, clear of the building.)
+    return d.known ? std::pair{x + d.departure[0], y + d.departure[1]} : std::pair{x, y - 0.6f * kBlockSize};
 }
 
 int Economy::dockOut(const ColonyStructure& s, float speed, bool toDeparture) const {
@@ -2418,7 +2465,7 @@ bool Economy::evacuated(int structure) const {
 }
 
 void Economy::syncState(save::Serializer& s) {
-    s(stores_)(refined_)(capacity_)(capBank_)(phantoms_)(vehicles_)(structures_)(ore_)(dug_)(mineCarry_)(oreCycle_)(refineSlot_);
+    s(stores_)(capacity_)(capBank_)(phantoms_)(vehicles_)(structures_)(dug_)(mineCarry_)(oreCycle_);
     s(tickClock_)(clock_)(lastPowerWarning_)(reserve_)(requested_)(met_)(consumption_)(pendingShort_)(jobs_)(nextOrder_);
     s(finished_)(officers_)(yardRunning_)(orbit_)(officersDown_)(life_)(lifeDraw_)(lifeProduced_)(lifeUsed_);
     s(lifeMet_)(dead_)(walking_)(transports_)(rides_)(nextRide_)(lastShortage_)(nextId_)(dockFree_);

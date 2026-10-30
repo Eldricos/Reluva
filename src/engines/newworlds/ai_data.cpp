@@ -6329,6 +6329,30 @@ const CombatType* combatType(int id) {
     return i < 0 ? nullptr : &kTypes[size_t(i)];
 }
 
+float dockSpeed(int type) {
+    switch (type) {
+    case 14: case 46: case 91: case 152: // construction bees
+        return 1000;
+    case 13: case 61: case 90: // cargo bees
+        return 600;
+    case 12: case 11: case 92: // worker bees
+        return 400;
+    case 99: case 203: case 136: case 145:
+        return 200;
+    case 262:
+        return 175;
+    case 97: case 37: case 98: // the ground scouts
+    case 10: case 229: case 228: case 36: case 35: // Klingon tanks, battery, artillery; Romulan cloaked tank
+    case 48: case 105: case 129: case 205: case 202: case 108: case 117: case 149:
+    case 261: case 264: case 269: case 270: case 272: case 275: case 280: case 284: case 286:
+        return 150;
+    case 199: case 227:
+        return 50;
+    default:
+        return 100;
+    }
+}
+
 const SideInfo* sideInfo(std::string_view mission, int slot) {
     for (const SideInfo& s : kSides)
         if (mission == s.mission && s.slot == slot)

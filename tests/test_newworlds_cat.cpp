@@ -604,6 +604,20 @@ void testBriefing() {
     CHECK(steps[10].view == BriefingView::Model && steps[10].model == "geo/bad/tt.geo"); // the temple
     // F1012's relief view draws its ground in grid lines (scheme 2); the rest the ring.
     CHECK(steps[11].clip == "F1012" && steps[11].scheme == 2 && steps[10].scheme == 0);
+    // Each step sets the Tricorders' zoom and view too: F1012's relief in
+    // Relief orbit, the rest Relief at X2; F2009 zooms to X4; J1F's last two
+    // relief steps take the Starship view.
+    CHECK(steps[11].tricorderView == 2 && steps[11].zoom == 1 && steps[10].tricorderView == 1 && steps[10].zoom == 1);
+    auto byClip = [&](const std::vector<BriefingStep>& v, const char* clip) -> const BriefingStep* {
+        const auto it = std::find_if(v.begin(), v.end(), [&](const BriefingStep& x) { return x.clip == clip; });
+        return it == v.end() ? nullptr : &*it;
+    };
+    const auto f2 = briefingScript("F2", 'F', table, {});
+    const BriefingStep* f2009 = byClip(f2, "F2009");
+    CHECK(f2009 && f2009->zoom == 0 && f2009->tricorderView == 2 && f2009->view == BriefingView::Relief);
+    const auto j1 = briefingScript("J1", 'F', table, {});
+    const BriefingStep* j1f019 = byClip(j1, "J1F019");
+    CHECK(j1f019 && j1f019->tricorderView == 0 && j1f019->scheme == 0);
     // F1's shuttle scene: the ground steps after the held star system
     // follow the briefing shuttle along its path.
     CHECK(steps[6].scene >= 0 && steps[7].scene == steps[6].scene && briefingScene(steps[6].scene) &&
@@ -2935,6 +2949,78 @@ void testStartingYardStock() {
     CHECK(j4.economy().stock() == (Stock{500, 1000, 2300, 500, 4000, 5000}));
 }
 
+// What the game itself leaves undone (exe.md#sides-and-combat,
+// exe.md#building-placement): J4F's hub, in its shield field with Gage
+// (security 1.0) inside, takes 0 from a Taubat tank's pulse of 6 (halved
+// to 3, / 5), and the tank fires on at it all the same, its target choice
+// weighing no damage; F3's and J2's Klingon artillery is ordered onto a
+// spot their hub and construction yard hold, and waits there for good.
+// The mission check counts both as waiting, not stuck.
+void testWhatTheGameLeavesUndone() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    auto has = [](const std::vector<std::string>& lines, const std::string& start, const std::string& part) {
+        return std::any_of(lines.begin(), lines.end(), [&](const std::string& l) {
+            return l.rfind(start, 0) == 0 && l.find(part) != std::string::npos;
+        });
+    };
+    {
+        MissionSim j4("J4", 'F', t, map, 64, 64, MissionSim::placedColony("J4", 'F'));
+        World& w = j4.world();
+        int hub = 0;
+        for (const Unit& u : w.units())
+            if (u.slot == j4.playerSlot() && u.name == "colony-hub")
+                hub = u.id;
+        CHECK(hub != 0);
+        if (!hub)
+            return;
+        // Of the player's colony only the hub and its field's generators
+        // left (the check's idle player loses the rest early on).
+        std::vector<int> ours;
+        for (const Unit& u : w.units())
+            if (u.slot == j4.playerSlot())
+                ours.push_back(u.id);
+        for (int id : ours) {
+            Unit& u = *w.unit(id);
+            if (u.name != "colony-hub" && u.name != "shield-generator" && u.name != "power-generator")
+                u.hp = 0;
+        }
+        const float hp = w.unit(hub)->hp;
+        const int tank = spawnObject(w, 3, 'T', *combatType(111), w.unit(hub)->x - 12000, w.unit(hub)->y, {});
+        CHECK(w.shotDamage(*w.unit(tank)) == 6 && w.hitDamage(*w.unit(tank), *w.unit(hub)) == 0);
+        World bare(t);
+        const int h = spawnObject(bare, 0, 'F', *combatType(23), 100000, 100000, {});
+        const int k = spawnObject(bare, 3, 'T', *combatType(111), 112000, 100000, {});
+        CHECK(bare.hitDamage(*bare.unit(k), *bare.unit(h)) == 6);
+        // (The Taubat raid's tanks hold their fire: the field stands.)
+        j4.advance(125, [&] {
+            std::vector<int> raid;
+            for (const Unit& u : w.units())
+                if (u.slot == 3 && u.id != tank && !u.holdFire)
+                    raid.push_back(u.id);
+            for (int id : raid)
+                w.unit(id)->holdFire = true;
+        });
+        const Unit* k4 = w.unit(tank);
+        CHECK(k4 && k4->target == hub && w.unit(hub)->hp == hp);
+        const std::vector<std::string> p = j4.problems();
+        CHECK(has(p, "waits: firing without effect, slot 3 taubat-tank", "on slot 0's colony-hub (as the game's"));
+        CHECK(!has(p, "stuck: firing without effect", ""));
+    }
+    for (const auto& [mission, order] : {std::pair{"F3", "kli-npc-build-def-art"}, {"J2", "kli-npc-build-def-art1"}}) {
+        MissionSim sim(mission, 'F', t, map, 64, 64, MissionSim::placedColony(mission, 'F'));
+        sim.advance(140);
+        const std::vector<std::string> p = sim.problems();
+        CHECK(has(p, "waits: build never placed, as the game's", std::string("): ") + order + " ["));
+        CHECK(!has(p, "stuck: build never placed", ""));
+    }
+}
+
 // COLONY SIZE at the start, as the games recorded show it (exe.md#the-economy):
 // every building, vehicle and bee but the transports, a worker bee free for
 // each yard, storage facility, processor and mine, starting housing counted
@@ -3003,7 +3089,7 @@ void testWardsAndPlants() {
 // Add-ons are each building's own (exe.md#upgrades-and-add-ons): a second
 // sickbay takes wards of its own, a second processor plants of its own; a
 // building lost takes only its own add-ons with it; a plant doubles what its
-// own processor refines (Reluva's refining: the first processor with crew).
+// own processor refines, each processor refining its own ore.
 void testAddOnsPerBuilding() {
     auto type = [](const char* id) -> const BuildingType& { return *buildingType(id); };
     // Magnesite (kind 5) in block 2,3 holding 30, nothing else.
@@ -3082,6 +3168,54 @@ void testAddOnsPerBuilding() {
     CHECK(doubled >= 200 && doubled <= 240);
     if (single < 100 || single > 120 || doubled < 200 || doubled > 240)
         std::printf("  refined %d (plant on the second processor), %d (on the first)\n", single, doubled);
+    // Each processor refines its own ore with its own plants
+    // (exe.md#the-economy). Ore goes to the first processor with its crew;
+    // without crew a processor takes none but still refines what it holds.
+    // plants: on the first, the second; firstCrewless: from the start;
+    // firstLeaves: once it holds the ore. Returns the nitrium made and the
+    // most ore the second held.
+    auto perProcessor = [&](bool onFirst, bool onSecond, bool firstCrewless, bool firstLeaves) {
+        Economy e('F', rich, 50, map);
+        int sb1 = 0, sb2 = 0, p1 = 0, p2 = 0;
+        colony(e, sb1, sb2, p1, p2);
+        for (const auto& [on, p] : {std::pair{onFirst, p1}, std::pair{onSecond, p2}}) {
+            const ColonyStructure* host = e.structure(p);
+            CHECK(!on || (host && e.order("nitrium-plant", host->x, host->y, 0, 0) != 0));
+        }
+        for (int i = 0; i < 4000 && !((!onFirst || e.fittedOn("nitrium-plant", p1)) &&
+                                      (!onSecond || e.fittedOn("nitrium-plant", p2)));
+             ++i)
+            e.advance(0.05);
+        if (firstCrewless)
+            e.setCrewTarget(p1, 0);
+        const int before = e.stock()[Nitrium];
+        CHECK(e.order("mining-station", 5 * kTile, 7 * kTile, 5, 7) != 0);
+        float second = 0;
+        bool dry = false;
+        for (int i = 0; i < 1600; ++i) {
+            for (const ScriptEvent& x : e.advance(0.25))
+                if (x.kind == "mine-exhausted" && firstLeaves && !dry) {
+                    dry = true;
+                    CHECK(e.oreStock(p1)[4] > 1 && e.oreStock(p2)[4] == 0);
+                    e.setCrewTarget(p1, 0);
+                }
+            second = std::max(second, e.oreStock(p2)[4]);
+        }
+        CHECK(e.oreStock()[4] < 0.01f);
+        return std::pair{e.stock()[Nitrium] - before, second};
+    };
+    // The first crewless: the second takes the ore, its plant doubling it.
+    const auto [bySecond, secondHeld] = perProcessor(false, true, true, false);
+    CHECK(bySecond >= 200 && bySecond <= 240 && secondHeld > 0);
+    // Its plant on the first only: the second refines it once.
+    const auto [onlyFirst, held2] = perProcessor(true, false, true, false);
+    CHECK(onlyFirst >= 100 && onlyFirst <= 120 && held2 > 0);
+    // The first, its crew gone once it holds the ore, refines it all with
+    // its own plant (the second, plantless, gets none of it).
+    const auto [kept, none] = perProcessor(true, false, false, true);
+    CHECK(kept >= 200 && kept <= 240 && none == 0);
+    if (bySecond < 200 || bySecond > 240 || onlyFirst < 100 || onlyFirst > 120 || kept < 200 || kept > 240)
+        std::printf("  per processor: %d, %d, %d\n", bySecond, onlyFirst, kept);
 }
 
 void testStartingColonySize() {
@@ -3128,6 +3262,28 @@ void testStartingColonySize() {
     {
         Economy e('F', {}, 95, map, 2); // (a value past 90 banks the rest)
         CHECK((e.carried() == CarriedCapacity{90, 7}));
+    }
+    // What the debriefing adds to what's carried on: the mission's starting
+    // housing once more (its scene makes it again), on top of the colony's
+    // capacity as it ends, past 90 into the bank; housing built in play
+    // counts once, as it was placed.
+    {
+        MissionSim sim("J8", 'F', t, map, 64, 64, MissionSim::placedColony("J8", 'F'));
+        CHECK(sim.economy().capacity() == 60 && (sim.economy().debriefed() == CarriedCapacity{65, 0}));
+        MissionSim k("J6", 'K', t, map, 64, 64, MissionSim::placedColony("J6", 'K'));
+        CHECK((k.economy().carried() == CarriedCapacity{90, 10}));
+        CHECK((k.economy().debriefed() == CarriedCapacity{90, 35}));
+        MissionSim f("F1", 'F', t, map, 64, 64, MissionSim::placedColony("F1", 'F'));
+        CHECK((f.economy().debriefed() == CarriedCapacity{50, 0})); // none standing at the start
+    }
+    {
+        Economy e('F', Stock{5000, 5000, 5000, 5000, 5000, 5000}, 50, map);
+        e.addBuilt("colony-hub", 0, 0);
+        e.addBuilt("construction-yard", 20000, 0);
+        e.addBuilt("accommodation", 40000, 0);
+        CHECK(e.capacity() == 60);
+        CHECK(e.order("farm", 60000, 0, 0, 0) != 0);
+        CHECK(e.capacity() == 70 && (e.debriefed() == CarriedCapacity{75, 0}));
     }
 }
 
@@ -3391,7 +3547,7 @@ void testEconomyFixes() {
         b.setBees(0, 0, 0); // (the counts given later leave worker bees be)
         CHECK(std::count_if(b.bees().begin(), b.bees().end(), [](const Economy::Bee& x) { return x.worker; }) == 3);
     }
-    // Ore and goods at the processors go only with the last.
+    // A processor's ore and goods are its own, lost with it.
     ColonyMap ore;
     ore.depositKind = [](int bx, int by) { return bx == 1 && by == 1 ? 2 : 0; };
     ore.depositAmount = [](int, int) { return 300; };
@@ -3407,28 +3563,40 @@ void testEconomyFixes() {
         const int p2 = e.addBuilt("resource-processor", 0, 0);
         e.addBuilt("mining-station", 1.5f * 16384, 1.5f * 16384);
         run(e, 5);
+        // (All at the first, the first that takes it.)
         const float held = oreTotal(e);
-        CHECK(held > 0);
-        e.remove(p1);
-        CHECK(oreTotal(e) == held);
+        const auto atFirst = e.oreStock(p1);
+        CHECK(held > 0 && held == std::accumulate(atFirst.begin(), atFirst.end(), 0.0f));
+        // The second's store goes with it; the first keeps its own.
         e.remove(p2);
+        CHECK(oreTotal(e) == held);
+        e.remove(p1);
         CHECK(oreTotal(e) == 0);
     }
-    // Neither a mine nor the processor works without crew.
+    // A mine doesn't work without its crew. A processor without crew
+    // takes no ore, but refines what it holds (the game's refining asks
+    // for no crew).
     {
         Economy e('F', rich, 50, ore);
         e.addBuilt("colony-hub", 0, 0);
         e.addBuilt("construction-yard", 0, 0);
-        const int proc = e.addBuilt("resource-processor", 0, 0);
+        e.addBuilt("resource-processor", 0, 0);
         const int mine = e.addBuilt("mining-station", 1.5f * 16384, 1.5f * 16384);
-        e.setCrewTarget(proc, 0);
-        const Stock had = e.stock();
-        run(e, 10);
-        const float dug = oreTotal(e);
-        CHECK(dug > 15 && e.stock() == had); // dug, nothing refined
         e.setCrewTarget(mine, 0);
+        const Stock had = e.stock();
         run(e, 5);
-        CHECK(oreTotal(e) == dug);
+        CHECK(oreTotal(e) == 0 && e.stock() == had);
+        Economy f('F', rich, 50, ore);
+        f.addBuilt("colony-hub", 0, 0);
+        f.addBuilt("construction-yard", 0, 0);
+        const int fproc = f.addBuilt("resource-processor", 0, 0);
+        f.addBuilt("mining-station", 1.5f * 16384, 1.5f * 16384);
+        run(f, 3);
+        CHECK(oreTotal(f) > 2);
+        f.setCrewTarget(fproc, 0);
+        const Stock some = f.stock();
+        run(f, 60);
+        CHECK(oreTotal(f) == 0 && f.stock()[Polycomp] > some[Polycomp]);
     }
     // Building orders wait for room in the colony (not upgrades).
     {
@@ -4547,6 +4715,119 @@ void testFactoryRollOut() {
             }
     }
     CHECK(made > 0 && atDock == made && !asked.empty() && asked[0] == "geo/bad/tw.geo");
+
+    // The roll-out the yards share with the factories (exe.md#vehicle-
+    // production): a tick, a check, the release leg (across only at a
+    // level dock) three times, a check, the climb from 50 above LOCK to
+    // DEPARTURE; each leg at least 10 ticks at the vehicle's dock speed.
+    Economy::DockPoints dock;
+    dock.known = true;
+    dock.lock = {0, 0, -500};
+    dock.release = {0, -3000, -400};
+    dock.departure = {0, -5000, 1050}; // 2000 on, 1500 up from LOCK + 50: 2500
+    CHECK(Economy::rollOutTicks(dock, 100) == 3 + 3 * 30 + 25 && Economy::rollOutTicks(dock, 400) == 3 + 3 * 10 + 10);
+    CHECK(Economy::rollOutTicks(2530, 3200, 100) == 110); // a Taubat hangar's, unread
+    CHECK(Economy::rollOutSpot(dock, 1000, 2000) == std::make_pair(1000.0f, -3000.0f));
+    CHECK(dockSpeed(8) == 100 && dockSpeed(97) == 150 && dockSpeed(10) == 150 && dockSpeed(12) == 400 &&
+          dockSpeed(14) == 1000 && dockSpeed(99) == 200);
+    auto yardDock = [dock](const std::string& type) { return type == "vehicle-yard" ? dock : Economy::DockPoints{}; };
+
+    // The player's yard: a scout out at its DEPARTURE point once rolled
+    // out (no work: 3 + 3 x 20 + 16 ticks at 150, about 4 s).
+    {
+        Terrain pt;
+        pt.width = pt.height = 128;
+        pt.moveClass.assign(128 * 128, 1);
+        pt.heightAt = [](float, float) { return 0.0f; };
+        ColonyMap map;
+        map.depositKind = [](int, int) { return 0; };
+        map.depositAmount = [](int, int) { return 0; };
+        std::vector<ColonyBuilding> colony = MissionSim::placedColony("F1", 'F');
+        colony.push_back({"vehicle-yard", "", 430, 206});
+        MissionSim sim("F1", 'F', pt, map, 64, 64, colony);
+        sim.economy().setDocks(yardDock);
+        const ColonyStructure* yard = nullptr;
+        for (const ColonyStructure& c : sim.economy().structures())
+            if (c.type == "vehicle-yard")
+                yard = &c;
+        CHECK(yard != nullptr);
+        if (yard) {
+            const float yx = yard->x, yy = yard->y;
+            std::set<int> had;
+            for (const Unit& u : sim.world().units())
+                had.insert(u.id);
+            CHECK(sim.economy().orderVehicle(*vehicleType(97)));
+            const Unit* scout = nullptr;
+            double at = 0;
+            for (int i = 0; i < 200 && !scout; ++i) {
+                sim.advance(0.05);
+                at += 0.05;
+                for (const Unit& u : sim.world().units())
+                    if (!had.count(u.id) && u.slot == sim.playerSlot() && u.type == 97)
+                        scout = &u;
+            }
+            CHECK(scout && std::hypot(scout->x - yx, scout->y - (yy - 5000)) < 1 && at > 3.8 && at < 4.3);
+        }
+    }
+
+    // A yard's worker bee leaves from there too.
+    {
+        Economy b('F', {500, 1000, 2300, 500, 4000, 5000}, 50, ColonyMap{});
+        b.setDocks(yardDock);
+        b.setBees(0, 0, 0);
+        b.addBuilt("colony-hub", 0, 0);
+        b.addBuilt("construction-yard", 20000, 0);
+        b.addBuilt("vehicle-yard", 40000, 0);
+        const int proc = b.addBuilt("resource-processor", 0, 20000);
+        const Economy::Bee* bee = nullptr;
+        for (int i = 0; i < 2000 && !bee; ++i) {
+            b.advance(0.05);
+            for (const Economy::Bee& x : b.bees())
+                if (x.worker && x.site == proc)
+                    bee = &x;
+        }
+        CHECK(bee && bee->fromX == 40000 && bee->fromY == -5000);
+    }
+
+    // An AI colony's yard (F1's Klingons, theirs built at 180 s): its
+    // tanks out at its model's DEPARTURE point.
+    {
+        World kw(t);
+        AiSides kai("F1", 0, kw);
+        std::set<std::string> models;
+        kai.setDocks([&](const std::string& model) {
+            models.insert(model);
+            Economy::DockPoints d = dock;
+            d.known = model == "geo/kln/kvy.geo";
+            d.departure = {-77, -6042, 3014};
+            return d;
+        });
+        kai.start();
+        const auto wanted = kai.dockModels();
+        CHECK(std::find(wanted.begin(), wanted.end(), "geo/kln/kvy.geo") != wanted.end());
+        std::vector<int> tanks;
+        for (const Unit& u : kw.units())
+            if (u.slot == 1 && u.type == 10)
+                tanks.push_back(u.id);
+        for (int id : tanks)
+            kw.remove(id);
+        spawnObject(kw, 0, 'F', *combatType(23), 60 * kTile, 100 * kTile, {}); // (something to attack)
+        CHECK(kai.order("klingon", "assault-random1"));
+        const Unit* tank = nullptr;
+        for (int i = 0; i < 1500 && !tank; ++i) {
+            kai.advance(1.0);
+            for (const Unit& u : kw.units())
+                if (u.slot == 1 && u.type == 10)
+                    tank = &u;
+        }
+        const Unit* yard = nullptr;
+        for (const Unit& u : kw.units())
+            if (u.slot == 1 && u.name == "vehicle-yard")
+                yard = &u;
+        CHECK(tank && yard && models.count("geo/kln/kvy.geo"));
+        if (tank && yard)
+            CHECK(std::hypot(tank->x - (yard->x - 77), tank->y - (yard->y - 6042)) < 1);
+    }
 }
 
 int main() {
@@ -4589,6 +4870,7 @@ int main() {
     testTransports();
     testSaveState();
     testStartingYardStock();
+    testWhatTheGameLeavesUndone();
     testStartingColonySize();
     testWardsAndPlants();
     testAddOnsPerBuilding();

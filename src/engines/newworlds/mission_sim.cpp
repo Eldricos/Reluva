@@ -696,8 +696,8 @@ void MissionSim::step() {
 
 // The colony's buildings' officer terms (the best officer posted of its
 // speciality; an upgrade, with no object of its own, its host's) and
-// health; vehicles out of the yards: bees into the hub, the rest beside
-// their yard, armed ones on to the rally point.
+// health; vehicles out of the yards: bees into the hub, the rest at their
+// yard's dock's DEPARTURE point, armed ones on to the rally point.
 void MissionSim::rollOut() {
     for (size_t i = 0; i < colonyObjects_.size() && i < structureIds_.size(); ++i) {
         const BuildingType* b = buildingType(colony_[i].name);
@@ -734,10 +734,11 @@ void MissionSim::rollOut() {
             ++garage_; // it drives into the hub, a transport
             continue;
         }
+        // Out of the yard's dock, at its DEPARTURE point (as a natives'
+        // factory's unit).
         float x = float(blocksWide_) * kBlock / 2, y = float(blocksHigh_) * kBlock / 2;
-        for (const ColonyStructure& c : economy_->structures())
-            if (c.id == yard)
-                x = c.x, y = c.y - 1.2f * kTile;
+        if (const ColonyStructure* c = economy_->structure(yard))
+            std::tie(x, y) = economy_->rollOutSpot(*c);
         const ObjectType* t = objectType(type);
         const CombatType* ct = combatType(type);
         if (!ct || (!t && !orderOnlyVehicle(type)))
@@ -811,13 +812,14 @@ void MissionSim::useModels(const Archives& archives) {
         const auto it = docks->find(type);
         return it == docks->end() ? Economy::DockPoints{} : it->second;
     });
-    // The natives' factories', by model.
-    auto factoryDocks = std::make_shared<std::map<std::string, Economy::DockPoints>>();
-    for (const std::string& model : AiSides::factoryModels())
-        (*factoryDocks)[model] = dockAt(model);
-    ai_->setDocks([factoryDocks](const std::string& model) {
-        const auto it = factoryDocks->find(model);
-        return it == factoryDocks->end() ? Economy::DockPoints{} : it->second;
+    // The natives' factories' and the other colonies' buildings', by
+    // model.
+    auto modelDocks = std::make_shared<std::map<std::string, Economy::DockPoints>>();
+    for (const std::string& model : ai_->dockModels())
+        (*modelDocks)[model] = dockAt(model);
+    ai_->setDocks([modelDocks](const std::string& model) {
+        const auto it = modelDocks->find(model);
+        return it == modelDocks->end() ? Economy::DockPoints{} : it->second;
     });
     // Each model's bounds radius, by name, from the first archive that
     // has it.
@@ -1052,9 +1054,11 @@ void MissionSim::watchUnits() {
             continue;
         }
         shooting[u.id] = it->second;
-        if (clock_ - it->second.since >= kHarmless && harmless_.insert(u.id).second)
+        if (clock_ - it->second.since >= kHarmless && harmless_.insert(u.id).second) {
+            const std::string why = harmlessBy(u, *t);
             note("firing without effect: slot " + std::to_string(u.slot) + " " + u.name + " at " + mapPosition(u.x, u.y) +
-                 " on slot " + std::to_string(t->slot) + "'s " + t->name);
+                 " on slot " + std::to_string(t->slot) + "'s " + t->name + (why.empty() ? "" : " (" + why + ")"));
+        }
     }
     shooting_ = std::move(shooting);
     std::map<int, Track> next;
@@ -1080,6 +1084,22 @@ void MissionSim::watchUnits() {
     tracks_ = std::move(next);
 }
 
+std::string MissionSim::harmlessBy(const Unit& u, const Unit& t) const {
+    if (world_->hitDamage(u, t) > 0)
+        return {};
+    const float shot = world_->shotDamage(u);
+    const CombatType* ct = combatType(t.type);
+    const bool field = ct && ct->shielded && fog_ &&
+                       fog_->has(int(t.x / kBlock), int(t.y / kBlock), Fog::Shielded, t.slot);
+    const float security = t.slot == player_ ? fieldWork_->skill(t.id, 2) : 0;
+    char why[160], by[64] = "";
+    if (security > 0)
+        std::snprintf(by, sizeof by, ", / %g for its security officer", 4 * security + 1);
+    std::snprintf(why, sizeof why, "as the game's: each hit %g%s%s, cut to 0", shot,
+                  field ? ", halved in its shield field" : "", by);
+    return why;
+}
+
 std::vector<std::string> MissionSim::problems() const {
     std::vector<std::string> out;
     for (int id : stuck_)
@@ -1089,19 +1109,28 @@ std::vector<std::string> MissionSim::problems() const {
         if (const Unit* u = world_->unit(id))
             out.push_back("stuck: unit placed on ground it can't move on, slot " + std::to_string(u->slot) + " " + u->name +
                           " at " + mapPosition(u->x, u->y));
+    // (Hits the game's own rules make 0 it fires on just the same: its
+    // target choice doesn't weigh damage. Waiting, not stuck.)
     for (int id : harmless_)
         if (const Unit* u = world_->unit(id); u && shooting_.count(id))
-            if (const Unit* t = world_->unit(shooting_.at(id).target))
-                out.push_back("stuck: firing without effect, slot " + std::to_string(u->slot) + " " + u->name + " at " +
-                              mapPosition(u->x, u->y) + " on slot " + std::to_string(t->slot) + "'s " + t->name);
+            if (const Unit* t = world_->unit(shooting_.at(id).target)) {
+                const std::string why = harmlessBy(*u, *t);
+                out.push_back((why.empty() ? "stuck: " : "waits: ") + std::string("firing without effect, slot ") +
+                              std::to_string(u->slot) + " " + u->name + " at " + mapPosition(u->x, u->y) + " on slot " +
+                              std::to_string(t->slot) + "'s " + t->name + (why.empty() ? "" : " (" + why + ")"));
+            }
     for (const AiSides::OrderStatus& s : ai_->status()) {
         const NpcOrder& o = *s.order;
         if (!s.started)
             continue;
         if (o.task == 3 || o.task == 9) {
             if (!s.site && s.legSeconds >= kBuilding) {
+                // A building on its spot: the game's order waits there for
+                // good too (no search for another spot; exe.md#ai-build-orders).
                 const Unit* b = s.blocker ? world_->unit(s.blocker) : nullptr;
-                out.push_back("stuck: build never placed (its spot " + std::to_string(o.way[0][0]) + ":" +
+                out.push_back(std::string(b ? "waits: build never placed, as the game's" : "stuck: build never placed") +
+                              " (its spot " +
+                              std::to_string(o.way[0][0]) + ":" +
                               std::to_string(o.way[0][1]) + " " +
                               (b ? "has slot " + std::to_string(b->slot) + "'s " + b->name + " at " + mapPosition(b->x, b->y)
                                  : !s.refusal.empty() ? s.refusal

@@ -108,7 +108,10 @@ void MissionViewer::startStep(int step) {
                           return kind >= 1 && kind <= 6 && map_.depositAmount(bx, by) > 0 ? 1 + kind : 0;
                       },
                       {});
+    // (Each step sets the scheme, zoom and view of both Tricorders.)
     map_.setTricorderScheme(s.scheme);
+    tricorderZoom_ = std::clamp(s.zoom, 0, 2);
+    tricorderView_ = std::clamp(s.tricorderView, 0, 3);
     stepOnMap_ = hasMap_ && (s.view == BriefingView::Ground || s.view == BriefingView::Relief);
     if (stepOnMap_) {
         map_.setColouring(s.view == BriefingView::Relief ? 1 : 0);
