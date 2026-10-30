@@ -47,13 +47,22 @@ std::shared_ptr<const audio::Sound> MissionViewer::loadSound(const std::string& 
 
 // The colony's voices (exe.md#sounds): an officer's report by number,
 // in the player's race's recording (FED002c, KLI002a, ...); "attack" its
-// "under attack" clip. Each at most once in 600 ms, and none over a clip
-// already playing.
+// "under attack" clip; each at most once in 600 ms, on the officers'
+// channel (1), and none over a clip already playing there. Anything else
+// is a finished building's clip (B_fcycom, a hub's FED004b), on the
+// buildings' channel (0), dropped if one is still playing there.
 void MissionViewer::speak(const std::string& what) {
     static const std::map<std::string, std::array<char, 3>> kLetters = {
         {"001", {'c', 'a', 'b'}}, {"002", {'c', 'a', 'a'}}, {"003", {'b', 'a', 'a'}}, {"004", {'b', 'b', 'a'}},
         {"005", {'b', 'a', 'a'}}, {"006", {'c', 'd', 'd'}}, {"007", {'a', 'b', 'a'}}, {"008", {'a', 'b', 'b'}}};
-    if (!mixer_ || (clipPlaying() && what != "attack"))
+    if (!mixer_)
+        return;
+    if (what != "attack" && !kLetters.count(what)) {
+        if (!what.empty() && !mixer_->isPlaying(buildingClipHandle_))
+            playOnChannel(*mixer_, buildingClipHandle_, loadSound(what));
+        return;
+    }
+    if (clipPlaying() && what != "attack")
         return;
     const char side = this->side();
     const int race = side == 'K' ? 1 : side == 'R' ? 2 : 0;
@@ -72,8 +81,7 @@ void MissionViewer::speak(const std::string& what) {
     if (clip.empty() || clipPlaying() || nowMs_ - spokenAt_[clip] < 600)
         return;
     spokenAt_[clip] = nowMs_;
-    if (auto sound = loadSound(clip))
-        clipHandle_ = mixer_->play(std::move(sound), audio::SoundType::Speech);
+    playOnChannel(*mixer_, clipHandle_, loadSound(clip));
 }
 
 // One of the player's vehicles speaking (exe.md#sounds): group 0

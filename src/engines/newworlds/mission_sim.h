@@ -28,6 +28,11 @@
 
 namespace reluva::newworlds {
 
+// The clip one of the side's ('F', 'K', 'R') buildings plays as it's
+// finished (buildingFinishedClip, by the side's type of that name; an
+// upgrade or add-on by its base building's): empty for none.
+std::string finishedClip(const std::string& building, char side);
+
 // A mission being played: the one simulation both the missions page's
 // play mode and the headless runs use. Its map's terrain; the player's
 // starting colony and units as the mission places them; the other sides
@@ -146,8 +151,10 @@ public:
     std::vector<Said> takeSaid();
     std::vector<WorldEvent> takeEvents();
     // What the colony says (exe.md#sounds): its officers' reports by
-    // number ("002": construction delayed, ...) and "attack" (one of its
-    // finished buildings hit; at most once in 30 seconds).
+    // number ("002": construction delayed, ...), "attack" (one of its
+    // finished buildings hit; at most once in 30 seconds) and, for each
+    // of its buildings finished, script or none, that building's clip
+    // (finishedClip: "B_fcycom", a hub's "FED004b").
     std::vector<std::string> takeVoices();
     // The player's objects with an alert (exe.md#cameras: hit, or a
     // report: everyone beamed down, a mine exhausted), for Space; an
@@ -167,7 +174,7 @@ public:
 private:
     void step();
     void deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out);
-    void spawnColonyObject(size_t index);
+    void spawnColonyObject(size_t index, const std::string& label = {});
     void rollOut();
     void runTransports(double dt);
     void sightings(std::vector<ScriptEvent>& happened);

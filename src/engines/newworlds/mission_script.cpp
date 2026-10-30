@@ -10,6 +10,8 @@
 #include <cctype>
 #include <cstdio>
 #include <cstdlib>
+#include <iterator>
+#include <utility>
 
 namespace reluva::newworlds {
 
@@ -818,33 +820,41 @@ std::string announcementFor(const ScriptEvent& event, const std::vector<MissionR
         return s + "objmet";
     if (event.kind == "power-low")
         return s + "lowpowr";
-    if (event.kind != "built" || event.args.empty())
-        return {};
-    // A building's spoken name: its short name in the file's (fab, the
-    // Federation's accommodation block, and fcy heard as each finished).
-    struct Name {
-        const char* building;
-        const char *fed, *kln, *rom;
+    return {};
+}
+
+// The game's table (exe.md#sounds), by type id (in order): each a clip
+// in Media/Misc. Upgrades and advanced versions have their base's; the
+// Romulans' power, shield, security, defence and farm buildings the
+// Federation's; ids 15, 17, 25 and 76 have no name in the game's tables.
+std::string buildingFinishedClip(int type) {
+    static constexpr std::pair<int, const char*> kClips[] = {
+        {15, "B_fsccom"}, {16, "B_fsccom"}, {17, "B_fvycom"}, {21, "B_fsgcom"}, {22, "B_fpgcom"}, {23, "FED004b"},
+        {24, "B_fvycom"}, {25, "B_fsfcom"}, {26, "B_frpcom"}, {27, "B_ftpcom"}, {28, "KLI004b"}, {29, "A_ksgcom"},
+        {30, "A_kpgcom"}, {31, "A_kvycom"}, {32, "A_ksfcom"}, {43, "ROM004a"}, {44, "B_fabcom"}, {45, "B_fmscom"},
+        {49, "KLI004b"}, {50, "A_klfcom"}, {51, "A_krpcom"}, {52, "A_kmscom"}, {53, "A_kcycom"}, {54, "A_kdtcom"},
+        {65, "B_rmscom"}, {66, "B_rsfcom"}, {67, "B_rrescom"}, {68, "A_kchcom"}, {69, "B_fsgcom"}, {70, "B_fpgcom"},
+        {71, "B_rvycom"}, {72, "B_rtpcom"}, {73, "A_ktpcom"}, {74, "B_fsccom"}, {75, "A_kacom"}, {76, "B_rsfcom"},
+        {77, "B_fcycom"}, {78, "B_rcycom"}, {80, "B_fptcom"}, {81, "B_fptcom"}, {82, "A_kphtcom"},
+        {83, "B_fphtcom"}, {84, "B_fphtcom"}, {121, "B_rrpcom"}, {122, "B_fsfcom"}, {123, "B_fsbycom"},
+        {124, "A_ksbcom"}, {125, "B_rsbcom"}, {126, "B_fsbcom"}, {127, "A_ksscom"}, {128, "B_rsscom"},
+        {146, "B_fvycom"}, {147, "B_fvycom"}, {158, "B_fapgcom"}, {159, "FED004b"}, {160, "FED004b"},
+        {161, "B_fcycom"}, {162, "B_fcycom"}, {163, "B_famscom"}, {164, "B_fsbcom"}, {165, "B_fsbycom"},
+        {166, "B_frpcom"}, {167, "B_frpcom"}, {168, "KLI004b"}, {169, "KLI004b"}, {171, "B_fhfcom"},
+        {172, "A_kapgcom"}, {173, "B_ramscom"}, {174, "ROM004a"}, {175, "ROM004a"}, {176, "B_rcycom"},
+        {177, "B_rvycom"}, {178, "B_fapgcom"}, {179, "B_rsscom"}, {180, "B_rsbcom"}, {181, "B_rrpcom"},
+        {182, "B_fhfcom"}, {183, "A_kvycom"}, {184, "A_ksscom"}, {185, "A_ksscom"}, {186, "A_ksscom"},
+        {187, "A_ksbcom"}, {188, "A_ksbcom"}, {189, "A_kamscom"}, {190, "A_krpcom"}, {191, "A_kcycom"},
+        {192, "A_kcycom"}, {293, "B_fsbcom"}, {294, "B_fsbcom"}, {295, "B_fsbcom"}, {296, "B_fsbcom"},
+        {297, "B_fsbcom"}, {298, "B_fsbycom"}, {299, "B_fsbycom"}, {300, "B_fsbycom"}, {301, "B_fsbycom"},
+        {302, "A_ksscom"}, {303, "A_ksscom"}, {304, "A_ksscom"}, {305, "A_ksbcom"}, {306, "A_ksbcom"},
+        {307, "B_rsscom"}, {308, "B_rsscom"}, {309, "B_rsscom"}, {310, "B_rsscom"}, {311, "B_rsscom"},
+        {312, "B_rsbcom"}, {313, "B_rsbcom"}, {314, "B_rsbcom"}, {315, "B_rsbcom"},
     };
-    static constexpr Name kNames[] = {
-        {"construction-yard", "cy", "cy", "cy"}, {"vehicle-yard", "vy", "vy", "vy"},
-        {"accommodation", "ab", "a", ""},       {"arsenal", "", "a", ""},
-        {"power-generator", "pg", "pg", ""},    {"advanced-generator", "apg", "apg", ""},
-        {"resource-processor", "rp", "rp", "rp"}, {"mining-station", "ms", "ms", "ms"},
-        {"sickbay", "sb", "sb", ""},            {"science-station", "", "ss", ""},
-        {"security-center", "sc", "", ""},      {"hydroponics-farm", "hf", "", ""},
-        {"livestock-farm", "", "lf", ""},       {"storage-facility", "sf", "sf", "sf"},
-        {"transporter-pad", "tp", "tp", "tp"},  {"photon-turret", "pt", "", ""},
-        {"colony-hub", "", "ch", ""},           {"disruptor-tank", "", "dt", ""},
-        {"disruptor-turret", "", "sg", ""},
-    };
-    for (const Name& n : kNames)
-        if (event.args[0] == n.building) {
-            const std::string code = side == 'K' ? n.kln : side == 'R' ? n.rom : n.fed;
-            if (code.empty())
-                return {};
-            return std::string(side == 'K' ? "A_" : "B_") + s + code + "com";
-        }
+    const auto* it = std::lower_bound(std::begin(kClips), std::end(kClips), type,
+                                      [](const std::pair<int, const char*>& e, int t) { return e.first < t; });
+    if (it != std::end(kClips) && it->first == type)
+        return it->second;
     return {};
 }
 

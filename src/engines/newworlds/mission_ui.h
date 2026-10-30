@@ -3,10 +3,12 @@
 
 #pragma once
 
+#include "common/audio/mixer.h"
 #include "common/types.h"
 
 #include <algorithm>
 #include <cctype>
+#include <memory>
 #include <string>
 
 // What the missions page's files (mission_*.cpp, MissionViewer's parts)
@@ -61,6 +63,17 @@ inline const BeeModels& beeModels(char side) {
     static constexpr BeeModels kKln{"geo/kln/conbee.geo", "geo/kln/kwb.geo", "geo/kln/kwb.geo", "geo/kln/kwbc.geo"};
     static constexpr BeeModels kRom{"geo/rom/rcb.geo", "geo/rom/rwbc.geo", "geo/rom/rwb.geo", "geo/rom/rc.geo"};
     return side == 'K' ? kKln : side == 'R' ? kRom : kFed;
+}
+
+// One of the game's two speech channels (exe.md#sounds): 0 the
+// buildings' finished clips, 1 the officers' reports. A channel plays one
+// clip at a time: a clip offered while it's still playing is dropped, not
+// cut in on. Whether it started (none for no sound).
+inline bool playOnChannel(audio::Mixer& mixer, audio::SoundHandle& channel, std::shared_ptr<const audio::Sound> sound) {
+    if (mixer.isPlaying(channel) || !sound)
+        return false;
+    channel = mixer.play(std::move(sound), audio::SoundType::Speech);
+    return channel != audio::kNoSound;
 }
 
 } // namespace reluva::newworlds

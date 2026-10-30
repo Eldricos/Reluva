@@ -1064,7 +1064,12 @@ private:
     int scene_ = -1, sceneLeg_ = 0;
     float sceneX_ = 0, sceneY_ = 0, sceneHeading_ = 0;
     uint64_t sceneMs_ = 0;
-    audio::SoundHandle clipHandle_ = audio::kNoSound, musicHandle_ = audio::kNoSound;
+    // The speech channels (exe.md#sounds): clipHandle_ the officers' (1),
+    // which the briefings, the script's messages and announcements and the
+    // vehicles' voices use too; buildingClipHandle_ the finished
+    // buildings' (0).
+    audio::SoundHandle clipHandle_ = audio::kNoSound, buildingClipHandle_ = audio::kNoSound;
+    audio::SoundHandle musicHandle_ = audio::kNoSound;
     std::string musicName_;
 };
 

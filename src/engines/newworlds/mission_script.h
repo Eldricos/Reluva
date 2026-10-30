@@ -238,9 +238,18 @@ private:
 
 // The game's spoken announcement (a stem in Media/Misc) for what a step
 // did, for the side ('F', 'K', 'R'): the mission won or lost, an objective
-// met, power low, production held up (Federation), a building finished
-// (its name, B_f...com, A_k...com, B_r...com); the first of these that
-// applies, or empty. Matched in recordings (docs/formats/newworlds/media.md).
+// met, power low; the first of these that applies, or empty. Matched in
+// recordings (docs/formats/newworlds/media.md). A building finished isn't
+// one: its clip plays whether or not a script hears it
+// (buildingFinishedClip, MissionSim::takeVoices).
 std::string announcementFor(const ScriptEvent& event, const std::vector<MissionRun::Output>& out, char side);
+
+// What the game plays as one of the player's buildings is finished
+// (exe.md#sounds), by the building's type id: its "<name>com" clip in
+// Media/Misc (B_fcycom, A_kvycom, B_rsscom; an upgrade or add-on its base
+// building's, some Romulan buildings the Federation's), a hub and its
+// upgrades their race's officer line 004 (FED004b); empty for a type the
+// game's table hasn't (vehicles, the natives').
+std::string buildingFinishedClip(int type);
 
 } // namespace reluva::newworlds

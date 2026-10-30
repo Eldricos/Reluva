@@ -87,7 +87,7 @@ void MissionViewer::activate() {
 void MissionViewer::deactivate() {
     stopClip();
     if (mixer_)
-        mixer_->stop(musicHandle_);
+        mixer_->stop(musicHandle_), mixer_->stop(buildingClipHandle_);
     musicHandle_ = audio::kNoSound;
 }
 
@@ -348,7 +348,7 @@ void MissionViewer::stopPlay() {
         carried_ = economy_->carried();
     map_.stopFollowing();
     if (mixer_)
-        mixer_->stop(stingHandle_);
+        mixer_->stop(stingHandle_), mixer_->stop(buildingClipHandle_);
     world_ = nullptr, economy_ = nullptr, ai_ = nullptr, fieldWork_ = nullptr;
     research_ = nullptr, effects_ = nullptr, fog_ = nullptr, run_ = nullptr;
     sim_.reset();
@@ -859,13 +859,19 @@ void MissionViewer::stepScript() {
         }
         out = run_->fire(e);
         // The colony grows as the script builds (on the missions page only:
-        // the game's own building is the player's).
+        // the game's own building is the player's), each building with its
+        // clip.
         if (e.kind == "built" && !e.args.empty() && colony_) {
             if (colony_->add(e.args[0]))
                 showColony();
             else
                 walkNote_ += " (not placed)";
         }
+        if (e.kind == "built" && !e.args.empty())
+            if (const std::string clip = finishedClip(e.args[0], side()); !clip.empty()) {
+                speak(clip);
+                walkNote_ += " [" + clip + "]";
+            }
     } else if (run_->nextTimer() >= 0) {
         walkNote_ = "time passes (" + std::to_string(int(run_->nextTimer())) + " s)";
         if (sim_) {
@@ -887,6 +893,9 @@ void MissionViewer::stepScript() {
 
 // What the script said: its messages to the log, the game's spoken
 // announcement for it (Media/Misc), if any, and the outcome in the note.
+// The voice is on the officers' channel, cutting in on what plays there
+// (where the game plays a message's clip isn't known); a building's clip
+// is apart (speak).
 void MissionViewer::deliver(const ScriptEvent& fired, const std::vector<MissionRun::Output>& out) {
     if (playing_ && !out.empty())
         walkNote_ = fired.kind; // in play, the latest that said anything
@@ -937,6 +946,8 @@ void MissionViewer::stopScript() {
     run_ = nullptr;
     walk_.clear();
     log_.clear();
+    if (mixer_)
+        mixer_->stop(buildingClipHandle_);
     startColony();
     redraw();
     updateTitle();

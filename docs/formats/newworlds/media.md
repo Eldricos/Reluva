@@ -59,15 +59,18 @@ tag naming the original file (`F1005.WAV`) and the encoder (SoundJam MP).
 
 WAV files, the same for every mission:
 
-- **Building complete** (`com`), one per building type and side:
-  Klingon `A_k…com` (17: `ka` accommodation, `kams`, `kapg`, `kch` colony
-  hub, `kcy` construction yard, `kdt`, `klf` livestock farm, `kms` mining
+- **Building complete** (`com`), one per building type and side (which
+  type plays which: [exe.md](exe.md#sounds)):
+  Klingon `A_k…com` (17: `ka` security centre, `kams`, `kapg`, `kch`
+  accommodation, `kcy` construction yard, `kdt`, `klf` livestock farm, `kms` mining
   station, `kpg` power generator, `kpht` photon artillery, `krp` resource
-  processor, `ksb` sickbay, `ksf`, `ksg` static gun, `kss` science
+  processor, `ksb` sickbay, `ksf`, `ksg` shield generator, `kss` science
   station, `ktp` transporter pad, `kvy` vehicle yard), Federation
   `B_f…com` (17: `fab`, `fams`, `fapg`, `fcy`, `fhf` hydroponics farm,
-  `fms`, `fpg`, `fpht`, `fpt`, `frp`, `fsb`, `fsby`, `fsc`, `fsf`, `fsg`,
-  `ftp`, `fvy`), Romulan `B_r…com` (10). `fed01.stb`'s "Vehicle yard
+  `fms`, `fpg`, `fpht`, `fpt`, `frp`, `fsb` science station, `fsby`
+  sickbay, `fsc`, `fsf`, `fsg`, `ftp`, `fvy`), Romulan `B_r…com` (10; the
+  Romulans' power, shield, security, defence and farm buildings play the
+  Federation's). `fed01.stb`'s "Vehicle yard
   completed, Sir." is such a message.
 - **Events**, per side (`f`, `k`, `r`): `atckvoc` (under attack),
   `lowpowr` (low power), `miswin` / `mislose` (mission won / lost),
@@ -128,10 +131,10 @@ plays them; `reluva-tool wav-info` and `wav-decode` take MP3s too. The
 missions page plays each mission's voice clips and its planet's theme (see
 [level.md](level.md#in-reluva)). The voice
 MP3s decode to within 1 of ffmpeg's samples. Stepping through a mission's
-script (**X**), it plays the side's announcement for each step: the
-building's name as it's finished, power low, production held up, an
-objective met, the mission won or lost (`announcementFor` in
-`mission_script.h`).
+script (**X**), it plays the side's announcement for each step: power
+low, an objective met, the mission won or lost (`announcementFor` in
+`mission_script.h`); and, apart, a building's clip as it's finished, as
+in play (`buildingFinishedClip`, [exe.md](exe.md#sounds)).
 
 ## Open questions
 

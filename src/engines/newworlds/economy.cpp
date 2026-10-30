@@ -1256,9 +1256,9 @@ void Economy::buildTick(std::vector<ScriptEvent>& out) {
                 if (!b.cargo && !b.worker && b.site == s.id)
                     b.site = 0, b.working = false;
             s.stored = t->bufferCap;
+            // (Its clip, a hub's officer line 004 among them, MissionSim's:
+            // finishedClip.)
             out.push_back({"built", {s.type}});
-            if (s.type == "colony-hub")
-                out.push_back({"officer", {"004"}}); // a hub finished: Engineering's line
             requestCrew(s);
         }
     }

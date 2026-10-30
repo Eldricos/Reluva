@@ -458,9 +458,10 @@ needs to work; housing the crew it holds (the hub 150, accommodation 200).
     worker bee of its own, free, which counts (the yards are the same kind
     of agent as the mines): so a start is its placements (the human-only
     and AI-only filter applied: J3, J6) plus one per such building. That
-    gives 17 of 22 recorded starts exactly (F1 20, J8F 41, J4K 47, C10 47
-    ...); K2 reads one lower, and J1K, K7 and J7K 9-10 lower, which nothing
-    in the executable explains.
+    gives all 22 recorded starts (F1 20, J8F 41, J4K 47, C10 47 ...). In
+    the recordings' small panel font a 3 and a 2 differ by a few pixels,
+    and five starts were first read with a 3 taken for a 2 (J1K, K7, J7K,
+    K2; J9R read after a site was placed).
   - **b** is set to 50 once, when the program starts, and never reset: no
     mission or script sets it. Housing raises it as it's made (a site as
     it's placed, or a starting placement): accommodation 5, a farm
@@ -1391,7 +1392,39 @@ materials), 002 a building delayed for want of materials, 003 an
 upgrade delayed, 004 a colony hub finished, 005 a vehicle finished, 006
 a yard's power below 0.2 (production suspended), 008 back above 0.35
 (007 never plays). Each report at most once in 600 ms; none plays over
-one already playing. A finished building of the player's hit plays the
+one already playing.
+
+**A building finished.** As a construction site of the player's side is
+finished (any building, upgrade or add-on: the site's finaliser,
+0x5f2d84-0x5f2f58, whatever the mission's script does), its type id
+picks one clip from a table (0x5f3040, types 15-315, into the jump table
+at 0x5f2f80); a type not in it plays nothing, and no message goes to the
+comms log. Upgrades and add-ons play their base building's clip, and the
+hubs and their upgrades the officers' 004 instead:
+
+| Types | Clip |
+|---|---|
+| hubs: Federation 23, 159, 160 / Klingon 28, 49, 168, 169 / Romulan 43, 174, 175 | `FED004b` / `KLI004b` / `ROM004a` |
+| Federation construction yard 77, 161, 162; vehicle yard 24, 146, 147 (and 17); resource processor 26, plants 166, 167; storage facility 122 (and 25); transporter pad 27; accommodation 44 | `B_fcycom`, `B_fvycom`, `B_frpcom`, `B_fsfcom`, `B_ftpcom`, `B_fabcom` |
+| Federation mining station 45, advanced 163; power generator 22, advanced 158; shield generator 21; security centre 16 (and 15); defensive weapon 80, artillery 83; farm 171 | `B_fmscom`, `B_famscom`, `B_fpgcom`, `B_fapgcom`, `B_fsgcom`, `B_fsccom`, `B_fptcom`, `B_fphtcom`, `B_fhfcom` |
+| Federation science station 126, labs 164, 293-297; sickbay 123, wards 165, 298-301 | `B_fsbcom`, `B_fsbycom` |
+| Klingon construction yard 53, 191, 192; vehicle yard 31, 183; processor 51, 190; storage 32; pad 73; accommodation 68; security centre 75 | `A_kcycom`, `A_kvycom`, `A_krpcom`, `A_ksfcom`, `A_ktpcom`, `A_kchcom`, `A_kacom` |
+| Klingon mining 52, advanced 189; power 30, advanced 172; shield 29; defensive weapon 54, artillery 82; farm 50; science 127, 184-186, 302-304; sickbay 124, 187, 188, 305, 306 | `A_kmscom`, `A_kamscom`, `A_kpgcom`, `A_kapgcom`, `A_ksgcom`, `A_kdtcom`, `A_kphtcom`, `A_klfcom`, `A_ksscom`, `A_ksbcom` |
+| Romulan construction yard 78, 176; vehicle yard 71, 177; processor 121, 181; storage 66 (and 76); pad 72; accommodation 67; mining 65, advanced 173; science 128, 179, 307-311; sickbay 125, 180, 312-315 | `B_rcycom`, `B_rvycom`, `B_rrpcom`, `B_rsfcom`, `B_rtpcom`, `B_rrescom`, `B_rmscom`, `B_ramscom`, `B_rsscom`, `B_rsbcom` |
+| Romulan power 70, advanced 178, shield 69, security centre 74, defensive weapon 81, artillery 84, farm 182: the Federation's | `B_fpgcom`, `B_fapgcom`, `B_fsgcom`, `B_fsccom`, `B_fptcom`, `B_fphtcom`, `B_fhfcom` |
+
+(15, 17, 25 and 76 have no name in the type tables.) The clip follows the
+building's type, not the player's race (in practice the same). The
+computer's and natives' sides are silent. A vehicle finished is one
+line for every type, the race's 005, again only the player's.
+
+**Two speech channels.** The officers' reports (001-008 as above, but
+004) play on stream channel 1 (0x4dee90), the finished buildings' clips,
+the hubs' 004 among them, on channel 0 (0x4dee00); each only with the
+voice option on, and dropped if its own channel is still playing (nothing
+is cut short), so a building's clip and an officer's report can be heard
+together. Which channel a script message's clip, the events' clips
+(`lowpowr`, `objmet`, ...) and the "under attack" voice use isn't known. A finished building of the player's hit plays the
 colony's danger music (Media/Music: `fedcoldanger`, `klinColonydan`,
 `RomColonyInDangr`) and its "under attack" voice, at most once in 30
 seconds. Other sides' reports are never heard.
@@ -1409,6 +1442,15 @@ off; panned by how far to the side it lies; one at a time (a new one
 stops the last). Reluva listens from the camera's spot on the ground.
 Vehicles' start-up clips are their drives', played as their moves start
 (above).
+
+In Reluva (`buildingFinishedClip` in `mission_script.h`, by the side's
+type of the building's name, an upgrade's base's; `MissionSim::takeVoices`,
+`MissionViewer::speak`, `playOnChannel` in `mission_ui.h`): the clip goes
+with the economy's every finished building, script or none; the officers'
+channel is also the briefings', the script's messages' and events', and
+the vehicles' voices' (which, as before, don't start over a clip playing
+there; a message's clip still cuts in on it), the buildings' channel is
+theirs alone.
 
 The executable's sound table pairs each resource id (archive number <<
 24 | the entry's index in it) with a side filter and the slot it fills.

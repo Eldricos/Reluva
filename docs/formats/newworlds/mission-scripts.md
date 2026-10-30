@@ -41,7 +41,9 @@ recordings now serve to check them. The scripts are text files in
   (`built ground-scout`), other colonies' objects with their race
   (`klingon-disruptor-tank`), the natives' as they are (`hubrin`,
   `taubat-temple`), labels (the placements', and a beamed-in group by its
-  order: `destroyed orion-attack2j`), and the raids' labels for scans and
+  order: `destroyed orion-attack2j`; the player's starting buildings carry
+  theirs too, whatever runs them, the economy's included: C9's `mine1`,
+  R8's `primary-colony-building`), and the raids' labels for scans and
   captures (`metar-colony-hub`). A test checks every handler's names
   against these for each mission and side. Two of the game's upgrades
   aren't in the economy yet: J6's sickbay ward stands in as the sickbay it

@@ -25,6 +25,7 @@
 #include "engines/newworlds/mdl.h"
 #include "engines/newworlds/mission_script.h"
 #include "engines/newworlds/mission_sim.h"
+#include "engines/newworlds/mission_ui.h"
 #include "engines/newworlds/placement.h"
 #include "engines/newworlds/model_pose.h"
 #include "engines/newworlds/model_textures.h"
@@ -765,10 +766,28 @@ void testMissionScripts() {
     CHECK(out.size() == 1 && out[0].text == "The mine at 404, 220 has run out of minerals.");
     out = f1.fire({"built", {"vehicle-yard"}});
     CHECK(!out.empty() && out[0].text == "Vehicle yard finished.");
-    // The game's spoken announcements.
-    CHECK(announcementFor({"built", {"construction-yard"}}, {}, 'F') == "B_fcycom");
-    CHECK(announcementFor({"built", {"accommodation"}}, {}, 'K') == "A_kacom");
-    CHECK(announcementFor({"built", {"sickbay"}}, {}, 'R').empty());
+    // The game's spoken announcements; a building finished isn't one.
+    CHECK(announcementFor({"built", {"construction-yard"}}, {}, 'F').empty());
+    // A building's own clip as it's finished (exe.md#sounds), by type
+    // id: the hubs and their upgrades the officers' 004, an upgrade its
+    // base's, the Romulans' shield generator the Federation's; none for
+    // a vehicle.
+    CHECK(buildingFinishedClip(77) == "B_fcycom" && buildingFinishedClip(161) == "B_fcycom");
+    CHECK(buildingFinishedClip(23) == "FED004b" && buildingFinishedClip(169) == "KLI004b" &&
+          buildingFinishedClip(175) == "ROM004a");
+    CHECK(buildingFinishedClip(123) == "B_fsbycom" && buildingFinishedClip(126) == "B_fsbcom");
+    CHECK(buildingFinishedClip(68) == "A_kchcom" && buildingFinishedClip(75) == "A_kacom");
+    CHECK(buildingFinishedClip(69) == "B_fsgcom" && buildingFinishedClip(182) == "B_fhfcom" &&
+          buildingFinishedClip(67) == "B_rrescom");
+    CHECK(buildingFinishedClip(163) == "B_famscom" && buildingFinishedClip(315) == "B_rsbcom");
+    CHECK(buildingFinishedClip(56).empty() && buildingFinishedClip(14).empty() && buildingFinishedClip(316).empty());
+    // By a side's building's name: an upgrade or add-on its base's.
+    CHECK(finishedClip("construction-yard", 'F') == "B_fcycom" && finishedClip("accommodation", 'K') == "A_kchcom");
+    CHECK(finishedClip("colony-hub", 'F') == "FED004b" && finishedClip("colony-hub-advanced", 'R') == "ROM004a");
+    CHECK(finishedClip("vehicle-yard-upgrade", 'K') == "A_kvycom" && finishedClip("energy-lab", 'R') == "B_rsscom");
+    CHECK(finishedClip("power-generator", 'R') == "B_fpgcom" && finishedClip("farm", 'F') == "B_fhfcom");
+    CHECK(finishedClip("defensive-artillery", 'K') == "A_kphtcom" && finishedClip("sickbay", 'R') == "B_rsbcom");
+    CHECK(finishedClip("ground-scout", 'F').empty() && finishedClip("taubat-temple", 'F').empty());
     CHECK(announcementFor({"power-low", {}}, {}, 'K') == "klowpowr");
     CHECK(announcementFor({"short-crew", {}}, {}, 'F').empty()); // the officers say it (MissionSim::takeVoices)
     // The vehicles' voices: selected, ordered, refusing.
@@ -3084,7 +3103,10 @@ void testStartingColonySize() {
                            Start{"J3", 'K', 24, 50}, Start{"J4", 'K', 47, 50}, Start{"K8", 'K', 28, 50},
                            Start{"J6", 'K', 47, 90}, Start{"J8", 'K', 41, 50}, Start{"K14", 'K', 55, 70},
                            Start{"J9", 'K', 35, 50}, Start{"C10", 'K', 47, 50}, Start{"R1", 'R', 17, 50},
-                           Start{"R2", 'R', 22, 50}, Start{"R8", 'R', 53, 50}, Start{"R9", 'R', 19, 50}}) {
+                           Start{"R2", 'R', 22, 50}, Start{"R8", 'R', 53, 50}, Start{"R9", 'R', 19, 50},
+                           // (first misread with a 3 taken for a 2: play-kli-lp.md#starting-colonies)
+                           Start{"J1", 'K', 35, 50}, Start{"K7", 'K', 30, 50}, Start{"J7", 'K', 35, 50},
+                           Start{"K2", 'K', 23, 50}, Start{"J9", 'R', 38, 50}}) {
         MissionSim sim(w.mission, w.side, t, map, 64, 64, MissionSim::placedColony(w.mission, w.side));
         sim.advance(0.1);
         CHECK(sim.economy().colonySize() == w.size);
@@ -3585,6 +3607,62 @@ void testOfficersAndUpgrades() {
     CHECK(sim.fieldWork().aboard(bay).empty() && sim.fieldWork().skill(bay, 3) == 0);
 }
 
+// A finished building's clip (exe.md#sounds), on the colony's voices
+// whether or not the script hears it: each building its own, an upgrade
+// its base's (a hub's the officers' 004), as each is finished.
+void testFinishedClips() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    std::vector<ColonyBuilding> colony = MissionSim::placedColony("F1", 'F');
+    CHECK(!colony.empty() && colony[0].name == "colony-hub");
+    // F1's colony with no script at all (every mission's generic rules
+    // speak for every building finished).
+    MissionSim sim("X1", 'F', t, map, 64, 64, colony);
+    CHECK(!sim.run());
+    sim.advance(0.1);
+    CHECK(sim.takeVoices().empty()); // (the starting colony stands already)
+    const ColonyStructure* hub = sim.economy().hub();
+    CHECK(hub != nullptr);
+    if (!hub)
+        return;
+    const float hx = hub->x, hy = hub->y;
+    sim.economy().setFree(true);
+    sim.economy().setBees(8, 0); // (the mission's own start with none)
+    CHECK(sim.placeUpgrade("colony-hub-upgrade", "", colony[0].a, colony[0].b, hx, hy) >= 0);
+    CHECK(sim.placeUpgrade("power-generator", "", colony[0].a, colony[0].b + 16, hx + 2 * 16384, hy) >= 0);
+    std::vector<std::string> heard;
+    for (int i = 0; i < 1200 && heard.size() < 2; ++i) {
+        sim.advance(0.5);
+        for (std::string& v : sim.takeVoices())
+            if (v.size() > 3 && v != "attack") // (not the officers' numbered reports)
+                heard.push_back(std::move(v));
+    }
+    std::sort(heard.begin(), heard.end());
+    CHECK(heard == std::vector<std::string>({"B_fpgcom", "FED004b"}));
+    // The two speech channels: a clip offered to a busy one is dropped (the
+    // one playing goes on); the other channel is free all the while.
+    audio::Mixer mixer(22050);
+    auto clip = [](size_t frames) {
+        auto c = std::make_shared<audio::Sound>();
+        c->rate = 22050, c->channels = 1, c->samples.assign(frames, 1000);
+        return std::shared_ptr<const audio::Sound>(c);
+    };
+    audio::SoundHandle buildings = audio::kNoSound, officers = audio::kNoSound;
+    CHECK(playOnChannel(mixer, buildings, clip(100)));
+    const audio::SoundHandle first = buildings;
+    CHECK(!playOnChannel(mixer, buildings, clip(100)) && buildings == first && mixer.isPlaying(first));
+    CHECK(playOnChannel(mixer, officers, clip(10)) && mixer.isPlaying(first));
+    CHECK(!playOnChannel(mixer, officers, nullptr));
+    std::vector<int16_t> out(2 * 120);
+    mixer.mix(out.data(), 120);
+    CHECK(!mixer.isPlaying(first) && playOnChannel(mixer, buildings, clip(10)));
+}
+
 // The transports with the hub lost (exe.md#transports): one on its way
 // home stops where it is and stands there, still one of the side's
 // transports; none is housed.
@@ -4054,6 +4132,70 @@ void testRivalPowerGenerator() {
     }));
 }
 
+// A labelled building of the player's starting colony, whatever owns it
+// (the economy's storage facility, processor and construction yard, C5),
+// carries its placement's label: destroyed, it's heard by that name as well
+// as its type's, so a script's handler for the label runs. And the script's
+// effects find it by it: C9's timed hits on its two mines.
+void testColonyLabels() {
+    Terrain t;
+    t.width = t.height = 128;
+    t.moveClass.assign(size_t(t.width) * size_t(t.height), 1);
+    t.heightAt = [](float, float) { return 0.0f; };
+    ColonyMap map;
+    map.depositKind = [](int, int) { return 0; };
+    map.depositAmount = [](int, int) { return 0; };
+    MissionSim c5("C5", 'F', t, map, 64, 64, MissionSim::placedColony("C5", 'F'));
+    const std::vector<std::pair<std::string, std::string>> labelled{
+        {"material-storage", "storage-facility"}, {"resource-proc", "resource-processor"}, {"con-yard", "construction-yard"}};
+    std::vector<MissionScript> scripts;
+    CHECK(!parseMissionScripts("mission T F\n"
+                               "on destroyed material-storage\n  say operations \"store gone\"\n"
+                               "on destroyed resource-proc\n  say operations \"processor gone\"\n"
+                               "on destroyed con-yard\n  say operations \"yard gone\"\n",
+                               scripts));
+    CHECK(scripts.size() == 1);
+    if (scripts.size() != 1)
+        return;
+    MissionRun run(scripts[0], nullptr);
+    std::set<std::string> heard;
+    for (const auto& [label, type] : labelled) {
+        int id = 0;
+        for (const Unit& u : c5.world().units())
+            if (u.label == label && u.slot == c5.playerSlot())
+                id = u.id;
+        CHECK(id > 0);
+        // One of the colony's own, in the economy.
+        const auto& objects = c5.colonyObjects();
+        const auto it = std::find(objects.begin(), objects.end(), id);
+        CHECK(it != objects.end() && c5.colony()[size_t(it - objects.begin())].name == type);
+        if (Unit* u = id ? c5.world().unit(id) : nullptr)
+            u->hp = 0;
+        c5.advance(0.05);
+        for (const WorldEvent& e : c5.takeEvents())
+            if (e.kind == WorldEvent::Destroyed && e.what.id == id) {
+                const auto names = scriptNames(e.what, c5.playerSlot());
+                CHECK(std::find(names.begin(), names.end(), type) != names.end());
+                for (const std::string& n : names) // one event per name, as AiSides::observe() reports it
+                    for (const MissionRun::Output& o : run.fire({"destroyed", {n}}))
+                        heard.insert(o.text);
+            }
+    }
+    CHECK((heard == std::set<std::string>{"store gone", "processor gone", "yard gone"}));
+
+    MissionSim c9("C9", 'F', t, map, 64, 64, MissionSim::placedColony("C9", 'F'));
+    std::map<std::string, int> mines;
+    for (const Unit& u : c9.world().units())
+        if (u.slot == c9.playerSlot() && u.name == "mining-station" && !u.label.empty())
+            mines[u.label] = u.id;
+    CHECK(mines.size() == 3 && mines.count("mine1") && mines.count("mine2"));
+    const float full = mines.count("mine1") ? c9.world().unit(mines["mine1"])->hp : 0;
+    c9.fireScript({"timer", {"mine1-hit"}});
+    const Unit* hit = mines.count("mine1") ? c9.world().unit(mines["mine1"]) : nullptr;
+    const Unit* spared = mines.count("mine2") ? c9.world().unit(mines["mine2"]) : nullptr;
+    CHECK(hit && spared && hit->hp < full && spared->hp == full);
+}
+
 // The lookups and caches the simulation's hot paths use give what the
 // plain scans did: type by id and by name, repairs forgetting units that
 // are gone, the AI's counts noticing each kind of change.
@@ -4432,6 +4574,7 @@ int main() {
     testCombat();
     testAiSides();
     testFieldWork();
+    testColonyLabels();
     testResearch();
     testVehicleProduction();
     testCrew();
@@ -4460,6 +4603,7 @@ int main() {
     testCorruptReaders();
     testSpawnOwnType();
     testOfficersAndUpgrades();
+    testFinishedClips();
     testTransportsWithoutHub();
     testPodsOfLostBuildings();
     testKlingonPods();

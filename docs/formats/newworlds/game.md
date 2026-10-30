@@ -137,8 +137,9 @@ Alt + A, P, S, M, E and C (and Y) give the playbook's orders without it.
   building rising out of it, the bees at work at its corners playing
   their `manipulate` animation (`fconbee`, `conbee`, `rcb`), and the
   others flying. When it's done, the script hears `built <type>`
-  (Engineering's message, the game's spoken announcement; a hub the
-  officer's report instead). The officers' other reports (delays, a
+  (Engineering's message), and the building's clip plays, script or
+  none ([exe.md](exe.md#sounds): its type's, an upgrade its base's, a
+  hub the officers' 004), on its own channel. The officers' other reports (delays, a
   vehicle finished, a yard suspended and back), the "under attack"
   voice, and the vehicles' answers to being selected, ordered or unable
   to go are heard as [exe.md](exe.md#sounds) gives them. Upgrades

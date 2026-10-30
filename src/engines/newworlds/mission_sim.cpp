@@ -13,6 +13,7 @@
 #include <cctype>
 #include <cmath>
 #include <cstdio>
+#include <set>
 #include <tuple>
 
 namespace reluva::newworlds {
@@ -195,6 +196,33 @@ std::vector<ColonyBuilding> headlessColony(std::string_view mission, char side) 
     return out;
 }
 
+// The labels the side's own placements give the colony's starting buildings
+// (C9's "mine1", R8's "primary-colony-building"), whatever owns them (the
+// economy, or nothing but the world): each labelled placement on the
+// nearest unlabelled building of its type within a block of it (the
+// colony stands on its footprints' middles). The placements used go in
+// claimed.
+std::vector<std::string> colonyLabels(const std::vector<ColonyBuilding>& colony, std::string_view mission, int slot,
+                                      std::set<const SidePlacement*>& claimed) {
+    std::vector<std::string> out(colony.size());
+    for (const SidePlacement* p : sidePlacements(mission, slot)) {
+        const ObjectType* t = objectType(p->type);
+        if (!t || !t->building || !*p->label)
+            continue;
+        size_t best = colony.size();
+        int bestDistance = 8 + 1; // a block, in map positions, and one
+        for (size_t i = 0; i < colony.size(); ++i)
+            if (const int d = std::abs(colony[i].a - p->a) + std::abs(colony[i].b - p->b);
+                out[i].empty() && colony[i].name == t->name && d < bestDistance)
+                best = i, bestDistance = d;
+        if (best < colony.size()) {
+            out[best] = p->label;
+            claimed.insert(p);
+        }
+    }
+    return out;
+}
+
 } // namespace
 
 MissionSim::MissionSim(std::string_view mission, char side, const Ground& ground)
@@ -237,8 +265,10 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         return v && economy_->orderVehicle(*v);
     });
     ai_->start();
+    std::set<const SidePlacement*> labelled;
+    const std::vector<std::string> labels = colonyLabels(colony_, mission_, player_, labelled);
     for (size_t i = 0; i < colony_.size(); ++i)
-        spawnColonyObject(i);
+        spawnColonyObject(i, labels[i]);
     script_ = findMissionScript(mission_, side_);
     fieldWork_ = std::make_unique<FieldWork>(mission_, player_, *world_,
                                              script_ ? script_->sites : std::map<std::string, std::pair<int, int>>{});
@@ -306,9 +336,10 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
         }
     }
     // The player's own named objects the colony doesn't cover (K7's escape
-    // pods): placed for the scripts.
+    // pods): placed for the scripts. (The colony's own carry their labels.)
     for (const SidePlacement* p : sidePlacements(mission_, player_))
-        if (const CombatType* t = combatType(p->type); t && *p->label && t->building && !buildingType(t->name)) {
+        if (const CombatType* t = combatType(p->type);
+            t && *p->label && t->building && !buildingType(t->name) && !labelled.count(p)) {
             const auto [x, y] = worldAt(p->a, p->b);
             spawnObject(*world_, player_, side_, *t, x, y, p->label, p->model, true);
         }
@@ -351,6 +382,12 @@ MissionSim::MissionSim(std::string_view mission, char side, Terrain terrain, Col
     }
 }
 
+std::string finishedClip(const std::string& building, char side) {
+    const BuildingType* b = buildingType(building);
+    const CombatType* t = typeNamed(b && !b->upgradeOf.empty() ? b->upgradeOf : building, side, true);
+    return t && t->race == side ? buildingFinishedClip(t->id) : std::string();
+}
+
 // A colony building as something the other sides can shoot at (its
 // side's type of that name).
 namespace {
@@ -361,13 +398,13 @@ const CombatType* buildingOfSide(const std::string& name, char side) {
 }
 } // namespace
 
-void MissionSim::spawnColonyObject(size_t index) {
+void MissionSim::spawnColonyObject(size_t index, const std::string& label) {
     if (colonyObjects_.size() <= index)
         colonyObjects_.resize(index + 1, 0);
     const ColonyBuilding& c = colony_[index];
     if (const CombatType* t = buildingOfSide(c.name, side_)) {
         const auto [x, y] = worldAt(c.a, c.b);
-        colonyObjects_[index] = spawnObject(*world_, player_, side_, *t, x, y, {}, c.model, true);
+        colonyObjects_[index] = spawnObject(*world_, player_, side_, *t, x, y, label, c.model, true);
     }
 }
 
@@ -598,6 +635,11 @@ void MissionSim::step() {
             voices_.push_back(e.args.empty() ? std::string() : e.args[0]);
             continue;
         }
+        // A building finished: its clip, whether or not the script hears
+        // it (the economy's are the player's alone).
+        if (e.kind == "built" && !e.args.empty())
+            if (std::string clip = finishedClip(e.args[0], side_); !clip.empty())
+                voices_.push_back(std::move(clip));
         // A vehicle finished: the script hears built <type> as it rolls
         // out (rollOut), by the name it knows it by, not the panel's.
         if (e.kind == "vehicle-built")

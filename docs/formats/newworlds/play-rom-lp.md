@@ -111,14 +111,14 @@ the earlier Romulan pages took for the start):
 | R12 | 43/50 | 800 / 1750 / 2300 / 1000 / 24000 / 25000 | none |
 | J8R | 41/50 after an early order | the top-up | yes |
 | R14 | 58/80 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | yes |
-| J9R | 39/50 | the data's (the 988 / 2211 / 497 / 3500 elsewhere is the stock after a construction yard ordered 3 s in) | none |
+| J9R | 38/50 (39 read 3 s in, after a construction yard was placed) | the data's (the 988 / 2211 / 497 / 3500 elsewhere is the stock after a construction yard ordered 3 s in) | none |
 | C11 | 27/50 (28 after a yard ordered) | 500 / 1000 / 2300 / 500 / 4000 / 5000 | none |
 
 Every capacity starts at 50 but where starting housing raises it, not the
 90 of several Romulan pages (those were later readings). Reluva's starts
 match all of these, colony size and stock, with the executable's rule
-([exe.md](exe.md#the-economy)), J9R apart: it reads one more than the rule
-gives, as K2 did.
+([exe.md](exe.md#the-economy)). J9R's 39 was read after a construction
+yard was placed; its start is 38.
 
 ## Messages worth noting
 

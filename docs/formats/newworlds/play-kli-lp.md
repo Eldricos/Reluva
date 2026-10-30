@@ -69,15 +69,15 @@ The NEW WORLDS panel in the first second of play:
 | Mission | Colony | Stock (dil / poly / thermo / trans / nit / dur) | Against the data |
 |---|---|---|---|
 | K1 | 22/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
-| K2 | 22/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
-| J1K | 25/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
+| K2 | 23/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
+| J1K | 35/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
 | J2K | 25/55 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
 | J3K | 24/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
-| K7 | 20/50 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
+| K7 | 30/50 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
 | J4K | 47/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
 | K8 | 28/50 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
 | J6K | 47/90 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
-| J7K | 26/50 | 150 / 1000 / 2300 / 200 / 4000 / 10000 | the same |
+| J7K | 35/50 | 150 / 1000 / 2300 / 200 / 4000 / 10000 | the same |
 | J8K | 41/50 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
 | K14 | 55/70 | 660 / 1160 / 2300 / 660 / 5600 / 6600 | topped up |
 | J9K | 35/50 | 500 / 1000 / 2300 / 500 / 4000 / 5000 | the same |
@@ -97,11 +97,12 @@ The colony sizes these starts show led to the executable's rule
 transports, a free worker bee for each yard, storage facility, processor
 and mine, and starting housing counted twice in the capacity (the
 briefing's scene makes it once more). Reluva now counts so, and starts
-J2K, J3K, J4K, K1, K8, J6K, J8K, K14, J9K and C10 as recorded. **K2 reads
-one lower than the rule gives, and J1K, K7 and J7K 9-10 lower** (J1K
-25/50 for 35, K7 20/50 for 30, J7K 26/50 for 35); nothing in the
-executable takes anything off at the start, so another version's data, a
-loaded save or a reading after the start are the likely causes. K2's 90
+all fourteen as recorded. Four were first misread, a 3 taken for a 2
+(the panel's small font, scaled down, tells them apart by a few pixels;
+compared against frames of known digits): J1K 35/50 (not 25; it goes on
+36, 39, 40), K7 30/50 (another play shows 31 eleven seconds in), J7K
+35/50 and K2 23/50. J3K's "falls by about 10" at 8:34 is the same
+misreading. K2's 90
 in [play-k2.md](play-k2.md) is a later reading: the capacity grows with
 the buildings (here 50 at the start, 60 by 16:39, 70 by 22:55, 85 by
 27:46).
